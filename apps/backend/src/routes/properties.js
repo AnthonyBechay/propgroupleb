@@ -144,12 +144,24 @@ router.get('/', async (req, res) => {
     // Build where clause
     const where = {};
 
+    // By default, only show PUBLIC properties unless visibility is explicitly specified
+    if (visibility) {
+      where.visibility = visibility;
+    } else {
+      where.visibility = 'PUBLIC';
+    }
+
+    // Only show available properties by default
+    if (availabilityStatus) {
+      where.availabilityStatus = availabilityStatus;
+    } else {
+      where.availabilityStatus = 'AVAILABLE';
+    }
+
     if (country) where.country = country;
     if (city) where.city = { contains: city, mode: 'insensitive' };
     if (propertyType) where.propertyType = propertyType;
     if (status) where.status = status;
-    if (availabilityStatus) where.availabilityStatus = availabilityStatus;
-    if (visibility) where.visibility = visibility;
     if (furnishingStatus) where.furnishingStatus = furnishingStatus;
     if (isGoldenVisaEligible !== undefined) where.isGoldenVisaEligible = isGoldenVisaEligible;
     if (featured !== undefined) where.featured = featured;

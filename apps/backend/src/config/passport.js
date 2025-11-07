@@ -13,28 +13,35 @@ passport.use(
     },
     async (email, password, done) => {
       try {
+        // Normalize email to lowercase
+        const normalizedEmail = email.toLowerCase().trim();
+        
         // Find user by email
         const user = await prisma.user.findUnique({
-          where: { email: email.toLowerCase() }
+          where: { email: normalizedEmail }
         });
 
         if (!user) {
+          console.log(`[Auth] User not found: ${normalizedEmail}`);
           return done(null, false, { message: 'Invalid email or password' });
         }
 
         // Check if account is active
         if (!user.isActive || user.bannedAt) {
+          console.log(`[Auth] Account inactive or banned: ${normalizedEmail}`);
           return done(null, false, { message: 'Account is inactive or banned' });
         }
 
         // Verify password
         if (!user.password) {
+          console.log(`[Auth] No password set for user: ${normalizedEmail}`);
           return done(null, false, { message: 'Please sign in with Google' });
         }
 
         const isValidPassword = await bcrypt.compare(password, user.password);
 
         if (!isValidPassword) {
+          console.log(`[Auth] Invalid password for user: ${normalizedEmail}`);
           return done(null, false, { message: 'Invalid email or password' });
         }
 
@@ -44,8 +51,10 @@ passport.use(
           data: { lastLoginAt: new Date() }
         });
 
+        console.log(`[Auth] Successful login: ${normalizedEmail}`);
         return done(null, user);
       } catch (error) {
+        console.error('[Auth] Login error:', error);
         return done(error);
       }
     }

@@ -24,6 +24,9 @@ function LoginForm() {
   const searchParams = useSearchParams()
   const next = searchParams.get('next') || '/'
   const { signIn, user, loading } = useAuth()
+  
+  // Track if we've already checked for redirect to prevent loops
+  const [hasCheckedRedirect, setHasCheckedRedirect] = useState(false)
 
   const [isLoading, setIsLoading] = useState(false)
   const [isGoogleLoading, setIsGoogleLoading] = useState(false)
@@ -37,23 +40,28 @@ function LoginForm() {
     },
   })
 
-  // Check if already logged in
+  // Check if already logged in - optimized to prevent unnecessary re-renders
   useEffect(() => {
-    if (user && !loading) {
-      // Only redirect if user is active and not banned
-      if (!user.isActive || user.bannedAt) {
-        router.push('/auth/banned')
-        return
-      }
+    // Only check once after loading completes
+    if (!loading && !hasCheckedRedirect) {
+      setHasCheckedRedirect(true)
+      
+      if (user) {
+        // Only redirect if user is active and not banned
+        if (!user.isActive || user.bannedAt) {
+          router.push('/auth/banned')
+          return
+        }
 
-      // Redirect based on role
-      if (user.role === 'SUPER_ADMIN' || user.role === 'ADMIN') {
-        router.push('/admin')
-      } else {
-        router.push(next)
+        // Redirect based on role
+        if (user.role === 'SUPER_ADMIN' || user.role === 'ADMIN') {
+          router.push('/admin')
+        } else {
+          router.push(next)
+        }
       }
     }
-  }, [user, loading, router, next])
+  }, [user, loading, router, next, hasCheckedRedirect])
 
   const handleGoogleLogin = async () => {
     setIsGoogleLoading(true)
@@ -98,14 +106,8 @@ function LoginForm() {
     }
   }
 
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#0a1628] via-[#0f2439] to-[#1e293b]">
-        <Loader2 className="h-8 w-8 animate-spin text-cyan-400" />
-      </div>
-    )
-  }
-
+  // Show login form immediately, don't wait for auth check
+  // This prevents the 2-minute delay issue
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#0a1628] via-[#0f2439] to-[#1e293b] py-12 px-4 sm:px-6 lg:px-8">
       {/* Background Effects */}

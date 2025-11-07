@@ -11,7 +11,14 @@ async function main() {
   
   const superAdmin = await prisma.user.upsert({
     where: { email: 'admin@propgroup.com' },
-    update: {},
+    update: {
+      // Update password and ensure user is active and verified
+      password: hashedPassword,
+      role: 'SUPER_ADMIN',
+      isActive: true,
+      emailVerifiedAt: new Date(),
+      provider: 'local'
+    },
     create: {
       email: 'admin@propgroup.com',
       password: hashedPassword,
@@ -19,7 +26,8 @@ async function main() {
       lastName: 'Admin',
       role: 'SUPER_ADMIN',
       isActive: true,
-      emailVerifiedAt: new Date()
+      emailVerifiedAt: new Date(),
+      provider: 'local'
     }
   });
 
@@ -107,18 +115,24 @@ async function main() {
         description: 'Stunning 3-bedroom penthouse with panoramic sea views in the heart of Limassol. Features modern amenities and premium finishes.',
         price: 850000,
         currency: 'EUR',
+        propertyType: 'PENTHOUSE',
         bedrooms: 3,
         bathrooms: 2,
         area: 120,
         country: 'CYPRUS',
+        city: 'Limassol',
         status: 'NEW_BUILD',
+        availabilityStatus: 'AVAILABLE',
+        visibility: 'PUBLIC',
         isGoldenVisaEligible: true,
+        featured: true,
         images: [
           'https://example.com/penthouse1.jpg',
           'https://example.com/penthouse2.jpg'
         ],
         developerId: developers[0].id,
-        locationGuideId: locationGuides[0].id
+        locationGuideId: locationGuides[0].id,
+        publishedAt: new Date()
       }
     }),
     prisma.property.upsert({
@@ -129,18 +143,25 @@ async function main() {
         description: 'Beautiful traditional villa with private pool, perfect for vacation rental or permanent residence.',
         price: 1200000,
         currency: 'EUR',
+        propertyType: 'VILLA',
         bedrooms: 4,
         bathrooms: 3,
         area: 200,
         country: 'GREECE',
+        city: 'Mykonos',
         status: 'RESALE',
+        availabilityStatus: 'AVAILABLE',
+        visibility: 'PUBLIC',
         isGoldenVisaEligible: true,
+        hasPool: true,
+        featured: true,
         images: [
           'https://example.com/villa1.jpg',
           'https://example.com/villa2.jpg'
         ],
         developerId: developers[1].id,
-        locationGuideId: locationGuides[1].id
+        locationGuideId: locationGuides[1].id,
+        publishedAt: new Date()
       }
     }),
     prisma.property.upsert({
@@ -151,18 +172,24 @@ async function main() {
         description: 'Contemporary 2-bedroom apartment in the historic center of Tbilisi. Great investment opportunity with high rental potential.',
         price: 95000,
         currency: 'USD',
+        propertyType: 'APARTMENT',
         bedrooms: 2,
         bathrooms: 1,
         area: 75,
         country: 'GEORGIA',
+        city: 'Tbilisi',
         status: 'OFF_PLAN',
+        availabilityStatus: 'AVAILABLE',
+        visibility: 'PUBLIC',
         isGoldenVisaEligible: false,
+        featured: true,
         images: [
           'https://example.com/apartment1.jpg',
           'https://example.com/apartment2.jpg'
         ],
         developerId: developers[2].id,
-        locationGuideId: locationGuides[2].id
+        locationGuideId: locationGuides[2].id,
+        publishedAt: new Date()
       }
     })
   ]);

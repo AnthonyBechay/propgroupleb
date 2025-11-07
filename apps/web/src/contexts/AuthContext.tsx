@@ -40,11 +40,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    // Get initial user session
+    // Get initial user session - optimized with timeout to prevent hanging
     const getInitialUser = async () => {
       try {
-        const response = await apiClient.getCurrentUser() as ApiResponse<User>
-        if (response.success) {
+        // Add timeout to prevent hanging
+        const timeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Request timeout')), 5000)
+        )
+        
+        const responsePromise = apiClient.getCurrentUser() as Promise<ApiResponse<User>>
+        
+        const response = await Promise.race([responsePromise, timeoutPromise]) as ApiResponse<User>
+        
+        if (response && response.success) {
           setUser(response.data)
           setError(null)
         } else {
@@ -52,7 +60,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setError(null)
         }
       } catch (err) {
-        console.error('Auth initialization error:', err)
+        // Silently fail for initial auth check - user might not be logged in
         setUser(null)
         setError(null)
       } finally {

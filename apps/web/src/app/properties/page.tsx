@@ -11,7 +11,10 @@ export default async function PropertiesPage({ searchParams }: PropertiesPagePro
   const params = await searchParams;
   
   // Build the where clause based on search parameters
-  const where: any = {};
+  const where: any = {
+    visibility: 'PUBLIC',
+    availabilityStatus: 'AVAILABLE',
+  };
   
   if (params.country) {
     where.country = params.country.toUpperCase();
@@ -56,6 +59,7 @@ export default async function PropertiesPage({ searchParams }: PropertiesPagePro
       include: {
         investmentData: true,
         developer: true,
+        locationGuide: true,
       },
       orderBy: { createdAt: 'desc' },
     });
