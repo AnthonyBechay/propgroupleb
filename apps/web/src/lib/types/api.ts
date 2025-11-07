@@ -25,6 +25,9 @@ export interface User {
   country?: string;
   role: 'USER' | 'AGENT' | 'ADMIN' | 'SUPER_ADMIN';
   isActive: boolean;
+  bannedAt?: string | null;
+  emailVerifiedAt?: string | null;
+  lastLoginAt?: string | null;
   createdAt: string;
   updatedAt?: string;
 }
@@ -41,9 +44,9 @@ export interface Property {
   bathrooms?: number;
   area?: number;
   areaUnit?: string;
-  location: string;
-  city: string;
-  state: string;
+  location?: string;
+  city?: string;
+  state?: string;
   country: string;
   zipCode?: string;
   latitude?: number;
@@ -54,13 +57,37 @@ export interface Property {
   nearbyFacilities?: string;
   yearBuilt?: number;
   parkingSpaces?: number;
-  views: number;
-  isActive: boolean;
-  isFeatured: boolean;
+  views?: number;
+  isActive?: boolean;
+  isFeatured?: boolean;
+  // Additional properties from backend
+  status?: 'OFF_PLAN' | 'NEW_BUILD' | 'RESALE';
+  availabilityStatus?: 'AVAILABLE' | 'RESERVED' | 'SOLD' | 'OFF_MARKET';
+  visibility?: 'PUBLIC' | 'ELITE_ONLY' | 'HIDDEN';
+  isGoldenVisaEligible?: boolean;
+  developerId?: string;
+  locationGuideId?: string;
   agentId?: string;
   agent?: User;
+  investmentData?: {
+    expectedROI?: number | null;
+    rentalYield?: number | null;
+    capitalGrowth?: number | null;
+    minInvestment?: number | null;
+    maxInvestment?: number | null;
+    paymentPlan?: string | null;
+    completionDate?: string | null;
+  };
+  developer?: {
+    id: string;
+    name: string;
+  };
+  locationGuide?: {
+    id: string;
+    title: string;
+  };
   createdAt: string;
-  updatedAt: string;
+  updatedAt?: string;
   _count?: {
     propertyInquiries?: number;
     favoriteProperties?: number;

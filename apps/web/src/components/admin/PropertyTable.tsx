@@ -26,33 +26,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { EditPropertyModal } from './EditPropertyModal'
-
-type Property = {
-  id: string
-  title: string
-  price: number
-  currency: string
-  country: string
-  status: string
-  bedrooms: number
-  bathrooms: number
-  area: number
-  isGoldenVisaEligible: boolean
-  createdAt: string
-  developer?: {
-    id: string
-    name: string
-  } | null
-  investmentData?: {
-    expectedROI?: number
-    rentalYield?: number
-    capitalGrowth?: number
-  } | null
-  _count: {
-    favoriteProperties: number
-    propertyInquiries: number
-  }
-}
+import { Property } from '@/lib/types/api'
 
 type PropertyTableProps = {
   properties: Property[]
@@ -165,8 +139,8 @@ export function PropertyTable({ properties }: PropertyTableProps) {
                   <div className="capitalize">{property.country.toLowerCase()}</div>
                 </TableCell>
                 <TableCell>
-                  <Badge className={getStatusColor(property.status)}>
-                    {property.status.replace('_', ' ')}
+                  <Badge className={getStatusColor(property.status || 'NEW_BUILD')}>
+                    {(property.status || 'NEW_BUILD').replace('_', ' ')}
                   </Badge>
                 </TableCell>
                 <TableCell>
@@ -200,11 +174,11 @@ export function PropertyTable({ properties }: PropertyTableProps) {
                   <div className="flex items-center space-x-4 text-sm">
                     <div className="flex items-center text-red-600">
                       <Heart className="h-4 w-4 mr-1" />
-                      {property._count.favoriteProperties}
+                      {property._count?.favoriteProperties || 0}
                     </div>
                     <div className="flex items-center text-blue-600">
                       <MessageSquare className="h-4 w-4 mr-1" />
-                      {property._count.propertyInquiries}
+                      {property._count?.propertyInquiries || 0}
                     </div>
                   </div>
                 </TableCell>

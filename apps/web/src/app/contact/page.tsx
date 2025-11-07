@@ -3,7 +3,15 @@
 import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { contactFormSchema } from '@propgroup/config'
+import { z } from 'zod'
+
+const contactFormSchema = z.object({
+  email: z.string().email('Invalid email address'),
+  name: z.string().min(1, 'Name is required'),
+  phone: z.string().optional(),
+  message: z.string().optional(),
+  propertyId: z.string().optional(),
+})
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'

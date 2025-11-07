@@ -2,6 +2,7 @@
 
 import { apiClient } from '@/lib/api/client'
 import { getCurrentUser } from '@/lib/auth/rbac'
+import { ApiResponse, Inquiry } from '@/lib/types/api'
 import { z } from 'zod'
 
 const inquirySchema = z.object({
@@ -17,12 +18,12 @@ export async function submitInquiry(data: z.infer<typeof inquirySchema>) {
     const validatedData = inquirySchema.parse(data)
     
     // Submit the inquiry using the API client
-    const response = await apiClient.createInquiry(validatedData)
+    const response = await apiClient.createInquiry(validatedData) as ApiResponse<Inquiry>
 
-    if (response.success) {
+    if (response.success && response.data) {
       // Log the inquiry for now (you could store this in a separate table for admin review)
       console.log('New property inquiry:', {
-        property: response.data.property.title,
+        property: response.data.property?.title || 'N/A',
         name: response.data.name,
         email: response.data.email,
         date: response.data.createdAt
@@ -62,9 +63,9 @@ export async function getUserInquiries() {
       return { success: false, error: 'You must be logged in to view inquiries' }
     }
 
-    const response = await apiClient.getMyInquiries()
+    const response = await apiClient.getMyInquiries() as ApiResponse<Inquiry[]>
     
-    if (response.success) {
+    if (response.success && response.data) {
       return { 
         success: true, 
         inquiries: response.data 
@@ -80,9 +81,9 @@ export async function getUserInquiries() {
 
 export async function getPropertyInquiries(propertyId: string) {
   try {
-    const response = await apiClient.getInquiries({ propertyId })
+    const response = await apiClient.getInquiries({ propertyId }) as ApiResponse<Inquiry[]>
     
-    if (response.success) {
+    if (response.success && response.data) {
       return { 
         success: true, 
         inquiries: response.data 

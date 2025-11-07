@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
 import { apiClient } from '@/lib/api/client'
+import { ApiResponse, AgentDashboardStats } from '@/lib/types/api'
 import {
   Home,
   TrendingUp,
@@ -28,25 +29,9 @@ import { Button } from '@/components/ui/button'
 import Link from 'next/link'
 import Image from 'next/image'
 
-interface DashboardStats {
-  overview: {
-    totalProperties: number
-    activeProperties: number
-    soldProperties: number
-    totalInquiries: number
-    pendingInquiries: number
-    totalViews: number
-    totalSalesValue: number
-    estimatedCommission: number
-    commissionRate: number
-  }
-  recentInquiries: any[]
-  topProperties: any[]
-}
-
 export default function AgentDashboardClient() {
   const { user } = useAuth()
-  const [stats, setStats] = useState<DashboardStats | null>(null)
+  const [stats, setStats] = useState<AgentDashboardStats | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -57,8 +42,8 @@ export default function AgentDashboardClient() {
   const fetchDashboardStats = async () => {
     try {
       setLoading(true)
-      const response = await apiClient.getAgentDashboardStats()
-      if (response.success) {
+      const response = await apiClient.getAgentDashboardStats() as ApiResponse<AgentDashboardStats>
+      if (response.success && response.data) {
         setStats(response.data)
       } else {
         setError(response.error || 'Failed to fetch dashboard stats')
@@ -106,7 +91,8 @@ export default function AgentDashboardClient() {
     )
   }
 
-  const { overview, recentInquiries, topProperties } = stats
+  // AgentDashboardStats has direct properties, not nested in overview
+  const { totalProperties, totalInquiries, totalViews, estimatedCommission, recentInquiries, topProperties } = stats
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900">
@@ -131,7 +117,7 @@ export default function AgentDashboardClient() {
               </div>
               <div className="flex items-center text-sm text-green-600 dark:text-green-400">
                 <ArrowUpRight className="w-4 h-4 mr-1" />
-                {overview.activeProperties} active
+                Active
               </div>
             </div>
             <div>
@@ -139,7 +125,7 @@ export default function AgentDashboardClient() {
                 Total Properties
               </p>
               <p className="pg-text-3xl sm:pg-text-4xl font-bold text-gray-900 dark:text-white">
-                {overview.totalProperties}
+                {totalProperties}
               </p>
             </div>
           </div>
@@ -152,7 +138,7 @@ export default function AgentDashboardClient() {
               </div>
               <div className="flex items-center text-sm text-orange-600 dark:text-orange-400">
                 <Clock className="w-4 h-4 mr-1" />
-                {overview.pendingInquiries} pending
+                Pending
               </div>
             </div>
             <div>
@@ -160,7 +146,7 @@ export default function AgentDashboardClient() {
                 Total Inquiries
               </p>
               <p className="pg-text-3xl sm:pg-text-4xl font-bold text-gray-900 dark:text-white">
-                {overview.totalInquiries}
+                {totalInquiries}
               </p>
             </div>
           </div>
@@ -180,7 +166,7 @@ export default function AgentDashboardClient() {
                 Total Views
               </p>
               <p className="pg-text-3xl sm:pg-text-4xl font-bold text-gray-900 dark:text-white">
-                {overview.totalViews.toLocaleString()}
+                {totalViews.toLocaleString()}
               </p>
             </div>
           </div>
@@ -192,7 +178,7 @@ export default function AgentDashboardClient() {
                 <DollarSign className="w-6 h-6 text-yellow-600 dark:text-yellow-400" />
               </div>
               <div className="text-sm text-gray-600 dark:text-gray-400">
-                {overview.soldProperties} sales @ {overview.commissionRate}%
+                Estimated
               </div>
             </div>
             <div>
@@ -200,7 +186,7 @@ export default function AgentDashboardClient() {
                 Est. Commission
               </p>
               <p className="pg-text-3xl sm:pg-text-4xl font-bold text-gray-900 dark:text-white">
-                {formatCurrency(overview.estimatedCommission)}
+                {formatCurrency(estimatedCommission)}
               </p>
             </div>
           </div>

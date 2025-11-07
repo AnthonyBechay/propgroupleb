@@ -52,8 +52,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         
         const response = await Promise.race([responsePromise, timeoutPromise]) as ApiResponse<User>
         
-        if (response && response.success) {
-          setUser(response.data)
+        if (response && response.success && response.data) {
+          // Map User type to AuthUser type
+          const authUser: AuthUser = {
+            id: response.data.id,
+            email: response.data.email,
+            role: response.data.role as 'USER' | 'ADMIN' | 'SUPER_ADMIN',
+            isActive: response.data.isActive,
+            bannedAt: undefined,
+            emailVerifiedAt: undefined,
+            firstName: response.data.firstName,
+            lastName: response.data.lastName,
+            phone: response.data.phone,
+            country: response.data.country,
+            investmentGoals: [],
+            createdAt: response.data.createdAt ? new Date(response.data.createdAt) : undefined,
+            updatedAt: response.data.updatedAt ? new Date(response.data.updatedAt) : undefined,
+          }
+          setUser(authUser)
           setError(null)
         } else {
           setUser(null)
@@ -78,8 +94,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       
       const response = await apiClient.login(email, password) as ApiResponse<User>
       
-      if (response.success) {
-        setUser(response.data)
+      if (response.success && response.data) {
+        // Map User type to AuthUser type
+        const authUser: AuthUser = {
+          id: response.data.id,
+          email: response.data.email,
+          role: response.data.role as 'USER' | 'ADMIN' | 'SUPER_ADMIN',
+          isActive: response.data.isActive,
+          bannedAt: undefined,
+          emailVerifiedAt: undefined,
+          firstName: response.data.firstName,
+          lastName: response.data.lastName,
+          phone: response.data.phone,
+          country: response.data.country,
+          investmentGoals: [],
+          createdAt: response.data.createdAt ? new Date(response.data.createdAt) : undefined,
+          updatedAt: response.data.updatedAt ? new Date(response.data.updatedAt) : undefined,
+        }
+        setUser(authUser)
         return { error: null }
       } else {
         setError(response.message || 'Login failed')
@@ -109,8 +141,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         investmentGoals: userData?.investmentGoals
       }) as ApiResponse<User>
       
-      if (response.success) {
-        setUser(response.data)
+      if (response.success && response.data) {
+        // Map User type to AuthUser type
+        const authUser: AuthUser = {
+          id: response.data.id,
+          email: response.data.email,
+          role: response.data.role as 'USER' | 'ADMIN' | 'SUPER_ADMIN',
+          isActive: response.data.isActive,
+          bannedAt: undefined,
+          emailVerifiedAt: undefined,
+          firstName: response.data.firstName,
+          lastName: response.data.lastName,
+          phone: response.data.phone,
+          country: response.data.country,
+          investmentGoals: [],
+          createdAt: response.data.createdAt ? new Date(response.data.createdAt) : undefined,
+          updatedAt: response.data.updatedAt ? new Date(response.data.updatedAt) : undefined,
+        }
+        setUser(authUser)
         return { error: null }
       } else {
         setError(response.message || 'Registration failed')
@@ -151,8 +199,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         investmentGoals: data.investmentGoals
       }) as ApiResponse<User>
       
-      if (response.success) {
-        setUser(response.data)
+      if (response.success && response.data) {
+        // Map User type to AuthUser type
+        const authUser: AuthUser = {
+          id: response.data.id,
+          email: response.data.email,
+          role: response.data.role as 'USER' | 'ADMIN' | 'SUPER_ADMIN',
+          isActive: response.data.isActive,
+          bannedAt: undefined,
+          emailVerifiedAt: undefined,
+          firstName: response.data.firstName,
+          lastName: response.data.lastName,
+          phone: response.data.phone,
+          country: response.data.country,
+          investmentGoals: [],
+          createdAt: response.data.createdAt ? new Date(response.data.createdAt) : undefined,
+          updatedAt: response.data.updatedAt ? new Date(response.data.updatedAt) : undefined,
+        }
+        setUser(authUser)
         return { error: null }
       } else {
         setError(response.message || 'Profile update failed')
@@ -195,8 +259,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const refreshUser = async () => {
     try {
       const response = await apiClient.getCurrentUser() as ApiResponse<User>
-      if (response.success) {
-        setUser(response.data)
+      if (response.success && response.data) {
+        // Map User type to AuthUser type
+        const authUser: AuthUser = {
+          id: response.data.id,
+          email: response.data.email,
+          role: response.data.role as 'USER' | 'ADMIN' | 'SUPER_ADMIN',
+          isActive: response.data.isActive,
+          bannedAt: undefined,
+          emailVerifiedAt: undefined,
+          firstName: response.data.firstName,
+          lastName: response.data.lastName,
+          phone: response.data.phone,
+          country: response.data.country,
+          investmentGoals: [],
+          createdAt: response.data.createdAt ? new Date(response.data.createdAt) : undefined,
+          updatedAt: response.data.updatedAt ? new Date(response.data.updatedAt) : undefined,
+        }
+        setUser(authUser)
         setError(null)
       } else {
         setUser(null)
