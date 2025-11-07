@@ -68,16 +68,17 @@ function LoginForm() {
     setError(null)
 
     try {
-      // Get the API base URL
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api'
+      // Get the API base URL - normalize it
+      const { normalizeApiUrl } = await import('@/lib/utils/api-url')
+      const apiUrl = normalizeApiUrl(process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001')
 
       // Store the intended next page
       if (typeof window !== 'undefined') {
         sessionStorage.setItem('auth_redirect', next)
       }
 
-      // Redirect to Google OAuth
-      window.location.href = `${apiUrl}/auth/google`
+      // Redirect to Google OAuth - endpoint is /api/auth/google
+      window.location.href = `${apiUrl}/api/auth/google`
     } catch (err) {
       console.error('Google login error:', err)
       setError('Failed to initiate Google login')

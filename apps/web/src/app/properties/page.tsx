@@ -47,7 +47,9 @@ export default async function PropertiesPage({ searchParams }: PropertiesPagePro
     }
 
     // Fetch from API - Use fetch directly for server-side rendering
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+    const { normalizeApiUrl } = await import('@/lib/utils/api-url');
+    const apiUrl = normalizeApiUrl(process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001');
+    
     const queryString = new URLSearchParams(
       Object.entries(queryParams)
         .filter(([_, v]) => v !== undefined && v !== null)
@@ -64,9 +66,27 @@ export default async function PropertiesPage({ searchParams }: PropertiesPagePro
     
     if (response.ok) {
       const data = await response.json();
+      console.log('Properties API response:', { success: data.success, dataLength: data.data?.length, pagination: data.pagination });
+      
       if (data.success && data.data) {
-        properties = data.data;
+        // Backend returns { success: true, data: [properties array], pagination: {...} }
+        if (Array.isArray(data.data)) {
+          properties = data.data;
+          console.log(`[Properties Page] Loaded ${properties.length} properties from ${apiUrl}/api/properties`);
+        } else {
+          console.warn('[Properties Page] Properties data is not an array:', data.data);
+        }
+      } else {
+        console.warn('[Properties Page] API returned unsuccessful response:', data);
       }
+    } else {
+      const errorText = await response.text();
+      console.error('[Properties Page] Failed to fetch properties:', {
+        status: response.status,
+        statusText: response.statusText,
+        error: errorText,
+        url: `${apiUrl}/api/properties?${queryString}`
+      });
     }
   } catch (error) {
     console.warn('Failed to fetch properties from API:', error);

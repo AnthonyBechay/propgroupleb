@@ -117,9 +117,9 @@ export function AuthModal({ children }: AuthModalProps) {
     setError(null);
 
     try {
-      // Get the API base URL
-      const apiUrl =
-        process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api";
+      // Get the API base URL - normalize it
+      const { normalizeApiUrl } = await import('@/lib/utils/api-url');
+      const apiUrl = normalizeApiUrl(process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001");
 
       // Store that we're in a modal flow
       if (typeof window !== "undefined") {
@@ -127,8 +127,8 @@ export function AuthModal({ children }: AuthModalProps) {
         sessionStorage.setItem("auth_redirect", window.location.pathname);
       }
 
-      // Redirect to Google OAuth
-      window.location.href = `${apiUrl}/auth/google`;
+      // Redirect to Google OAuth - endpoint is /api/auth/google
+      window.location.href = `${apiUrl}/api/auth/google`;
     } catch (err) {
       console.error("Google auth error:", err);
       setError("Failed to initiate Google authentication");

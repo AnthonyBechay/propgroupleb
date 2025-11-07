@@ -1,23 +1,27 @@
 // API Client for PropGroup Backend
 // For production, NEXT_PUBLIC_API_URL must be set in Vercel environment variables
-// API_BASE_URL should NOT include /api since we add it in each request
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ||
-  (typeof window !== 'undefined' && window.location.hostname !== 'localhost'
-    ? '' // Use relative URLs in production if API_URL not set
-    : 'http://localhost:3001');
+import { normalizeApiUrl } from '../utils/api-url';
+
+const API_BASE_URL = normalizeApiUrl(process.env.NEXT_PUBLIC_API_URL);
 
 class ApiClient {
   private baseURL: string;
 
   constructor(baseURL: string = API_BASE_URL) {
-    this.baseURL = baseURL;
+    this.baseURL = normalizeApiUrl(baseURL);
   }
 
   private async request<T>(
     endpoint: string,
     options: RequestInit = {}
   ): Promise<T> {
-    const url = `${this.baseURL}${endpoint}`;
+    // Endpoints already include /api/ prefix, so just use as-is
+    // Ensure endpoint starts with /
+    const normalizedEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+    const url = `${this.baseURL}${normalizedEndpoint}`;
+    
+    // Always log in production to debug issues
+    console.log('[API Client] Request:', url, 'baseURL:', this.baseURL, 'endpoint:', normalizedEndpoint);
 
     const config: RequestInit = {
       credentials: 'include', // Include cookies for authentication

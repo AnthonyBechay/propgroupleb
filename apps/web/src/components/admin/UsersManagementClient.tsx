@@ -124,7 +124,9 @@ function RoleSelectButton({ userId, currentRole }: { userId: string, currentRole
     }
 
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ''}/api/users/${userId}/role`, {
+      const { normalizeApiUrl } = await import('@/lib/utils/api-url');
+      const apiUrl = normalizeApiUrl(process.env.NEXT_PUBLIC_API_URL || '');
+      const response = await fetch(`${apiUrl}/api/users/${userId}/role`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -172,9 +174,11 @@ function BanButton({ userId, isBanned }: { userId: string, isBanned: boolean }) 
     }
 
     try {
+      const { normalizeApiUrl } = await import('@/lib/utils/api-url');
+      const apiUrl = normalizeApiUrl(process.env.NEXT_PUBLIC_API_URL || '');
       const endpoint = isBanned
-        ? `${process.env.NEXT_PUBLIC_API_URL || ''}/api/users/${userId}/unban`
-        : `${process.env.NEXT_PUBLIC_API_URL || ''}/api/users/${userId}/ban`
+        ? `${apiUrl}/api/users/${userId}/unban`
+        : `${apiUrl}/api/users/${userId}/ban`
 
       const response = await fetch(endpoint, {
         method: 'POST',
@@ -219,7 +223,9 @@ function DeleteButton({ userId, email }: { userId: string, email: string }) {
     }
 
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ''}/api/users/${userId}`, {
+      const { normalizeApiUrl } = await import('@/lib/utils/api-url');
+      const apiUrl = normalizeApiUrl(process.env.NEXT_PUBLIC_API_URL || '');
+      const response = await fetch(`${apiUrl}/api/users/${userId}`, {
         method: 'DELETE',
         credentials: 'include',
       })
@@ -255,7 +261,9 @@ function InviteUserButton() {
     const role = formData.get('role') as string
 
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ''}/api/users/invite`, {
+      const { normalizeApiUrl } = await import('@/lib/utils/api-url');
+      const apiUrl = normalizeApiUrl(process.env.NEXT_PUBLIC_API_URL || '');
+      const response = await fetch(`${apiUrl}/api/users/invite`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

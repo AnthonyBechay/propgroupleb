@@ -68,7 +68,9 @@ export function PropertyTable({ properties }: PropertyTableProps) {
     }
 
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ''}/api/properties/${property.id}`, {
+      const { normalizeApiUrl } = await import('@/lib/utils/api-url');
+      const apiUrl = normalizeApiUrl(process.env.NEXT_PUBLIC_API_URL || '');
+      const response = await fetch(`${apiUrl}/api/properties/${property.id}`, {
         method: 'DELETE',
         credentials: 'include',
       })
