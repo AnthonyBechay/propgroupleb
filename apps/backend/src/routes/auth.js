@@ -35,12 +35,22 @@ const createToken = (userId) => {
 
 // Helper function to set secure cookie
 const setTokenCookie = (res, token) => {
-  res.cookie('token', token, {
+  const isProduction = process.env.NODE_ENV === 'production';
+  const cookieOptions = {
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax', // 'none' for cross-origin in production
-    maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
-  });
+    secure: isProduction,
+    sameSite: isProduction ? 'none' : 'lax', // 'none' for cross-origin in production
+    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+    path: '/',
+    domain: isProduction ? undefined : undefined // Let browser handle domain
+  };
+  
+  res.cookie('token', token, cookieOptions);
+  
+  // Also set in response header for debugging
+  if (isProduction) {
+    res.setHeader('Set-Cookie', `token=${token}; HttpOnly; Secure; SameSite=None; Path=/; Max-Age=${7 * 24 * 60 * 60}`);
+  }
 };
 
 // Register new user
@@ -124,6 +134,11 @@ router.post('/register', async (req, res) => {
 // Login user
 router.post('/login', async (req, res, next) => {
   try {
+    // Handle OPTIONS preflight explicitly
+    if (req.method === 'OPTIONS') {
+      return res.sendStatus(204);
+    }
+
     const validatedData = loginSchema.parse(req.body);
 
     passport.authenticate('local', (err, user, info) => {
@@ -173,13 +188,62 @@ router.post('/login', async (req, res, next) => {
   }
 });
 
-// Get current user
-router.get('/me', authenticateToken, async (req, res) => {
+// Get current user - Optional auth, returns null if not authenticated
+router.get('/me', async (req, res) => {
   try {
-    res.json({
-      success: true,
-      data: req.user
-    });
+    // Try to authenticate, but don't fail if no token
+    const token = req.cookies?.token || req.headers.authorization?.replace('Bearer ', '');
+    
+    if (!token) {
+      return res.json({
+        success: true,
+        data: null
+      });
+    }
+
+    try {
+      const decoded = jwt.verify(token, process.env.JWT_SECRET);
+      
+      const user = await prisma.user.findUnique({
+        where: { id: decoded.userId },
+        select: {
+          id: true,
+          email: true,
+          role: true,
+          isActive: true,
+          bannedAt: true,
+          emailVerifiedAt: true,
+          firstName: true,
+          lastName: true,
+          phone: true,
+          country: true,
+          investmentGoals: true,
+          membershipTier: true,
+          membershipStartDate: true,
+          membershipEndDate: true,
+          createdAt: true,
+          updatedAt: true
+        }
+      });
+
+      if (!user || !user.isActive || user.bannedAt) {
+        return res.json({
+          success: true,
+          data: null
+        });
+      }
+
+      res.json({
+        success: true,
+        data: user
+      });
+    } catch (tokenError) {
+      // Token is invalid or expired, return null
+      return res.json({
+        success: true,
+        data: null
+      });
+    }
   } catch (error) {
     console.error('Get current user error:', error);
     res.status(500).json({

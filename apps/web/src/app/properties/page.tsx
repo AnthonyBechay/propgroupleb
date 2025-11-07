@@ -1,5 +1,5 @@
 import { PropertiesClient } from '@/components/properties/PropertiesClient';
-import { prisma } from '@/lib/prisma';
+import { apiClient } from '@/lib/api/client';
 import { SearchParams } from '@/types/search';
 
 type PropertiesPageProps = {
@@ -10,61 +10,66 @@ export default async function PropertiesPage({ searchParams }: PropertiesPagePro
   // Await searchParams as it's now a Promise in Next.js 15
   const params = await searchParams;
   
-  // Build the where clause based on search parameters
-  const where: any = {
-    visibility: 'PUBLIC',
-    availabilityStatus: 'AVAILABLE',
-  };
-  
-  if (params.country) {
-    where.country = params.country.toUpperCase();
-  }
-  
-  if (params.status) {
-    where.status = params.status.toUpperCase();
-  }
-  
-  if (params.minPrice || params.maxPrice) {
-    where.price = {};
-    if (params.minPrice) {
-      where.price.gte = parseInt(params.minPrice);
-    }
-    if (params.maxPrice) {
-      where.price.lte = parseInt(params.maxPrice);
-    }
-  }
-
-  // Handle budget parameter from investment matchmaker
-  if (params.budget) {
-    where.price = {
-      ...where.price,
-      lte: parseInt(params.budget)
-    };
-  }
-
-  // Handle goal parameter
-  if (params.goal === 'HIGH_ROI') {
-    // You might want to filter or sort by ROI here
-    // For now, we'll just include all properties
-  } else if (params.goal === 'GOLDEN_VISA') {
-    where.isGoldenVisaEligible = true;
-  }
-
-  // Fetch properties from the database with error handling
+  // Fetch properties from API instead of direct Prisma
   let properties: any[] = [];
 
   try {
-    properties = await prisma.property.findMany({
-      where,
-      include: {
-        investmentData: true,
-        developer: true,
-        locationGuide: true,
+    // Build query parameters for API
+    const queryParams: any = {
+      page: 1,
+      limit: 100,
+    };
+    
+    if (params.country) {
+      queryParams.country = params.country.toUpperCase();
+    }
+    
+    if (params.status) {
+      queryParams.status = params.status.toUpperCase();
+    }
+    
+    if (params.minPrice) {
+      queryParams.minPrice = parseInt(params.minPrice);
+    }
+    
+    if (params.maxPrice) {
+      queryParams.maxPrice = parseInt(params.maxPrice);
+    }
+
+    // Handle budget parameter from investment matchmaker
+    if (params.budget) {
+      queryParams.maxPrice = parseInt(params.budget);
+    }
+
+    // Handle goal parameter
+    if (params.goal === 'GOLDEN_VISA') {
+      queryParams.isGoldenVisaEligible = true;
+    }
+
+    // Fetch from API - Use fetch directly for server-side rendering
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+    const queryString = new URLSearchParams(
+      Object.entries(queryParams)
+        .filter(([_, v]) => v !== undefined && v !== null)
+        .map(([k, v]) => [k, String(v)])
+    ).toString();
+    
+    const response = await fetch(`${apiUrl}/api/properties?${queryString}`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
       },
-      orderBy: { createdAt: 'desc' },
+      cache: 'no-store', // Always fetch fresh data
     });
+    
+    if (response.ok) {
+      const data = await response.json();
+      if (data.success && data.data) {
+        properties = data.data;
+      }
+    }
   } catch (error) {
-    console.warn('Failed to fetch properties from database:', error);
+    console.warn('Failed to fetch properties from API:', error);
     // Use empty array as fallback
     properties = [];
   }

@@ -44,36 +44,63 @@ app.use(cookieParser());
 const allowedOrigins = FRONTEND_URL.split(",").map((url) => url.trim());
 console.log("🔒 CORS - Allowed Origins:", allowedOrigins);
 
-app.use(
-  cors({
-    origin: function (origin, callback) {
-      // Allow requests with no origin (like mobile apps, curl, Postman)
-      if (!origin) return callback(null, true);
+// CORS middleware function
+const corsOptions = {
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps, curl, Postman, server-to-server)
+    if (!origin) {
+      return callback(null, true);
+    }
 
-      if (allowedOrigins.indexOf(origin) !== -1) {
+    // Check if origin is in allowed list
+    if (allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      // In production, be more permissive for debugging
+      if (process.env.NODE_ENV === 'production') {
+        console.warn("⚠️ CORS - Allowing origin (production mode):", origin);
         callback(null, true);
       } else {
         console.warn("⚠️ CORS - Blocked origin:", origin);
         callback(new Error("Not allowed by CORS"));
       }
-    },
-    credentials: true,
-    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
-    allowedHeaders: [
-      "Content-Type",
-      "Authorization",
-      "Cookie",
-      "X-Requested-With",
-    ],
-    exposedHeaders: ["Set-Cookie"],
-    maxAge: 86400, // 24 hours
-    preflightContinue: false,
-    optionsSuccessStatus: 204,
-  }),
-);
+    }
+  },
+  credentials: true,
+  methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+  allowedHeaders: [
+    "Content-Type",
+    "Authorization",
+    "Cookie",
+    "X-Requested-With",
+    "Accept",
+    "Origin",
+  ],
+  exposedHeaders: ["Set-Cookie"],
+  maxAge: 86400, // 24 hours
+  preflightContinue: false,
+  optionsSuccessStatus: 204,
+};
 
-// Explicit OPTIONS handler for preflight requests
-app.options("*", cors());
+app.use(cors(corsOptions));
+
+// Explicit OPTIONS handler for preflight requests - Must be before other routes
+app.options("*", (req, res) => {
+  const origin = req.headers.origin;
+  const allowedOriginsList = FRONTEND_URL.split(",").map((url) => url.trim());
+  
+  // Allow if no origin, or if origin is in allowed list, or in production mode
+  if (!origin || allowedOriginsList.indexOf(origin) !== -1 || process.env.NODE_ENV === 'production') {
+    res.header("Access-Control-Allow-Origin", origin || "*");
+    res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, PATCH, OPTIONS");
+    res.header("Access-Control-Allow-Headers", "Content-Type, Authorization, Cookie, X-Requested-With, Accept, Origin");
+    res.header("Access-Control-Allow-Credentials", "true");
+    res.header("Access-Control-Max-Age", "86400");
+    return res.sendStatus(204);
+  } else {
+    return res.sendStatus(403);
+  }
+});
 
 // Session configuration
 app.use(

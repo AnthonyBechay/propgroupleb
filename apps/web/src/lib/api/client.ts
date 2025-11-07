@@ -1,9 +1,10 @@
 // API Client for PropGroup Backend
 // For production, NEXT_PUBLIC_API_URL must be set in Vercel environment variables
+// API_BASE_URL should NOT include /api since we add it in each request
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ||
   (typeof window !== 'undefined' && window.location.hostname !== 'localhost'
     ? '' // Use relative URLs in production if API_URL not set
-    : 'http://localhost:3001/api');
+    : 'http://localhost:3001');
 
 class ApiClient {
   private baseURL: string;
@@ -66,27 +67,27 @@ class ApiClient {
     country?: string;
     investmentGoals?: string[];
   }) {
-    return this.request('/auth/register', {
+    return this.request('/api/auth/register', {
       method: 'POST',
       body: JSON.stringify(data),
     });
   }
 
   async login(email: string, password: string) {
-    return this.request('/auth/login', {
+    return this.request('/api/auth/login', {
       method: 'POST',
       body: JSON.stringify({ email, password }),
     });
   }
 
   async logout() {
-    return this.request('/auth/logout', {
+    return this.request('/api/auth/logout', {
       method: 'POST',
     });
   }
 
   async getCurrentUser() {
-    return this.request('/auth/me');
+    return this.request('/api/auth/me');
   }
 
   async updateProfile(data: {
@@ -96,7 +97,7 @@ class ApiClient {
     country?: string;
     investmentGoals?: string[];
   }) {
-    return this.request('/auth/profile', {
+    return this.request('/api/auth/profile', {
       method: 'PUT',
       body: JSON.stringify(data),
     });
@@ -106,7 +107,7 @@ class ApiClient {
     currentPassword: string;
     newPassword: string;
   }) {
-    return this.request('/auth/change-password', {
+    return this.request('/api/auth/change-password', {
       method: 'PUT',
       body: JSON.stringify(data),
     });
@@ -145,52 +146,52 @@ class ApiClient {
     }
 
     const queryString = searchParams.toString();
-    return this.request(`/properties${queryString ? `?${queryString}` : ''}`);
+    return this.request(`/api/properties${queryString ? `?${queryString}` : ''}`);
   }
 
   async getProperty(id: string) {
-    return this.request(`/properties/${id}`);
+    return this.request(`/api/properties/${id}`);
   }
 
   async createProperty(data: any) {
-    return this.request('/properties', {
+    return this.request('/api/properties', {
       method: 'POST',
       body: JSON.stringify(data),
     });
   }
 
   async updateProperty(id: string, data: any) {
-    return this.request(`/properties/${id}`, {
+    return this.request(`/api/properties/${id}`, {
       method: 'PUT',
       body: JSON.stringify(data),
     });
   }
 
   async deleteProperty(id: string) {
-    return this.request(`/properties/${id}`, {
+    return this.request(`/api/properties/${id}`, {
       method: 'DELETE',
     });
   }
 
   // Favorites endpoints
   async getFavorites() {
-    return this.request('/favorites');
+    return this.request('/api/favorites');
   }
 
   async addFavorite(propertyId: string) {
-    return this.request(`/favorites/${propertyId}`, {
+    return this.request(`/api/favorites/${propertyId}`, {
       method: 'POST',
     });
   }
 
   async removeFavorite(propertyId: string) {
-    return this.request(`/favorites/${propertyId}`, {
+    return this.request(`/api/favorites/${propertyId}`, {
       method: 'DELETE',
     });
   }
 
   async checkFavorite(propertyId: string) {
-    return this.request(`/favorites/check/${propertyId}`);
+    return this.request(`/api/favorites/check/${propertyId}`);
   }
 
   // Inquiries endpoints
@@ -201,14 +202,14 @@ class ApiClient {
     phone?: string;
     message?: string;
   }) {
-    return this.request('/inquiries', {
+    return this.request('/api/inquiries', {
       method: 'POST',
       body: JSON.stringify(data),
     });
   }
 
   async getMyInquiries() {
-    return this.request('/inquiries/my');
+    return this.request('/api/inquiries/my');
   }
 
   async getInquiries(params?: {
@@ -226,22 +227,22 @@ class ApiClient {
     }
     
     const queryString = searchParams.toString();
-    return this.request(`/inquiries${queryString ? `?${queryString}` : ''}`);
+    return this.request(`/api/inquiries${queryString ? `?${queryString}` : ''}`);
   }
 
   async getInquiry(id: string) {
-    return this.request(`/inquiries/${id}`);
+    return this.request(`/api/inquiries/${id}`);
   }
 
   async deleteInquiry(id: string) {
-    return this.request(`/inquiries/${id}`, {
+    return this.request(`/api/inquiries/${id}`, {
       method: 'DELETE',
     });
   }
 
   // Portfolio endpoints
   async getPortfolio() {
-    return this.request('/portfolio');
+    return this.request('/api/portfolio');
   }
 
   async addToPortfolio(data: {
@@ -253,27 +254,27 @@ class ApiClient {
     notes?: string;
     propertyId?: string;
   }) {
-    return this.request('/portfolio', {
+    return this.request('/api/portfolio', {
       method: 'POST',
       body: JSON.stringify(data),
     });
   }
 
   async updatePortfolioItem(id: string, data: any) {
-    return this.request(`/portfolio/${id}`, {
+    return this.request(`/api/portfolio/${id}`, {
       method: 'PUT',
       body: JSON.stringify(data),
     });
   }
 
   async removeFromPortfolio(id: string) {
-    return this.request(`/portfolio/${id}`, {
+    return this.request(`/api/portfolio/${id}`, {
       method: 'DELETE',
     });
   }
 
   async getPortfolioStats() {
-    return this.request('/portfolio/stats');
+    return this.request('/api/portfolio/stats');
   }
 
   // Users endpoints (admin)
@@ -294,41 +295,41 @@ class ApiClient {
     }
     
     const queryString = searchParams.toString();
-    return this.request(`/users${queryString ? `?${queryString}` : ''}`);
+    return this.request(`/api/users${queryString ? `?${queryString}` : ''}`);
   }
 
   async getUser(id: string) {
-    return this.request(`/users/${id}`);
+    return this.request(`/api/users/${id}`);
   }
 
   async updateUserRole(id: string, role: string) {
-    return this.request(`/users/${id}/role`, {
+    return this.request(`/api/users/${id}/role`, {
       method: 'PUT',
       body: JSON.stringify({ role }),
     });
   }
 
   async banUser(id: string, reason: string) {
-    return this.request(`/users/${id}/ban`, {
+    return this.request(`/api/users/${id}/ban`, {
       method: 'POST',
       body: JSON.stringify({ reason }),
     });
   }
 
   async unbanUser(id: string) {
-    return this.request(`/users/${id}/unban`, {
+    return this.request(`/api/users/${id}/unban`, {
       method: 'POST',
     });
   }
 
   async deleteUser(id: string) {
-    return this.request(`/users/${id}`, {
+    return this.request(`/api/users/${id}`, {
       method: 'DELETE',
     });
   }
 
   async inviteAdmin(email: string, role: string) {
-    return this.request('/users/invite', {
+    return this.request('/api/users/invite', {
       method: 'POST',
       body: JSON.stringify({ email, role }),
     });
@@ -336,7 +337,7 @@ class ApiClient {
 
   // Admin endpoints
   async getAdminStats() {
-    return this.request('/admin/stats');
+    return this.request('/api/admin/stats');
   }
 
   async getAuditLogs(params?: {
@@ -355,35 +356,35 @@ class ApiClient {
     }
     
     const queryString = searchParams.toString();
-    return this.request(`/admin/audit-logs${queryString ? `?${queryString}` : ''}`);
+    return this.request(`/api/admin/audit-logs${queryString ? `?${queryString}` : ''}`);
   }
 
   async createSuperAdmin(email: string, password: string) {
-    return this.request('/admin/create-super-admin', {
+    return this.request('/api/admin/create-super-admin', {
       method: 'POST',
       body: JSON.stringify({ email, password }),
     });
   }
 
   async getSystemHealth() {
-    return this.request('/admin/health');
+    return this.request('/api/admin/health');
   }
 
   // AI Search endpoints
   async aiSearch(query: string, context?: { userId?: string; previousSearches?: string[] }) {
-    return this.request('/ai-search', {
+    return this.request('/api/ai-search', {
       method: 'POST',
       body: JSON.stringify({ query, context }),
     });
   }
 
   async getAISearchSuggestions() {
-    return this.request('/ai-search/suggestions');
+    return this.request('/api/ai-search/suggestions');
   }
 
   // Agent endpoints
   async getAgentDashboardStats() {
-    return this.request('/agent/dashboard/stats');
+    return this.request('/api/agent/dashboard/stats');
   }
 
   async getAgentProperties(params?: {
@@ -403,7 +404,7 @@ class ApiClient {
     }
 
     const queryString = searchParams.toString();
-    return this.request(`/agent/properties${queryString ? `?${queryString}` : ''}`);
+    return this.request(`/api/agent/properties${queryString ? `?${queryString}` : ''}`);
   }
 
   async getAgentInquiries(params?: {
@@ -421,11 +422,11 @@ class ApiClient {
     }
 
     const queryString = searchParams.toString();
-    return this.request(`/agent/inquiries${queryString ? `?${queryString}` : ''}`);
+    return this.request(`/api/agent/inquiries${queryString ? `?${queryString}` : ''}`);
   }
 
   async getAgentProfile() {
-    return this.request('/agent/profile');
+    return this.request('/api/agent/profile');
   }
 
   async updateAgentProfile(data: {
@@ -437,14 +438,14 @@ class ApiClient {
     agentBio?: string;
     agentCommissionRate?: number;
   }) {
-    return this.request('/agent/profile', {
+    return this.request('/api/agent/profile', {
       method: 'PUT',
       body: JSON.stringify(data),
     });
   }
 
   async updatePropertyStatus(propertyId: string, availabilityStatus: string) {
-    return this.request(`/agent/properties/${propertyId}/status`, {
+    return this.request(`/api/agent/properties/${propertyId}/status`, {
       method: 'PATCH',
       body: JSON.stringify({ availabilityStatus }),
     });
@@ -456,7 +457,7 @@ class ApiClient {
       searchParams.append('period', period.toString());
     }
     const queryString = searchParams.toString();
-    return this.request(`/agent/analytics${queryString ? `?${queryString}` : ''}`);
+    return this.request(`/api/agent/analytics${queryString ? `?${queryString}` : ''}`);
   }
 }
 
