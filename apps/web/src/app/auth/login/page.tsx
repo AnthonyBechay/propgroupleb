@@ -38,6 +38,7 @@ function LoginForm() {
       email: '',
       password: '',
     },
+    mode: 'onChange', // Enable real-time validation
   })
 
   // Check if already logged in - optimized to prevent unnecessary re-renders
@@ -203,6 +204,8 @@ function LoginForm() {
                   placeholder="admin@example.com"
                   className="pl-10 border-2 border-slate-200 rounded-xl focus:border-cyan-500 focus:ring-cyan-500"
                   autoComplete="email"
+                  disabled={isLoading || isGoogleLoading}
+                  readOnly={false}
                 />
               </div>
               {form.formState.errors.email && (
@@ -225,6 +228,8 @@ function LoginForm() {
                   placeholder="Enter your password"
                   className="pl-10 border-2 border-slate-200 rounded-xl focus:border-cyan-500 focus:ring-cyan-500"
                   autoComplete="current-password"
+                  disabled={isLoading || isGoogleLoading}
+                  readOnly={false}
                 />
               </div>
               {form.formState.errors.password && (

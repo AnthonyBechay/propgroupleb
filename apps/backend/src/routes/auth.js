@@ -151,11 +151,21 @@ router.post('/login', async (req, res, next) => {
       }
 
       if (!user) {
+        console.log('[Login Route] Authentication failed:', {
+          email: validatedData.email,
+          reason: info?.message || 'User not found'
+        });
         return res.status(401).json({
           error: 'Invalid credentials',
           message: info?.message || 'Email or password is incorrect'
         });
       }
+      
+      console.log('[Login Route] Authentication successful:', {
+        email: user.email,
+        role: user.role,
+        isActive: user.isActive
+      });
 
       // Create token
       const token = createToken(user.id);
