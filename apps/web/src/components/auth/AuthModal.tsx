@@ -1,10 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { apiClient } from "@/lib/api/client";
+import { useAuth } from "@/contexts/AuthContext";
 import { Chrome, Loader2 } from "lucide-react";
 import {
   Dialog,
@@ -43,12 +43,21 @@ type AuthModalProps = {
 };
 
 export function AuthModal({ children }: AuthModalProps) {
+  const { signIn, signUp } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
   const [isLogin, setIsLogin] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+
+  // Reset errors and success messages when switching between login/signup or opening modal
+  useEffect(() => {
+    if (isOpen) {
+      setError(null);
+      setSuccess(null);
+    }
+  }, [isOpen, isLogin]);
 
   const loginForm = useForm<AuthData>({
     resolver: zodResolver(authSchema),
@@ -73,14 +82,19 @@ export function AuthModal({ children }: AuthModalProps) {
     setSuccess(null);
 
     try {
-      await apiClient.login(data.email, data.password);
-      setSuccess("Login successful!");
-      setTimeout(() => {
-        setIsOpen(false);
-        loginForm.reset();
-        // Reload the page to update the auth state
-        window.location.reload();
-      }, 1000);
+      const result = await signIn(data.email, data.password);
+
+      if (result.error) {
+        setError(result.error);
+      } else {
+        setSuccess("Login successful!");
+        setTimeout(() => {
+          setIsOpen(false);
+          loginForm.reset();
+          // Use router.refresh() or just close - AuthContext already updated
+          window.location.href = window.location.pathname;
+        }, 500);
+      }
     } catch (err: any) {
       setError(err.message || "An unexpected error occurred");
     } finally {
@@ -94,17 +108,19 @@ export function AuthModal({ children }: AuthModalProps) {
     setSuccess(null);
 
     try {
-      await apiClient.register({
-        email: data.email,
-        password: data.password,
-      });
-      setSuccess("Account created successfully!");
-      setTimeout(() => {
-        setIsOpen(false);
-        signupForm.reset();
-        // Reload to update auth state
-        window.location.reload();
-      }, 1500);
+      const result = await signUp(data.email, data.password);
+
+      if (result.error) {
+        setError(result.error);
+      } else {
+        setSuccess("Account created successfully!");
+        setTimeout(() => {
+          setIsOpen(false);
+          signupForm.reset();
+          // Use router navigation instead of reload
+          window.location.href = window.location.pathname;
+        }, 500);
+      }
     } catch (err: any) {
       setError(err.message || "An unexpected error occurred");
     } finally {
@@ -174,6 +190,7 @@ export function AuthModal({ children }: AuthModalProps) {
                 {...loginForm.register("email")}
                 placeholder="Enter your email"
                 autoComplete="email"
+                disabled={isLoading}
               />
               {loginForm.formState.errors.email && (
                 <p className="text-sm text-red-600">
@@ -190,6 +207,7 @@ export function AuthModal({ children }: AuthModalProps) {
                 {...loginForm.register("password")}
                 placeholder="Enter your password"
                 autoComplete="current-password"
+                disabled={isLoading}
               />
               {loginForm.formState.errors.password && (
                 <p className="text-sm text-red-600">
@@ -262,6 +280,7 @@ export function AuthModal({ children }: AuthModalProps) {
                 {...signupForm.register("email")}
                 placeholder="Enter your email"
                 autoComplete="email"
+                disabled={isLoading}
               />
               {signupForm.formState.errors.email && (
                 <p className="text-sm text-red-600">
@@ -278,6 +297,7 @@ export function AuthModal({ children }: AuthModalProps) {
                 {...signupForm.register("password")}
                 placeholder="Enter your password (min 6 characters)"
                 autoComplete="new-password"
+                disabled={isLoading}
               />
               {signupForm.formState.errors.password && (
                 <p className="text-sm text-red-600">
@@ -294,6 +314,7 @@ export function AuthModal({ children }: AuthModalProps) {
                 {...signupForm.register("confirmPassword")}
                 placeholder="Confirm your password"
                 autoComplete="new-password"
+                disabled={isLoading}
               />
               {signupForm.formState.errors.confirmPassword && (
                 <p className="text-sm text-red-600">

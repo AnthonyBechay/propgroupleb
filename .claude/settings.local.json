@@ -32,7 +32,9 @@
       "Bash(npm run lint)",
       "Bash(npx prettier:*)",
       "Bash(npm run build:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(.env)",
+      "Bash(npx prisma migrate:*)"
     ],
     "deny": [],
     "ask": []
