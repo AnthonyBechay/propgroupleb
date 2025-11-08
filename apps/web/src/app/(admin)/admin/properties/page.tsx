@@ -12,6 +12,8 @@ export default async function AdminPropertiesPage() {
   let locationGuides: any[] = []
 
   try {
+    console.log('[Admin Properties] Attempting to fetch properties from database...')
+
     // Fetch all properties with related data
     properties = await prisma.property.findMany({
       include: {
@@ -28,6 +30,8 @@ export default async function AdminPropertiesPage() {
       orderBy: { createdAt: 'desc' }
     })
 
+    console.log(`[Admin Properties] Found ${properties.length} properties`)
+
     // Fetch developers and location guides for the form
     const results = await Promise.all([
       prisma.developer.findMany({
@@ -39,8 +43,15 @@ export default async function AdminPropertiesPage() {
     ])
     developers = results[0]
     locationGuides = results[1]
+
+    console.log(`[Admin Properties] Found ${developers.length} developers and ${locationGuides.length} location guides`)
   } catch (error) {
-    console.error('Error fetching properties data:', error)
+    console.error('[Admin Properties] Error fetching properties data:', error)
+    console.error('[Admin Properties] Error details:', {
+      name: (error as Error).name,
+      message: (error as Error).message,
+      stack: (error as Error).stack
+    })
     // Return empty arrays if database query fails
   }
 

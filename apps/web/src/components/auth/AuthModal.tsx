@@ -91,9 +91,8 @@ export function AuthModal({ children }: AuthModalProps) {
         setTimeout(() => {
           setIsOpen(false);
           loginForm.reset();
-          // Use router.refresh() or just close - AuthContext already updated
-          window.location.href = window.location.pathname;
-        }, 500);
+          // AuthContext already updated, just close the modal
+        }, 300);
       }
     } catch (err: any) {
       setError(err.message || "An unexpected error occurred");
@@ -117,9 +116,8 @@ export function AuthModal({ children }: AuthModalProps) {
         setTimeout(() => {
           setIsOpen(false);
           signupForm.reset();
-          // Use router navigation instead of reload
-          window.location.href = window.location.pathname;
-        }, 500);
+          // AuthContext already updated, just close the modal
+        }, 300);
       }
     } catch (err: any) {
       setError(err.message || "An unexpected error occurred");

@@ -143,15 +143,15 @@ export function CreatePropertyModal({
         ...data,
         images: imageUrls,
       }
-      
+
       await createProperty(propertyData as any)
       form.reset()
       setImageUrls([])
       setOpen(false)
-      // Refresh the page or update the table
-      window.location.reload()
+      // Server action handles revalidation automatically
     } catch (error) {
       console.error('Error creating property:', error)
+      alert('Failed to create property. Please try again.')
     } finally {
       setIsSubmitting(false)
     }
