@@ -57,7 +57,7 @@ export default async function AdminPropertiesPage() {
           </p>
         </div>
         <div className="mt-4 sm:ml-16 sm:mt-0 sm:flex-none">
-          <CreatePropertyModal 
+          <CreatePropertyModal
             developers={developers}
             locationGuides={locationGuides}
           >
@@ -70,7 +70,24 @@ export default async function AdminPropertiesPage() {
       </div>
 
       <div className="mt-8">
-        <PropertyTable properties={properties} />
+        {properties.length === 0 ? (
+          <div className="bg-white shadow rounded-lg p-12 text-center">
+            <Building2 className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+            <h3 className="text-lg font-medium text-gray-900 mb-2">No properties yet</h3>
+            <p className="text-gray-500 mb-6">Get started by adding your first property to the platform.</p>
+            <CreatePropertyModal
+              developers={developers}
+              locationGuides={locationGuides}
+            >
+              <Button>
+                <Plus className="h-4 w-4 mr-2" />
+                Add Your First Property
+              </Button>
+            </CreatePropertyModal>
+          </div>
+        ) : (
+          <PropertyTable properties={properties} />
+        )}
       </div>
     </div>
   )

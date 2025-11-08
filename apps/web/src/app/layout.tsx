@@ -2,11 +2,11 @@ import type { Metadata } from "next";
 import { Inter, Plus_Jakarta_Sans } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/contexts/AuthContext";
-import { Navbar } from "@/components/layout/Navbar";
-import { Footer } from "@/components/layout/Footer";
+import { ConditionalNavbar } from "@/components/layout/ConditionalNavbar";
+import { ConditionalFooter } from "@/components/layout/ConditionalFooter";
 import { Toaster } from "@/components/ui/toast";
-import { ScrollToTop } from "@/components/layout/ScrollToTop";
-import { AIAssistantFab } from "@/components/ai/AIAssistantFab";
+import { ConditionalScrollToTop } from "@/components/layout/ConditionalScrollToTop";
+import { ConditionalAIAssistantFab } from "@/components/ai/ConditionalAIAssistantFab";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -84,13 +84,13 @@ export default function RootLayout({
     <html lang="en" className={`${inter.variable} ${plusJakarta.variable} overflow-x-hidden`}>
       <body className="font-plus-jakarta antialiased min-h-screen flex flex-col bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900 overflow-x-hidden">
         <AuthProvider>
-          <Navbar />
+          <ConditionalNavbar />
           <main className="flex-1">
             {children}
           </main>
-          <Footer />
-          <ScrollToTop />
-          <AIAssistantFab />
+          <ConditionalFooter />
+          <ConditionalScrollToTop />
+          <ConditionalAIAssistantFab />
           <Toaster />
         </AuthProvider>
       </body>
