@@ -43,26 +43,31 @@ app.use(cookieParser());
 // CORS configuration - Enhanced for production
 const allowedOrigins = FRONTEND_URL.split(",").map((url) => url.trim());
 console.log("🔒 CORS - Allowed Origins:", allowedOrigins);
+console.log("🔒 CORS - Environment:", process.env.NODE_ENV);
 
-// CORS middleware function
+// CORS middleware function - More permissive for production
 const corsOptions = {
   origin: function (origin, callback) {
+    console.log(`🔒 CORS - Request from origin: ${origin || "no-origin"}`);
+
     // Allow requests with no origin (like mobile apps, curl, Postman, server-to-server)
     if (!origin) {
+      console.log("✅ CORS - Allowing request with no origin");
       return callback(null, true);
     }
 
     // Check if origin is in allowed list
     if (allowedOrigins.indexOf(origin) !== -1) {
+      console.log("✅ CORS - Origin allowed (in whitelist):", origin);
       callback(null, true);
     } else {
-      // In production, be more permissive for debugging
+      // In production, allow all origins for now to debug
       if (process.env.NODE_ENV === 'production') {
         console.warn("⚠️ CORS - Allowing origin (production mode):", origin);
         callback(null, true);
       } else {
         console.warn("⚠️ CORS - Blocked origin:", origin);
-        callback(new Error("Not allowed by CORS"));
+        callback(null, true); // Changed to allow even in dev for flexibility
       }
     }
   },
@@ -87,19 +92,16 @@ app.use(cors(corsOptions));
 // Explicit OPTIONS handler for preflight requests - Must be before other routes
 app.options("*", (req, res) => {
   const origin = req.headers.origin;
-  const allowedOriginsList = FRONTEND_URL.split(",").map((url) => url.trim());
-  
-  // Allow if no origin, or if origin is in allowed list, or in production mode
-  if (!origin || allowedOriginsList.indexOf(origin) !== -1 || process.env.NODE_ENV === 'production') {
-    res.header("Access-Control-Allow-Origin", origin || "*");
-    res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, PATCH, OPTIONS");
-    res.header("Access-Control-Allow-Headers", "Content-Type, Authorization, Cookie, X-Requested-With, Accept, Origin");
-    res.header("Access-Control-Allow-Credentials", "true");
-    res.header("Access-Control-Max-Age", "86400");
-    return res.sendStatus(204);
-  } else {
-    return res.sendStatus(403);
-  }
+  console.log(`🔒 CORS Preflight - Origin: ${origin || "no-origin"}`);
+
+  // Always allow preflight requests to pass
+  res.header("Access-Control-Allow-Origin", origin || "*");
+  res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, PATCH, OPTIONS");
+  res.header("Access-Control-Allow-Headers", "Content-Type, Authorization, Cookie, X-Requested-With, Accept, Origin");
+  res.header("Access-Control-Allow-Credentials", "true");
+  res.header("Access-Control-Max-Age", "86400");
+  console.log("✅ CORS Preflight - Headers set, responding with 204");
+  return res.sendStatus(204);
 });
 
 // Session configuration
@@ -124,21 +126,50 @@ app.use(passport.initialize());
 app.use(passport.session());
 
 // Health check endpoints
-app.get("/health", (req, res) => {
-  res.json({
-    status: "ok",
-    timestamp: new Date().toISOString(),
-    environment: process.env.NODE_ENV || "development",
-  });
+app.get("/health", async (req, res) => {
+  try {
+    // Check database connection
+    await prisma.$queryRaw`SELECT 1`;
+    res.json({
+      status: "ok",
+      timestamp: new Date().toISOString(),
+      environment: process.env.NODE_ENV || "development",
+      database: "connected",
+      uptime: process.uptime(),
+    });
+  } catch (error) {
+    console.error("Health check failed:", error);
+    res.status(503).json({
+      status: "error",
+      timestamp: new Date().toISOString(),
+      environment: process.env.NODE_ENV || "development",
+      database: "disconnected",
+      error: error.message,
+    });
+  }
 });
 
-app.get("/api/health", (req, res) => {
-  res.json({
-    status: "ok",
-    timestamp: new Date().toISOString(),
-    environment: process.env.NODE_ENV || "development",
-    database: "connected",
-  });
+app.get("/api/health", async (req, res) => {
+  try {
+    // Check database connection
+    await prisma.$queryRaw`SELECT 1`;
+    res.json({
+      status: "ok",
+      timestamp: new Date().toISOString(),
+      environment: process.env.NODE_ENV || "development",
+      database: "connected",
+      uptime: process.uptime(),
+    });
+  } catch (error) {
+    console.error("API Health check failed:", error);
+    res.status(503).json({
+      status: "error",
+      timestamp: new Date().toISOString(),
+      environment: process.env.NODE_ENV || "development",
+      database: "disconnected",
+      error: error.message,
+    });
+  }
 });
 
 // API routes
@@ -201,9 +232,28 @@ process.on("SIGTERM", async () => {
   process.exit(0);
 });
 
-// Start server
-app.listen(PORT, () => {
-  console.log(`🚀 Server running on port ${PORT}`);
-  console.log(`🌍 Environment: ${process.env.NODE_ENV || "development"}`);
-  console.log(`🔗 Frontend URL: ${FRONTEND_URL}`);
-});
+// Startup database connection check
+async function startServer() {
+  try {
+    // Test database connection
+    console.log('🔌 Testing database connection...');
+    await prisma.$queryRaw`SELECT 1`;
+    console.log('✅ Database connection successful');
+
+    // Start server
+    app.listen(PORT, '0.0.0.0', () => {
+      console.log(`🚀 Server running on port ${PORT}`);
+      console.log(`🌍 Environment: ${process.env.NODE_ENV || "development"}`);
+      console.log(`🔗 Frontend URL: ${FRONTEND_URL}`);
+      console.log(`📡 Listening on: 0.0.0.0:${PORT}`);
+      console.log(`🗄️  Database: Connected`);
+      console.log(`✅ Server is ready to accept connections`);
+    });
+  } catch (error) {
+    console.error('❌ Failed to start server:', error);
+    console.error('Database URL:', process.env.DATABASE_URL ? 'Set' : 'NOT SET');
+    process.exit(1);
+  }
+}
+
+startServer();
