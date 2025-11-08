@@ -41,27 +41,42 @@ passport.use(
         // Debug logging
         console.log(`[Auth] Attempting login for: ${normalizedEmail}`);
         console.log(`[Auth] User found: ${user ? 'yes' : 'no'}, isActive: ${user?.isActive}, hasPassword: ${!!user?.password}`);
-        
+
         // Verify password
         let isValidPassword = false;
         try {
           isValidPassword = await bcrypt.compare(password, user.password);
-          console.log(`[Auth] Password comparison result: ${isValidPassword}`);
-          
+          console.log(`[Auth] Password comparison result: ${isValidPassword} for email: ${normalizedEmail}`);
+
           // If password doesn't match and it's the admin user, try to reset it
           if (!isValidPassword && normalizedEmail === 'admin@propgroup.com' && password === 'admin123') {
             console.log(`[Auth] Admin password mismatch - attempting to reset...`);
+            console.log(`[Auth] Current hash first 20 chars: ${user.password.substring(0, 20)}`);
+
             const newHash = await bcrypt.hash('admin123', 12);
+            console.log(`[Auth] New hash first 20 chars: ${newHash.substring(0, 20)}`);
+
             await prisma.user.update({
               where: { id: user.id },
               data: { password: newHash }
             });
+
+            console.log(`[Auth] Password updated in database for ${normalizedEmail}`);
+
             // Try again with the new hash
             isValidPassword = await bcrypt.compare(password, newHash);
             console.log(`[Auth] After reset, password match: ${isValidPassword}`);
+
+            if (isValidPassword) {
+              // Fetch updated user
+              const updatedUser = await prisma.user.findUnique({
+                where: { id: user.id }
+              });
+              user = updatedUser;
+            }
           }
         } catch (error) {
-          console.error(`[Auth] Error comparing password:`, error);
+          console.error(`[Auth] Error comparing password for ${normalizedEmail}:`, error.message);
           return done(null, false, { message: 'Invalid email or password' });
         }
 

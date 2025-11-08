@@ -57,7 +57,10 @@ const setTokenCookie = (res, token) => {
 router.post('/register', async (req, res) => {
   try {
     const validatedData = registerSchema.parse(req.body);
-    
+
+    // Normalize email to lowercase for consistent storage
+    validatedData.email = validatedData.email.toLowerCase().trim();
+
     // Check if user already exists
     const existingUser = await prisma.user.findUnique({
       where: { email: validatedData.email }
@@ -140,6 +143,9 @@ router.post('/login', async (req, res, next) => {
     }
 
     const validatedData = loginSchema.parse(req.body);
+
+    // Normalize email to lowercase for consistent lookup
+    validatedData.email = validatedData.email.toLowerCase().trim();
 
     passport.authenticate('local', (err, user, info) => {
       if (err) {
@@ -390,6 +396,51 @@ router.put('/change-password', authenticateToken, async (req, res) => {
     });
   }
 });
+
+// Debug endpoint to verify admin user exists (only in development/testing)
+if (process.env.NODE_ENV !== 'production') {
+  router.get('/debug/admin', async (req, res) => {
+    try {
+      const admin = await prisma.user.findUnique({
+        where: { email: 'admin@propgroup.com' },
+        select: {
+          id: true,
+          email: true,
+          role: true,
+          isActive: true,
+          emailVerifiedAt: true,
+          createdAt: true,
+          // Include password hash first 20 chars for debugging
+          password: true
+        }
+      });
+
+      if (!admin) {
+        return res.json({
+          exists: false,
+          message: 'Admin user not found in database'
+        });
+      }
+
+      res.json({
+        exists: true,
+        email: admin.email,
+        role: admin.role,
+        isActive: admin.isActive,
+        emailVerified: !!admin.emailVerifiedAt,
+        hasPassword: !!admin.password,
+        passwordHashPreview: admin.password?.substring(0, 20),
+        createdAt: admin.createdAt
+      });
+    } catch (error) {
+      console.error('Debug admin endpoint error:', error);
+      res.status(500).json({
+        error: 'Failed to check admin user',
+        message: error.message
+      });
+    }
+  });
+}
 
 // Google OAuth Routes (only if configured)
 if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
