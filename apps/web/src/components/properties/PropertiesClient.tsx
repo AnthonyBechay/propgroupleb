@@ -140,9 +140,9 @@ export function PropertiesClient({
 
   return (
     <div className="min-h-screen bg-white dark:bg-slate-900">
-      {/* Hero Section - Matching Landing Page */}
-      <section className="relative py-16 sm:py-20 bg-gradient-to-br from-[#0a1628] via-[#0f2439] to-[#1e293b] text-white overflow-hidden">
-        {/* Simplified Background - Matching Landing Page */}
+      {/* Compact Hero Section */}
+      <section className="relative py-6 sm:py-8 bg-gradient-to-br from-[#0a1628] via-[#0f2439] to-[#1e293b] text-white overflow-hidden">
+        {/* Simplified Background */}
         <div className="absolute inset-0 overflow-hidden">
           <div
             className="absolute top-0 -left-40 w-[600px] h-[600px] rounded-full opacity-15 blur-[120px]"
@@ -156,82 +156,78 @@ export function PropertiesClient({
 
         <div className="pg-container max-w-7xl mx-auto relative z-10">
           <div className="max-w-4xl mx-auto text-center">
-            <div className="inline-flex items-center gap-2 px-4 py-2 bg-slate-800/40 backdrop-blur-sm border border-slate-700/50 rounded-full text-sm font-semibold mb-6">
-              <Sparkles className="w-4 h-4 text-cyan-400" />
+            <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-slate-800/40 backdrop-blur-sm border border-slate-700/50 rounded-full text-xs font-semibold mb-3">
+              <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
               <span className="text-slate-300">CURATED PROPERTIES</span>
             </div>
-            <h1 className="pg-text-4xl sm:pg-text-5xl md:pg-text-6xl font-black mb-4 sm:mb-6">
-              <span className="block text-white mb-2">
-                Premium Investment
-              </span>
-              <span className="block bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-600 bg-clip-text text-transparent">
-                Properties
-              </span>
+            <h1 className="text-2xl sm:text-3xl md:text-4xl font-black mb-2">
+              <span className="text-white">Premium Investment </span>
+              <span className="bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-600 bg-clip-text text-transparent">Properties</span>
             </h1>
-            <p className="pg-text-lg sm:pg-text-xl text-slate-300 mb-8 max-w-2xl mx-auto">
-              Hand-picked opportunities with verified returns and expert analysis
+            <p className="text-sm sm:text-base text-slate-300 mb-4 max-w-2xl mx-auto">
+              Hand-picked opportunities with verified returns
             </p>
 
-            {/* Quick stats - Matching Landing Page Style */}
-            <div className="pg-grid pg-grid-cols-3 gap-4 sm:gap-8 max-w-2xl mx-auto">
+            {/* Quick stats - Compact */}
+            <div className="grid grid-cols-3 gap-3 sm:gap-6 max-w-lg mx-auto">
               <div>
-                <div className="pg-text-3xl sm:pg-text-4xl font-bold text-white mb-1">12.5%</div>
-                <div className="text-sm text-slate-400">Avg ROI</div>
+                <div className="text-xl sm:text-2xl font-bold text-white mb-0.5">12.5%</div>
+                <div className="text-xs text-slate-400">Avg ROI</div>
               </div>
               <div>
-                <div className="pg-text-3xl sm:pg-text-4xl font-bold text-white mb-1">25+</div>
-                <div className="text-sm text-slate-400">Countries</div>
+                <div className="text-xl sm:text-2xl font-bold text-white mb-0.5">25+</div>
+                <div className="text-xs text-slate-400">Countries</div>
               </div>
               <div>
-                <div className="pg-text-3xl sm:pg-text-4xl font-bold text-white mb-1">{filteredProperties.length}</div>
-                <div className="text-sm text-slate-400">Properties</div>
+                <div className="text-xl sm:text-2xl font-bold text-white mb-0.5">{filteredProperties.length}</div>
+                <div className="text-xs text-slate-400">Properties</div>
               </div>
             </div>
           </div>
         </div>
       </section>
 
-      <div className="pg-container max-w-7xl mx-auto py-8 sm:py-12">
-        {/* AI Search Banner - Updated to match landing page style */}
+      <div className="pg-container max-w-7xl mx-auto py-6 sm:py-8">
+        {/* AI Search Banner - More Compact */}
         {!showAISearch && (
-          <div className="mb-8 p-6 bg-gradient-to-br from-slate-800/60 to-slate-900/60 backdrop-blur-sm border border-slate-700/50 rounded-2xl text-white shadow-xl">
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-              <div className="flex items-start gap-4">
-                <div className="w-12 h-12 bg-gradient-to-br from-cyan-500 to-blue-600 rounded-xl flex items-center justify-center flex-shrink-0 shadow-lg">
-                  <Bot className="w-6 h-6 text-white" />
+          <div className="mb-6 p-4 bg-gradient-to-br from-slate-800/60 to-slate-900/60 backdrop-blur-sm border border-slate-700/50 rounded-xl text-white shadow-lg">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+              <div className="flex items-start gap-3">
+                <div className="w-10 h-10 bg-gradient-to-br from-cyan-500 to-blue-600 rounded-lg flex items-center justify-center flex-shrink-0">
+                  <Bot className="w-5 h-5 text-white" />
                 </div>
                 <div>
-                  <div className="flex items-center gap-2 mb-1">
-                    <h3 className="font-bold text-white">AI-Powered Search</h3>
-                    <span className="inline-flex items-center px-2 py-0.5 text-xs font-semibold bg-gradient-to-r from-cyan-500 to-blue-600 text-white rounded-full">
+                  <div className="flex items-center gap-2 mb-0.5">
+                    <h3 className="text-sm font-bold text-white">AI-Powered Search</h3>
+                    <span className="inline-flex items-center px-1.5 py-0.5 text-xs font-semibold bg-gradient-to-r from-cyan-500 to-blue-600 text-white rounded-full">
                       NEW
                     </span>
                   </div>
-                  <p className="text-sm text-slate-300">
-                    Find properties faster by describing what you want in plain English
+                  <p className="text-xs text-slate-300">
+                    Describe what you want in plain English
                   </p>
                 </div>
               </div>
               <Button
                 onClick={() => setShowAISearch(true)}
-                className="bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-white rounded-xl shadow-lg transition-all flex-shrink-0"
+                className="bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-white rounded-lg shadow-md transition-all flex-shrink-0"
                 size="sm"
               >
-                <Sparkles className="w-4 h-4 mr-2" />
+                <Sparkles className="w-3.5 h-3.5 mr-1.5" />
                 Try Now
               </Button>
             </div>
           </div>
         )}
 
-        {/* AI Search Interface - Updated styling */}
+        {/* AI Search Interface - Compact */}
         {showAISearch && (
-          <div className="mb-8 animate-in fade-in slide-in-from-top-2">
-            <div className="bg-slate-50 border border-slate-200 rounded-2xl p-6 shadow-sm">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-                  <div className="w-8 h-8 bg-gradient-to-br from-cyan-500 to-blue-600 rounded-lg flex items-center justify-center">
-                    <Bot className="w-5 h-5 text-white" />
+          <div className="mb-6 animate-in fade-in slide-in-from-top-2">
+            <div className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-4 shadow-sm">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-base font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                  <div className="w-7 h-7 bg-gradient-to-br from-cyan-500 to-blue-600 rounded-lg flex items-center justify-center">
+                    <Bot className="w-4 h-4 text-white" />
                   </div>
                   AI Property Search
                 </h3>
@@ -239,7 +235,7 @@ export function PropertiesClient({
                   variant="ghost"
                   size="sm"
                   onClick={() => setShowAISearch(false)}
-                  className="text-gray-500 hover:text-gray-900 hover:bg-slate-100"
+                  className="text-gray-500 hover:text-gray-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-700"
                 >
                   <X className="w-4 h-4" />
                 </Button>
@@ -249,8 +245,8 @@ export function PropertiesClient({
           </div>
         )}
 
-        {/* Toolbar - Updated styling to match theme */}
-        <div className="flex flex-wrap items-center justify-between gap-4 mb-8">
+        {/* Toolbar - Compact */}
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
           <div className="flex flex-wrap items-center gap-3">
             {/* AI Search button */}
             {!showAISearch && (
@@ -342,33 +338,33 @@ export function PropertiesClient({
           </div>
         )}
 
-        {/* Results summary - Updated styling */}
+        {/* Results summary - Compact */}
         {(searchParams.q || searchParams.goal || searchParams.budget) && (
-          <div className="mb-6 p-5 bg-gradient-to-r from-cyan-50 to-blue-50 border-2 border-cyan-200 rounded-2xl shadow-sm">
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-gradient-to-br from-cyan-500 to-blue-600 rounded-lg flex items-center justify-center shadow-md">
-                  <Search className="w-5 h-5 text-white" />
+          <div className="mb-4 p-3 bg-gradient-to-r from-cyan-50 to-blue-50 dark:from-cyan-950/30 dark:to-blue-950/30 border border-cyan-200 dark:border-cyan-800 rounded-lg shadow-sm">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 bg-gradient-to-br from-cyan-500 to-blue-600 rounded-lg flex items-center justify-center">
+                  <Search className="w-4 h-4 text-white" />
                 </div>
-                <span className="font-bold text-gray-900">
+                <span className="text-sm font-bold text-gray-900 dark:text-white">
                   Search Results
                 </span>
               </div>
-              <span className="text-sm font-medium text-slate-700 bg-white px-4 py-2 rounded-lg shadow-sm">
-                <span className="font-bold text-blue-600">{filteredProperties.length}</span> properties found
-                {searchParams.goal && ` for ${searchParams.goal.replace('_', ' ').toLowerCase()} goal`}
+              <span className="text-xs font-medium text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-800 px-3 py-1.5 rounded-md">
+                <span className="font-bold text-blue-600 dark:text-blue-400">{filteredProperties.length}</span> found
+                {searchParams.goal && ` for ${searchParams.goal.replace('_', ' ').toLowerCase()}`}
                 {searchParams.budget && ` under $${parseInt(searchParams.budget).toLocaleString()}`}
               </span>
             </div>
           </div>
         )}
 
-        {/* Content */}
+        {/* Content - Properties Grid */}
         {loading ? (
           <PropertyGridSkeleton />
         ) : viewMode === 'grid' ? (
           filteredProperties.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {filteredProperties.map((property: Property, index: number) => (
                 <div
                   key={property.id}
@@ -400,21 +396,20 @@ export function PropertiesClient({
               ))}
             </div>
           ) : (
-            <div className="text-center py-20 bg-slate-50 border-2 border-slate-200 rounded-3xl shadow-sm">
+            <div className="text-center py-12 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-sm">
               <div className="max-w-md mx-auto">
-                <div className="w-20 h-20 bg-gradient-to-br from-slate-200 to-slate-300 rounded-full flex items-center justify-center mx-auto mb-6 shadow-md">
-                  <Search className="w-10 h-10 text-slate-500" />
+                <div className="w-16 h-16 bg-gradient-to-br from-slate-200 to-slate-300 dark:from-slate-700 dark:to-slate-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <Search className="w-8 h-8 text-slate-500 dark:text-slate-400" />
                 </div>
-                <h3 className="text-3xl font-black text-gray-900 mb-3">
+                <h3 className="text-2xl font-black text-gray-900 dark:text-white mb-2">
                   No properties found
                 </h3>
-                <p className="text-lg text-slate-600 mb-8">
-                  Try adjusting your filters or search criteria to find more properties
+                <p className="text-sm text-slate-600 dark:text-slate-400 mb-6">
+                  Try adjusting your filters or search criteria
                 </p>
                 <Button
                   onClick={clearFilters}
-                  className="bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-white rounded-xl shadow-lg px-8"
-                  size="lg"
+                  className="bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-white rounded-lg shadow-md px-6"
                 >
                   <Sparkles className="w-4 h-4 mr-2" />
                   View All Properties
@@ -426,13 +421,12 @@ export function PropertiesClient({
           <MapView properties={filteredProperties} />
         )}
 
-        {/* Load more button - Updated styling */}
+        {/* Load more button - Compact */}
         {filteredProperties.length > 0 && filteredProperties.length % 9 === 0 && (
-          <div className="text-center mt-12">
+          <div className="text-center mt-8">
             <Button
-              size="lg"
               variant="outline"
-              className="min-w-[200px] border-2 border-slate-900 text-slate-900 hover:bg-slate-900 hover:text-white font-semibold rounded-xl shadow-md transition-all"
+              className="min-w-[180px] border-2 border-slate-900 dark:border-slate-300 text-slate-900 dark:text-slate-300 hover:bg-slate-900 hover:text-white dark:hover:bg-slate-300 dark:hover:text-slate-900 font-semibold rounded-lg shadow-sm transition-all"
             >
               Load More Properties
             </Button>
