@@ -1,19 +1,32 @@
 import jwt from 'jsonwebtoken';
 import { prisma } from '@propgroup/db';
 
+// Middleware to prevent caching of user-specific data
+export const noCache = (req, res, next) => {
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+  next();
+};
+
 export const authenticateToken = async (req, res, next) => {
   try {
+    // Add no-cache headers to all authenticated requests
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+
     const token = req.cookies?.token || req.headers.authorization?.replace('Bearer ', '');
-    
+
     if (!token) {
-      return res.status(401).json({ 
-        error: 'Unauthorized', 
-        message: 'No authentication token provided' 
+      return res.status(401).json({
+        error: 'Unauthorized',
+        message: 'No authentication token provided'
       });
     }
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    
+
     // Get user from database to ensure they still exist and are active
     const user = await prisma.user.findUnique({
       where: { id: decoded.userId },
@@ -38,16 +51,16 @@ export const authenticateToken = async (req, res, next) => {
     });
 
     if (!user) {
-      return res.status(401).json({ 
-        error: 'Unauthorized', 
-        message: 'User not found' 
+      return res.status(401).json({
+        error: 'Unauthorized',
+        message: 'User not found'
       });
     }
 
     if (!user.isActive || user.bannedAt) {
-      return res.status(401).json({ 
-        error: 'Unauthorized', 
-        message: 'Account is inactive or banned' 
+      return res.status(401).json({
+        error: 'Unauthorized',
+        message: 'Account is inactive or banned'
       });
     }
 
@@ -55,23 +68,23 @@ export const authenticateToken = async (req, res, next) => {
     next();
   } catch (error) {
     if (error.name === 'JsonWebTokenError') {
-      return res.status(401).json({ 
-        error: 'Unauthorized', 
-        message: 'Invalid token' 
+      return res.status(401).json({
+        error: 'Unauthorized',
+        message: 'Invalid token'
       });
     }
-    
+
     if (error.name === 'TokenExpiredError') {
-      return res.status(401).json({ 
-        error: 'Unauthorized', 
-        message: 'Token expired' 
+      return res.status(401).json({
+        error: 'Unauthorized',
+        message: 'Token expired'
       });
     }
 
     console.error('Auth middleware error:', error);
-    return res.status(500).json({ 
-      error: 'Internal Server Error', 
-      message: 'Authentication failed' 
+    return res.status(500).json({
+      error: 'Internal Server Error',
+      message: 'Authentication failed'
     });
   }
 };

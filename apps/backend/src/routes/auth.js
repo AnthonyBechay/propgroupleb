@@ -8,6 +8,31 @@ import passport from '../config/passport.js';
 
 const router = express.Router();
 
+// Middleware to add no-cache headers to all auth endpoints
+router.use((req, res, next) => {
+  // Add cache-control headers to prevent caching of sensitive data
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+
+  // Add CORS headers explicitly for auth routes
+  const origin = req.headers.origin;
+  if (origin) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, Cookie, X-Requested-With, Accept, Origin');
+  }
+
+  // Handle OPTIONS preflight
+  if (req.method === 'OPTIONS') {
+    console.log(`[Auth CORS] Preflight request for ${req.path} from ${origin || 'no-origin'}`);
+    return res.sendStatus(204);
+  }
+
+  next();
+});
+
 // Validation schemas
 const registerSchema = z.object({
   email: z.string().email('Invalid email address'),
@@ -137,11 +162,6 @@ router.post('/register', async (req, res) => {
 // Login user
 router.post('/login', async (req, res, next) => {
   try {
-    // Handle OPTIONS preflight explicitly
-    if (req.method === 'OPTIONS') {
-      return res.sendStatus(204);
-    }
-
     const validatedData = loginSchema.parse(req.body);
 
     // Normalize email to lowercase for consistent lookup
@@ -207,9 +227,14 @@ router.post('/login', async (req, res, next) => {
 // Get current user - Optional auth, returns null if not authenticated
 router.get('/me', async (req, res) => {
   try {
+    // Add cache-control headers to prevent caching of user data
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+
     // Try to authenticate, but don't fail if no token
     const token = req.cookies?.token || req.headers.authorization?.replace('Bearer ', '');
-    
+
     if (!token) {
       return res.json({
         success: true,
@@ -219,7 +244,7 @@ router.get('/me', async (req, res) => {
 
     try {
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
-      
+
       const user = await prisma.user.findUnique({
         where: { id: decoded.userId },
         select: {
@@ -271,12 +296,50 @@ router.get('/me', async (req, res) => {
 
 // Logout user
 router.post('/logout', (req, res) => {
-  // Clear cookie with same options as when it was set
-  res.clearCookie('token', {
+  console.log('[Logout] User logout request');
+
+  // Destroy session if it exists
+  if (req.session) {
+    req.session.destroy((err) => {
+      if (err) {
+        console.error('[Logout] Error destroying session:', err);
+      } else {
+        console.log('[Logout] Session destroyed successfully');
+      }
+    });
+  }
+
+  // Logout passport if authenticated
+  if (req.logout) {
+    req.logout((err) => {
+      if (err) {
+        console.error('[Logout] Error logging out passport:', err);
+      }
+    });
+  }
+
+  // Clear all auth-related cookies
+  const cookieOptions = {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
-    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax'
-  });
+    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+    path: '/'
+  };
+
+  // Clear token cookie
+  res.clearCookie('token', cookieOptions);
+
+  // Clear session cookie (connect.sid)
+  res.clearCookie('connect.sid', cookieOptions);
+
+  // Add cache-control headers to prevent caching
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+  res.setHeader('Clear-Site-Data', '"cache", "cookies", "storage"');
+
+  console.log('[Logout] Logout successful, all cookies and cache cleared');
+
   res.json({
     success: true,
     message: 'Logged out successfully'
