@@ -1,4 +1,3 @@
-import { prisma } from '@/lib/prisma'
 import { PropertyTable } from '@/components/admin/PropertyTable'
 import { CreatePropertyModal } from '@/components/admin/CreatePropertyModal'
 import { Button } from '@/components/ui/button'
@@ -12,37 +11,35 @@ export default async function AdminPropertiesPage() {
   let locationGuides: any[] = []
 
   try {
-    console.log('[Admin Properties] Attempting to fetch properties from database...')
+    console.log('[Admin Properties] Fetching properties from API...')
 
-    // Fetch all properties with related data
-    properties = await prisma.property.findMany({
-      include: {
-        developer: true,
-        investmentData: true,
-        locationGuide: true,
-        _count: {
-          select: {
-            favoriteProperties: true,
-            propertyInquiries: true
-          }
-        }
+    // Fetch from API instead of direct database access
+    const { normalizeApiUrl } = await import('@/lib/utils/api-url')
+    const apiUrl = normalizeApiUrl(process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001')
+
+    // Fetch all properties
+    const propertiesResponse = await fetch(`${apiUrl}/api/properties?limit=1000`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
       },
-      orderBy: { createdAt: 'desc' }
+      cache: 'no-store',
     })
 
-    console.log(`[Admin Properties] Found ${properties.length} properties`)
+    if (propertiesResponse.ok) {
+      const propertiesData = await propertiesResponse.json()
+      if (propertiesData.success && propertiesData.data) {
+        properties = propertiesData.data
+        console.log(`[Admin Properties] Found ${properties.length} properties`)
+      }
+    } else {
+      console.error('[Admin Properties] Failed to fetch properties:', propertiesResponse.status)
+    }
 
-    // Fetch developers and location guides for the form
-    const results = await Promise.all([
-      prisma.developer.findMany({
-        select: { id: true, name: true, country: true }
-      }),
-      prisma.locationGuide.findMany({
-        select: { id: true, title: true, country: true }
-      })
-    ])
-    developers = results[0]
-    locationGuides = results[1]
+    // Fetch developers and location guides (we'll need to create these API endpoints or use mock data)
+    // For now, using empty arrays - you can add API endpoints for these later
+    developers = []
+    locationGuides = []
 
     console.log(`[Admin Properties] Found ${developers.length} developers and ${locationGuides.length} location guides`)
   } catch (error) {
@@ -52,7 +49,7 @@ export default async function AdminPropertiesPage() {
       message: (error as Error).message,
       stack: (error as Error).stack
     })
-    // Return empty arrays if database query fails
+    // Return empty arrays if API fetch fails
   }
 
   return (
