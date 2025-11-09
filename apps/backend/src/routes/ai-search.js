@@ -1,8 +1,14 @@
 import express from 'express';
 import { z } from 'zod';
 import { prisma } from '@propgroup/db';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 
 const router = express.Router();
+
+// Initialize Google Gemini AI
+const genAI = process.env.GOOGLE_GEMINI_API_KEY
+  ? new GoogleGenerativeAI(process.env.GOOGLE_GEMINI_API_KEY)
+  : null;
 
 // Validation schema for AI search
 const aiSearchSchema = z.object({
@@ -191,13 +197,80 @@ function buildOrderBy(filters) {
   return orderBy;
 }
 
+// Use Google Gemini AI to parse natural language query
+async function parseQueryWithGemini(query) {
+  if (!genAI) {
+    console.log('Gemini API not configured, using fallback parser');
+    return null;
+  }
+
+  try {
+    const model = genAI.getGenerativeModel({ model: 'gemini-pro' });
+
+    const prompt = `You are a property search filter parser. Extract search criteria from the user's natural language query and return ONLY a valid JSON object (no markdown, no code blocks, just raw JSON).
+
+Available countries: GEORGIA, CYPRUS, GREECE, LEBANON
+Available property statuses: OFF_PLAN, NEW_BUILD, RESALE
+Available goals: GOLDEN_VISA, HIGH_ROI, PASSIVE_INCOME
+
+User query: "${query}"
+
+Return a JSON object with these possible fields (only include fields that are mentioned in the query):
+{
+  "country": "COUNTRY_CODE",
+  "minPrice": number,
+  "maxPrice": number,
+  "bedrooms": number,
+  "minBedrooms": number,
+  "maxBedrooms": number,
+  "bathrooms": number,
+  "status": "STATUS",
+  "goal": "GOAL",
+  "isGoldenVisaEligible": boolean,
+  "sortBy": "price" | "roi" | "rentalYield",
+  "propertyType": "apartment" | "villa" | "house" | "condo" | "penthouse"
+}
+
+Important:
+- For prices like "300k" or "$300k", convert to 300000
+- For "under X" or "below X", use maxPrice
+- For "above X" or "over X", use minPrice
+- For "between X and Y", use both minPrice and maxPrice
+- For bedroom ranges like "2-3 bedroom", use minBedrooms and maxBedrooms
+- If golden visa or residency is mentioned, set isGoldenVisaEligible to true and goal to GOLDEN_VISA
+- If ROI or investment return is mentioned, set goal to HIGH_ROI and sortBy to roi
+- If rental or passive income is mentioned, set goal to PASSIVE_INCOME and sortBy to rentalYield
+
+Return ONLY the JSON object, nothing else.`;
+
+    const result = await model.generateContent(prompt);
+    const response = await result.response;
+    const text = response.text().trim();
+
+    // Remove markdown code blocks if present
+    const jsonText = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+
+    const filters = JSON.parse(jsonText);
+    console.log('Gemini parsed filters:', filters);
+    return filters;
+  } catch (error) {
+    console.error('Gemini parsing error:', error);
+    return null;
+  }
+}
+
 // POST /api/ai-search - AI-powered property search
 router.post('/', async (req, res) => {
   try {
     const { query, context } = aiSearchSchema.parse(req.body);
 
-    // Parse the natural language query
-    const filters = parseNaturalLanguageQuery(query);
+    // Try to parse with Gemini AI first, fallback to regex-based parsing
+    let filters = await parseQueryWithGemini(query);
+
+    if (!filters) {
+      console.log('Using fallback regex parser');
+      filters = parseNaturalLanguageQuery(query);
+    }
 
     // Build Prisma query
     const where = buildWhereClause(filters);
@@ -222,7 +295,7 @@ router.post('/', async (req, res) => {
     });
 
     // Generate AI response summary
-    const summary = generateSearchSummary(query, filters, properties.length);
+    const summary = await generateAISummary(query, filters, properties.length);
 
     res.json({
       success: true,
@@ -231,7 +304,8 @@ router.post('/', async (req, res) => {
         filters,
         summary,
         properties,
-        count: properties.length
+        count: properties.length,
+        aiPowered: genAI !== null
       }
     });
 
@@ -252,7 +326,39 @@ router.post('/', async (req, res) => {
   }
 });
 
-// Generate human-readable search summary
+// Generate AI-powered search summary using Gemini
+async function generateAISummary(query, filters, count) {
+  if (!genAI) {
+    return generateSearchSummary(query, filters, count);
+  }
+
+  try {
+    const model = genAI.getGenerativeModel({ model: 'gemini-pro' });
+
+    const prompt = `You are a friendly real estate assistant. Generate a concise, natural response (2-3 sentences max) about property search results.
+
+User searched for: "${query}"
+Filters applied: ${JSON.stringify(filters)}
+Properties found: ${count}
+
+Generate a helpful, conversational response that:
+1. Confirms what they're looking for
+2. States how many properties were found
+3. If count is 0, suggests they adjust their criteria
+4. If count > 0, encourages them to explore the results
+
+Keep it brief and friendly. Don't use emojis.`;
+
+    const result = await model.generateContent(prompt);
+    const response = await result.response;
+    return response.text().trim();
+  } catch (error) {
+    console.error('Gemini summary generation error:', error);
+    return generateSearchSummary(query, filters, count);
+  }
+}
+
+// Fallback: Generate human-readable search summary (when Gemini is not available)
 function generateSearchSummary(query, filters, count) {
   const parts = [];
 

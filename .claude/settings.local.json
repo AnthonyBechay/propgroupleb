@@ -34,7 +34,8 @@
       "Bash(npm run build:*)",
       "Bash(git add:*)",
       "Bash(.env)",
-      "Bash(npx prisma migrate:*)"
+      "Bash(npx prisma migrate:*)",
+      "Bash(pnpm add:*)"
     ],
     "deny": [],
     "ask": []

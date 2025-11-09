@@ -31,6 +31,28 @@ services:
       - key: JWT_EXPIRES_IN
         value: 7d
 
+      # Google OAuth (Optional)
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: GOOGLE_CALLBACK_URL
+        value: https://propgroup.onrender.com/api/auth/google/callback
+
+      # Google Gemini AI (Required for AI features)
+      - key: GOOGLE_GEMINI_API_KEY
+        sync: false
+
+      # Email Services (Optional)
+      - key: RESEND_API_KEY
+        sync: false
+      - key: SENDGRID_API_KEY
+        sync: false
+      - key: FROM_EMAIL
+        value: noreply@propgroup.com
+      - key: ADMIN_EMAIL
+        value: admin@propgroup.com
+
 databases:
   - name: propgroup-database
     databaseName: propgroup_database

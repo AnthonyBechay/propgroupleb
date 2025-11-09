@@ -70,126 +70,6 @@ export function AIPropertySearch({
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }
 
-  const parseNaturalLanguageQuery = (query: string): PropertyFilters => {
-    const filters: PropertyFilters = {}
-    const lowerQuery = query.toLowerCase()
-
-    // Extract countries
-    const countries = ['georgia', 'cyprus', 'greece', 'lebanon']
-    for (const country of countries) {
-      if (lowerQuery.includes(country)) {
-        filters.country = country.toUpperCase()
-        break
-      }
-    }
-
-    // Extract price range
-    const priceMatch = lowerQuery.match(/(?:under|below|less than|max|maximum)\s*\$?([0-9,]+)k?/i)
-    if (priceMatch) {
-      let price = parseInt(priceMatch[1].replace(/,/g, ''))
-      if (lowerQuery.includes('k') || lowerQuery.includes('thousand')) {
-        price *= 1000
-      }
-      filters.maxPrice = price
-    }
-
-    const minPriceMatch = lowerQuery.match(/(?:above|over|more than|min|minimum)\s*\$?([0-9,]+)k?/i)
-    if (minPriceMatch) {
-      let price = parseInt(minPriceMatch[1].replace(/,/g, ''))
-      if (lowerQuery.includes('k') || lowerQuery.includes('thousand')) {
-        price *= 1000
-      }
-      filters.minPrice = price
-    }
-
-    // Extract range prices like "between $100k and $200k"
-    const rangeMatch = lowerQuery.match(/between\s*\$?([0-9,]+)k?\s*(?:and|to|-)\s*\$?([0-9,]+)k?/i)
-    if (rangeMatch) {
-      let min = parseInt(rangeMatch[1].replace(/,/g, ''))
-      let max = parseInt(rangeMatch[2].replace(/,/g, ''))
-      if (lowerQuery.includes('k') || lowerQuery.includes('thousand')) {
-        min *= 1000
-        max *= 1000
-      }
-      filters.minPrice = min
-      filters.maxPrice = max
-    }
-
-    // Extract bedrooms
-    const bedroomMatch = lowerQuery.match(/(\d+)[- ]?(?:bed|bedroom|br)/i)
-    if (bedroomMatch) {
-      filters.bedrooms = parseInt(bedroomMatch[1])
-    }
-
-    // Extract bathrooms
-    const bathroomMatch = lowerQuery.match(/(\d+)[- ]?(?:bath|bathroom)/i)
-    if (bathroomMatch) {
-      filters.bathrooms = parseInt(bathroomMatch[1])
-    }
-
-    // Extract goals
-    if (lowerQuery.includes('golden visa') || lowerQuery.includes('residency') || lowerQuery.includes('citizenship')) {
-      filters.goal = 'GOLDEN_VISA'
-      filters.isGoldenVisaEligible = true
-    }
-    if (lowerQuery.includes('roi') || lowerQuery.includes('return') || lowerQuery.includes('investment return')) {
-      filters.goal = 'HIGH_ROI'
-    }
-    if (lowerQuery.includes('rental') || lowerQuery.includes('passive income') || lowerQuery.includes('rent')) {
-      filters.goal = 'PASSIVE_INCOME'
-    }
-
-    // Extract status
-    if (lowerQuery.includes('off plan') || lowerQuery.includes('off-plan')) {
-      filters.status = 'OFF_PLAN'
-    } else if (lowerQuery.includes('new build') || lowerQuery.includes('new-build')) {
-      filters.status = 'NEW_BUILD'
-    } else if (lowerQuery.includes('resale')) {
-      filters.status = 'RESALE'
-    }
-
-    return filters
-  }
-
-  const generateAssistantResponse = (filters: PropertyFilters, originalQuery: string): string => {
-    const parts: string[] = []
-
-    parts.push("I'll help you find properties matching your criteria:")
-
-    if (filters.bedrooms) {
-      parts.push(`${filters.bedrooms} bedroom${filters.bedrooms > 1 ? 's' : ''}`)
-    }
-
-    if (filters.country) {
-      parts.push(`in ${filters.country.charAt(0) + filters.country.slice(1).toLowerCase()}`)
-    }
-
-    if (filters.minPrice && filters.maxPrice) {
-      parts.push(`between $${filters.minPrice.toLocaleString()} and $${filters.maxPrice.toLocaleString()}`)
-    } else if (filters.maxPrice) {
-      parts.push(`under $${filters.maxPrice.toLocaleString()}`)
-    } else if (filters.minPrice) {
-      parts.push(`above $${filters.minPrice.toLocaleString()}`)
-    }
-
-    if (filters.goal === 'GOLDEN_VISA') {
-      parts.push('eligible for Golden Visa programs')
-    }
-
-    if (filters.status) {
-      const statusText = filters.status.replace('_', ' ').toLowerCase()
-      parts.push(`(${statusText})`)
-    }
-
-    let response = parts.length > 1
-      ? parts.join(' ') + '.'
-      : "I'll search for properties based on your request."
-
-    response += "\n\nSearching our database now..."
-
-    return response
-  }
-
   const handleSearch = async () => {
     if (!query.trim()) return
 
@@ -202,45 +82,79 @@ export function AIPropertySearch({
 
     setMessages(prev => [...prev, userMessage])
     setIsLoading(true)
+    const currentQuery = query
     setQuery('')
 
-    // Simulate AI processing
-    await new Promise(resolve => setTimeout(resolve, 500))
+    try {
+      // Call backend AI search API
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api'
+      const response = await fetch(`${apiUrl}/ai-search`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          query: currentQuery,
+          context: {
+            previousSearches: messages
+              .filter(m => m.role === 'user')
+              .map(m => m.content)
+              .slice(-3)
+          }
+        })
+      })
 
-    const filters = parseNaturalLanguageQuery(query)
-    const assistantResponse = generateAssistantResponse(filters, query)
-
-    const assistantMessage: Message = {
-      id: (Date.now() + 1).toString(),
-      role: 'assistant',
-      content: assistantResponse,
-      timestamp: new Date(),
-      filters
-    }
-
-    setMessages(prev => [...prev, assistantMessage])
-    setIsLoading(false)
-
-    // Navigate to properties with filters after a short delay
-    setTimeout(() => {
-      const params = new URLSearchParams()
-      if (filters.country) params.append('country', filters.country)
-      if (filters.minPrice) params.append('minPrice', filters.minPrice.toString())
-      if (filters.maxPrice) params.append('maxPrice', filters.maxPrice.toString())
-      if (filters.bedrooms) params.append('bedrooms', filters.bedrooms.toString())
-      if (filters.bathrooms) params.append('bathrooms', filters.bathrooms.toString())
-      if (filters.goal) params.append('goal', filters.goal)
-      if (filters.status) params.append('status', filters.status)
-      if (filters.isGoldenVisaEligible) params.append('goldenVisa', 'true')
-
-      params.append('q', query)
-
-      if (onSearch) {
-        onSearch(filters)
-      } else {
-        router.push(`/properties?${params.toString()}`)
+      if (!response.ok) {
+        throw new Error('AI search request failed')
       }
-    }, 1000)
+
+      const data = await response.json()
+      const { filters, summary } = data.data
+
+      const assistantMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        role: 'assistant',
+        content: summary,
+        timestamp: new Date(),
+        filters
+      }
+
+      setMessages(prev => [...prev, assistantMessage])
+      setIsLoading(false)
+
+      // Navigate to properties with filters after a short delay
+      setTimeout(() => {
+        const params = new URLSearchParams()
+        if (filters.country) params.append('country', filters.country)
+        if (filters.minPrice) params.append('minPrice', filters.minPrice.toString())
+        if (filters.maxPrice) params.append('maxPrice', filters.maxPrice.toString())
+        if (filters.bedrooms) params.append('bedrooms', filters.bedrooms.toString())
+        if (filters.bathrooms) params.append('bathrooms', filters.bathrooms.toString())
+        if (filters.goal) params.append('goal', filters.goal)
+        if (filters.status) params.append('status', filters.status)
+        if (filters.isGoldenVisaEligible) params.append('goldenVisa', 'true')
+
+        params.append('q', currentQuery)
+
+        if (onSearch) {
+          onSearch(filters)
+        } else {
+          router.push(`/properties?${params.toString()}`)
+        }
+      }, 1000)
+    } catch (error) {
+      console.error('AI search error:', error)
+
+      const errorMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        role: 'assistant',
+        content: "I'm having trouble processing your request right now. Please try again or use the regular search filters.",
+        timestamp: new Date()
+      }
+
+      setMessages(prev => [...prev, errorMessage])
+      setIsLoading(false)
+    }
   }
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -260,48 +174,86 @@ export function AIPropertySearch({
   if (variant === 'inline') {
     return (
       <div className="w-full">
-        <div className="relative">
-          <div className="absolute left-4 top-1/2 transform -translate-y-1/2 flex items-center gap-2">
-            <Bot className="w-5 h-5 text-blue-600" />
-            <Sparkles className="w-4 h-4 text-yellow-500 animate-pulse" />
+        {/* Enhanced Search Input with Gradient Border */}
+        <div className="relative group">
+          {/* Gradient border wrapper */}
+          <div className="absolute -inset-0.5 bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 rounded-2xl opacity-50 group-hover:opacity-100 blur-sm transition-all duration-300"></div>
+
+          <div className="relative bg-white dark:bg-gray-900 rounded-2xl shadow-2xl">
+            <div className="absolute left-4 top-1/2 transform -translate-y-1/2 flex items-center gap-2 z-10">
+              <div className="relative">
+                <Bot className="w-6 h-6 text-blue-600 dark:text-blue-400" />
+                <Sparkles className="w-3 h-3 text-amber-500 dark:text-amber-400 absolute -top-1 -right-1 animate-pulse" />
+              </div>
+            </div>
+
+            <Input
+              ref={inputRef}
+              type="text"
+              placeholder={placeholder}
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              onKeyPress={handleKeyPress}
+              className="pl-16 pr-32 h-16 text-base bg-transparent border-2 border-transparent focus:border-transparent focus:ring-0 rounded-2xl text-gray-900 dark:text-gray-100 placeholder:text-gray-500 dark:placeholder:text-gray-400"
+            />
+
+            <Button
+              onClick={handleSearch}
+              disabled={!query.trim() || isLoading}
+              className="absolute right-2 top-1/2 transform -translate-y-1/2 h-12 px-6 bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 hover:from-blue-700 hover:via-purple-700 hover:to-pink-700 text-white font-medium rounded-xl shadow-lg hover:shadow-xl transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+              size="sm"
+            >
+              {isLoading ? (
+                <div className="flex items-center gap-2">
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span className="hidden sm:inline">Searching</span>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <Search className="w-4 h-4" />
+                  <span className="hidden sm:inline">Search</span>
+                </div>
+              )}
+            </Button>
           </div>
-          <Input
-            ref={inputRef}
-            type="text"
-            placeholder={placeholder}
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            onKeyPress={handleKeyPress}
-            className="pl-16 pr-12 h-14 text-base border-2 border-gray-200 dark:border-gray-700 focus:border-blue-500 dark:focus:border-blue-500 rounded-xl shadow-lg"
-          />
-          <Button
-            onClick={handleSearch}
-            disabled={!query.trim() || isLoading}
-            className="absolute right-2 top-1/2 transform -translate-y-1/2 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
-            size="sm"
-          >
-            {isLoading ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
-            ) : (
-              <Search className="w-4 h-4" />
-            )}
-          </Button>
         </div>
 
-        {/* Quick suggestions */}
-        <div className="mt-4 flex flex-wrap gap-2">
-          {quickSuggestions.map((suggestion, index) => (
-            <button
-              key={index}
-              onClick={() => setQuery(suggestion.text)}
-              className="flex items-center gap-2 px-4 py-2 text-sm bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg hover:border-blue-500 dark:hover:border-blue-500 transition-all group"
-            >
-              <suggestion.icon className={`w-4 h-4 text-${suggestion.color}-500`} />
-              <span className="text-gray-700 dark:text-gray-300 group-hover:text-blue-600 dark:group-hover:text-blue-400">
-                {suggestion.text}
-              </span>
-            </button>
-          ))}
+        {/* Quick suggestions with improved styling */}
+        <div className="mt-6 flex flex-wrap gap-3">
+          {quickSuggestions.map((suggestion, index) => {
+            const colorClasses = {
+              blue: 'bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-800 hover:border-blue-400 dark:hover:border-blue-500 text-blue-700 dark:text-blue-300',
+              green: 'bg-emerald-50 dark:bg-emerald-950/30 border-emerald-200 dark:border-emerald-800 hover:border-emerald-400 dark:hover:border-emerald-500 text-emerald-700 dark:text-emerald-300',
+              yellow: 'bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-800 hover:border-amber-400 dark:hover:border-amber-500 text-amber-700 dark:text-amber-300',
+              purple: 'bg-purple-50 dark:bg-purple-950/30 border-purple-200 dark:border-purple-800 hover:border-purple-400 dark:hover:border-purple-500 text-purple-700 dark:text-purple-300'
+            }
+
+            const iconColorClasses = {
+              blue: 'text-blue-600 dark:text-blue-400',
+              green: 'text-emerald-600 dark:text-emerald-400',
+              yellow: 'text-amber-600 dark:text-amber-400',
+              purple: 'text-purple-600 dark:text-purple-400'
+            }
+
+            return (
+              <button
+                key={index}
+                onClick={() => setQuery(suggestion.text)}
+                className={`flex items-center gap-2 px-4 py-2.5 text-sm border rounded-xl transition-all duration-200 hover:shadow-md hover:scale-105 ${colorClasses[suggestion.color as keyof typeof colorClasses]}`}
+              >
+                <suggestion.icon className={`w-4 h-4 ${iconColorClasses[suggestion.color as keyof typeof iconColorClasses]}`} />
+                <span className="font-medium">
+                  {suggestion.text}
+                </span>
+              </button>
+            )
+          })}
+        </div>
+
+        {/* AI Badge */}
+        <div className="mt-4 flex items-center justify-center gap-2 text-xs text-gray-500 dark:text-gray-400">
+          <Sparkles className="w-3 h-3 text-amber-500" />
+          <span>Powered by Google Gemini AI</span>
         </div>
       </div>
     )
@@ -309,16 +261,19 @@ export function AIPropertySearch({
 
   // Chat interface for modal or page variant
   return (
-    <div className={`flex flex-col ${variant === 'page' ? 'h-[calc(100vh-200px)]' : 'h-[600px]'} bg-white dark:bg-gray-900 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700`}>
-      {/* Header */}
-      <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-t-xl">
+    <div className={`flex flex-col ${variant === 'page' ? 'h-[calc(100vh-200px)]' : 'h-[600px]'} bg-white dark:bg-gray-900 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 overflow-hidden`}>
+      {/* Header with Enhanced Gradient */}
+      <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 text-white rounded-t-xl">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center">
+          <div className="relative w-10 h-10 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center">
             <Bot className="w-6 h-6" />
+            <Sparkles className="w-3 h-3 text-amber-400 absolute -top-0.5 -right-0.5 animate-pulse" />
           </div>
           <div>
-            <h3 className="font-semibold">PropGroup AI Assistant</h3>
-            <p className="text-xs text-white/80">Powered by advanced property matching</p>
+            <h3 className="font-semibold text-lg">PropGroup AI Assistant</h3>
+            <p className="text-xs text-white/90 flex items-center gap-1">
+              <span>Powered by Google Gemini</span>
+            </p>
           </div>
         </div>
         {variant === 'modal' && (
@@ -372,10 +327,10 @@ export function AIPropertySearch({
               className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
             >
               <div
-                className={`max-w-[80%] rounded-2xl px-4 py-3 ${
+                className={`max-w-[80%] rounded-2xl px-4 py-3 shadow-md ${
                   message.role === 'user'
-                    ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white'
-                    : 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white'
+                    ? 'bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 text-white'
+                    : 'bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-900 text-gray-900 dark:text-white border border-gray-200 dark:border-gray-700'
                 }`}
               >
                 <div className="whitespace-pre-wrap">{message.content}</div>
@@ -402,33 +357,36 @@ export function AIPropertySearch({
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Input */}
-      <div className="p-4 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 rounded-b-xl">
+      {/* Input with Enhanced Styling */}
+      <div className="p-4 border-t border-gray-200 dark:border-gray-700 bg-gradient-to-br from-gray-50 to-white dark:from-gray-800/50 dark:to-gray-900/50 rounded-b-xl">
         <div className="flex items-center gap-2">
-          <Input
-            ref={inputRef}
-            type="text"
-            placeholder="Describe your ideal property..."
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            onKeyPress={handleKeyPress}
-            disabled={isLoading}
-            className="flex-1 bg-white dark:bg-gray-900"
-          />
+          <div className="relative flex-1">
+            <Input
+              ref={inputRef}
+              type="text"
+              placeholder="Describe your ideal property..."
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              onKeyPress={handleKeyPress}
+              disabled={isLoading}
+              className="w-full bg-white dark:bg-gray-900 border-2 border-gray-200 dark:border-gray-700 focus:border-blue-500 dark:focus:border-blue-500 rounded-xl h-12"
+            />
+          </div>
           <Button
             onClick={handleSearch}
             disabled={!query.trim() || isLoading}
-            className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
+            className="h-12 px-4 bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 hover:from-blue-700 hover:via-purple-700 hover:to-pink-700 shadow-lg hover:shadow-xl transition-all duration-200"
           >
             {isLoading ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
+              <Loader2 className="w-5 h-5 animate-spin" />
             ) : (
-              <Send className="w-4 h-4" />
+              <Send className="w-5 h-5" />
             )}
           </Button>
         </div>
-        <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
-          Try: "2-bedroom in Cyprus under $400k" or "Golden Visa properties in Greece"
+        <p className="text-xs text-gray-500 dark:text-gray-400 mt-2 flex items-center gap-1">
+          <Sparkles className="w-3 h-3 text-amber-500" />
+          <span>Try: "2-bedroom in Cyprus under $400k" or "Golden Visa properties in Greece"</span>
         </p>
       </div>
     </div>
