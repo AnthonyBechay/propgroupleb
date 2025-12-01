@@ -57,7 +57,7 @@ databases:
   - name: propgroup-database
     databaseName: propgroup_database
     user: propgroup_database_user
-    plan: basic-256mb
+    plan: free
     region: frankfurt
     ipAllowList:
       - source: 0.0.0.0/0
