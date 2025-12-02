@@ -24,10 +24,7 @@
     "build:web": "pnpm run build:packages && pnpm --filter web build",
     "build:backend": "pnpm --filter backend build",
     "build:mobile": "pnpm run build:packages && pnpm --filter mobile-capacitor build",
-    "vercel-build": "node scripts/vercel-build-monorepo.js",
     "deploy": "pnpm run build",
-    "deploy:web": "vercel --prod",
-    "deploy:preview": "vercel",
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md,sql}\"",
     "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,md,sql}\"",
     "db:seed": "node packages/db/seed.js",
@@ -43,8 +40,7 @@
     "@typescript-eslint/parser": "^6.0.0",
     "eslint": "^8.0.0",
     "prettier": "^3.0.0",
-    "typescript": "^5.0.0",
-    "vercel": "^32.0.0"
+    "typescript": "^5.0.0"
   },
   "engines": {
     "node": ">=18.0.0"
