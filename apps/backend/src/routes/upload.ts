@@ -33,29 +33,21 @@ const videoUpload = multer({
   },
 });
 
-// POST /api/upload — Upload multiple images (max 10)
+// POST /api/upload — Upload single image (field: "file")
 router.post(
   '/',
   authenticateToken,
   requireAdmin,
-  imageUpload.array('files', 10),
+  imageUpload.single('file'),
   asyncHandler(async (req, res) => {
-    const files = req.files as Express.Multer.File[];
-    if (!files || files.length === 0) {
-      res.status(400).json({ error: 'No files provided' });
+    const file = req.file;
+    if (!file) {
+      res.status(400).json({ error: 'No file provided' });
       return;
     }
 
-    const results = await Promise.all(
-      files.map((file) =>
-        uploadFile(file.buffer, file.originalname, file.mimetype, 'properties')
-      )
-    );
-
-    res.status(201).json({
-      urls: results.map((r) => r.url),
-      keys: results.map((r) => r.key),
-    });
+    const result = await uploadFile(file.buffer, file.originalname, file.mimetype, 'properties');
+    res.status(201).json({ url: result.url, key: result.key });
   })
 );
 

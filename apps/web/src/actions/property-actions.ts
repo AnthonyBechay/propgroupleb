@@ -123,45 +123,35 @@ export async function updateProperty(id: string, data: Partial<z.infer<typeof pr
   try {
     const validatedData = propertySchema.partial().parse(data)
 
-    // Prepare update data
-    const updateData: any = {}
+    // Use backend API instead of Prisma directly (reliable in production Docker)
+    const { normalizeApiUrl } = await import('@/lib/utils/api-url')
+    const { cookies } = await import('next/headers')
 
-    if (validatedData.title) updateData.title = validatedData.title
-    if (validatedData.description) updateData.description = validatedData.description
-    if (validatedData.price !== undefined) updateData.price = validatedData.price
-    if (validatedData.currency) updateData.currency = validatedData.currency
-    if (validatedData.propertyType) updateData.propertyType = validatedData.propertyType
-    if (validatedData.bedrooms !== undefined) updateData.bedrooms = validatedData.bedrooms
-    if (validatedData.bathrooms !== undefined) updateData.bathrooms = validatedData.bathrooms
-    if (validatedData.area !== undefined) updateData.area = validatedData.area
-    if (validatedData.country) updateData.country = validatedData.country
-    if (validatedData.status) updateData.status = validatedData.status
-    if (validatedData.isGoldenVisaEligible !== undefined) updateData.isGoldenVisaEligible = validatedData.isGoldenVisaEligible
-    if (validatedData.city) updateData.city = validatedData.city
-    if (validatedData.district) updateData.district = validatedData.district
-    if (validatedData.address) updateData.address = validatedData.address
-    if (validatedData.location) updateData.location = validatedData.location
-    if (validatedData.amenities) updateData.amenities = validatedData.amenities
-    if (validatedData.nearbyFacilities) updateData.nearbyFacilities = validatedData.nearbyFacilities
-    if (validatedData.images) updateData.images = validatedData.images
-    if (validatedData.developerId) updateData.developerId = validatedData.developerId
-    if (validatedData.locationGuideId) updateData.locationGuideId = validatedData.locationGuideId
+    const apiUrl = normalizeApiUrl(process.env.NEXT_PUBLIC_API_URL)
+    const cookieStore = await cookies()
+    const token = cookieStore.get('token')?.value
 
-    // Update the property using Prisma
-    const property = await prisma.property.update({
-      where: { id },
-      data: updateData,
-      include: {
-        developer: true,
-        locationGuide: true,
-      }
+    const response = await fetch(`${apiUrl}/api/properties/${id}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify(validatedData),
     })
+
+    if (!response.ok) {
+      const errData = await response.json().catch(() => ({}))
+      throw new Error(errData.message || errData.error || `Update failed (${response.status})`)
+    }
+
+    const result = await response.json()
 
     revalidatePath('/admin/properties')
     revalidatePath('/properties')
     revalidatePath(`/property/${id}`)
 
-    return { success: true, property }
+    return { success: true, property: result.data }
   } catch (error: any) {
     console.error('Error updating property:', error)
     throw new Error(error.message || 'Failed to update property')

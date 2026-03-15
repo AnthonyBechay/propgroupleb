@@ -291,7 +291,7 @@ export function VideoUpload({
   const handleDelete = useCallback(async () => {
     if (!value) return
     try {
-      await fetch(`${API_BASE_URL}/api/upload/video`, {
+      await fetch(`${API_BASE_URL}/api/upload`, {
         method: 'DELETE',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
