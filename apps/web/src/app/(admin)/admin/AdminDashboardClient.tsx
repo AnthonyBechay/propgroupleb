@@ -46,15 +46,16 @@ export function AdminDashboardClient() {
   useEffect(() => {
     async function fetchDashboardData() {
       try {
-        const data = await apiClient.getAdminStats()
+        const response = await apiClient.getAdminStats() as any
+        const stats = response.data || response
         setStats({
-          totalProperties: data.overview.totalProperties,
-          totalUsers: data.overview.totalUsers,
-          totalFavorites: data.overview.totalFavorites,
-          totalInquiries: data.overview.totalInquiries,
+          totalProperties: stats.overview?.totalProperties ?? 0,
+          totalUsers: stats.overview?.totalUsers ?? 0,
+          totalFavorites: stats.overview?.totalFavorites ?? 0,
+          totalInquiries: stats.overview?.totalInquiries ?? 0,
         })
-        setRecentProperties(data.recent?.properties || [])
-        setRecentUsers(data.recent?.users || [])
+        setRecentProperties(stats.recent?.properties || [])
+        setRecentUsers(stats.recent?.users || [])
       } catch (error) {
         console.error('Error fetching dashboard data:', error)
       } finally {
