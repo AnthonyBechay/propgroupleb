@@ -1,8 +1,10 @@
 'use client'
 
+import { useState, useEffect } from 'react'
 import { Brain, Shield, TrendingUp, LineChart } from 'lucide-react'
+import { fetchSectionContent } from '@/lib/content'
 
-const features = [
+const defaultFeatures = [
   {
     icon: Brain,
     title: 'AI-Powered Analysis',
@@ -30,19 +32,28 @@ const features = [
 ]
 
 export function FeaturesSectionSimple() {
+  const [cms, setCms] = useState<Record<string, string>>({})
+
+  useEffect(() => {
+    fetchSectionContent('features').then(setCms)
+  }, [])
+
+  const features = defaultFeatures.map((f, i) => ({
+    ...f,
+    title: cms[`feature-${i + 1}-title`] || f.title,
+    description: cms[`feature-${i + 1}-description`] || f.description,
+  }))
+
   return (
     <section className="relative py-16 sm:py-20 bg-white dark:from-[#0a1628] dark:to-[#0f2439] overflow-hidden">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
         {/* Section Header */}
         <div className="text-center max-w-2xl mx-auto mb-12">
           <h2 className="text-3xl sm:text-4xl lg:text-5xl font-black text-gray-900 dark:text-white mb-4">
-            Why Choose{' '}
-            <span className="bg-gradient-to-r from-cyan-600 to-blue-600 dark:from-cyan-400 dark:to-blue-500 bg-clip-text text-transparent">
-              PropGroup
-            </span>
+            {cms['features-title'] || <>Why Choose{' '}<span className="bg-gradient-to-r from-cyan-600 to-blue-600 dark:from-cyan-400 dark:to-blue-500 bg-clip-text text-transparent">PropGroup</span></>}
           </h2>
           <p className="text-lg text-gray-600 dark:text-slate-300">
-            Smart tools for smarter real estate investments
+            {cms['features-subtitle'] || 'Smart tools for smarter real estate investments'}
           </p>
         </div>
 

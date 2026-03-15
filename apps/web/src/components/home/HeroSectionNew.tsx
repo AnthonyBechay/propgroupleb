@@ -4,14 +4,17 @@ import { useState, useEffect } from 'react'
 import { Search, Sparkles, TrendingUp, ArrowRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { AIPropertySearch } from '@/components/ai/AIPropertySearch'
+import { fetchSectionContent } from '@/lib/content'
 import Link from 'next/link'
 
 export function HeroSectionNew() {
   const [mounted, setMounted] = useState(false)
   const [activeTab, setActiveTab] = useState<'ai' | 'traditional'>('ai')
+  const [cms, setCms] = useState<Record<string, string>>({})
 
   useEffect(() => {
     setMounted(true)
+    fetchSectionContent('hero').then(setCms)
   }, [])
 
   if (!mounted) {
@@ -50,15 +53,15 @@ export function HeroSectionNew() {
           <div className="text-center space-y-4 sm:space-y-6 mb-10 sm:mb-12">
             <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-black leading-tight">
               <span className="block text-white mb-2">
-                Smart Real Estate
+                {(cms['hero-title'] || 'Smart Real Estate').split(' ').slice(0, -1).join(' ') || 'Smart Real Estate'}
               </span>
               <span className="block bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-600 bg-clip-text text-transparent">
-                Investments
+                {cms['hero-title'] ? cms['hero-title'].split(' ').slice(-1)[0] : 'Investments'}
               </span>
             </h1>
 
             <p className="text-lg sm:text-xl md:text-2xl text-slate-300 max-w-2xl mx-auto">
-              AI-powered property search with verified ROI data
+              {cms['hero-subtitle'] || 'AI-powered property search with verified ROI data'}
             </p>
           </div>
 
@@ -80,15 +83,15 @@ export function HeroSectionNew() {
           {/* Stats Row */}
           <div className="grid grid-cols-3 gap-4 sm:gap-8 max-w-2xl mx-auto mb-8 text-center">
             <div>
-              <div className="text-3xl sm:text-4xl font-bold text-white mb-1">12.5%</div>
+              <div className="text-3xl sm:text-4xl font-bold text-white mb-1">{cms['hero-stat-roi'] || '12.5%'}</div>
               <div className="text-sm text-slate-400">Avg ROI</div>
             </div>
             <div>
-              <div className="text-3xl sm:text-4xl font-bold text-white mb-1">25+</div>
+              <div className="text-3xl sm:text-4xl font-bold text-white mb-1">{cms['hero-stat-countries'] || '25+'}</div>
               <div className="text-sm text-slate-400">Countries</div>
             </div>
             <div>
-              <div className="text-3xl sm:text-4xl font-bold text-white mb-1">5K+</div>
+              <div className="text-3xl sm:text-4xl font-bold text-white mb-1">{cms['hero-stat-properties'] || '5K+'}</div>
               <div className="text-sm text-slate-400">Properties</div>
             </div>
           </div>

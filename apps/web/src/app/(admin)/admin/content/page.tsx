@@ -143,6 +143,19 @@ export default function AdminContentPage() {
         </button>
       </div>
 
+      {/* Section mapping info banner */}
+      <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 text-sm text-blue-800">
+        <p className="font-semibold mb-1">Section &rarr; Page Mapping</p>
+        <p>
+          <span className="font-medium">hero</span> &rarr; Homepage hero &nbsp;|&nbsp;{' '}
+          <span className="font-medium">features</span> &rarr; Homepage features &nbsp;|&nbsp;{' '}
+          <span className="font-medium">cta</span> &rarr; Homepage CTA &nbsp;|&nbsp;{' '}
+          <span className="font-medium">about</span> &rarr; About page &nbsp;|&nbsp;{' '}
+          <span className="font-medium">contact</span> &rarr; Contact page &nbsp;|&nbsp;{' '}
+          <span className="font-medium">footer</span> &rarr; Site footer
+        </p>
+      </div>
+
       {/* New content form */}
       {showNewForm && (
         <div className="bg-white rounded-xl border p-6 space-y-4">
@@ -160,13 +173,19 @@ export default function AdminContentPage() {
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Section</label>
-              <input
-                type="text"
+              <select
                 value={newSection}
                 onChange={(e) => setNewSection(e.target.value)}
-                placeholder="e.g., hero"
                 className="w-full px-3 py-2 border rounded-lg text-sm"
-              />
+              >
+                <option value="">Select a section...</option>
+                <option value="hero">hero</option>
+                <option value="about">about</option>
+                <option value="features">features</option>
+                <option value="cta">cta</option>
+                <option value="contact">contact</option>
+                <option value="footer">footer</option>
+              </select>
             </div>
           </div>
           <div>

@@ -31,7 +31,8 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { createProperty } from '@/actions/property-actions'
-import { Upload, X, Image as ImageIcon } from 'lucide-react'
+import { Upload, X, Image as ImageIcon, ChevronDown, ChevronUp } from 'lucide-react'
+import { ImageUpload, VideoUpload } from '@/components/ui/ImageUpload'
 
 const propertySchema = z.object({
   title: z.string().min(1, 'Title is required'),
@@ -93,6 +94,9 @@ export function CreatePropertyModal({
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [imageUrls, setImageUrls] = useState<string[]>([])
   const [currentImageUrl, setCurrentImageUrl] = useState('')
+  const [showManualImageUrl, setShowManualImageUrl] = useState(false)
+  const [videoUrl, setVideoUrl] = useState('')
+  const [showManualVideoUrl, setShowManualVideoUrl] = useState(false)
 
   const form = useForm<PropertyFormData>({
     resolver: zodResolver(propertySchema),
@@ -138,15 +142,17 @@ export function CreatePropertyModal({
   const onSubmit = async (data: PropertyFormData) => {
     setIsSubmitting(true)
     try {
-      // Include images in the property data
+      // Include images and video in the property data
       const propertyData = {
         ...data,
         images: imageUrls,
+        ...(videoUrl ? { videoUrl } : {}),
       }
 
       await createProperty(propertyData as any)
       form.reset()
       setImageUrls([])
+      setVideoUrl('')
       setOpen(false)
       // Server action handles revalidation automatically
     } catch (error) {
@@ -656,58 +662,79 @@ export function CreatePropertyModal({
               </div>
             </div>
 
-            {/* Image URLs Section */}
+            {/* Image Upload Section */}
             <div className="space-y-4">
               <h3 className="text-lg font-medium">Property Images</h3>
-              
-              <div className="flex gap-2">
-                <Input
-                  placeholder="Enter image URL"
-                  value={currentImageUrl}
-                  onChange={(e) => setCurrentImageUrl(e.target.value)}
-                  onKeyPress={(e) => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault()
-                      addImageUrl()
-                    }
-                  }}
-                />
-                <Button type="button" onClick={addImageUrl} variant="outline">
-                  <Upload className="h-4 w-4 mr-2" />
-                  Add
-                </Button>
-              </div>
 
-              {imageUrls.length > 0 && (
-                <div className="grid grid-cols-2 gap-4">
-                  {imageUrls.map((url, index) => (
-                    <div key={index} className="relative group">
-                      <div className="aspect-video rounded-lg overflow-hidden bg-gray-100 flex items-center justify-center">
-                        {url.startsWith('http') ? (
-                          <img 
-                            src={url} 
-                            alt={`Property ${index + 1}`}
-                            className="w-full h-full object-cover"
-                            onError={(e) => {
-                              (e.target as HTMLImageElement).style.display = 'none'
-                            }}
-                          />
-                        ) : (
-                          <ImageIcon className="h-8 w-8 text-gray-400" />
-                        )}
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => removeImageUrl(index)}
-                        className="absolute top-2 right-2 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
-                      >
-                        <X className="h-4 w-4" />
-                      </button>
-                      <p className="text-xs text-gray-500 mt-1 truncate">{url}</p>
-                    </div>
-                  ))}
-                </div>
-              )}
+              <ImageUpload
+                value={imageUrls}
+                onChange={setImageUrls}
+                maxFiles={10}
+                disabled={isSubmitting}
+              />
+
+              {/* Manual URL fallback */}
+              <div>
+                <button
+                  type="button"
+                  onClick={() => setShowManualImageUrl(!showManualImageUrl)}
+                  className="text-xs text-slate-400 hover:text-cyan-400 flex items-center gap-1 transition-colors"
+                >
+                  {showManualImageUrl ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+                  Or add URL manually
+                </button>
+                {showManualImageUrl && (
+                  <div className="flex gap-2 mt-2">
+                    <Input
+                      placeholder="Enter image URL"
+                      value={currentImageUrl}
+                      onChange={(e) => setCurrentImageUrl(e.target.value)}
+                      onKeyPress={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault()
+                          addImageUrl()
+                        }
+                      }}
+                    />
+                    <Button type="button" onClick={addImageUrl} variant="outline" size="sm">
+                      <Upload className="h-4 w-4 mr-1" />
+                      Add
+                    </Button>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Video Upload Section */}
+            <div className="space-y-4">
+              <h3 className="text-lg font-medium">Property Video</h3>
+
+              <VideoUpload
+                value={videoUrl}
+                onChange={setVideoUrl}
+                disabled={isSubmitting}
+              />
+
+              {/* Manual video URL fallback */}
+              <div>
+                <button
+                  type="button"
+                  onClick={() => setShowManualVideoUrl(!showManualVideoUrl)}
+                  className="text-xs text-slate-400 hover:text-cyan-400 flex items-center gap-1 transition-colors"
+                >
+                  {showManualVideoUrl ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+                  Or add video URL manually
+                </button>
+                {showManualVideoUrl && (
+                  <div className="flex gap-2 mt-2">
+                    <Input
+                      placeholder="Enter video URL"
+                      value={videoUrl}
+                      onChange={(e) => setVideoUrl(e.target.value)}
+                    />
+                  </div>
+                )}
+              </div>
             </div>
 
             <div className="flex justify-end space-x-4 pt-4 border-t">

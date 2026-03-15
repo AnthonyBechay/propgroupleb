@@ -14,6 +14,7 @@ import {
   Bot,
   MessageSquare,
   PenTool,
+  ArrowLeft,
 } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 
@@ -83,7 +84,18 @@ export function Sidebar() {
                 })}
               </ul>
             </li>
-            <li className="mt-auto">
+            <li className="mt-auto space-y-2">
+              <Link
+                href="/"
+                target="_blank"
+                className="group flex w-full gap-x-3 rounded-xl p-3 text-sm font-bold leading-6 text-slate-300 hover:bg-cyan-500/20 hover:text-cyan-400 transition-all border-2 border-slate-700 hover:border-cyan-500/50"
+              >
+                <ArrowLeft
+                  className="h-5 w-5 shrink-0 text-slate-400 group-hover:text-cyan-400"
+                  aria-hidden="true"
+                />
+                Back to Website
+              </Link>
               <button
                 onClick={signOut}
                 className="group flex w-full gap-x-3 rounded-xl p-3 text-sm font-bold leading-6 text-slate-300 hover:bg-red-500/20 hover:text-red-400 transition-all border-2 border-slate-700 hover:border-red-500/50"

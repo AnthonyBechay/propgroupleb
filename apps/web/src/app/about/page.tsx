@@ -1,13 +1,16 @@
 import { TrendingUp, Shield, Globe, Award } from 'lucide-react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
+import { fetchSectionContent } from '@/lib/content'
 
 export const metadata = {
   title: 'About PropGroup - Real Estate Investment Platform',
   description: 'AI-powered platform for verified real estate investments with data-driven ROI projections.',
 }
 
-export default function AboutPage() {
+export default async function AboutPage() {
+  const content = await fetchSectionContent('about')
+
   return (
     <main className="min-h-screen bg-white dark:bg-[#0a1628]">
       {/* Hero Section */}
@@ -15,13 +18,10 @@ export default function AboutPage() {
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
           <div className="max-w-3xl mx-auto text-center">
             <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black text-white mb-6">
-              Smart Real Estate{' '}
-              <span className="bg-gradient-to-r from-cyan-400 to-blue-500 bg-clip-text text-transparent">
-                Investments
-              </span>
+              {content['about-title'] || <>Smart Real Estate{' '}<span className="bg-gradient-to-r from-cyan-400 to-blue-500 bg-clip-text text-transparent">Investments</span></>}
             </h1>
             <p className="text-xl text-slate-300">
-              We help investors make data-driven real estate decisions with AI-powered analysis and verified ROI data
+              {content['about-description'] || 'We help investors make data-driven real estate decisions with AI-powered analysis and verified ROI data'}
             </p>
           </div>
         </div>

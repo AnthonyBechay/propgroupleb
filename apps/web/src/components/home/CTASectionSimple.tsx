@@ -1,23 +1,28 @@
 'use client'
 
+import { useState, useEffect } from 'react'
 import { ArrowRight, CheckCircle2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { fetchSectionContent } from '@/lib/content'
 import Link from 'next/link'
 
 export function CTASectionSimple() {
+  const [cms, setCms] = useState<Record<string, string>>({})
+
+  useEffect(() => {
+    fetchSectionContent('cta').then(setCms)
+  }, [])
+
   return (
     <section className="relative py-16 sm:py-20 bg-gradient-to-br from-[#0a1628] to-[#1e293b] overflow-hidden">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
         <div className="max-w-4xl mx-auto text-center">
           <h2 className="text-3xl sm:text-4xl lg:text-5xl font-black text-white mb-6">
-            Ready to Start{' '}
-            <span className="bg-gradient-to-r from-cyan-400 to-blue-500 bg-clip-text text-transparent">
-              Investing?
-            </span>
+            {cms['cta-title'] || <>Ready to Start{' '}<span className="bg-gradient-to-r from-cyan-400 to-blue-500 bg-clip-text text-transparent">Investing?</span></>}
           </h2>
 
           <p className="text-lg sm:text-xl text-slate-300 mb-8 max-w-2xl mx-auto">
-            Join thousands of investors building wealth through verified real estate opportunities
+            {cms['cta-subtitle'] || 'Join thousands of investors building wealth through verified real estate opportunities'}
           </p>
 
           {/* Benefits */}
