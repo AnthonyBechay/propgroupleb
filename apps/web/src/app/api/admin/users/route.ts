@@ -15,10 +15,10 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    // Verify super admin role
-    if (authResult.user.role !== 'SUPER_ADMIN') {
+    // Verify admin or super admin role
+    if (authResult.user.role !== 'SUPER_ADMIN' && authResult.user.role !== 'ADMIN') {
       return NextResponse.json(
-        { error: 'Forbidden - Super Admin access required' },
+        { error: 'Forbidden - Admin access required' },
         { status: 403 }
       )
     }
