@@ -1,4 +1,4 @@
-import express, { type Request, type Response } from 'express';
+import express, { type Request, type Response, type Router } from 'express';
 import { prisma } from '@propgroup/db';
 import { authenticateToken, requireAgent, logAdminAction } from '../middleware/auth.js';
 import { asyncHandler } from '../utils/errors.js';
@@ -7,7 +7,7 @@ import { parsePagination, buildPaginationResponse } from '../utils/pagination.js
 import { PROPERTY_LIST_INCLUDE } from '../utils/prisma-includes.js';
 import type { AuthenticatedRequest } from '../types/index.js';
 
-const router = express.Router();
+const router: Router = express.Router();
 
 // Get agent dashboard stats
 router.get(

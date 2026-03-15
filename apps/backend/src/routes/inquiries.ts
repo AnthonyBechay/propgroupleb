@@ -1,4 +1,4 @@
-import express, { type Request, type Response } from 'express';
+import express, { type Request, type Response, type Router } from 'express';
 import { prisma } from '@propgroup/db';
 import { authenticateToken, requireAdmin, logAdminAction } from '../middleware/auth.js';
 import { asyncHandler } from '../utils/errors.js';
@@ -8,7 +8,7 @@ import { PROPERTY_WITH_STATS_INCLUDE } from '../utils/prisma-includes.js';
 import { inquirySchema } from '../schemas/index.js';
 import type { AuthenticatedRequest, MaybeAuthRequest } from '../types/index.js';
 
-const router = express.Router();
+const router: Router = express.Router();
 
 // Create property inquiry (public - no auth required)
 router.post(

@@ -1,4 +1,4 @@
-import express, { type Request, type Response, type NextFunction } from 'express';
+import express, { type Request, type Response, type NextFunction, type Router } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { prisma } from '@propgroup/db';
@@ -10,7 +10,7 @@ import { registerSchema, loginSchema, updateProfileSchema, changePasswordSchema 
 import passport from '../config/passport.js';
 import type { AuthenticatedRequest } from '../types/index.js';
 
-const router = express.Router();
+const router: Router = express.Router();
 
 // No-cache headers for all auth routes
 router.use((_req: Request, res: Response, next: NextFunction) => {

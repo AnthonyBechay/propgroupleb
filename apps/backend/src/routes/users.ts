@@ -1,4 +1,4 @@
-import express, { type Request, type Response } from 'express';
+import express, { type Request, type Response, type Router } from 'express';
 import { prisma } from '@propgroup/db';
 import { authenticateToken, requireAdmin, requireSuperAdmin, logAdminAction } from '../middleware/auth.js';
 import { asyncHandler } from '../utils/errors.js';
@@ -8,7 +8,7 @@ import { USER_ADMIN_SELECT } from '../utils/prisma-includes.js';
 import { updateRoleSchema, banUserSchema, inviteAdminSchema } from '../schemas/index.js';
 import type { AuthenticatedRequest } from '../types/index.js';
 
-const router = express.Router();
+const router: Router = express.Router();
 
 // Get all users (admin only)
 router.get(

@@ -1,4 +1,4 @@
-import express, { type Request, type Response } from 'express';
+import express, { type Request, type Response, type Router } from 'express';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { prisma } from '@propgroup/db';
 import { asyncHandler } from '../utils/errors.js';
@@ -6,7 +6,7 @@ import { sendSuccess } from '../utils/response.js';
 import { PROPERTY_LIST_INCLUDE } from '../utils/prisma-includes.js';
 import { aiSearchSchema } from '../schemas/index.js';
 
-const router = express.Router();
+const router: Router = express.Router();
 
 // Initialize Google Gemini AI
 const genAI = process.env.GOOGLE_GEMINI_API_KEY

@@ -1,4 +1,4 @@
-import express, { type Request, type Response } from 'express';
+import express, { type Request, type Response, type Router } from 'express';
 import { z } from 'zod';
 import { authenticateToken, requireAdmin, logAdminAction } from '../middleware/auth.js';
 import { asyncHandler } from '../utils/errors.js';
@@ -6,7 +6,7 @@ import { sendSuccess, sendCreated, sendNotFound } from '../utils/response.js';
 import * as contentService from '../services/content.service.js';
 import type { AuthenticatedRequest } from '../types/index.js';
 
-const router = express.Router();
+const router: Router = express.Router();
 
 const contentSchema = z.object({
   section: z.string().optional(),

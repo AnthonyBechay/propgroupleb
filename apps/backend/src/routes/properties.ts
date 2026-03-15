@@ -1,4 +1,4 @@
-import express, { type Request, type Response } from 'express';
+import express, { type Request, type Response, type Router } from 'express';
 import { prisma } from '@propgroup/db';
 import { authenticateToken, requireAdmin, logAdminAction } from '../middleware/auth.js';
 import { asyncHandler } from '../utils/errors.js';
@@ -8,7 +8,7 @@ import { PROPERTY_LIST_INCLUDE, PROPERTY_DETAIL_INCLUDE } from '../utils/prisma-
 import { propertySchema, propertyQuerySchema, extractInvestmentData, buildInvestmentDataPayload } from '../schemas/index.js';
 import type { AuthenticatedRequest } from '../types/index.js';
 
-const router = express.Router();
+const router: Router = express.Router();
 
 // Get all properties (public)
 router.get(

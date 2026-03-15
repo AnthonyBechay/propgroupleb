@@ -1,4 +1,4 @@
-import express, { type Request, type Response } from 'express';
+import express, { type Request, type Response, type Router } from 'express';
 import { prisma } from '@propgroup/db';
 import { authenticateToken } from '../middleware/auth.js';
 import { asyncHandler } from '../utils/errors.js';
@@ -7,7 +7,7 @@ import { PROPERTY_WITH_STATS_INCLUDE } from '../utils/prisma-includes.js';
 import { ownedPropertySchema } from '../schemas/index.js';
 import type { AuthenticatedRequest } from '../types/index.js';
 
-const router = express.Router();
+const router: Router = express.Router();
 
 const PORTFOLIO_INCLUDE = {
   property: { include: PROPERTY_WITH_STATS_INCLUDE },

@@ -1,4 +1,4 @@
-import express, { type Request, type Response } from 'express';
+import express, { type Request, type Response, type Router } from 'express';
 import bcrypt from 'bcryptjs';
 import { prisma } from '@propgroup/db';
 import { authenticateToken, requireAdmin, requireSuperAdmin, logAdminAction } from '../middleware/auth.js';
@@ -7,7 +7,7 @@ import { sendSuccess, sendCreated, sendPaginated } from '../utils/response.js';
 import { parsePagination, buildPaginationResponse } from '../utils/pagination.js';
 import type { AuthenticatedRequest } from '../types/index.js';
 
-const router = express.Router();
+const router: Router = express.Router();
 
 // Get admin dashboard stats
 router.get(

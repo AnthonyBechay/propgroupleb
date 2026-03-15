@@ -1,4 +1,4 @@
-import express, { type Request, type Response } from 'express';
+import express, { type Request, type Response, type Router } from 'express';
 import { prisma } from '@propgroup/db';
 import { authenticateToken } from '../middleware/auth.js';
 import { asyncHandler } from '../utils/errors.js';
@@ -6,7 +6,7 @@ import { sendSuccess, sendCreated, sendNotFound } from '../utils/response.js';
 import { PROPERTY_WITH_STATS_INCLUDE } from '../utils/prisma-includes.js';
 import type { AuthenticatedRequest } from '../types/index.js';
 
-const router = express.Router();
+const router: Router = express.Router();
 
 // Get user's favorite properties
 router.get(
