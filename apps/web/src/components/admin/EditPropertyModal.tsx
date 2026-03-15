@@ -149,29 +149,29 @@ export function EditPropertyModal({ property, open, onOpenChange }: EditProperty
 
   if (!open || !property) return null
 
-  const inputClass = 'w-full px-3 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 text-sm'
-  const selectClass = 'w-full px-3 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 text-sm appearance-none'
-  const labelClass = 'block text-sm font-medium text-slate-300 mb-1'
+  const inputClass = 'w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 text-sm'
+  const selectClass = 'w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 text-sm'
+  const labelClass = 'block text-sm font-medium text-gray-700 mb-1'
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       {/* Backdrop */}
       <div
-        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+        className="absolute inset-0 bg-black/40"
         onClick={() => onOpenChange(false)}
       />
 
       {/* Modal */}
-      <div className="relative w-full max-w-4xl max-h-[90vh] bg-slate-800 border border-slate-700 rounded-2xl shadow-2xl overflow-hidden">
+      <div className="relative w-full max-w-4xl max-h-[90vh] bg-white border border-gray-200 rounded-2xl shadow-2xl overflow-hidden">
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-700">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
           <div>
-            <h2 className="text-lg font-bold text-white">Edit Property</h2>
-            <p className="text-sm text-slate-400">Update property information</p>
+            <h2 className="text-lg font-bold text-gray-900">Edit Property</h2>
+            <p className="text-sm text-gray-500">Update property information</p>
           </div>
           <button
             onClick={() => onOpenChange(false)}
-            className="p-2 text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg transition-colors"
+            className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
           >
             <X className="h-5 w-5" />
           </button>
@@ -180,14 +180,14 @@ export function EditPropertyModal({ property, open, onOpenChange }: EditProperty
         {/* Body */}
         <form onSubmit={handleSubmit} className="overflow-y-auto max-h-[calc(90vh-140px)] p-6 space-y-6">
           {error && (
-            <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-lg text-red-400 text-sm" role="alert">
+            <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm" role="alert">
               {error}
             </div>
           )}
 
           {/* Basic Info */}
           <section>
-            <h3 className="text-sm font-semibold text-cyan-400 uppercase tracking-wider mb-4">Basic Information</h3>
+            <h3 className="text-sm font-semibold text-blue-600 uppercase tracking-wider mb-4">Basic Information</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="md:col-span-2">
                 <label className={labelClass}>Title *</label>
@@ -251,16 +251,16 @@ export function EditPropertyModal({ property, open, onOpenChange }: EditProperty
                   id="goldenVisa"
                   checked={form.isGoldenVisaEligible}
                   onChange={(e) => updateField('isGoldenVisaEligible', e.target.checked)}
-                  className="h-4 w-4 rounded border-slate-600 bg-slate-700 text-cyan-500 focus:ring-cyan-500"
+                  className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                 />
-                <label htmlFor="goldenVisa" className="text-sm text-slate-300">Golden Visa Eligible</label>
+                <label htmlFor="goldenVisa" className="text-sm text-gray-700">Golden Visa Eligible</label>
               </div>
             </div>
           </section>
 
           {/* Investment Data */}
           <section>
-            <h3 className="text-sm font-semibold text-cyan-400 uppercase tracking-wider mb-4">Investment Data</h3>
+            <h3 className="text-sm font-semibold text-blue-600 uppercase tracking-wider mb-4">Investment Data</h3>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
                 <label className={labelClass}>Expected ROI (%)</label>
@@ -295,11 +295,11 @@ export function EditPropertyModal({ property, open, onOpenChange }: EditProperty
 
           {/* Images */}
           <section>
-            <h3 className="text-sm font-semibold text-cyan-400 uppercase tracking-wider mb-4">Property Images</h3>
+            <h3 className="text-sm font-semibold text-blue-600 uppercase tracking-wider mb-4">Property Images</h3>
             <ImageUpload value={imageUrls} onChange={setImageUrls} maxFiles={10} disabled={isSubmitting} />
             <div className="mt-2">
               <button type="button" onClick={() => setShowManualUrl(!showManualUrl)}
-                className="text-xs text-slate-500 hover:text-cyan-400 flex items-center gap-1 transition-colors">
+                className="text-xs text-gray-500 hover:text-blue-600 flex items-center gap-1 transition-colors">
                 {showManualUrl ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
                 Or add URL manually
               </button>
@@ -308,7 +308,7 @@ export function EditPropertyModal({ property, open, onOpenChange }: EditProperty
                   <input className={inputClass} placeholder="https://..." value={manualUrl} onChange={(e) => setManualUrl(e.target.value)}
                     onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); if (manualUrl.trim()) { setImageUrls([...imageUrls, manualUrl.trim()]); setManualUrl('') } } }} />
                   <button type="button" onClick={() => { if (manualUrl.trim()) { setImageUrls([...imageUrls, manualUrl.trim()]); setManualUrl('') } }}
-                    className="px-3 py-2 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600 text-sm whitespace-nowrap">Add</button>
+                    className="px-3 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 text-sm whitespace-nowrap border border-gray-300">Add</button>
                 </div>
               )}
             </div>
@@ -316,26 +316,24 @@ export function EditPropertyModal({ property, open, onOpenChange }: EditProperty
 
           {/* Video */}
           <section>
-            <h3 className="text-sm font-semibold text-cyan-400 uppercase tracking-wider mb-4">Property Video</h3>
+            <h3 className="text-sm font-semibold text-blue-600 uppercase tracking-wider mb-4">Property Video</h3>
             <VideoUpload value={videoUrl} onChange={setVideoUrl} disabled={isSubmitting} />
           </section>
         </form>
 
         {/* Footer with buttons - OUTSIDE the scrollable area */}
-        <div className="px-6 py-4 border-t border-slate-700 bg-slate-800 flex justify-end gap-3">
+        <div className="px-6 py-4 border-t border-gray-200 bg-gray-50 flex justify-end gap-3">
           <button
             type="button"
             onClick={() => onOpenChange(false)}
-            className="px-4 py-2 text-sm font-medium text-slate-300 bg-slate-700 hover:bg-slate-600 rounded-lg transition-colors"
+            className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 rounded-lg transition-colors"
           >
             Cancel
           </button>
           <button
-            type="submit"
-            form="edit-form"
             disabled={isSubmitting}
             onClick={handleSubmit}
-            className="px-5 py-2 text-sm font-medium text-white bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+            className="px-5 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
           >
             {isSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
             {isSubmitting ? 'Updating...' : 'Update Property'}

@@ -32,11 +32,11 @@ export function PropertyTable({ properties }: PropertyTableProps) {
 
   const getStatusBadge = (status: string) => {
     const styles: Record<string, string> = {
-      OFF_PLAN: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
-      NEW_BUILD: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
-      RESALE: 'bg-purple-500/20 text-purple-400 border-purple-500/30',
+      OFF_PLAN: 'bg-blue-100 text-blue-700',
+      NEW_BUILD: 'bg-emerald-100 text-emerald-700',
+      RESALE: 'bg-purple-100 text-purple-700',
     }
-    return styles[status] || 'bg-slate-500/20 text-slate-400 border-slate-500/30'
+    return styles[status] || 'bg-gray-100 text-gray-700'
   }
 
   const handleEdit = (property: Property) => {
@@ -79,97 +79,104 @@ export function PropertyTable({ properties }: PropertyTableProps) {
         onOpenChange={setEditModalOpen}
       />
 
-      <div className="space-y-3">
-        {properties.map((property) => (
-          <div
-            key={property.id}
-            className="bg-slate-800/50 border border-slate-700 rounded-xl p-4 hover:border-slate-600 transition-colors"
-          >
-            <div className="flex items-start justify-between gap-4">
-              {/* Left: Property Info */}
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-3 mb-2">
-                  <h3 className="text-white font-semibold truncate">{property.title}</h3>
-                  <span className={`text-xs px-2 py-0.5 rounded-full border ${getStatusBadge(property.status || 'NEW_BUILD')}`}>
-                    {(property.status || 'NEW_BUILD').replace('_', ' ')}
-                  </span>
-                  {property.isGoldenVisaEligible && (
-                    <span className="text-xs px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-400 border border-amber-500/30">
-                      Golden Visa
-                    </span>
+      <div className="bg-white rounded-xl border overflow-hidden">
+        <table className="w-full text-sm">
+          <thead className="bg-gray-50 border-b">
+            <tr>
+              <th className="text-left px-4 py-3 font-medium text-gray-600">Property</th>
+              <th className="text-left px-4 py-3 font-medium text-gray-600">Price</th>
+              <th className="text-left px-4 py-3 font-medium text-gray-600">Location</th>
+              <th className="text-left px-4 py-3 font-medium text-gray-600">Details</th>
+              <th className="text-left px-4 py-3 font-medium text-gray-600">Status</th>
+              <th className="text-left px-4 py-3 font-medium text-gray-600">Engagement</th>
+              <th className="text-right px-4 py-3 font-medium text-gray-600">Actions</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y">
+            {properties.map((property) => (
+              <tr key={property.id} className="hover:bg-gray-50">
+                <td className="px-4 py-3">
+                  <div className="font-medium text-gray-900 max-w-[200px] truncate">{property.title}</div>
+                  {property.developer && (
+                    <div className="text-xs text-gray-500 flex items-center gap-1 mt-0.5">
+                      <Building2 className="h-3 w-3" />
+                      {property.developer.name}
+                    </div>
                   )}
-                </div>
-
-                <div className="flex flex-wrap items-center gap-4 text-sm text-slate-400">
-                  <span className="text-cyan-400 font-semibold text-base">
+                </td>
+                <td className="px-4 py-3">
+                  <span className="font-semibold text-gray-900">
                     {formatCurrency(property.price, property.currency)}
                   </span>
-                  <span className="flex items-center gap-1">
-                    <MapPin className="h-3.5 w-3.5" />
+                </td>
+                <td className="px-4 py-3">
+                  <div className="flex items-center gap-1 text-gray-700">
+                    <MapPin className="h-3.5 w-3.5 text-gray-400" />
                     {property.country.charAt(0) + property.country.slice(1).toLowerCase()}
-                  </span>
-                  <span>
-                    {property.bedrooms} bed · {property.bathrooms} bath · {property.area} m²
-                  </span>
-                  {property.developer && (
+                  </div>
+                </td>
+                <td className="px-4 py-3 text-gray-600">
+                  {property.bedrooms} bed · {property.bathrooms} bath · {property.area} m²
+                </td>
+                <td className="px-4 py-3">
+                  <div className="flex flex-wrap gap-1.5">
+                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${getStatusBadge(property.status || 'NEW_BUILD')}`}>
+                      {(property.status || 'NEW_BUILD').replace('_', ' ')}
+                    </span>
+                    {property.isGoldenVisaEligible && (
+                      <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-amber-100 text-amber-700">
+                        Golden Visa
+                      </span>
+                    )}
+                  </div>
+                </td>
+                <td className="px-4 py-3">
+                  <div className="flex items-center gap-3 text-xs text-gray-500">
+                    {property.investmentData?.rentalYield ? (
+                      <span className="flex items-center gap-1 text-emerald-600">
+                        <TrendingUp className="h-3 w-3" />
+                        {property.investmentData.rentalYield.toFixed(1)}%
+                      </span>
+                    ) : null}
                     <span className="flex items-center gap-1">
-                      <Building2 className="h-3.5 w-3.5" />
-                      {property.developer.name}
+                      <Heart className="h-3 w-3 text-red-400" />
+                      {property._count?.favoriteProperties || 0}
                     </span>
-                  )}
-                </div>
-
-                {/* Metrics row */}
-                <div className="flex items-center gap-4 mt-2 text-xs text-slate-500">
-                  {property.investmentData?.rentalYield && (
-                    <span className="flex items-center gap-1 text-emerald-400">
-                      <TrendingUp className="h-3 w-3" />
-                      {property.investmentData.rentalYield.toFixed(1)}% yield
+                    <span className="flex items-center gap-1">
+                      <MessageSquare className="h-3 w-3 text-blue-400" />
+                      {property._count?.propertyInquiries || 0}
                     </span>
-                  )}
-                  {property.investmentData?.expectedROI && (
-                    <span className="text-blue-400">
-                      {property.investmentData.expectedROI.toFixed(1)}% ROI
-                    </span>
-                  )}
-                  <span className="flex items-center gap-1">
-                    <Heart className="h-3 w-3 text-red-400" />
-                    {property._count?.favoriteProperties || 0}
-                  </span>
-                  <span className="flex items-center gap-1">
-                    <MessageSquare className="h-3 w-3 text-blue-400" />
-                    {property._count?.propertyInquiries || 0}
-                  </span>
-                </div>
-              </div>
-
-              {/* Right: Action Buttons */}
-              <div className="flex items-center gap-1.5 flex-shrink-0">
-                <button
-                  onClick={() => handleView(property)}
-                  className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700 transition-colors"
-                  title="View"
-                >
-                  <Eye className="h-4 w-4" />
-                </button>
-                <button
-                  onClick={() => handleEdit(property)}
-                  className="p-2 rounded-lg text-slate-400 hover:text-cyan-400 hover:bg-cyan-500/10 transition-colors"
-                  title="Edit"
-                >
-                  <Edit className="h-4 w-4" />
-                </button>
-                <button
-                  onClick={() => handleDelete(property)}
-                  className="p-2 rounded-lg text-slate-400 hover:text-red-400 hover:bg-red-500/10 transition-colors"
-                  title="Delete"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </button>
-              </div>
-            </div>
-          </div>
-        ))}
+                  </div>
+                </td>
+                <td className="px-4 py-3">
+                  <div className="flex items-center justify-end gap-1">
+                    <button
+                      onClick={() => handleView(property)}
+                      className="p-1.5 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors"
+                      title="View"
+                    >
+                      <Eye className="h-4 w-4" />
+                    </button>
+                    <button
+                      onClick={() => handleEdit(property)}
+                      className="p-1.5 rounded-lg text-gray-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"
+                      title="Edit"
+                    >
+                      <Edit className="h-4 w-4" />
+                    </button>
+                    <button
+                      onClick={() => handleDelete(property)}
+                      className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors"
+                      title="Delete"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
     </>
   )

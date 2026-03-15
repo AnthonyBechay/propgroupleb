@@ -35,7 +35,23 @@ app.use(
     crossOriginResourcePolicy: { policy: 'cross-origin' },
   })
 );
-app.use(morgan('combined'));
+// Custom request logging - skip health checks, clean format
+app.use(
+  morgan(
+    (tokens, req, res) => {
+      const method = tokens.method(req, res);
+      const url = tokens.url(req, res);
+      const status = tokens.status(req, res);
+      const responseTime = tokens['response-time'](req, res);
+      const statusNum = Number(status);
+      const icon = statusNum >= 500 ? 'ERR' : statusNum >= 400 ? 'WARN' : 'OK';
+      return `[${icon}] ${method} ${url} ${status} ${responseTime}ms`;
+    },
+    {
+      skip: (req) => req.url === '/health' || req.url === '/api/health',
+    }
+  )
+);
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
@@ -169,9 +185,14 @@ async function startServer() {
     console.log('Database connection successful');
 
     app.listen(PORT, () => {
-      console.log(`Server running on port ${PORT}`);
-      console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
-      console.log(`Frontend URL: ${FRONTEND_URL}`);
+      console.log('');
+      console.log('=================================');
+      console.log(`  PropGroup API Server`);
+      console.log(`  Port: ${PORT}`);
+      console.log(`  Env:  ${process.env.NODE_ENV || 'development'}`);
+      console.log(`  CORS: ${allowedOrigins.join(', ')}`);
+      console.log('=================================');
+      console.log('');
     });
   } catch (error) {
     console.error('Failed to start server:', error);
