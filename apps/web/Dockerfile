@@ -1,6 +1,6 @@
 FROM node:20-alpine
 
-RUN apk add --no-cache bash libc6-compat
+RUN apk add --no-cache bash libc6-compat openssl
 
 RUN corepack enable && corepack prepare pnpm@9.15.0 --activate
 
