@@ -87,8 +87,9 @@ export function AIPropertySearch({
 
     try {
       // Call backend AI search API
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api'
-      const response = await fetch(`${apiUrl}/ai-search`, {
+      const { normalizeApiUrl } = await import('@/lib/utils/api-url')
+      const apiUrl = normalizeApiUrl(process.env.NEXT_PUBLIC_API_URL)
+      const response = await fetch(`${apiUrl}/api/ai-search`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

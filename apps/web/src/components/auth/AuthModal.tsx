@@ -5,7 +5,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useAuth } from "@/contexts/AuthContext";
-import { Chrome, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -21,14 +21,14 @@ import { Label } from "@/components/ui/label";
 // Define schemas locally to avoid import issues
 const authSchema = z.object({
   email: z.string().email("Invalid email address"),
-  password: z.string().min(6, "Password must be at least 6 characters"),
+  password: z.string().min(8, "Password must be at least 8 characters"),
 });
 
 const signupSchema = authSchema
   .extend({
     confirmPassword: z
       .string()
-      .min(6, "Password must be at least 6 characters"),
+      .min(8, "Password must be at least 8 characters"),
   })
   .refine((data) => data.password === data.confirmPassword, {
     message: "Passwords don't match",
@@ -40,24 +40,34 @@ type SignupData = z.infer<typeof signupSchema>;
 
 type AuthModalProps = {
   children: React.ReactNode;
+  defaultMode?: "login" | "signup";
 };
 
-export function AuthModal({ children }: AuthModalProps) {
+export function AuthModal({ children, defaultMode = "login" }: AuthModalProps) {
   const { signIn, signUp } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
-  const [isLogin, setIsLogin] = useState(true);
+  const [isLogin, setIsLogin] = useState(defaultMode === "login");
   const [isLoading, setIsLoading] = useState(false);
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
-  // Reset errors and success messages when switching between login/signup or opening modal
+  // Reset errors, success messages, and form inputs when switching modes or opening modal
   useEffect(() => {
     if (isOpen) {
       setError(null);
       setSuccess(null);
+      loginForm.reset();
+      signupForm.reset();
     }
   }, [isOpen, isLogin]);
+
+  // Reset to default mode when opening
+  useEffect(() => {
+    if (isOpen) {
+      setIsLogin(defaultMode === "login");
+    }
+  }, [isOpen, defaultMode]);
 
   const loginForm = useForm<AuthData>({
     resolver: zodResolver(authSchema),
@@ -164,13 +174,13 @@ export function AuthModal({ children }: AuthModalProps) {
         </DialogHeader>
 
         {error && (
-          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
+          <div role="alert" className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
             {error}
           </div>
         )}
 
         {success && (
-          <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded">
+          <div role="alert" className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded">
             {success}
           </div>
         )}
@@ -214,6 +224,16 @@ export function AuthModal({ children }: AuthModalProps) {
               )}
             </div>
 
+            <div className="flex flex-col space-y-2 pt-2">
+              <Button
+                type="submit"
+                disabled={isLoading || isGoogleLoading}
+                className="w-full"
+              >
+                {isLoading ? "Signing In..." : "Sign In"}
+              </Button>
+            </div>
+
             <div className="relative my-4">
               <div className="absolute inset-0 flex items-center">
                 <span className="w-full border-t" />
@@ -239,21 +259,13 @@ export function AuthModal({ children }: AuthModalProps) {
                 </>
               ) : (
                 <>
-                  <Chrome className="mr-2 h-4 w-4 text-blue-600" />
+                  <span className="mr-2 h-4 w-4 font-bold text-blue-600 text-sm">G</span>
                   Continue with Google
                 </>
               )}
             </Button>
 
-            <div className="flex flex-col space-y-2 pt-2">
-              <Button
-                type="submit"
-                disabled={isLoading || isGoogleLoading}
-                className="w-full"
-              >
-                {isLoading ? "Signing In..." : "Sign In"}
-              </Button>
-
+            <div className="pt-2">
               <Button
                 type="button"
                 variant="ghost"
@@ -293,7 +305,7 @@ export function AuthModal({ children }: AuthModalProps) {
                 id="signup-password"
                 type="password"
                 {...signupForm.register("password")}
-                placeholder="Enter your password (min 6 characters)"
+                placeholder="Enter your password (min 8 characters)"
                 autoComplete="new-password"
                 disabled={isLoading}
               />
@@ -321,6 +333,16 @@ export function AuthModal({ children }: AuthModalProps) {
               )}
             </div>
 
+            <div className="flex flex-col space-y-2 pt-2">
+              <Button
+                type="submit"
+                disabled={isLoading || isGoogleLoading}
+                className="w-full"
+              >
+                {isLoading ? "Creating Account..." : "Create Account"}
+              </Button>
+            </div>
+
             <div className="relative my-4">
               <div className="absolute inset-0 flex items-center">
                 <span className="w-full border-t" />
@@ -346,21 +368,13 @@ export function AuthModal({ children }: AuthModalProps) {
                 </>
               ) : (
                 <>
-                  <Chrome className="mr-2 h-4 w-4 text-blue-600" />
+                  <span className="mr-2 h-4 w-4 font-bold text-blue-600 text-sm">G</span>
                   Sign up with Google
                 </>
               )}
             </Button>
 
-            <div className="flex flex-col space-y-2 pt-2">
-              <Button
-                type="submit"
-                disabled={isLoading || isGoogleLoading}
-                className="w-full"
-              >
-                {isLoading ? "Creating Account..." : "Create Account"}
-              </Button>
-
+            <div className="pt-2">
               <Button
                 type="button"
                 variant="ghost"

@@ -1,5 +1,5 @@
 import { notFound } from 'next/navigation'
-import { prisma } from '@/lib/prisma'
+import { normalizeApiUrl } from '@/lib/utils/api-url'
 import { RoiCalculator } from '@/components/RoiCalculator'
 import { Button } from '@/components/ui/button'
 import { MapPin, Building, Calendar, DollarSign, TrendingUp, Shield } from 'lucide-react'
@@ -10,27 +10,33 @@ type PropertyPageProps = {
   }>
 }
 
+async function getProperty(slug: string) {
+  const baseUrl = normalizeApiUrl(process.env.NEXT_PUBLIC_API_URL)
+  const res = await fetch(`${baseUrl}/api/properties/${slug}`, {
+    cache: 'no-store',
+  })
+
+  if (!res.ok) {
+    if (res.status === 404) return null
+    throw new Error(`Failed to fetch property: ${res.status}`)
+  }
+
+  const data = await res.json()
+  return data.data || data.property || data
+}
+
 export default async function PropertyPage({ params }: PropertyPageProps) {
   // Await params as it's now a Promise in Next.js 15
   const { slug } = await params;
-  
-  // For now, we'll use the slug as the property ID
-  // In a real app, you'd have a slug field in your database
-  const property = await prisma.property.findUnique({
-    where: { id: slug },
-    include: {
-      investmentData: true,
-      developer: true,
-      locationGuide: true,
-    },
-  })
+
+  const property = await getProperty(slug)
 
   if (!property) {
     notFound()
   }
 
   // Calculate estimated monthly rent (simplified calculation)
-  const estimatedRent = property.investmentData?.rentalYield 
+  const estimatedRent = property.investmentData?.rentalYield
     ? (property.price * property.investmentData.rentalYield / 100) / 12
     : property.price * 0.005 // 6% annual yield as fallback
 
@@ -58,7 +64,7 @@ export default async function PropertyPage({ params }: PropertyPageProps) {
           <div className="lg:col-span-2 space-y-8">
             {/* Property Images */}
             <div className="bg-white rounded-lg shadow-sm overflow-hidden">
-              {property.images.length > 0 ? (
+              {property.images?.length > 0 ? (
                 <div className="aspect-video bg-gray-200">
                   <img
                     src={property.images[0]}
@@ -107,7 +113,7 @@ export default async function PropertyPage({ params }: PropertyPageProps) {
             {/* Investment Dashboard */}
             <div className="bg-white rounded-lg shadow-sm p-6">
               <h2 className="text-2xl font-semibold text-gray-900 mb-6">Investment Dashboard</h2>
-              
+
               {property.investmentData ? (
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                   <div className="text-center p-4 bg-green-50 rounded-lg">
@@ -140,7 +146,7 @@ export default async function PropertyPage({ params }: PropertyPageProps) {
             </div>
 
             {/* ROI Calculator */}
-            <RoiCalculator 
+            <RoiCalculator
               propertyPrice={property.price}
               estimatedRent={estimatedRent}
             />

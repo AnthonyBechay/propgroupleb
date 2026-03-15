@@ -1,5 +1,6 @@
 import express, { type Request, type Response, type Router } from 'express';
 import { prisma } from '@propgroup/db';
+import rateLimit from 'express-rate-limit';
 import { authenticateToken, requireAdmin, logAdminAction } from '../middleware/auth.js';
 import { asyncHandler } from '../utils/errors.js';
 import { sendSuccess, sendCreated, sendPaginated, sendNotFound } from '../utils/response.js';
@@ -10,9 +11,16 @@ import type { AuthenticatedRequest, MaybeAuthRequest } from '../types/index.js';
 
 const router: Router = express.Router();
 
+const inquiryLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+  message: { error: 'Too many inquiry submissions. Please try again later.' },
+});
+
 // Create property inquiry (public - no auth required)
 router.post(
   '/',
+  inquiryLimiter,
   asyncHandler(async (req: Request, res: Response) => {
     const maybeReq = req as MaybeAuthRequest;
     const validatedData = inquirySchema.parse(req.body);

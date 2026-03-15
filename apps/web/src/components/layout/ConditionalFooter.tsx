@@ -6,8 +6,8 @@ import { Footer } from './Footer'
 export function ConditionalFooter() {
   const pathname = usePathname()
 
-  // Don't show footer on admin routes
-  if (pathname?.startsWith('/admin')) {
+  // Don't show footer on admin or auth routes
+  if (pathname?.startsWith('/admin') || pathname?.startsWith('/auth')) {
     return null
   }
 

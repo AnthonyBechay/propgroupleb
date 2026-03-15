@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import { redirect } from 'next/navigation'
 import { cookies } from 'next/headers'
+import { normalizeApiUrl } from '@/lib/utils/api-url'
 
 export type UserRole = 'USER' | 'ADMIN' | 'SUPER_ADMIN'
 
@@ -28,13 +29,10 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
       return null
     }
 
-    // Use the backend URL, not the public API URL (which may be relative)
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api'
-    const backendUrl = apiUrl.startsWith('http') ? apiUrl : `https://propgroup.onrender.com/api`
+    // Use normalizeApiUrl for consistent URL handling
+    const backendUrl = normalizeApiUrl(process.env.NEXT_PUBLIC_API_URL)
 
-    console.log(`[rbac] Attempting auth check to: ${backendUrl}/auth/me`)
-
-    const response = await fetch(`${backendUrl}/auth/me`, {
+    const response = await fetch(`${backendUrl}/api/auth/me`, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',

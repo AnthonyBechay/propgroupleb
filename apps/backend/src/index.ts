@@ -3,8 +3,6 @@ import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
 import rateLimit from 'express-rate-limit';
-import dotenv from 'dotenv';
-import session from 'express-session';
 import cookieParser from 'cookie-parser';
 import { prisma } from '@propgroup/db';
 import passport from './config/passport.js';
@@ -21,9 +19,7 @@ import adminRoutes from './routes/admin.js';
 import agentRoutes from './routes/agent.js';
 import aiSearchRoutes from './routes/ai-search.js';
 import contentRoutes from './routes/content.js';
-
-// Load environment variables
-dotenv.config();
+import contactRoutes from './routes/contact.js';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -97,29 +93,8 @@ app.use('/api/', generalLimiter);
 app.use('/api/auth/login', authLimiter);
 app.use('/api/auth/register', authLimiter);
 
-// Session configuration
-const sessionSecret = process.env.SESSION_SECRET;
-if (!sessionSecret && process.env.NODE_ENV === 'production') {
-  throw new Error('SESSION_SECRET must be set in production');
-}
-
-app.use(
-  session({
-    secret: sessionSecret || 'dev-session-secret-change-in-production',
-    resave: false,
-    saveUninitialized: false,
-    cookie: {
-      secure: process.env.NODE_ENV === 'production',
-      httpOnly: true,
-      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
-    },
-  })
-);
-
-// Initialize Passport
+// Initialize Passport (JWT-only, no sessions)
 app.use(passport.initialize());
-app.use(passport.session());
 
 // Health check endpoint
 app.get('/api/health', async (_req, res) => {
@@ -161,6 +136,7 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/agent', agentRoutes);
 app.use('/api/ai-search', aiSearchRoutes);
 app.use('/api/content', contentRoutes);
+app.use('/api/contact', contactRoutes);
 
 // Global error handler
 app.use(errorHandler);

@@ -9,7 +9,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Building2, Loader2, Mail, Lock, Shield, Chrome } from 'lucide-react'
+import { Building2, Loader2, Mail, Lock, Shield } from 'lucide-react'
 import Link from 'next/link'
 
 const loginSchema = z.object({
@@ -172,7 +172,7 @@ function LoginForm() {
                 </>
               ) : (
                 <>
-                  <Chrome className="h-5 w-5 mr-3 text-blue-600" />
+                  <span className="h-5 w-5 mr-3 font-bold text-blue-600 text-lg flex items-center justify-center">G</span>
                   Continue with Google
                 </>
               )}
@@ -253,12 +253,12 @@ function LoginForm() {
               </div>
 
               <div className="text-sm">
-                <Link
-                  href="/auth/reset-password"
-                  className="font-medium text-cyan-600 hover:text-cyan-700"
+                <span
+                  className="font-medium text-gray-400 cursor-default"
+                  title="Password reset coming soon"
                 >
                   Forgot password?
-                </Link>
+                </span>
               </div>
             </div>
 

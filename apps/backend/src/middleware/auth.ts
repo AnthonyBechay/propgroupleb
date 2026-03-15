@@ -53,6 +53,7 @@ export async function authenticateToken(req: Request, res: Response, next: NextF
         membershipTier: true,
         membershipStartDate: true,
         membershipEndDate: true,
+        agentCommissionRate: true,
         createdAt: true,
         updatedAt: true,
       },

@@ -6,8 +6,8 @@ import { Navbar } from './Navbar'
 export function ConditionalNavbar() {
   const pathname = usePathname()
 
-  // Don't show navbar on admin routes
-  if (pathname?.startsWith('/admin')) {
+  // Don't show navbar on admin or auth routes
+  if (pathname?.startsWith('/admin') || pathname?.startsWith('/auth')) {
     return null
   }
 

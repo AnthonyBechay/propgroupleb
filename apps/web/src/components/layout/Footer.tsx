@@ -1,88 +1,22 @@
 'use client'
 
 import Link from 'next/link'
-import { 
-  Building2, 
-  MapPin, 
-  Phone, 
-  Mail, 
-  Facebook, 
-  Twitter, 
-  Linkedin, 
-  Instagram,
-  ArrowRight,
-  Globe,
-  Shield,
-  Award,
-  TrendingUp
+import {
+  Building2,
+  Phone,
+  Mail,
+  Facebook,
+  Twitter,
+  Linkedin,
+  Instagram
 } from 'lucide-react'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { useState } from 'react'
-import { toast } from '@/components/ui/use-toast'
 
 export function Footer() {
-  const [email, setEmail] = useState('')
-  const [isSubscribing, setIsSubscribing] = useState(false)
-
-  const handleSubscribe = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setIsSubscribing(true)
-    
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1000))
-    
-    toast({
-      title: "Successfully subscribed!",
-      description: "You'll receive our latest investment opportunities and market insights.",
-    })
-    
-    setEmail('')
-    setIsSubscribing(false)
-  }
-
   const currentYear = new Date().getFullYear()
 
   return (
     <footer className="relative bg-gradient-to-b from-gray-900 to-black text-white">
-      {/* Compact Newsletter Section */}
-      <div className="border-b border-gray-800">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-          <div className="bg-gradient-to-r from-blue-600/10 to-purple-600/10 border border-blue-500/20 rounded-lg p-4">
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-              <div className="text-center sm:text-left">
-                <h3 className="text-lg font-bold mb-1">Stay Ahead of the Market</h3>
-                <p className="text-gray-300 text-sm">
-                  Get exclusive opportunities and insights.
-                </p>
-              </div>
-              <form onSubmit={handleSubscribe} className="flex gap-2 w-full sm:w-auto">
-                <Input
-                  type="email"
-                  placeholder="Enter your email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                  className="flex-1 sm:w-64 bg-white/10 border-white/20 text-white placeholder:text-gray-400 focus:bg-white/20 h-10"
-                />
-                <Button
-                  type="submit"
-                  disabled={isSubscribing}
-                  className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 h-10 px-4"
-                >
-                  {isSubscribing ? (
-                    <span className="animate-spin h-4 w-4 border-2 border-white/30 border-t-white rounded-full" />
-                  ) : (
-                    <ArrowRight className="w-4 h-4" />
-                  )}
-                </Button>
-              </form>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Compact Main Footer */}
+      {/* Main Footer */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-6">
           {/* Company Info */}
@@ -96,17 +30,20 @@ export function Footer() {
                 <p className="text-xs text-gray-400">Smart Investments</p>
               </div>
             </div>
+            <p className="text-xs text-gray-400 mb-3">
+              AI-powered real estate investment platform helping you make smarter property decisions.
+            </p>
             <div className="flex gap-2">
-              <a href="#" className="w-8 h-8 bg-white/10 rounded-lg flex items-center justify-center hover:bg-blue-600 transition-colors">
+              <a href="#" aria-label="Facebook" className="w-8 h-8 bg-white/10 rounded-lg flex items-center justify-center hover:bg-blue-600 transition-colors">
                 <Facebook className="w-4 h-4 text-gray-400 hover:text-white" />
               </a>
-              <a href="#" className="w-8 h-8 bg-white/10 rounded-lg flex items-center justify-center hover:bg-blue-400 transition-colors">
+              <a href="#" aria-label="Twitter" className="w-8 h-8 bg-white/10 rounded-lg flex items-center justify-center hover:bg-blue-400 transition-colors">
                 <Twitter className="w-4 h-4 text-gray-400 hover:text-white" />
               </a>
-              <a href="#" className="w-8 h-8 bg-white/10 rounded-lg flex items-center justify-center hover:bg-blue-700 transition-colors">
+              <a href="#" aria-label="LinkedIn" className="w-8 h-8 bg-white/10 rounded-lg flex items-center justify-center hover:bg-blue-700 transition-colors">
                 <Linkedin className="w-4 h-4 text-gray-400 hover:text-white" />
               </a>
-              <a href="#" className="w-8 h-8 bg-white/10 rounded-lg flex items-center justify-center hover:bg-pink-600 transition-colors">
+              <a href="#" aria-label="Instagram" className="w-8 h-8 bg-white/10 rounded-lg flex items-center justify-center hover:bg-pink-600 transition-colors">
                 <Instagram className="w-4 h-4 text-gray-400 hover:text-white" />
               </a>
             </div>
@@ -136,7 +73,7 @@ export function Footer() {
 
           {/* Resources */}
           <div>
-            <h4 className="font-semibold text-sm mb-2">Resources</h4>
+            <h4 className="font-semibold text-sm mb-2">Company</h4>
             <ul className="space-y-1.5">
               <li>
                 <Link href="/about" className="text-gray-400 hover:text-white transition-colors text-xs">
@@ -144,13 +81,13 @@ export function Footer() {
                 </Link>
               </li>
               <li>
-                <Link href="/blog" className="text-gray-400 hover:text-white transition-colors text-xs">
-                  Blog
+                <Link href="/contact" className="text-gray-400 hover:text-white transition-colors text-xs">
+                  Contact
                 </Link>
               </li>
               <li>
-                <Link href="/faq" className="text-gray-400 hover:text-white transition-colors text-xs">
-                  FAQ
+                <Link href="/ai-search" className="text-gray-400 hover:text-white transition-colors text-xs">
+                  AI Search
                 </Link>
               </li>
             </ul>
@@ -180,7 +117,7 @@ export function Footer() {
         <div className="border-t border-gray-800 pt-4">
           <div className="flex flex-col sm:flex-row justify-between items-center gap-3">
             <p className="text-gray-400 text-xs text-center sm:text-left">
-              © {currentYear} PropGroup. All rights reserved.
+              &copy; {currentYear} PropGroup. All rights reserved.
             </p>
             <div className="flex gap-4 text-xs">
               <Link href="/privacy" className="text-gray-400 hover:text-white transition-colors">
@@ -188,9 +125,6 @@ export function Footer() {
               </Link>
               <Link href="/terms" className="text-gray-400 hover:text-white transition-colors">
                 Terms
-              </Link>
-              <Link href="/cookies" className="text-gray-400 hover:text-white transition-colors">
-                Cookies
               </Link>
             </div>
           </div>

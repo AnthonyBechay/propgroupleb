@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server'
 import { cookies } from 'next/headers'
+import { normalizeApiUrl } from '@/lib/utils/api-url'
 
 export interface AuthUser {
   id: string
@@ -27,10 +28,9 @@ export async function verifyAuth(request: NextRequest): Promise<AuthResult> {
       return { authenticated: false, user: null }
     }
 
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api'
-    const backendUrl = apiUrl.startsWith('http') ? apiUrl : `https://propgroup.onrender.com/api`
+    const backendUrl = normalizeApiUrl(process.env.NEXT_PUBLIC_API_URL)
 
-    const response = await fetch(`${backendUrl}/auth/me`, {
+    const response = await fetch(`${backendUrl}/api/auth/me`, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',

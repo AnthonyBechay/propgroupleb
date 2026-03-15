@@ -110,56 +110,54 @@ async function main() {
   // 2. CREATE DEVELOPERS
   // ============================================
   console.log('\n🏗️  Creating developers...')
+
+  // Helper: find existing developer by name or create new one
+  async function upsertDeveloper(data: { name: string; description: string; website: string; country: Country; logo: string }) {
+    const existing = await prisma.developer.findFirst({ where: { name: data.name } })
+    if (existing) return existing
+    return prisma.developer.create({ data })
+  }
+
   const developers = await Promise.all([
-    prisma.developer.create({
-      data: {
-        name: 'Archi Development',
-        description:
-          'Leading developer in Georgia with over 15 years of experience in premium residential and commercial projects. Known for innovative architectural designs and sustainable building practices.',
-        website: 'https://archidevelopment.ge',
-        country: Country.GEORGIA,
-        logo: 'https://images.unsplash.com/photo-1560179707-f14e90ef3623?w=400',
-      },
+    upsertDeveloper({
+      name: 'Archi Development',
+      description:
+        'Leading developer in Georgia with over 15 years of experience in premium residential and commercial projects. Known for innovative architectural designs and sustainable building practices.',
+      website: 'https://archidevelopment.ge',
+      country: Country.GEORGIA,
+      logo: 'https://images.unsplash.com/photo-1560179707-f14e90ef3623?w=400',
     }),
-    prisma.developer.create({
-      data: {
-        name: 'Cyprus Elite Properties',
-        description:
-          'Premium real estate development company in Cyprus, specializing in luxury beachfront villas and Golden Visa eligible properties with world-class amenities.',
-        website: 'https://cypruselite.com',
-        country: Country.CYPRUS,
-        logo: 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=400',
-      },
+    upsertDeveloper({
+      name: 'Cyprus Elite Properties',
+      description:
+        'Premium real estate development company in Cyprus, specializing in luxury beachfront villas and Golden Visa eligible properties with world-class amenities.',
+      website: 'https://cypruselite.com',
+      country: Country.CYPRUS,
+      logo: 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=400',
     }),
-    prisma.developer.create({
-      data: {
-        name: 'Athens Modern Living',
-        description:
-          'Contemporary urban development specialist in Athens, creating modern residential spaces that blend Greek heritage with cutting-edge design and technology.',
-        website: 'https://athensmodern.gr',
-        country: Country.GREECE,
-        logo: 'https://images.unsplash.com/photo-1511818966892-d7d671e672a2?w=400',
-      },
+    upsertDeveloper({
+      name: 'Athens Modern Living',
+      description:
+        'Contemporary urban development specialist in Athens, creating modern residential spaces that blend Greek heritage with cutting-edge design and technology.',
+      website: 'https://athensmodern.gr',
+      country: Country.GREECE,
+      logo: 'https://images.unsplash.com/photo-1511818966892-d7d671e672a2?w=400',
     }),
-    prisma.developer.create({
-      data: {
-        name: 'Batumi Beach Developments',
-        description:
-          'Beachfront property specialist in Batumi, Georgia. Expert in high-yield investment properties with stunning sea views and modern amenities.',
-        website: 'https://batumibeach.ge',
-        country: Country.GEORGIA,
-        logo: 'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?w=400',
-      },
+    upsertDeveloper({
+      name: 'Batumi Beach Developments',
+      description:
+        'Beachfront property specialist in Batumi, Georgia. Expert in high-yield investment properties with stunning sea views and modern amenities.',
+      website: 'https://batumibeach.ge',
+      country: Country.GEORGIA,
+      logo: 'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?w=400',
     }),
-    prisma.developer.create({
-      data: {
-        name: 'Beirut Urban Estates',
-        description:
-          'Prestigious developer in Lebanon, creating luxury residential and commercial properties in prime locations throughout Beirut and coastal areas.',
-        website: 'https://beiruturban.com',
-        country: Country.LEBANON,
-        logo: 'https://images.unsplash.com/photo-1582407947304-fd86f028f716?w=400',
-      },
+    upsertDeveloper({
+      name: 'Beirut Urban Estates',
+      description:
+        'Prestigious developer in Lebanon, creating luxury residential and commercial properties in prime locations throughout Beirut and coastal areas.',
+      website: 'https://beiruturban.com',
+      country: Country.LEBANON,
+      logo: 'https://images.unsplash.com/photo-1582407947304-fd86f028f716?w=400',
     }),
   ])
 
@@ -169,8 +167,16 @@ async function main() {
   // 3. CREATE LOCATION GUIDES
   // ============================================
   console.log('\n📍 Creating location guides...')
+
+  // Helper: find existing location guide by title or create new one
+  async function upsertLocationGuide(args: { data: { title: string; content: string; country: Country; imageUrl: string } }) {
+    const existing = await prisma.locationGuide.findFirst({ where: { title: args.data.title } })
+    if (existing) return existing
+    return prisma.locationGuide.create(args)
+  }
+
   const locationGuides = await Promise.all([
-    prisma.locationGuide.create({
+    upsertLocationGuide({
       data: {
         title: 'Tbilisi Investment Guide 2025',
         content: `Tbilisi, the vibrant capital of Georgia, has emerged as one of Eastern Europe's most promising real estate markets. The city offers:
@@ -197,7 +203,7 @@ async function main() {
         imageUrl: 'https://images.unsplash.com/photo-1565008576549-57569a49371d?w=1200',
       },
     }),
-    prisma.locationGuide.create({
+    upsertLocationGuide({
       data: {
         title: 'Cyprus Golden Visa & Property Investment Guide',
         content: `Cyprus offers one of Europe's most attractive Golden Visa programs combined with excellent property investment opportunities.
@@ -225,7 +231,7 @@ async function main() {
         imageUrl: 'https://images.unsplash.com/photo-1598300042247-d088f8ab3a91?w=1200',
       },
     }),
-    prisma.locationGuide.create({
+    upsertLocationGuide({
       data: {
         title: 'Athens Real Estate Investment Overview',
         content: `Athens is experiencing a renaissance, with property prices recovering strongly and offering excellent investment potential.
@@ -252,7 +258,7 @@ async function main() {
         imageUrl: 'https://images.unsplash.com/photo-1555993539-1732b0258235?w=1200',
       },
     }),
-    prisma.locationGuide.create({
+    upsertLocationGuide({
       data: {
         title: 'Batumi - Black Sea Riviera Investment',
         content: `Batumi, Georgia's premier seaside resort, offers exceptional value for property investors seeking high rental yields.
@@ -278,7 +284,7 @@ async function main() {
         imageUrl: 'https://images.unsplash.com/photo-1624571395775-253d9666612b?w=1200',
       },
     }),
-    prisma.locationGuide.create({
+    upsertLocationGuide({
       data: {
         title: 'Lebanon Property Market Guide',
         content: `Lebanon offers unique opportunities for investors familiar with emerging markets and seeking high-risk, high-reward investments.

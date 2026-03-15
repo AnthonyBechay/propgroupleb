@@ -137,43 +137,4 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
   console.log('Google OAuth not configured - skipping Google Strategy');
 }
 
-// Serialize user for session
-passport.serializeUser((user: Express.User, done) => {
-  done(null, (user as { id: string }).id);
-});
-
-// Deserialize user from session
-passport.deserializeUser(async (id: string, done) => {
-  try {
-    const user = await prisma.user.findUnique({
-      where: { id },
-      select: {
-        id: true,
-        email: true,
-        role: true,
-        isActive: true,
-        bannedAt: true,
-        emailVerifiedAt: true,
-        firstName: true,
-        lastName: true,
-        phone: true,
-        country: true,
-        investmentGoals: true,
-        provider: true,
-        avatar: true,
-        createdAt: true,
-        updatedAt: true,
-      },
-    });
-
-    if (!user) {
-      return done(new Error('User not found'));
-    }
-
-    done(null, user);
-  } catch (error) {
-    done(error);
-  }
-});
-
 export default passport;

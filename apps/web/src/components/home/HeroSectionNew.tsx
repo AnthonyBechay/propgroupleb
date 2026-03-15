@@ -14,7 +14,19 @@ export function HeroSectionNew() {
     setMounted(true)
   }, [])
 
-  if (!mounted) return null
+  if (!mounted) {
+    return (
+      <section className="relative min-h-[85vh] flex items-center justify-center overflow-hidden bg-gradient-to-br from-[#0a1628] via-[#0f2439] to-[#1e293b] w-full">
+        <div className="relative z-10 container mx-auto px-4 sm:px-6 lg:px-8 py-16 w-full max-w-7xl">
+          <div className="max-w-5xl mx-auto text-center space-y-4 sm:space-y-6">
+            <div className="h-16 sm:h-20 md:h-24 lg:h-28 bg-white/5 rounded-xl animate-pulse mx-auto max-w-xl" />
+            <div className="h-8 bg-white/5 rounded-lg animate-pulse mx-auto max-w-md" />
+            <div className="h-40 bg-white/5 rounded-2xl animate-pulse mx-auto max-w-3xl mt-10" />
+          </div>
+        </div>
+      </section>
+    )
+  }
 
   return (
     <section className="relative min-h-[85vh] flex items-center justify-center overflow-hidden bg-gradient-to-br from-[#0a1628] via-[#0f2439] to-[#1e293b] w-full">

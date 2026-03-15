@@ -6,13 +6,13 @@ import { usePathname } from 'next/navigation'
 import { useAuth } from '@/contexts/AuthContext'
 import { AuthModal } from '@/components/auth/AuthModal'
 import { Button } from '@/components/ui/button'
-import { 
-  Menu, 
-  X, 
-  Home, 
-  Building2, 
-  Info, 
-  Phone, 
+import {
+  Menu,
+  X,
+  Home,
+  Building2,
+  Info,
+  Phone,
   BarChart3,
   Calculator,
   DollarSign,
@@ -23,7 +23,6 @@ import {
   Heart,
   FileText,
   Bell,
-  Search,
   Globe,
   Sparkles,
   TrendingUp,
@@ -115,6 +114,8 @@ export function Navbar() {
                 <button
                   onClick={() => setIsPortalDropdownOpen(!isPortalDropdownOpen)}
                   onBlur={() => setTimeout(() => setIsPortalDropdownOpen(false), 200)}
+                  aria-expanded={isPortalDropdownOpen}
+                  aria-haspopup="true"
                   className={`px-4 py-2 rounded-lg font-medium transition-all flex items-center gap-1 whitespace-nowrap ${
                     pathname.startsWith('/portal')
                       ? 'bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-900/20 dark:to-purple-900/20 text-blue-700 dark:text-blue-400'
@@ -129,11 +130,12 @@ export function Navbar() {
                 </button>
 
                 {isPortalDropdownOpen && (
-                  <div className="absolute top-full left-0 mt-2 w-64 bg-white dark:bg-gray-800 rounded-2xl shadow-2xl border border-gray-100 dark:border-gray-700 py-2 animate-in fade-in slide-in-from-top-2">
+                  <div role="menu" className="absolute top-full left-0 mt-2 w-64 bg-white dark:bg-gray-800 rounded-2xl shadow-2xl border border-gray-100 dark:border-gray-700 py-2 animate-in fade-in slide-in-from-top-2">
                     {portalLinks.map((link, index) => (
                       <Link
                         key={link.href}
                         href={link.href}
+                        role="menuitem"
                         className="flex items-center gap-3 px-4 py-3 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors group"
                         style={{ animationDelay: `${index * 50}ms` }}
                       >
@@ -168,32 +170,26 @@ export function Navbar() {
 
           {/* Desktop Auth Section */}
           <div className="hidden lg:flex items-center space-x-2 flex-shrink-0">
-            {/* Search Button */}
-            <Button
-              variant="ghost"
-              size="sm"
-              className="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
-            >
-              <Search className="w-5 h-5" />
-            </Button>
-
             {user ? (
               <div className="flex items-center space-x-2 flex-shrink-0">
                 {/* Notification Bell */}
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="relative text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
-                >
-                  <Bell className="w-5 h-5" />
-                  <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full animate-pulse" />
-                </Button>
+                <Link href="/portal/notifications">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="relative text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
+                  >
+                    <Bell className="w-5 h-5" />
+                  </Button>
+                </Link>
 
                 {/* User Profile Dropdown */}
                 <div className="relative">
                   <button
                     onClick={() => setIsProfileDropdownOpen(!isProfileDropdownOpen)}
                     onBlur={() => setTimeout(() => setIsProfileDropdownOpen(false), 200)}
+                    aria-expanded={isProfileDropdownOpen}
+                    aria-haspopup="true"
                     className="flex items-center gap-2 px-3 py-1.5 bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-700 rounded-full hover:shadow-md transition-all"
                   >
                     <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-sm font-bold">
@@ -208,19 +204,20 @@ export function Navbar() {
                   </button>
 
                   {isProfileDropdownOpen && (
-                    <div className="absolute top-full right-0 mt-2 w-56 bg-white dark:bg-gray-800 rounded-2xl shadow-2xl border border-gray-100 dark:border-gray-700 py-2 animate-in fade-in slide-in-from-top-2">
+                    <div role="menu" className="absolute top-full right-0 mt-2 w-56 bg-white dark:bg-gray-800 rounded-2xl shadow-2xl border border-gray-100 dark:border-gray-700 py-2 animate-in fade-in slide-in-from-top-2">
                       <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-700">
                         <p className="text-sm font-medium text-gray-900 dark:text-white">
                           {user.email}
                         </p>
                         <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                          Free Plan • 5 properties saved
+                          My Account
                         </p>
                       </div>
                       {profileLinks.map((link) => (
                         <Link
                           key={link.href}
                           href={link.href}
+                          role="menuitem"
                           className="flex items-center gap-3 px-4 py-2.5 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
                         >
                           {link.icon}
@@ -230,6 +227,7 @@ export function Navbar() {
                       <div className="border-t border-gray-100 dark:border-gray-700 mt-2 pt-2">
                         <button
                           onClick={signOut}
+                          role="menuitem"
                           className="flex items-center gap-3 px-4 py-2.5 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors w-full text-left"
                         >
                           <LogOut className="w-4 h-4" />
@@ -266,7 +264,7 @@ export function Navbar() {
                     Sign In
                   </Button>
                 </AuthModal>
-                <AuthModal>
+                <AuthModal defaultMode="signup">
                   <Button size="sm" className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 shadow-md hover:shadow-lg transition-all">
                     <Sparkles className="w-4 h-4 mr-2" />
                     Get Started

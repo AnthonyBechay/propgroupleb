@@ -45,7 +45,7 @@ export const metadata: Metadata = {
   openGraph: {
     type: "website",
     locale: "en_US",
-    url: "https://propgroup.com",
+    url: "https://www.bechays.com",
     title: "PropGroup - Smart Real Estate Investment Platform",
     description: "Your gateway to international real estate investment opportunities",
     siteName: "PropGroup",
@@ -85,9 +85,9 @@ export default function RootLayout({
       <body className="font-plus-jakarta antialiased min-h-screen flex flex-col bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900 overflow-x-hidden">
         <AuthProvider>
           <ConditionalNavbar />
-          <main className="flex-1">
+          <div className="flex-1">
             {children}
-          </main>
+          </div>
           <ConditionalFooter />
           <ConditionalScrollToTop />
           <ConditionalAIAssistantFab />

@@ -31,83 +31,7 @@ const mediaSchema = z.object({
 });
 
 // ============================================
-// PUBLIC - Site Content
-// ============================================
-
-// GET /api/content/all - list all content (admin only)
-router.get(
-  '/all',
-  authenticateToken,
-  requireAdmin,
-  asyncHandler(async (_req: Request, res: Response) => {
-    const content = await contentService.getAllContent();
-    sendSuccess(res, content);
-  })
-);
-
-// GET /api/content?section=hero - get content by section (public)
-router.get(
-  '/',
-  asyncHandler(async (req: Request, res: Response) => {
-    const { section } = req.query;
-    if (!section) {
-      res.status(400).json({ success: false, message: 'section query parameter is required' });
-      return;
-    }
-    const content = await contentService.getContentBySection(section as string);
-    sendSuccess(res, content);
-  })
-);
-
-// GET /api/content/key/:key
-router.get(
-  '/key/:key',
-  asyncHandler(async (req: Request, res: Response) => {
-    const content = await contentService.getContentByKey(req.params.key);
-    if (!content) { sendNotFound(res, 'Content'); return; }
-    sendSuccess(res, content);
-  })
-);
-
-// PUT /api/content/:key (admin)
-router.put(
-  '/:key',
-  authenticateToken,
-  requireAdmin,
-  asyncHandler(async (req: Request, res: Response) => {
-    const authReq = req as AuthenticatedRequest;
-    const data = contentSchema.parse(req.body);
-    const result = await contentService.upsertContent(req.params.key, data, authReq.user.id);
-
-    await logAdminAction('UPDATE_CONTENT', 'site_content', req.params.key, {
-      section: result.section,
-      title: result.title,
-    }, authReq);
-
-    sendSuccess(res, result, 'Content updated successfully');
-  })
-);
-
-// DELETE /api/content/:key (admin)
-router.delete(
-  '/:key',
-  authenticateToken,
-  requireAdmin,
-  asyncHandler(async (req: Request, res: Response) => {
-    const authReq = req as AuthenticatedRequest;
-    const result = await contentService.deleteContent(req.params.key);
-    if (!result) { sendNotFound(res, 'Content'); return; }
-
-    await logAdminAction('DELETE_CONTENT', 'site_content', req.params.key, {
-      section: result.section,
-    }, authReq);
-
-    sendSuccess(res, null, 'Content deleted successfully');
-  })
-);
-
-// ============================================
-// PUBLIC - Site Media
+// PUBLIC - Site Media (must be before /:key)
 // ============================================
 
 // GET /api/content/media - list all media or by section
@@ -169,6 +93,82 @@ router.delete(
     }, authReq);
 
     sendSuccess(res, null, 'Media deleted successfully');
+  })
+);
+
+// ============================================
+// PUBLIC - Site Content
+// ============================================
+
+// GET /api/content/all - list all content (admin only)
+router.get(
+  '/all',
+  authenticateToken,
+  requireAdmin,
+  asyncHandler(async (_req: Request, res: Response) => {
+    const content = await contentService.getAllContent();
+    sendSuccess(res, content);
+  })
+);
+
+// GET /api/content?section=hero - get content by section (public)
+router.get(
+  '/',
+  asyncHandler(async (req: Request, res: Response) => {
+    const { section } = req.query;
+    if (!section) {
+      res.status(400).json({ success: false, message: 'section query parameter is required' });
+      return;
+    }
+    const content = await contentService.getContentBySection(section as string);
+    sendSuccess(res, content);
+  })
+);
+
+// GET /api/content/key/:key
+router.get(
+  '/key/:key',
+  asyncHandler(async (req: Request, res: Response) => {
+    const content = await contentService.getContentByKey(req.params.key);
+    if (!content) { sendNotFound(res, 'Content'); return; }
+    sendSuccess(res, content);
+  })
+);
+
+// PUT /api/content/:key (admin) - MUST be last (catches all params)
+router.put(
+  '/:key',
+  authenticateToken,
+  requireAdmin,
+  asyncHandler(async (req: Request, res: Response) => {
+    const authReq = req as AuthenticatedRequest;
+    const data = contentSchema.parse(req.body);
+    const result = await contentService.upsertContent(req.params.key, data, authReq.user.id);
+
+    await logAdminAction('UPDATE_CONTENT', 'site_content', req.params.key, {
+      section: result.section,
+      title: result.title,
+    }, authReq);
+
+    sendSuccess(res, result, 'Content updated successfully');
+  })
+);
+
+// DELETE /api/content/:key (admin) - MUST be last (catches all params)
+router.delete(
+  '/:key',
+  authenticateToken,
+  requireAdmin,
+  asyncHandler(async (req: Request, res: Response) => {
+    const authReq = req as AuthenticatedRequest;
+    const result = await contentService.deleteContent(req.params.key);
+    if (!result) { sendNotFound(res, 'Content'); return; }
+
+    await logAdminAction('DELETE_CONTENT', 'site_content', req.params.key, {
+      section: result.section,
+    }, authReq);
+
+    sendSuccess(res, null, 'Content deleted successfully');
   })
 );
 

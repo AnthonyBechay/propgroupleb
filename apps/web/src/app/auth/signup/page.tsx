@@ -9,7 +9,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Building2, Loader2, Mail, Lock, User as UserIcon, Chrome } from 'lucide-react'
+import { Building2, Loader2, Mail, Lock, User as UserIcon } from 'lucide-react'
 import Link from 'next/link'
 
 const signupSchema = z.object({
@@ -58,16 +58,17 @@ function SignupForm() {
     setError(null)
 
     try {
-      // Get the API base URL
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api'
+      // Get the API base URL - normalize it (same pattern as AuthModal)
+      const { normalizeApiUrl } = await import('@/lib/utils/api-url')
+      const apiUrl = normalizeApiUrl(process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001')
 
       // Store the intended next page
       if (typeof window !== 'undefined') {
         sessionStorage.setItem('auth_redirect', next)
       }
 
-      // Redirect to Google OAuth
-      window.location.href = `${apiUrl}/auth/google`
+      // Redirect to Google OAuth - endpoint is /api/auth/google
+      window.location.href = `${apiUrl}/api/auth/google`
     } catch (err) {
       console.error('Google signup error:', err)
       setError('Failed to initiate Google signup')
@@ -162,7 +163,7 @@ function SignupForm() {
                 </>
               ) : (
                 <>
-                  <Chrome className="h-5 w-5 mr-3 text-blue-600" />
+                  <span className="h-5 w-5 mr-3 font-bold text-blue-600 text-lg flex items-center justify-center">G</span>
                   Continue with Google
                 </>
               )}

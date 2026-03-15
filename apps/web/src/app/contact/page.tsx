@@ -36,6 +36,7 @@ type ContactFormData = {
 export default function ContactPage() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isSubmitted, setIsSubmitted] = useState(false)
+  const [submitError, setSubmitError] = useState<string | null>(null)
 
   const form = useForm<ContactFormData>({
     resolver: zodResolver(contactFormSchema),
@@ -50,8 +51,11 @@ export default function ContactPage() {
 
   const onSubmit = async (data: ContactFormData) => {
     setIsSubmitting(true)
+    setSubmitError(null)
     try {
-      const response = await fetch('/api/contact', {
+      const { normalizeApiUrl } = await import('@/lib/utils/api-url')
+      const baseUrl = normalizeApiUrl(process.env.NEXT_PUBLIC_API_URL)
+      const response = await fetch(`${baseUrl}/api/contact`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -63,10 +67,12 @@ export default function ContactPage() {
         setIsSubmitted(true)
         form.reset()
       } else {
-        console.error('Failed to send message')
+        const errorData = await response.json().catch(() => ({}))
+        setSubmitError(errorData.message || 'Failed to send message. Please try again.')
       }
     } catch (error) {
       console.error('Error sending message:', error)
+      setSubmitError('Unable to send message. Please check your connection and try again.')
     } finally {
       setIsSubmitting(false)
     }
@@ -126,6 +132,11 @@ export default function ContactPage() {
                 <p className="text-gray-600 dark:text-slate-400 mb-6">
                   Tell us about your investment goals and we'll provide tailored property recommendations.
                 </p>
+                {submitError && (
+                  <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl mb-4">
+                    {submitError}
+                  </div>
+                )}
                 <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
