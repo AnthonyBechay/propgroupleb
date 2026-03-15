@@ -33,23 +33,23 @@ export const changePasswordSchema = z.object({
 // ─── Property Schemas ───────────────────────────────────────────────────────
 
 const investmentFields = {
-  expectedROI: z.number().optional(),
-  rentalYield: z.number().optional(),
-  capitalGrowth: z.number().optional(),
-  annualAppreciation: z.number().optional(),
-  minInvestment: z.number().optional(),
-  maxInvestment: z.number().optional(),
-  downPaymentPercentage: z.number().optional(),
-  paymentPlan: z.string().optional(),
-  installmentYears: z.number().optional(),
-  completionDate: z.string().optional(),
-  handoverDate: z.string().optional(),
-  expectedRentalStart: z.string().optional(),
-  averageRentPerMonth: z.number().optional(),
-  mortgageAvailable: z.boolean().optional(),
-  serviceFee: z.number().optional(),
-  propertyTax: z.number().optional(),
-  goldenVisaMinAmount: z.number().optional(),
+  expectedROI: z.number().nullish(),
+  rentalYield: z.number().nullish(),
+  capitalGrowth: z.number().nullish(),
+  annualAppreciation: z.number().nullish(),
+  minInvestment: z.number().nullish(),
+  maxInvestment: z.number().nullish(),
+  downPaymentPercentage: z.number().nullish(),
+  paymentPlan: z.string().nullish(),
+  installmentYears: z.number().nullish(),
+  completionDate: z.string().nullish(),
+  handoverDate: z.string().nullish(),
+  expectedRentalStart: z.string().nullish(),
+  averageRentPerMonth: z.number().nullish(),
+  mortgageAvailable: z.boolean().nullish(),
+  serviceFee: z.number().nullish(),
+  propertyTax: z.number().nullish(),
+  goldenVisaMinAmount: z.number().nullish(),
 };
 
 export const INVESTMENT_FIELD_KEYS = Object.keys(investmentFields) as (keyof typeof investmentFields)[];
@@ -57,7 +57,7 @@ export const INVESTMENT_FIELD_KEYS = Object.keys(investmentFields) as (keyof typ
 export const propertySchema = z.object({
   title: z.string().min(1, 'Title is required'),
   description: z.string().min(10, 'Description must be at least 10 characters'),
-  shortDescription: z.string().optional(),
+  shortDescription: z.string().nullish(),
   price: z.number().min(0, 'Price must be positive'),
   currency: z.string().min(3, 'Currency is required'),
 
@@ -65,49 +65,49 @@ export const propertySchema = z.object({
   bedrooms: z.number().min(0, 'Bedrooms must be non-negative'),
   bathrooms: z.number().min(0, 'Bathrooms must be non-negative'),
   area: z.number().min(0, 'Area must be positive'),
-  builtYear: z.number().optional(),
-  floors: z.number().optional(),
-  floor: z.number().optional(),
-  parkingSpaces: z.number().optional(),
+  builtYear: z.number().nullish(),
+  floors: z.number().nullish(),
+  floor: z.number().nullish(),
+  parkingSpaces: z.number().nullish(),
 
   country: z.enum(['GEORGIA', 'CYPRUS', 'GREECE', 'LEBANON']),
-  city: z.string().optional(),
-  district: z.string().optional(),
-  address: z.string().optional(),
-  zipCode: z.string().optional(),
-  latitude: z.number().optional(),
-  longitude: z.number().optional(),
+  city: z.string().nullish(),
+  district: z.string().nullish(),
+  address: z.string().nullish(),
+  zipCode: z.string().nullish(),
+  latitude: z.number().nullish(),
+  longitude: z.number().nullish(),
 
   status: z.enum(['OFF_PLAN', 'NEW_BUILD', 'RESALE']),
-  availabilityStatus: z.enum(['AVAILABLE', 'RESERVED', 'SOLD', 'OFF_MARKET']).optional(),
-  visibility: z.enum(['PUBLIC', 'ELITE_ONLY', 'HIDDEN']).optional(),
+  availabilityStatus: z.enum(['AVAILABLE', 'RESERVED', 'SOLD', 'OFF_MARKET']).nullish(),
+  visibility: z.enum(['PUBLIC', 'ELITE_ONLY', 'HIDDEN']).nullish(),
 
-  furnishingStatus: z.enum(['UNFURNISHED', 'SEMI_FURNISHED', 'FULLY_FURNISHED']).optional(),
-  ownershipType: z.enum(['FREEHOLD', 'LEASEHOLD']).optional(),
-  isGoldenVisaEligible: z.boolean().optional(),
-  hasPool: z.boolean().optional(),
-  hasGym: z.boolean().optional(),
-  hasGarden: z.boolean().optional(),
-  hasBalcony: z.boolean().optional(),
-  hasSecurity: z.boolean().optional(),
-  hasElevator: z.boolean().optional(),
-  hasCentralAC: z.boolean().optional(),
+  furnishingStatus: z.enum(['UNFURNISHED', 'SEMI_FURNISHED', 'FULLY_FURNISHED']).nullish(),
+  ownershipType: z.enum(['FREEHOLD', 'LEASEHOLD']).nullish(),
+  isGoldenVisaEligible: z.boolean().nullish(),
+  hasPool: z.boolean().nullish(),
+  hasGym: z.boolean().nullish(),
+  hasGarden: z.boolean().nullish(),
+  hasBalcony: z.boolean().nullish(),
+  hasSecurity: z.boolean().nullish(),
+  hasElevator: z.boolean().nullish(),
+  hasCentralAC: z.boolean().nullish(),
 
-  images: z.array(z.string()).optional(),
-  videoUrl: z.string().optional(),
-  virtualTourUrl: z.string().optional(),
+  images: z.array(z.string()).nullish(),
+  videoUrl: z.string().nullish(),
+  virtualTourUrl: z.string().nullish(),
 
-  slug: z.string().optional(),
-  metaTitle: z.string().optional(),
-  metaDescription: z.string().optional(),
-  featured: z.boolean().optional(),
-  featuredUntil: z.string().optional(),
+  slug: z.string().nullish(),
+  metaTitle: z.string().nullish(),
+  metaDescription: z.string().nullish(),
+  featured: z.boolean().nullish(),
+  featuredUntil: z.string().nullish(),
 
-  highlightedFeatures: z.array(z.string()).optional(),
+  highlightedFeatures: z.array(z.string()).nullish(),
 
-  developerId: z.string().optional(),
-  locationGuideId: z.string().optional(),
-  agentId: z.string().optional(),
+  developerId: z.string().nullish(),
+  locationGuideId: z.string().nullish(),
+  agentId: z.string().nullish(),
 
   // Investment data (flattened into property for API convenience)
   ...investmentFields,
@@ -208,7 +208,7 @@ export function extractInvestmentData(
  */
 export function buildInvestmentDataPayload(
   fields: Record<string, unknown>,
-  isGoldenVisaEligible?: boolean
+  isGoldenVisaEligible?: boolean | null
 ): Record<string, unknown> {
   const result: Record<string, unknown> = {};
 

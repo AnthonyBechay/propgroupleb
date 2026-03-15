@@ -29,8 +29,9 @@ router.get(
     const totalInvestment = owned.reduce((sum: number, p) => sum + p.purchasePrice, 0);
     const totalMortgage = owned.reduce((sum: number, p) => sum + (p.initialMortgage || 0), 0);
     const totalRent = owned.reduce((sum: number, p) => sum + (p.currentRent || 0), 0);
-    const averageROI = totalProperties > 0
-      ? owned.reduce((sum: number, p) => sum + ((p.property?.investmentData as { expectedROI?: number } | null)?.expectedROI || 0), 0) / totalProperties
+    const propertiesWithROI = owned.filter((p) => p.property?.investmentData?.expectedROI);
+    const averageROI = propertiesWithROI.length > 0
+      ? propertiesWithROI.reduce((sum: number, p) => sum + (p.property?.investmentData?.expectedROI ?? 0), 0) / propertiesWithROI.length
       : 0;
 
     sendSuccess(res, {
