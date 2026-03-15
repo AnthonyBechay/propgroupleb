@@ -64,7 +64,9 @@
       "Bash(ls /Users/anthonybechay/development/propgroup/apps/web/.env*)",
       "Bash(curl -s http://localhost:3001/health)",
       "Bash(pkill -f \"tsx.*src/index.ts\")",
-      "mcp__Claude_Preview__preview_start"
+      "mcp__Claude_Preview__preview_start",
+      "Bash(pnpm --filter @propgroup/db run db:generate)",
+      "Bash(pnpm --filter propgroup-backend run build)"
     ],
     "deny": [],
     "ask": []

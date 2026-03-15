@@ -14,8 +14,8 @@ COPY packages/db/package.json ./packages/db/
 COPY packages/ui/package.json ./packages/ui/
 COPY packages/db/prisma ./packages/db/prisma
 
-# Install ALL dependencies (including devDependencies needed for building)
-RUN NODE_ENV=development pnpm install --frozen-lockfile --filter web... --filter @propgroup/db... --filter @propgroup/config... --filter @propgroup/ui...
+# Install all dependencies
+RUN NODE_ENV=development pnpm install --frozen-lockfile
 
 # Copy source
 COPY . .

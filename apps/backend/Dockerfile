@@ -14,8 +14,8 @@ COPY apps/backend/package.json ./apps/backend/
 COPY packages/db/package.json ./packages/db/
 COPY packages/db/prisma ./packages/db/prisma
 
-# Install dependencies
-RUN NODE_ENV=development pnpm install --frozen-lockfile --filter propgroup-backend... --filter @propgroup/db...
+# Install all dependencies
+RUN NODE_ENV=development pnpm install --frozen-lockfile
 
 # Copy source
 COPY apps/backend ./apps/backend
