@@ -43,8 +43,11 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
-// CORS configuration - only allow configured origins
-const allowedOrigins = FRONTEND_URL.split(',').map((url) => url.trim());
+// CORS configuration - use ALLOWED_ORIGINS env var, fallback to FRONTEND_URL
+const allowedOrigins = (process.env.ALLOWED_ORIGINS || FRONTEND_URL)
+  .split(',')
+  .map((url) => url.trim())
+  .filter(Boolean);
 
 app.use(
   cors({
@@ -61,10 +64,10 @@ app.use(
         if (origin.includes('localhost') || origin.includes('127.0.0.1')) {
           callback(null, true);
         } else {
-          callback(new Error(`Origin ${origin} not allowed by CORS`));
+          callback(null, false);
         }
       } else {
-        callback(new Error(`Origin ${origin} not allowed by CORS`));
+        callback(null, false);
       }
     },
     credentials: true,
