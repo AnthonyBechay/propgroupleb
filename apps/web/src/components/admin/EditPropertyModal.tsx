@@ -2,9 +2,11 @@
 
 import { useState, useEffect } from 'react'
 import { Property } from '@/lib/types/api'
-import { updateProperty } from '@/actions/property-actions'
 import { ImageUpload, VideoUpload } from '@/components/ui/ImageUpload'
 import { X, ChevronDown, ChevronUp, Loader2 } from 'lucide-react'
+import { normalizeApiUrl } from '@/lib/utils/api-url'
+
+const API_BASE_URL = normalizeApiUrl(process.env.NEXT_PUBLIC_API_URL)
 
 type EditPropertyModalProps = {
   property: Property | null
@@ -137,7 +139,18 @@ export function EditPropertyModal({ property, open, onOpenChange }: EditProperty
         data.completionDate = form.completionDate || undefined
       }
 
-      await updateProperty(property.id, data)
+      const response = await fetch(`${API_BASE_URL}/api/properties/${property.id}`, {
+        method: 'PUT',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      })
+
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({}))
+        throw new Error(errData.message || errData.error || `Update failed (${response.status})`)
+      }
+
       onOpenChange(false)
       window.location.reload()
     } catch (err: any) {

@@ -1,9 +1,11 @@
 'use client'
 
 import { useState } from 'react'
-import { createProperty } from '@/actions/property-actions'
 import { ImageUpload, VideoUpload } from '@/components/ui/ImageUpload'
 import { X, ChevronDown, ChevronUp, Loader2, Plus } from 'lucide-react'
+import { normalizeApiUrl } from '@/lib/utils/api-url'
+
+const API_BASE_URL = normalizeApiUrl(process.env.NEXT_PUBLIC_API_URL)
 
 const PROPERTY_TYPES = [
   'APARTMENT', 'VILLA', 'TOWNHOUSE', 'PENTHOUSE', 'STUDIO',
@@ -164,7 +166,18 @@ export function CreatePropertyModal({
         data.completionDate = form.completionDate || undefined
       }
 
-      await createProperty(data)
+      const response = await fetch(`${API_BASE_URL}/api/properties`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      })
+
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({}))
+        throw new Error(errData.message || errData.error || `Create failed (${response.status})`)
+      }
+
       resetForm()
       setOpen(false)
       window.location.reload()

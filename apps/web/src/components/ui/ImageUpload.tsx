@@ -151,8 +151,8 @@ export function ImageUpload({
           relative flex flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed p-6
           transition-colors cursor-pointer
           ${isDragging
-            ? 'border-cyan-500 bg-cyan-500/10'
-            : 'border-slate-600 hover:border-slate-500 bg-slate-800/40'
+            ? 'border-blue-500 bg-blue-50'
+            : 'border-gray-300 hover:border-gray-400 bg-gray-50'
           }
           ${(disabled || isUploading) ? 'opacity-50 cursor-not-allowed' : ''}
         `}
@@ -169,18 +169,18 @@ export function ImageUpload({
 
         {isUploading ? (
           <>
-            <Loader2 className="h-8 w-8 text-cyan-400 animate-spin" />
-            <p className="text-sm text-slate-300">
+            <Loader2 className="h-8 w-8 text-blue-500 animate-spin" />
+            <p className="text-sm text-gray-600">
               Uploading {uploadCount} file{uploadCount > 1 ? 's' : ''}...
             </p>
           </>
         ) : (
           <>
-            <Upload className="h-8 w-8 text-slate-400" />
-            <p className="text-sm text-slate-300">
-              Drag & drop images here, or <span className="text-cyan-400 underline">browse</span>
+            <Upload className="h-8 w-8 text-gray-400" />
+            <p className="text-sm text-gray-600">
+              Drag & drop images here, or <span className="text-blue-600 underline">browse</span>
             </p>
-            <p className="text-xs text-slate-500">
+            <p className="text-xs text-gray-400">
               JPEG, PNG, WebP, AVIF &middot; max 10 MB each &middot; {value.length}/{maxFiles}
             </p>
           </>
@@ -189,7 +189,7 @@ export function ImageUpload({
 
       {/* Error */}
       {error && (
-        <div className="flex items-center gap-2 text-sm text-red-400">
+        <div className="flex items-center gap-2 text-sm text-red-600">
           <AlertCircle className="h-4 w-4 flex-shrink-0" />
           <span>{error}</span>
         </div>
@@ -199,7 +199,7 @@ export function ImageUpload({
       {value.length > 0 && (
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
           {value.map((url) => (
-            <div key={url} className="relative group aspect-video rounded-lg overflow-hidden bg-slate-800 border border-slate-700">
+            <div key={url} className="relative group aspect-video rounded-lg overflow-hidden bg-gray-100 border border-gray-200">
               <img
                 src={url}
                 alt=""
@@ -208,8 +208,8 @@ export function ImageUpload({
                   ;(e.target as HTMLImageElement).style.display = 'none'
                 }}
               />
-              <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                <ImageIcon className="h-6 w-6 text-slate-400" />
+              <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/10">
+                <ImageIcon className="h-6 w-6 text-gray-500" />
               </div>
               <button
                 type="button"
@@ -336,7 +336,7 @@ export function VideoUpload({
   return (
     <div className="space-y-3">
       {value ? (
-        <div className="relative rounded-lg overflow-hidden bg-slate-800 border border-slate-700">
+        <div className="relative rounded-lg overflow-hidden bg-gray-100 border border-gray-200">
           <video
             src={value}
             controls
@@ -360,8 +360,8 @@ export function VideoUpload({
             relative flex flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed p-6
             transition-colors cursor-pointer
             ${isDragging
-              ? 'border-cyan-500 bg-cyan-500/10'
-              : 'border-slate-600 hover:border-slate-500 bg-slate-800/40'
+              ? 'border-blue-500 bg-blue-50'
+              : 'border-gray-300 hover:border-gray-400 bg-gray-50'
             }
             ${(disabled || isUploading) ? 'opacity-50 cursor-not-allowed' : ''}
           `}
@@ -377,23 +377,23 @@ export function VideoUpload({
 
           {isUploading ? (
             <>
-              <Loader2 className="h-8 w-8 text-cyan-400 animate-spin" />
-              <p className="text-sm text-slate-300">Uploading video...</p>
+              <Loader2 className="h-8 w-8 text-blue-500 animate-spin" />
+              <p className="text-sm text-gray-600">Uploading video...</p>
             </>
           ) : (
             <>
-              <Film className="h-8 w-8 text-slate-400" />
-              <p className="text-sm text-slate-300">
-                Drag & drop a video, or <span className="text-cyan-400 underline">browse</span>
+              <Film className="h-8 w-8 text-gray-400" />
+              <p className="text-sm text-gray-600">
+                Drag & drop a video, or <span className="text-blue-600 underline">browse</span>
               </p>
-              <p className="text-xs text-slate-500">MP4, WebM, MOV &middot; max 100 MB</p>
+              <p className="text-xs text-gray-400">MP4, WebM, MOV &middot; max 100 MB</p>
             </>
           )}
         </div>
       )}
 
       {error && (
-        <div className="flex items-center gap-2 text-sm text-red-400">
+        <div className="flex items-center gap-2 text-sm text-red-600">
           <AlertCircle className="h-4 w-4 flex-shrink-0" />
           <span>{error}</span>
         </div>
