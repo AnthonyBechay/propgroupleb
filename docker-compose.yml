@@ -29,8 +29,7 @@ services:
       timeout: 10s
       retries: 10
       start_period: 120s
-    command: >
-      sh -c "cd packages/db && npx prisma migrate deploy && npx prisma db seed || true && cd /app && node apps/backend/dist/index.js"
+    command: ["sh", "-c", "cd packages/db && npx prisma migrate deploy && (npx prisma db seed || echo 'Seed skipped') && cd /app && node apps/backend/dist/index.js"]
 
   web:
     build:

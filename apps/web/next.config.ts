@@ -28,8 +28,6 @@ const nextConfig: NextConfig = {
   },
   // Enable strict mode for better debugging
   reactStrictMode: true,
-  // Output standalone for better deployment
-  output: 'standalone',
   // Transpile packages for better compatibility
   transpilePackages: ['@propgroup/config', '@propgroup/db', '@propgroup/supabase', '@propgroup/ui'],
   eslint: {
