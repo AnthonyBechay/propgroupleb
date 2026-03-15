@@ -10,7 +10,6 @@ import {
   PropertyVisibility,
   PropertyAvailabilityStatus,
   MembershipTier,
-  ReviewStatus,
 } from '@prisma/client'
 import bcrypt from 'bcryptjs'
 
@@ -1184,121 +1183,6 @@ Perfect for families or as a premium rental property.`,
 
   console.log('✅ Created property inquiries')
 
-  // ============================================
-  // 8. CREATE PROPERTY REVIEWS
-  // ============================================
-  console.log('\n⭐ Creating property reviews...')
-  await prisma.propertyReview.create({
-    data: {
-      propertyId: createdProperties[0].id,
-      userId: eliteUser.id,
-      rating: 5,
-      title: 'Excellent Investment Opportunity',
-      review:
-        'I purchased a similar property in this development last year and couldn\'t be happier. The quality of construction is outstanding, the location is perfect, and the rental yields have exceeded expectations. The developer is professional and responsive. Highly recommended for investors!',
-      locationRating: 5,
-      valueRating: 5,
-      qualityRating: 5,
-      amenitiesRating: 4,
-      isVerifiedPurchase: true,
-      status: ReviewStatus.APPROVED,
-      moderatedAt: new Date(),
-      moderatedBy: superAdmin.id,
-    },
-  })
-
-  console.log('✅ Created property reviews')
-
-  // ============================================
-  // 9. CREATE MEMBERSHIP BENEFITS
-  // ============================================
-  console.log('\n🎁 Creating membership benefits...')
-  const benefits = await prisma.membershipBenefit.createMany({
-    data: [
-      // FREE tier
-      {
-        tier: MembershipTier.FREE,
-        name: 'Browse Properties',
-        description: 'Access to public property listings',
-        icon: 'search',
-        sortOrder: 1,
-      },
-      {
-        tier: MembershipTier.FREE,
-        name: 'Save Favorites',
-        description: 'Save properties to your favorites list',
-        icon: 'heart',
-        sortOrder: 2,
-      },
-      {
-        tier: MembershipTier.FREE,
-        name: 'Basic Support',
-        description: 'Email support during business hours',
-        icon: 'support',
-        sortOrder: 3,
-      },
-      // ELITE tier
-      {
-        tier: MembershipTier.ELITE,
-        name: 'Exclusive Properties',
-        description: 'Access to elite-only property listings',
-        icon: 'star',
-        sortOrder: 1,
-      },
-      {
-        tier: MembershipTier.ELITE,
-        name: 'Priority Support',
-        description: '24/7 priority customer support',
-        icon: 'headset',
-        sortOrder: 2,
-      },
-      {
-        tier: MembershipTier.ELITE,
-        name: 'Investment Analysis',
-        description: 'Detailed ROI and investment reports',
-        icon: 'analytics',
-        sortOrder: 3,
-      },
-      {
-        tier: MembershipTier.ELITE,
-        name: 'Virtual Tours',
-        description: 'Schedule virtual property tours',
-        icon: 'video',
-        sortOrder: 4,
-      },
-      // PREMIUM tier
-      {
-        tier: MembershipTier.PREMIUM,
-        name: 'Personal Advisor',
-        description: 'Dedicated investment advisor',
-        icon: 'advisor',
-        sortOrder: 1,
-      },
-      {
-        tier: MembershipTier.PREMIUM,
-        name: 'Early Access',
-        description: 'First access to new listings',
-        icon: 'flash',
-        sortOrder: 2,
-      },
-      {
-        tier: MembershipTier.PREMIUM,
-        name: 'Golden Visa Assistance',
-        description: 'Full support with visa applications',
-        icon: 'passport',
-        sortOrder: 3,
-      },
-      {
-        tier: MembershipTier.PREMIUM,
-        name: 'Property Management',
-        description: 'Rental management services',
-        icon: 'manage',
-        sortOrder: 4,
-      },
-    ],
-  })
-
-  console.log(`✅ Created membership benefits`)
 
   // ============================================
   // 10. CREATE NOTIFICATIONS
@@ -1335,68 +1219,54 @@ Perfect for families or as a premium rental property.`,
 
   console.log('✅ Created sample notifications')
 
-  // ============================================
-  // 11. CREATE NEWSLETTER SUBSCRIPTIONS
-  // ============================================
-  console.log('\n📰 Creating newsletter subscriptions...')
-  await prisma.newsletterSubscription.createMany({
-    data: [
-      {
-        email: 'investor1@example.com',
-        firstName: 'Jane',
-        lastName: 'Investor',
-        preferences: { topics: ['investment', 'golden_visa', 'cyprus'] },
-      },
-      {
-        email: 'investor2@example.com',
-        firstName: 'Mike',
-        lastName: 'Smith',
-        preferences: { topics: ['market_updates', 'georgia', 'high_roi'] },
-      },
-    ],
-    skipDuplicates: true,
-  })
-
-  console.log('✅ Created newsletter subscriptions')
 
   // ============================================
-  // 12. CREATE EXCHANGE RATES
+  // SEED CMS SITE CONTENT
   // ============================================
-  console.log('\n💱 Creating exchange rates...')
-  await prisma.exchangeRate.createMany({
-    data: [
-      {
-        baseCurrency: 'USD',
-        targetCurrency: 'EUR',
-        rate: 0.92,
-        source: 'ECB',
-        validFrom: new Date(),
-      },
-      {
-        baseCurrency: 'EUR',
-        targetCurrency: 'USD',
-        rate: 1.09,
-        source: 'ECB',
-        validFrom: new Date(),
-      },
-      {
-        baseCurrency: 'USD',
-        targetCurrency: 'GBP',
-        rate: 0.79,
-        source: 'BOE',
-        validFrom: new Date(),
-      },
-      {
-        baseCurrency: 'GBP',
-        targetCurrency: 'USD',
-        rate: 1.27,
-        source: 'BOE',
-        validFrom: new Date(),
-      },
-    ],
-  })
+  console.log('Seeding site content...')
 
-  console.log('✅ Created exchange rates')
+  const siteContentData = [
+    // Hero Section
+    { key: 'hero_title', section: 'hero', title: 'Hero Title', content: 'Your Gateway to Premium Real Estate Investment', sortOrder: 1 },
+    { key: 'hero_subtitle', section: 'hero', title: 'Hero Subtitle', content: 'Discover high-yield properties across Cyprus, Greece, Georgia, and Lebanon', sortOrder: 2 },
+    { key: 'hero_cta_text', section: 'hero', title: 'Hero CTA Text', content: 'Explore Properties', sortOrder: 3 },
+    { key: 'hero_cta_link', section: 'hero', title: 'Hero CTA Link', content: '/properties', sortOrder: 4 },
+
+    // About Section
+    { key: 'about_title', section: 'about', title: 'About Title', content: 'About PropGroup', sortOrder: 1 },
+    { key: 'about_intro', section: 'about', title: 'About Introduction', content: 'PropGroup is a leading real estate investment platform connecting investors with premium properties across the Mediterranean and Eastern Europe.', sortOrder: 2 },
+    { key: 'about_mission', section: 'about', title: 'Our Mission', content: 'To make international real estate investment accessible, transparent, and profitable for everyone.', sortOrder: 3 },
+
+    // Features Section
+    { key: 'features_title', section: 'features', title: 'Features Title', content: 'Why Choose PropGroup', sortOrder: 1 },
+    { key: 'feature_1', section: 'features', title: 'Expert Guidance', content: 'Our team of local experts guides you through every step of the investment process.', sortOrder: 2 },
+    { key: 'feature_2', section: 'features', title: 'Golden Visa Programs', content: 'Access residency-by-investment programs in Cyprus and Greece.', sortOrder: 3 },
+    { key: 'feature_3', section: 'features', title: 'High ROI Properties', content: 'Curated properties with proven rental yields and capital growth potential.', sortOrder: 4 },
+
+    // CTA Section
+    { key: 'cta_title', section: 'cta', title: 'CTA Title', content: 'Ready to Start Your Investment Journey?', sortOrder: 1 },
+    { key: 'cta_subtitle', section: 'cta', title: 'CTA Subtitle', content: 'Browse our curated selection of properties or speak with an investment advisor today.', sortOrder: 2 },
+    { key: 'cta_button_text', section: 'cta', title: 'CTA Button Text', content: 'Get Started', sortOrder: 3 },
+    { key: 'cta_button_link', section: 'cta', title: 'CTA Button Link', content: '/properties', sortOrder: 4 },
+
+    // Contact Section
+    { key: 'contact_email', section: 'contact', title: 'Contact Email', content: 'info@propgroup.com', sortOrder: 1 },
+    { key: 'contact_phone', section: 'contact', title: 'Contact Phone', content: '+357 25 123 456', sortOrder: 2 },
+    { key: 'contact_address', section: 'contact', title: 'Contact Address', content: 'Limassol, Cyprus', sortOrder: 3 },
+
+    // Footer
+    { key: 'footer_tagline', section: 'footer', title: 'Footer Tagline', content: 'Premium Real Estate Investment Platform', sortOrder: 1 },
+    { key: 'footer_copyright', section: 'footer', title: 'Footer Copyright', content: '© 2025 PropGroup. All rights reserved.', sortOrder: 2 },
+  ]
+
+  for (const item of siteContentData) {
+    await prisma.siteContent.upsert({
+      where: { key: item.key },
+      update: { ...item },
+      create: { ...item },
+    })
+  }
+  console.log(`Created ${siteContentData.length} site content entries`)
 
   // ============================================
   // SUMMARY
@@ -1410,7 +1280,7 @@ Perfect for families or as a premium rental property.`,
   console.log(`   • ${locationGuides.length} Location Guides`)
   console.log(`   • ${createdProperties.length} Properties with Investment Data`)
   console.log(`   • ${tags.length} Tags`)
-  console.log(`   • Multiple amenities, reviews, and interactions`)
+  console.log(`   • Multiple amenities and interactions`)
   console.log('\n👤 Login Credentials:')
   console.log('   ┌─────────────────────────────────────────┐')
   console.log('   │ Super Admin:                            │')

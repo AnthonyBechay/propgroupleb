@@ -463,6 +463,52 @@ class ApiClient {
     const queryString = searchParams.toString();
     return this.request(`/api/agent/analytics${queryString ? `?${queryString}` : ''}`);
   }
+  // Content (CMS) endpoints
+  async getContentBySection(section: string) {
+    return this.request(`/api/content?section=${encodeURIComponent(section)}`);
+  }
+
+  async getContentByKey(key: string) {
+    return this.request(`/api/content/key/${encodeURIComponent(key)}`);
+  }
+
+  async getAllContent() {
+    return this.request('/api/content/all');
+  }
+
+  async updateContent(key: string, data: { section?: string; title?: string; content?: string; metadata?: Record<string, unknown>; sortOrder?: number; isActive?: boolean }) {
+    return this.request(`/api/content/${encodeURIComponent(key)}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deleteContent(key: string) {
+    return this.request(`/api/content/${encodeURIComponent(key)}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async getMediaBySection(section: string) {
+    return this.request(`/api/content/media?section=${encodeURIComponent(section)}`);
+  }
+
+  async getAllMedia() {
+    return this.request('/api/content/media');
+  }
+
+  async updateMedia(key: string, data: { section?: string; url: string; alt?: string; caption?: string }) {
+    return this.request(`/api/content/media/${encodeURIComponent(key)}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deleteMedia(key: string) {
+    return this.request(`/api/content/media/${encodeURIComponent(key)}`, {
+      method: 'DELETE',
+    });
+  }
 }
 
 // Export singleton instance

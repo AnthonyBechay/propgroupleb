@@ -1,6 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -9,6 +6,10 @@ datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
+
+// ============================================
+// ENUMS
+// ============================================
 
 enum Country {
   GEORGIA
@@ -31,9 +32,9 @@ enum PropertyAvailabilityStatus {
 }
 
 enum PropertyVisibility {
-  PUBLIC // Visible to all users
-  ELITE_ONLY // Visible only to elite members
-  HIDDEN // Hidden from all users (admin only)
+  PUBLIC
+  ELITE_ONLY
+  HIDDEN
 }
 
 enum MembershipTier {
@@ -100,7 +101,7 @@ enum Role {
   USER
   ADMIN
   SUPER_ADMIN
-  AGENT // Real estate agent/broker
+  AGENT
 }
 
 enum OfferStatus {
@@ -150,40 +151,14 @@ enum NotificationType {
   SYSTEM_ANNOUNCEMENT
 }
 
-enum MaintenanceRequestStatus {
-  OPEN
-  IN_PROGRESS
-  RESOLVED
-  CLOSED
-}
-
-enum MaintenanceRequestPriority {
-  LOW
-  MEDIUM
-  HIGH
-  URGENT
-}
-
-enum CampaignStatus {
-  DRAFT
-  SCHEDULED
-  ACTIVE
-  PAUSED
-  COMPLETED
-  CANCELLED
-}
-
-enum ReviewStatus {
-  PENDING_MODERATION
-  APPROVED
-  REJECTED
-  FLAGGED
-}
+// ============================================
+// CORE MODELS
+// ============================================
 
 model User {
   id              String           @id @default(cuid())
   email           String           @unique
-  password        String? // Hashed password for JWT auth (optional for OAuth users)
+  password        String?
   firstName       String?
   lastName        String?
   phone           String?
@@ -191,12 +166,12 @@ model User {
   role            Role             @default(USER)
   investmentGoals InvestmentGoal[]
 
-  // OAuth provider data
+  // OAuth
   googleId String? @unique
-  provider String? // 'local' or 'google'
-  avatar   String? // Profile picture URL
+  provider String?
+  avatar   String?
 
-  // Membership & Subscription
+  // Membership
   membershipTier      MembershipTier @default(FREE)
   membershipStartDate DateTime?
   membershipEndDate   DateTime?
@@ -211,11 +186,11 @@ model User {
   bannedBy     String?
   bannedReason String?
 
-  // Admin invitation tracking
-  invitedBy            String? // ID of admin who invited this user
+  // Admin invitation
+  invitedBy            String?
   invitationAcceptedAt DateTime?
 
-  // User Preferences
+  // Preferences
   preferredLanguage    String? @default("en")
   preferredCurrency    String? @default("USD")
   timezone             String?
@@ -223,7 +198,7 @@ model User {
   emailNotifications   Boolean @default(true)
   smsNotifications     Boolean @default(false)
 
-  // Agent specific fields
+  // Agent fields
   agentLicenseNumber  String?
   agentCompany        String?
   agentBio            String?
@@ -231,7 +206,7 @@ model User {
 
   // Referral
   referralCode String? @unique
-  referredBy   String? // User ID who referred this user
+  referredBy   String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -244,10 +219,7 @@ model User {
   propertyReservations PropertyReservation[]
   propertyOffers       PropertyOffer[]
   propertyTours        PropertyTour[]
-  propertyComparisons  PropertyComparison[]
   notifications        Notification[]
-  propertyReviews      PropertyReview[]
-  maintenanceRequests  MaintenanceRequest[]
   transactions         Transaction[]
   messages             Message[]             @relation("UserMessages")
   sentMessages         Message[]             @relation("SentMessages")
@@ -258,9 +230,7 @@ model User {
   bannedByAdmin        User?                 @relation("BannedByAdmin", fields: [bannedBy], references: [id])
   invitedUsers         User[]                @relation("InvitedByAdmin")
   invitedByAdmin       User?                 @relation("InvitedByAdmin", fields: [invitedBy], references: [id])
-
-  // Agent relations
-  managedProperties Property[] @relation("PropertyAgent")
+  managedProperties    Property[]            @relation("PropertyAgent")
 
   @@index([role])
   @@index([isActive])
@@ -280,7 +250,6 @@ model Developer {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  // Relations
   properties Property[]
 
   @@map("developers")
@@ -295,7 +264,6 @@ model LocationGuide {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  // Relations
   properties Property[]
 
   @@map("location_guides")
@@ -305,21 +273,21 @@ model Property {
   id               String  @id @default(cuid())
   title            String
   description      String
-  shortDescription String? // For listing previews
+  shortDescription String?
   price            Float
   currency         String  @default("USD")
 
-  // Basic Property Details
+  // Details
   propertyType  PropertyType
   bedrooms      Int
   bathrooms     Int
-  area          Float // in square meters
+  area          Float
   builtYear     Int?
   floors        Int?
-  floor         Int? // Which floor (for apartments)
+  floor         Int?
   parkingSpaces Int?         @default(0)
 
-  // Location Details
+  // Location
   country   Country
   city      String?
   district  String?
@@ -328,12 +296,12 @@ model Property {
   latitude  Float?
   longitude Float?
 
-  // Property Status & Visibility
+  // Status
   status             PropertyStatus
   availabilityStatus PropertyAvailabilityStatus @default(AVAILABLE)
   visibility         PropertyVisibility         @default(PUBLIC)
 
-  // Features & Amenities
+  // Features
   furnishingStatus     FurnishingStatus?
   ownershipType        OwnershipType?
   isGoldenVisaEligible Boolean           @default(false)
@@ -346,9 +314,9 @@ model Property {
   hasCentralAC         Boolean           @default(false)
 
   // Media
-  images         String[] // Main property images
-  videoUrl       String? // Property video/virtual tour
-  virtualTourUrl String? // 360 tour link
+  images         String[]
+  videoUrl       String?
+  virtualTourUrl String?
 
   // SEO & Marketing
   slug            String?   @unique
@@ -358,13 +326,13 @@ model Property {
   featuredUntil   DateTime?
   views           Int       @default(0)
 
-  // Availability Management
+  // Availability
   availableFrom DateTime?
   reservedUntil DateTime?
   soldAt        DateTime?
 
   // Investment Highlights
-  highlightedFeatures String[] // e.g., ["Beach Front", "High ROI", "Payment Plan"]
+  highlightedFeatures String[]
 
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
@@ -373,7 +341,7 @@ model Property {
   // Foreign Keys
   developerId     String?
   locationGuideId String?
-  agentId         String? // Assigned real estate agent
+  agentId         String?
 
   // Relations
   developer          Developer?              @relation(fields: [developerId], references: [id])
@@ -389,8 +357,6 @@ model Property {
   tags               PropertyTag[]
   offers             PropertyOffer[]
   tours              PropertyTour[]
-  reviews            PropertyReview[]
-  updates            PropertyUpdate[]
   transactions       Transaction[]
 
   @@index([country])
@@ -411,10 +377,10 @@ model PropertyInvestmentData {
   propertyId String @unique
 
   // ROI & Returns
-  expectedROI        Float? // Percentage
-  rentalYield        Float? // Percentage
-  capitalGrowth      Float? // Percentage
-  annualAppreciation Float? // Percentage
+  expectedROI        Float?
+  rentalYield        Float?
+  capitalGrowth      Float?
+  annualAppreciation Float?
 
   // Investment Details
   minInvestment         Float?
@@ -427,29 +393,32 @@ model PropertyInvestmentData {
   isGoldenVisaEligible Boolean @default(false)
   goldenVisaMinAmount  Float?
 
-  // Dates & Deadlines
+  // Dates
   completionDate      DateTime?
   handoverDate        DateTime?
   expectedRentalStart DateTime?
 
   // Market Analysis
   averageRentPerMonth         Float?
-  propertyAppreciationHistory Float[] // Historical appreciation percentages
-  comparableProperties        String[] // IDs of similar properties
+  propertyAppreciationHistory Float[]
+  comparableProperties        String[]
 
-  // Additional Investment Info
+  // Additional
   mortgageAvailable Boolean @default(false)
-  serviceFee        Float? // Annual service/maintenance fee
-  propertyTax       Float? // Annual property tax
+  serviceFee        Float?
+  propertyTax       Float?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  // Relations
   property Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
 
   @@map("property_investment_data")
 }
+
+// ============================================
+// USER INTERACTIONS
+// ============================================
 
 model FavoriteProperty {
   id         String   @id @default(cuid())
@@ -457,7 +426,6 @@ model FavoriteProperty {
   propertyId String
   createdAt  DateTime @default(now())
 
-  // Relations
   user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   property Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
 
@@ -475,7 +443,6 @@ model PropertyInquiry {
   message    String?
   createdAt  DateTime @default(now())
 
-  // Relations
   user     User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
   property Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
 
@@ -495,25 +462,27 @@ model UserOwnedProperty {
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
-  // Relations
   user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   property Property? @relation(fields: [propertyId], references: [id], onDelete: SetNull)
 
   @@map("user_owned_properties")
 }
 
+// ============================================
+// ADMIN & AUDIT
+// ============================================
+
 model AdminAuditLog {
   id         String   @id @default(cuid())
   adminId    String
-  action     String // 'CREATE_USER', 'BAN_USER', 'UNBAN_USER', 'UPDATE_ROLE', 'DELETE_PROPERTY', etc.
-  targetType String? // 'user', 'property', 'admin', etc.
+  action     String
+  targetType String?
   targetId   String?
-  details    Json? // Additional details about the action
+  details    Json?
   ipAddress  String?
   userAgent  String?
   createdAt  DateTime @default(now())
 
-  // Relations
   admin User @relation("AdminAuditLogs", fields: [adminId], references: [id])
 
   @@index([adminId])
@@ -523,7 +492,7 @@ model AdminAuditLog {
 }
 
 // ============================================
-// SUBSCRIPTION & MEMBERSHIP SYSTEM
+// SUBSCRIPTION & MEMBERSHIP
 // ============================================
 
 model Subscription {
@@ -531,24 +500,19 @@ model Subscription {
   userId         String
   membershipTier MembershipTier
 
-  // Pricing
   amount   Float
   currency String @default("USD")
 
-  // Period
   startDate DateTime
   endDate   DateTime
   autoRenew Boolean  @default(true)
 
-  // Status
   status PaymentStatus @default(PENDING)
 
-  // Payment Gateway Info
-  paymentGateway String? // 'stripe', 'paypal', etc.
+  paymentGateway String?
   transactionId  String?
-  paymentMethod  String? // 'card', 'bank_transfer', etc.
+  paymentMethod  String?
 
-  // Metadata
   cancelledAt  DateTime?
   cancelReason String?
   refundedAt   DateTime?
@@ -557,7 +521,6 @@ model Subscription {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  // Relations
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
@@ -567,7 +530,7 @@ model Subscription {
 }
 
 // ============================================
-// PROPERTY RESERVATION SYSTEM
+// PROPERTY RESERVATION
 // ============================================
 
 model PropertyReservation {
@@ -575,36 +538,30 @@ model PropertyReservation {
   propertyId String
   userId     String
 
-  // Reservation Details
   status          ReservationStatus @default(PENDING)
   reservationDate DateTime          @default(now())
   expiryDate      DateTime
 
-  // Financial
-  reservationFee Float? // Deposit/reservation fee
+  reservationFee Float?
   currency       String        @default("USD")
   paymentStatus  PaymentStatus @default(PENDING)
   transactionId  String?
 
-  // Admin Actions
   approvedAt      DateTime?
-  approvedBy      String? // Admin user ID
+  approvedBy      String?
   rejectedAt      DateTime?
-  rejectedBy      String? // Admin user ID
+  rejectedBy      String?
   rejectionReason String?
 
-  // User Actions
   cancelledAt  DateTime?
   cancelReason String?
 
-  // Notes & Communication
-  userNotes  String? // User's message/notes
-  adminNotes String? // Internal admin notes
+  userNotes  String?
+  adminNotes String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  // Relations
   property Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
   user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -616,49 +573,41 @@ model PropertyReservation {
 }
 
 // ============================================
-// PROPERTY AMENITIES
+// PROPERTY DETAILS
 // ============================================
 
 model PropertyAmenity {
   id          String  @id @default(cuid())
   propertyId  String
-  name        String // e.g., "Swimming Pool", "Gym", "Concierge"
-  category    String? // e.g., "Recreation", "Security", "Utilities"
+  name        String
+  category    String?
   description String?
-  icon        String? // Icon name or URL
+  icon        String?
 
   createdAt DateTime @default(now())
 
-  // Relations
   property Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
 
   @@index([propertyId])
   @@map("property_amenities")
 }
 
-// ============================================
-// PROPERTY DOCUMENTS
-// ============================================
-
 model PropertyDocument {
   id         String @id @default(cuid())
   propertyId String
 
-  // Document Info
   title       String
   description String?
   type        DocumentType
   fileUrl     String
-  fileSize    Int? // in bytes
+  fileSize    Int?
   mimeType    String?
 
-  // Access Control
-  isPublic Boolean @default(false) // If false, only elite/admin can view
+  isPublic Boolean @default(false)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  // Relations
   property Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
 
   @@index([propertyId])
@@ -666,81 +615,14 @@ model PropertyDocument {
   @@map("property_documents")
 }
 
-// ============================================
-// MEMBERSHIP BENEFITS TRACKING
-// ============================================
-
-model MembershipBenefit {
-  id          String         @id @default(cuid())
-  tier        MembershipTier
-  name        String
-  description String
-  icon        String?
-  sortOrder   Int            @default(0)
-  isActive    Boolean        @default(true)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([tier])
-  @@index([isActive])
-  @@map("membership_benefits")
-}
-
-// ============================================
-// PROPERTY VIEWS TRACKING
-// ============================================
-
-model PropertyView {
-  id         String   @id @default(cuid())
-  propertyId String
-  userId     String? // Null if anonymous
-  ipAddress  String?
-  userAgent  String?
-  referrer   String?
-  viewedAt   DateTime @default(now())
-
-  @@index([propertyId])
-  @@index([userId])
-  @@index([viewedAt])
-  @@map("property_views")
-}
-
-// ============================================
-// SAVED SEARCHES
-// ============================================
-
-model SavedSearch {
-  id     String @id @default(cuid())
-  userId String
-  name   String
-
-  // Search Criteria (stored as JSON)
-  criteria Json
-
-  // Notifications
-  emailAlerts Boolean @default(false)
-  frequency   String? // 'instant', 'daily', 'weekly'
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([userId])
-  @@map("saved_searches")
-}
-
-// ============================================
-// PROPERTY PRICE HISTORY
-// ============================================
-
 model PropertyPriceHistory {
   id         String   @id @default(cuid())
   propertyId String
   price      Float
   currency   String   @default("USD")
   changedAt  DateTime @default(now())
-  changedBy  String? // Admin user ID
-  reason     String? // Reason for price change
+  changedBy  String?
+  reason     String?
 
   @@index([propertyId])
   @@index([changedAt])
@@ -748,96 +630,7 @@ model PropertyPriceHistory {
 }
 
 // ============================================
-// CONTACT REQUESTS / LEADS
-// ============================================
-
-model ContactRequest {
-  id String @id @default(cuid())
-
-  // Contact Info
-  name    String
-  email   String
-  phone   String?
-  company String?
-
-  // Request Details
-  subject String
-  message String
-
-  // Context
-  relatedPropertyId String?
-  source            String? // 'contact_form', 'property_inquiry', 'chat', etc.
-
-  // Status
-  isRead     Boolean @default(false)
-  isReplied  Boolean @default(false)
-  assignedTo String? // Admin user ID
-
-  // Metadata
-  ipAddress String?
-  userAgent String?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([email])
-  @@index([isRead])
-  @@index([createdAt])
-  @@map("contact_requests")
-}
-
-// ============================================
-// NEWSLETTER SUBSCRIPTIONS
-// ============================================
-
-model NewsletterSubscription {
-  id        String  @id @default(cuid())
-  email     String  @unique
-  firstName String?
-  lastName  String?
-
-  // Preferences
-  isActive    Boolean @default(true)
-  preferences Json? // e.g., {"topics": ["investment", "market_updates"]}
-
-  // Metadata
-  subscribedAt      DateTime  @default(now())
-  unsubscribedAt    DateTime?
-  unsubscribeReason String?
-  source            String? // Where they subscribed from
-
-  @@index([isActive])
-  @@map("newsletter_subscriptions")
-}
-
-// ============================================
-// INVESTMENT PORTFOLIO ANALYTICS
-// ============================================
-
-model UserPortfolioAnalytics {
-  id     String @id @default(cuid())
-  userId String @unique
-
-  // Portfolio Metrics
-  totalInvestment   Float @default(0)
-  currentValue      Float @default(0)
-  totalROI          Float @default(0)
-  totalRentalIncome Float @default(0)
-
-  // Performance
-  averageROI              Float?
-  bestPerformingProperty  String?
-  worstPerformingProperty String?
-
-  lastCalculatedAt DateTime @default(now())
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
-
-  @@map("user_portfolio_analytics")
-}
-
-// ============================================
-// PROPERTY TAGS SYSTEM
+// TAGS
 // ============================================
 
 model Tag {
@@ -845,20 +638,16 @@ model Tag {
   name        String  @unique
   slug        String  @unique
   description String?
-  color       String? // Hex color for UI
+  color       String?
   icon        String?
+  category    String?
 
-  // Categorization
-  category String? // e.g., "feature", "location", "investment_type"
-
-  // Display
   isActive  Boolean @default(true)
   sortOrder Int     @default(0)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  // Relations
   properties PropertyTag[]
 
   @@index([category])
@@ -872,7 +661,6 @@ model PropertyTag {
   tagId      String
   createdAt  DateTime @default(now())
 
-  // Relations
   property Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
   tag      Tag      @relation(fields: [tagId], references: [id], onDelete: Cascade)
 
@@ -883,7 +671,7 @@ model PropertyTag {
 }
 
 // ============================================
-// PROPERTY OFFERS/BIDDING SYSTEM
+// OFFERS & TOURS
 // ============================================
 
 model PropertyOffer {
@@ -891,29 +679,23 @@ model PropertyOffer {
   propertyId String
   userId     String
 
-  // Offer Details
   offerAmount Float
   currency    String      @default("USD")
   status      OfferStatus @default(PENDING)
 
-  // Terms
   downPayment         Float?
-  financingType       String? // 'cash', 'mortgage', 'installment'
+  financingType       String?
   proposedClosingDate DateTime?
-  contingencies       String? // Special conditions
+  contingencies       String?
 
-  // Counter Offer
   counterAmount Float?
   counterTerms  String?
 
-  // Validity
   expiresAt DateTime
 
-  // Communication
   message    String?
   adminNotes String?
 
-  // Actions
   acceptedAt      DateTime?
   rejectedAt      DateTime?
   withdrawnAt     DateTime?
@@ -922,7 +704,6 @@ model PropertyOffer {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  // Relations
   property Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
   user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -933,53 +714,41 @@ model PropertyOffer {
   @@map("property_offers")
 }
 
-// ============================================
-// PROPERTY TOURS/VIEWINGS
-// ============================================
-
 model PropertyTour {
   id         String @id @default(cuid())
   propertyId String
   userId     String
 
-  // Tour Details
   tourType      TourType
   status        TourStatus @default(SCHEDULED)
   scheduledDate DateTime
-  duration      Int? // Duration in minutes
+  duration      Int?
 
-  // Contact
   attendeesCount  Int     @default(1)
   contactPhone    String?
   specialRequests String?
 
-  // Virtual Tour
-  meetingLink     String? // Zoom, Google Meet link
+  meetingLink     String?
   meetingId       String?
   meetingPassword String?
 
-  // Confirmation
   confirmedAt DateTime?
-  confirmedBy String? // Admin/Agent user ID
+  confirmedBy String?
 
-  // Completion
   completedAt        DateTime?
   noShowAt           DateTime?
   cancelledAt        DateTime?
   cancellationReason String?
 
-  // Feedback
   attendeeFeedback String?
   agentNotes       String?
 
-  // Reminders
   reminderSent   Boolean   @default(false)
   reminderSentAt DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  // Relations
   property Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
   user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -991,139 +760,25 @@ model PropertyTour {
 }
 
 // ============================================
-// PROPERTY COMPARISON
-// ============================================
-
-model PropertyComparison {
-  id     String  @id @default(cuid())
-  userId String
-  name   String? // User can name the comparison
-
-  // Properties being compared (stored as array of IDs)
-  propertyIds String[]
-
-  // Metadata
-  notes      String?
-  isPublic   Boolean @default(false) // Can user share this comparison?
-  shareToken String? @unique // Token for sharing
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // Relations
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId])
-  @@index([shareToken])
-  @@map("property_comparisons")
-}
-
-// ============================================
-// PROPERTY REVIEWS & RATINGS
-// ============================================
-
-model PropertyReview {
-  id         String @id @default(cuid())
-  propertyId String
-  userId     String
-
-  // Review Content
-  rating Int // 1-5 stars
-  title  String?
-  review String
-
-  // Detailed Ratings
-  locationRating  Int? // 1-5
-  valueRating     Int? // 1-5
-  qualityRating   Int? // 1-5
-  amenitiesRating Int? // 1-5
-
-  // Verification
-  isVerifiedPurchase Boolean @default(false)
-
-  // Status
-  status ReviewStatus @default(PENDING_MODERATION)
-
-  // Moderation
-  moderatedAt     DateTime?
-  moderatedBy     String? // Admin user ID
-  moderationNotes String?
-
-  // Engagement
-  helpfulCount Int @default(0)
-  reportCount  Int @default(0)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // Relations
-  property Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
-  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([propertyId, userId]) // One review per user per property
-  @@index([propertyId])
-  @@index([userId])
-  @@index([status])
-  @@index([rating])
-  @@map("property_reviews")
-}
-
-// ============================================
-// PROPERTY UPDATES/NEWS
-// ============================================
-
-model PropertyUpdate {
-  id         String @id @default(cuid())
-  propertyId String
-
-  // Update Content
-  title      String
-  content    String
-  updateType String // 'price_change', 'construction_progress', 'news', 'document_added'
-
-  // Media
-  images String[]
-
-  // Notifications
-  notifySubscribers Boolean @default(false)
-
-  // Author
-  createdBy String // Admin/Agent user ID
-
-  createdAt DateTime @default(now())
-
-  // Relations
-  property Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
-
-  @@index([propertyId])
-  @@index([createdAt])
-  @@map("property_updates")
-}
-
-// ============================================
-// TRANSACTION MANAGEMENT
+// TRANSACTIONS
 // ============================================
 
 model Transaction {
   id         String  @id @default(cuid())
   propertyId String
   buyerId    String
-  sellerId   String? // If applicable
+  sellerId   String?
 
-  // Transaction Details
   status          TransactionStatus @default(INITIATED)
-  transactionType String // 'purchase', 'rental', 'lease'
+  transactionType String
 
-  // Financial
   agreedPrice     Float
   currency        String @default("USD")
   downPayment     Float?
   remainingAmount Float?
 
-  // Payment Schedule
-  paymentSchedule Json? // Array of payment milestones
+  paymentSchedule Json?
 
-  // Important Dates
   initiatedAt         DateTime  @default(now())
   contractSignedAt    DateTime?
   depositPaidAt       DateTime?
@@ -1132,29 +787,24 @@ model Transaction {
   expectedClosingDate DateTime?
   actualClosingDate   DateTime?
 
-  // Legal
   contractUrl         String?
   legalRepresentative String?
   notaryDetails       String?
 
-  // Status Updates
   documentsComplete  Boolean @default(false)
   inspectionComplete Boolean @default(false)
   fundingApproved    Boolean @default(false)
   titleTransferred   Boolean @default(false)
 
-  // Notes
   notes         String?
-  internalNotes String? // Admin only
+  internalNotes String?
 
-  // Cancellation
   cancelledAt        DateTime?
   cancellationReason String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  // Relations
   property Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
   buyer    User     @relation(fields: [buyerId], references: [id], onDelete: Cascade)
 
@@ -1166,40 +816,32 @@ model Transaction {
 }
 
 // ============================================
-// NOTIFICATIONS SYSTEM
+// NOTIFICATIONS & MESSAGING
 // ============================================
 
 model Notification {
   id     String @id @default(cuid())
   userId String
 
-  // Notification Content
   type    NotificationType
   title   String
   message String
 
-  // Links & Actions
-  link        String? // URL to navigate to
-  actionLabel String? // e.g., "View Property"
+  link        String?
+  actionLabel String?
   actionUrl   String?
 
-  // Related Entity
-  relatedEntityType String? // 'property', 'reservation', 'offer', etc.
+  relatedEntityType String?
   relatedEntityId   String?
 
-  // Status
   isRead Boolean   @default(false)
   readAt DateTime?
 
-  // Priority
-  priority String @default("normal") // 'low', 'normal', 'high', 'urgent'
-
-  // Expiry
+  priority  String    @default("normal")
   expiresAt DateTime?
 
   createdAt DateTime @default(now())
 
-  // Relations
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
@@ -1209,38 +851,27 @@ model Notification {
   @@map("notifications")
 }
 
-// ============================================
-// MESSAGING SYSTEM
-// ============================================
-
 model Message {
   id String @id @default(cuid())
 
-  // Participants
   senderId    String
   recipientId String
 
-  // Content
   subject String?
   body    String
 
-  // Context
-  propertyId String? // If message is about a property
+  propertyId String?
 
-  // Attachments
   attachments String[]
 
-  // Status
   isRead Boolean   @default(false)
   readAt DateTime?
 
-  // Threading
-  parentMessageId String? // For replies
-  threadId        String? // Conversation thread
+  parentMessageId String?
+  threadId        String?
 
   createdAt DateTime @default(now())
 
-  // Relations
   sender    User @relation("SentMessages", fields: [senderId], references: [id], onDelete: Cascade)
   recipient User @relation("UserMessages", fields: [recipientId], references: [id], onDelete: Cascade)
 
@@ -1253,216 +884,7 @@ model Message {
 }
 
 // ============================================
-// MAINTENANCE REQUESTS (for sold properties)
-// ============================================
-
-model MaintenanceRequest {
-  id         String @id @default(cuid())
-  propertyId String
-  userId     String // Property owner
-
-  // Request Details
-  title       String
-  description String
-  category    String // 'plumbing', 'electrical', 'hvac', 'general', etc.
-  priority    MaintenanceRequestPriority @default(MEDIUM)
-  status      MaintenanceRequestStatus   @default(OPEN)
-
-  // Location within property
-  location String? // e.g., "Kitchen", "Master Bedroom"
-
-  // Media
-  images String[]
-
-  // Assignment
-  assignedTo String? // Maintenance staff/contractor
-
-  // Scheduling
-  scheduledDate DateTime?
-  completedDate DateTime?
-
-  // Cost
-  estimatedCost Float?
-  actualCost    Float?
-
-  // Resolution
-  resolutionNotes String?
-
-  // Feedback
-  userRating   Int? // 1-5
-  userFeedback String?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // Relations
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId])
-  @@index([propertyId])
-  @@index([status])
-  @@index([priority])
-  @@map("maintenance_requests")
-}
-
-// ============================================
-// MARKETING CAMPAIGNS
-// ============================================
-
-model MarketingCampaign {
-  id   String @id @default(cuid())
-  name String
-
-  // Campaign Details
-  description  String?
-  campaignType String // 'email', 'sms', 'push', 'banner'
-
-  // Status
-  status CampaignStatus @default(DRAFT)
-
-  // Targeting
-  targetAudience       Json? // Filters for user segments
-  targetProperties     String[] // Specific property IDs
-  targetMembershipTier MembershipTier?
-
-  // Content
-  subject  String?
-  body     String
-  imageUrl String?
-  ctaText  String? // Call-to-action text
-  ctaUrl   String?
-
-  // Scheduling
-  scheduledAt DateTime?
-  startDate   DateTime?
-  endDate     DateTime?
-
-  // Analytics
-  sentCount       Int @default(0)
-  openCount       Int @default(0)
-  clickCount      Int @default(0)
-  conversionCount Int @default(0)
-
-  // Budget
-  budget Float?
-  spent  Float?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  createdBy String // Admin user ID
-
-  @@index([status])
-  @@index([scheduledAt])
-  @@map("marketing_campaigns")
-}
-
-// ============================================
-// REFERRAL PROGRAM
-// ============================================
-
-model Referral {
-  id String @id @default(cuid())
-
-  // Referrer & Referee
-  referrerId String
-  refereeId  String
-
-  // Referral Details
-  referralCode String
-
-  // Status
-  status      String    @default("pending") // 'pending', 'completed', 'rewarded'
-  completedAt DateTime?
-
-  // Rewards
-  referrerRewardType     String? // 'discount', 'cash', 'membership_upgrade'
-  referrerRewardAmount   Float?
-  referrerRewardCurrency String?   @default("USD")
-  referrerRewarded       Boolean   @default(false)
-  referrerRewardedAt     DateTime?
-
-  refereeRewardType     String?
-  refereeRewardAmount   Float?
-  refereeRewardCurrency String?   @default("USD")
-  refereeRewarded       Boolean   @default(false)
-  refereeRewardedAt     DateTime?
-
-  // Context
-  conversionType String? // 'signup', 'subscription', 'property_purchase'
-  propertyId     String? // If referral led to property purchase
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([referrerId])
-  @@index([refereeId])
-  @@index([referralCode])
-  @@index([status])
-  @@map("referrals")
-}
-
-// ============================================
-// CURRENCY EXCHANGE RATES (for multi-currency)
-// ============================================
-
-model ExchangeRate {
-  id String @id @default(cuid())
-
-  baseCurrency   String // e.g., "USD"
-  targetCurrency String // e.g., "EUR"
-  rate           Float
-
-  // Source
-  source String? // API source
-
-  // Validity
-  validFrom  DateTime  @default(now())
-  validUntil DateTime?
-
-  createdAt DateTime @default(now())
-
-  @@unique([baseCurrency, targetCurrency, validFrom])
-  @@index([baseCurrency, targetCurrency])
-  @@map("exchange_rates")
-}
-
-// ============================================
-// LEGAL COMPLIANCE & DOCUMENTS
-// ============================================
-
-model LegalCompliance {
-  id         String @id @default(cuid())
-  propertyId String
-
-  // Compliance Details
-  complianceType String // 'golden_visa', 'tax_clearance', 'building_permit', etc.
-  status         String @default("pending") // 'pending', 'approved', 'rejected', 'expired'
-
-  // Documents
-  documentUrl      String?
-  documentNumber   String?
-  issuingAuthority String?
-
-  // Dates
-  issuedDate   DateTime?
-  expiryDate   DateTime?
-  verifiedDate DateTime?
-
-  // Verification
-  verifiedBy        String? // Admin user ID
-  verificationNotes String?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([propertyId])
-  @@index([status])
-  @@index([expiryDate])
-  @@map("legal_compliance")
-}
-
-// ============================================
-// SYSTEM SETTINGS & CONFIGURATION
+// SYSTEM SETTINGS
 // ============================================
 
 model SystemSetting {
@@ -1470,14 +892,64 @@ model SystemSetting {
   key   String @unique
   value Json
 
-  // Metadata
   description String?
-  category    String? // 'payment', 'notification', 'feature_flag', etc.
-  isPublic    Boolean @default(false) // Can clients access this?
+  category    String?
+  isPublic    Boolean @default(false)
 
   updatedAt DateTime @updatedAt
-  updatedBy String? // Admin user ID
+  updatedBy String?
 
   @@index([category])
   @@map("system_settings")
+}
+
+// ============================================
+// CMS - SITE CONTENT & MEDIA
+// ============================================
+
+model SiteContent {
+  id      String @id @default(cuid())
+  key     String @unique
+  section String
+
+  title   String?
+  content String?
+  metadata Json?
+
+  sortOrder Int     @default(0)
+  isActive  Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  updatedBy String?
+
+  @@index([section])
+  @@index([isActive])
+  @@map("site_content")
+}
+
+model SiteMedia {
+  id      String @id @default(cuid())
+  key     String @unique
+  section String
+
+  url     String
+  alt     String?
+  caption String?
+
+  width    Int?
+  height   Int?
+  fileSize Int?
+  mimeType String?
+
+  sortOrder Int     @default(0)
+  isActive  Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  updatedBy String?
+
+  @@index([section])
+  @@index([isActive])
+  @@map("site_media")
 }

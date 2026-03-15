@@ -10,6 +10,7 @@ import {
   Shield,
 } from 'lucide-react'
 import { SeedDataButton } from '@/components/admin/SeedDataButton'
+import { apiClient } from '@/lib/api/client'
 
 interface DashboardStats {
   totalProperties: number
@@ -45,16 +46,15 @@ export function AdminDashboardClient() {
   useEffect(() => {
     async function fetchDashboardData() {
       try {
-        const response = await fetch('/api/admin/dashboard', {
-          credentials: 'include'
+        const data = await apiClient.getAdminStats()
+        setStats({
+          totalProperties: data.overview.totalProperties,
+          totalUsers: data.overview.totalUsers,
+          totalFavorites: data.overview.totalFavorites,
+          totalInquiries: data.overview.totalInquiries,
         })
-
-        if (response.ok) {
-          const data = await response.json()
-          setStats(data.stats)
-          setRecentProperties(data.recentProperties)
-          setRecentUsers(data.recentUsers)
-        }
+        setRecentProperties(data.recent?.properties || [])
+        setRecentUsers(data.recent?.users || [])
       } catch (error) {
         console.error('Error fetching dashboard data:', error)
       } finally {

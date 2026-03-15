@@ -1,4 +1,3 @@
-# Backend Dockerfile - Simplified for Coolify
 FROM node:20-alpine AS base
 RUN corepack enable && corepack prepare pnpm@9.15.0 --activate
 WORKDIR /app
@@ -8,10 +7,10 @@ COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY apps/backend/package.json ./apps/backend/
 COPY packages/db/package.json ./packages/db/
 
-# Copy Prisma schema BEFORE install (needed for postinstall script)
+# Copy Prisma schema (needed for postinstall)
 COPY packages/db/prisma ./packages/db/prisma
 
-# Install ALL dependencies (force development to get devDependencies)
+# Install dependencies
 RUN NODE_ENV=development pnpm install --frozen-lockfile
 
 # Build stage
@@ -22,37 +21,40 @@ WORKDIR /app
 COPY apps/backend ./apps/backend
 COPY packages/db ./packages/db
 
-# Generate Prisma client (must be before build)
+# Generate Prisma client
 RUN pnpm --filter @propgroup/db run db:generate
+
+# Build DB package
+RUN pnpm --filter @propgroup/db run build
+
+# Build backend TypeScript
+RUN pnpm --filter backend run build
 
 # Production stage
 FROM node:20-alpine AS runner
 WORKDIR /app
 
-# Install OpenSSL for Prisma compatibility
 RUN apk add --no-cache openssl
-
 RUN corepack enable && corepack prepare pnpm@9.15.0 --activate
 
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY apps/backend/package.json ./apps/backend/
 COPY packages/db/package.json ./packages/db/
-
-# Copy Prisma schema BEFORE install (needed for postinstall script)
 COPY packages/db/prisma ./packages/db/prisma
 
-# Install ALL dependencies (including devDependencies for Prisma CLI)
-RUN pnpm install --frozen-lockfile --include-workspace-root
+# Install production dependencies only
+RUN pnpm install --frozen-lockfile --prod --include-workspace-root
 
-# Copy built files and source
-COPY --from=builder /app/apps/backend ./apps/backend
-COPY --from=builder /app/packages/db ./packages/db
+# Copy built output
+COPY --from=builder /app/apps/backend/dist ./apps/backend/dist
+COPY --from=builder /app/packages/db/dist ./packages/db/dist
+COPY --from=builder /app/packages/db/prisma ./packages/db/prisma
 
 # Regenerate Prisma client for Alpine runtime
 RUN pnpm --filter @propgroup/db run db:generate
 
-EXPOSE 3001
+EXPOSE 10000
 ENV NODE_ENV=production
-ENV PORT=3001
+ENV PORT=10000
 
-CMD ["node", "apps/backend/src/index.js"]
+CMD ["node", "apps/backend/dist/index.js"]

@@ -32,19 +32,11 @@ const nextConfig: NextConfig = {
   output: 'standalone',
   // Transpile packages for better compatibility
   transpilePackages: ['@propgroup/config', '@propgroup/db', '@propgroup/supabase', '@propgroup/ui'],
-  // Skip ESLint during production builds to avoid version conflicts
   eslint: {
-    // Warning: This allows production builds to successfully complete even if
-    // your project has ESLint errors.
-    ignoreDuringBuilds: true,
+    ignoreDuringBuilds: false,
   },
-  // Skip TypeScript errors during build (we handle them separately)
   typescript: {
-    // !! WARN !!
-    // Dangerously allow production builds to successfully complete even if
-    // your project has type errors.
-    // We're using this because we have proper type checking in CI/CD
-    ignoreBuildErrors: true,
+    ignoreBuildErrors: false,
   },
   // Don't hardcode environment variables - let them be resolved at runtime
 };
