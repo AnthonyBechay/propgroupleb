@@ -1,11 +1,11 @@
 'use client'
 
 import { useState } from 'react'
-import { 
-  DollarSign, 
-  Home, 
-  MapPin, 
-  Bed, 
+import {
+  DollarSign,
+  Home,
+  MapPin,
+  Bed,
   Bath,
   Square,
   X,
@@ -31,22 +31,22 @@ interface PropertyFiltersProps {
 }
 
 const countries = [
-  { value: 'GEORGIA', label: 'Georgia', flag: '🇬🇪' },
-  { value: 'CYPRUS', label: 'Cyprus', flag: '🇨🇾' },
-  { value: 'GREECE', label: 'Greece', flag: '🇬🇷' },
-  { value: 'LEBANON', label: 'Lebanon', flag: '🇱🇧' },
+  { value: 'GEORGIA', label: 'Georgia', flag: '\u{1F1EC}\u{1F1EA}' },
+  { value: 'CYPRUS', label: 'Cyprus', flag: '\u{1F1E8}\u{1F1FE}' },
+  { value: 'GREECE', label: 'Greece', flag: '\u{1F1EC}\u{1F1F7}' },
+  { value: 'LEBANON', label: 'Lebanon', flag: '\u{1F1F1}\u{1F1E7}' },
 ]
 
 const propertyTypes = [
-  { value: 'APARTMENT', label: 'Apartment', icon: '🏢' },
-  { value: 'VILLA', label: 'Villa', icon: '🏡' },
-  { value: 'PENTHOUSE', label: 'Penthouse', icon: '🏙️' },
-  { value: 'TOWNHOUSE', label: 'Townhouse', icon: '🏘️' },
-  { value: 'STUDIO', label: 'Studio', icon: '🏠' },
-  { value: 'DUPLEX', label: 'Duplex', icon: '🏘️' },
-  { value: 'COMMERCIAL', label: 'Commercial', icon: '🏪' },
-  { value: 'OFFICE', label: 'Office', icon: '🏢' },
-  { value: 'LAND', label: 'Land', icon: '🏞️' },
+  { value: 'APARTMENT', label: 'Apartment', icon: '\u{1F3E2}' },
+  { value: 'VILLA', label: 'Villa', icon: '\u{1F3E1}' },
+  { value: 'PENTHOUSE', label: 'Penthouse', icon: '\u{1F3D9}\u{FE0F}' },
+  { value: 'TOWNHOUSE', label: 'Townhouse', icon: '\u{1F3D8}\u{FE0F}' },
+  { value: 'STUDIO', label: 'Studio', icon: '\u{1F3E0}' },
+  { value: 'DUPLEX', label: 'Duplex', icon: '\u{1F3D8}\u{FE0F}' },
+  { value: 'COMMERCIAL', label: 'Commercial', icon: '\u{1F3EA}' },
+  { value: 'OFFICE', label: 'Office', icon: '\u{1F3E2}' },
+  { value: 'LAND', label: 'Land', icon: '\u{1F3DE}\u{FE0F}' },
 ]
 
 const statusOptions = [
@@ -85,9 +85,9 @@ export function PropertyFilters({ filters, onChange, onClose }: PropertyFiltersP
   }
 
   return (
-    <div className="glass-card rounded-2xl p-6">
+    <div className="bg-white border border-stone-200 rounded-2xl p-6 shadow-sm">
       <div className="flex items-center justify-between mb-6">
-        <h3 className="text-xl font-bold text-gray-900 dark:text-white">
+        <h3 className="text-xl font-bold text-stone-900">
           Filter Properties
         </h3>
         <Button
@@ -104,7 +104,7 @@ export function PropertyFilters({ filters, onChange, onClose }: PropertyFiltersP
         {/* Location */}
         <div className="space-y-2">
           <Label className="flex items-center gap-2">
-            <MapPin className="w-4 h-4 text-gray-500" />
+            <MapPin className="w-4 h-4 text-stone-500" />
             Location
           </Label>
           <Select
@@ -130,7 +130,7 @@ export function PropertyFilters({ filters, onChange, onClose }: PropertyFiltersP
         {/* Property Type */}
         <div className="space-y-2">
           <Label className="flex items-center gap-2">
-            <Home className="w-4 h-4 text-gray-500" />
+            <Home className="w-4 h-4 text-stone-500" />
             Property Type
           </Label>
           <Select
@@ -156,7 +156,7 @@ export function PropertyFilters({ filters, onChange, onClose }: PropertyFiltersP
         {/* Status */}
         <div className="space-y-2">
           <Label className="flex items-center gap-2">
-            <BadgeCheck className="w-4 h-4 text-gray-500" />
+            <BadgeCheck className="w-4 h-4 text-stone-500" />
             Status
           </Label>
           <Select
@@ -179,7 +179,7 @@ export function PropertyFilters({ filters, onChange, onClose }: PropertyFiltersP
         {/* Bedrooms */}
         <div className="space-y-2">
           <Label className="flex items-center gap-2">
-            <Bed className="w-4 h-4 text-gray-500" />
+            <Bed className="w-4 h-4 text-stone-500" />
             Bedrooms
           </Label>
           <Select
@@ -202,15 +202,15 @@ export function PropertyFilters({ filters, onChange, onClose }: PropertyFiltersP
         {/* Price Range - Full width */}
         <div className="space-y-2 lg:col-span-2">
           <Label className="flex items-center gap-2">
-            <DollarSign className="w-4 h-4 text-gray-500" />
+            <DollarSign className="w-4 h-4 text-stone-500" />
             Price Range
           </Label>
-          <div className="px-4 py-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+          <div className="px-4 py-3 bg-stone-50 rounded-lg">
             <div className="flex items-center justify-between mb-4">
-              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+              <span className="text-sm font-medium text-stone-700">
                 ${priceRange[0]}k
               </span>
-              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+              <span className="text-sm font-medium text-stone-700">
                 ${priceRange[1]}k{priceRange[1] >= 5000 ? '+' : ''}
               </span>
             </div>
@@ -228,7 +228,7 @@ export function PropertyFilters({ filters, onChange, onClose }: PropertyFiltersP
         {/* Area Range */}
         <div className="space-y-2">
           <Label className="flex items-center gap-2">
-            <Square className="w-4 h-4 text-gray-500" />
+            <Square className="w-4 h-4 text-stone-500" />
             Area (m²)
           </Label>
           <div className="flex gap-2">
@@ -250,7 +250,7 @@ export function PropertyFilters({ filters, onChange, onClose }: PropertyFiltersP
         {/* Golden Visa */}
         <div className="space-y-2">
           <Label className="flex items-center gap-2">
-            <BadgeCheck className="w-4 h-4 text-yellow-500" />
+            <BadgeCheck className="w-4 h-4 text-[#C97B4B]" />
             Special Features
           </Label>
           <div className="space-y-2">
@@ -259,9 +259,9 @@ export function PropertyFilters({ filters, onChange, onClose }: PropertyFiltersP
                 type="checkbox"
                 checked={localFilters.isGoldenVisaEligible === 'true'}
                 onChange={(e) => handleFilterChange('isGoldenVisaEligible', e.target.checked ? 'true' : '')}
-                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                className="rounded border-stone-300 text-[#1B4965] focus:ring-[#1B4965]"
               />
-              <span className="text-sm text-gray-700 dark:text-gray-300">
+              <span className="text-sm text-stone-700">
                 Golden Visa Eligible
               </span>
             </label>
@@ -270,9 +270,9 @@ export function PropertyFilters({ filters, onChange, onClose }: PropertyFiltersP
                 type="checkbox"
                 checked={localFilters.highRoi === 'true'}
                 onChange={(e) => handleFilterChange('highRoi', e.target.checked ? 'true' : '')}
-                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                className="rounded border-stone-300 text-[#1B4965] focus:ring-[#1B4965]"
               />
-              <span className="text-sm text-gray-700 dark:text-gray-300">
+              <span className="text-sm text-stone-700">
                 High ROI (15%+)
               </span>
             </label>
@@ -281,11 +281,11 @@ export function PropertyFilters({ filters, onChange, onClose }: PropertyFiltersP
       </div>
 
       {/* Action Buttons */}
-      <div className="flex items-center justify-between mt-8 pt-6 border-t border-gray-200 dark:border-gray-700">
+      <div className="flex items-center justify-between mt-8 pt-6 border-t border-stone-200">
         <Button
           variant="ghost"
           onClick={resetFilters}
-          className="text-gray-600 dark:text-gray-400"
+          className="text-stone-600"
         >
           Reset Filters
         </Button>
@@ -298,7 +298,7 @@ export function PropertyFilters({ filters, onChange, onClose }: PropertyFiltersP
           </Button>
           <Button
             onClick={applyFilters}
-            className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
+            className="bg-[#1B4965] hover:bg-[#2B6985] text-white"
           >
             Apply Filters
           </Button>

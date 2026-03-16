@@ -36,18 +36,18 @@ export function Sidebar() {
 
   return (
     <div className="hidden lg:fixed lg:inset-y-0 lg:z-50 lg:flex lg:w-64 lg:flex-col">
-      <div className="flex grow flex-col gap-y-5 overflow-y-auto bg-gradient-to-b from-slate-900 via-slate-800 to-slate-900 px-6 pb-4 border-r-2 border-slate-700">
+      <div className="flex grow flex-col gap-y-5 overflow-y-auto bg-[#1B4965] px-6 pb-4 border-r border-[#153B52]">
         <div className="flex h-16 shrink-0 items-center">
           <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 bg-gradient-to-br from-cyan-500 to-blue-600 rounded-xl flex items-center justify-center shadow-lg">
+            <div className="w-10 h-10 bg-[#C97B4B] rounded-xl flex items-center justify-center">
               <Shield className="text-white font-bold w-6 h-6" />
             </div>
             <div>
-              <span className="font-black text-lg text-white block leading-tight">
+              <span className="font-bold text-lg text-white block leading-tight">
                 Admin Panel
               </span>
               {user?.role === 'SUPER_ADMIN' && (
-                <span className="inline-flex items-center px-2 py-0.5 rounded-lg text-xs font-bold bg-gradient-to-r from-purple-500 to-pink-600 text-white shadow-md mt-0.5">
+                <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-semibold bg-[#C97B4B] text-white mt-0.5">
                   Super Admin
                 </span>
               )}
@@ -57,7 +57,7 @@ export function Sidebar() {
         <nav className="flex flex-1 flex-col">
           <ul role="list" className="flex flex-1 flex-col gap-y-7">
             <li>
-              <ul role="list" className="-mx-2 space-y-2">
+              <ul role="list" className="-mx-2 space-y-1">
                 {navigation.map((item) => {
                   const isActive = pathname === item.href ||
                     (item.href === '/admin/users' && pathname.startsWith('/admin/users'))
@@ -65,15 +65,15 @@ export function Sidebar() {
                     <li key={item.name}>
                       <Link
                         href={item.href}
-                        className={`group flex gap-x-3 rounded-xl p-3 text-sm font-bold leading-6 transition-all ${
+                        className={`group flex gap-x-3 rounded-lg p-3 text-sm font-semibold leading-6 transition-all ${
                           isActive
-                            ? 'bg-gradient-to-r from-cyan-500 to-blue-600 text-white shadow-lg'
-                            : 'text-slate-300 hover:text-white hover:bg-slate-700/50'
+                            ? 'bg-[#C97B4B] text-white'
+                            : 'text-white/70 hover:text-white hover:bg-white/10'
                         }`}
                       >
                         <item.icon
                           className={`h-5 w-5 shrink-0 ${
-                            isActive ? 'text-white' : 'text-slate-400 group-hover:text-white'
+                            isActive ? 'text-white' : 'text-white/50 group-hover:text-white'
                           }`}
                           aria-hidden="true"
                         />
@@ -88,20 +88,20 @@ export function Sidebar() {
               <Link
                 href="/"
                 target="_blank"
-                className="group flex w-full gap-x-3 rounded-xl p-3 text-sm font-bold leading-6 text-slate-300 hover:bg-cyan-500/20 hover:text-cyan-400 transition-all border-2 border-slate-700 hover:border-cyan-500/50"
+                className="group flex w-full gap-x-3 rounded-lg p-3 text-sm font-semibold leading-6 text-white/70 hover:bg-white/10 hover:text-white transition-all border border-white/20 hover:border-white/30"
               >
                 <ArrowLeft
-                  className="h-5 w-5 shrink-0 text-slate-400 group-hover:text-cyan-400"
+                  className="h-5 w-5 shrink-0 text-white/50 group-hover:text-white"
                   aria-hidden="true"
                 />
                 Back to Website
               </Link>
               <button
                 onClick={signOut}
-                className="group flex w-full gap-x-3 rounded-xl p-3 text-sm font-bold leading-6 text-slate-300 hover:bg-red-500/20 hover:text-red-400 transition-all border-2 border-slate-700 hover:border-red-500/50"
+                className="group flex w-full gap-x-3 rounded-lg p-3 text-sm font-semibold leading-6 text-white/70 hover:bg-red-500/20 hover:text-red-300 transition-all border border-white/20 hover:border-red-400/30"
               >
                 <LogOut
-                  className="h-5 w-5 shrink-0 text-slate-400 group-hover:text-red-400"
+                  className="h-5 w-5 shrink-0 text-white/50 group-hover:text-red-300"
                   aria-hidden="true"
                 />
                 Sign out

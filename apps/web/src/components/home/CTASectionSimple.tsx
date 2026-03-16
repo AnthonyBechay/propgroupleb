@@ -14,11 +14,11 @@ export function CTASectionSimple() {
   }, [])
 
   return (
-    <section className="relative py-16 sm:py-20 bg-gradient-to-br from-[#0a1628] to-[#1e293b] overflow-hidden">
+    <section className="relative py-16 sm:py-20 bg-[#1B4965] overflow-hidden">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
         <div className="max-w-4xl mx-auto text-center">
           <h2 className="text-3xl sm:text-4xl lg:text-5xl font-black text-white mb-6">
-            {cms['cta-title'] || <>Ready to Start{' '}<span className="bg-gradient-to-r from-cyan-400 to-blue-500 bg-clip-text text-transparent">Investing?</span></>}
+            {cms['cta-title'] || <>Ready to Start{' '}<span className="text-[#C97B4B]">Investing?</span></>}
           </h2>
 
           <p className="text-lg sm:text-xl text-slate-300 mb-8 max-w-2xl mx-auto">
@@ -46,7 +46,7 @@ export function CTASectionSimple() {
             <Link href="/auth/signup">
               <Button
                 size="lg"
-                className="w-full sm:w-auto h-14 px-10 text-base font-bold bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-white rounded-xl shadow-xl transition-all"
+                className="w-full sm:w-auto h-14 px-10 text-base font-bold bg-[#C97B4B] hover:bg-[#B86A3A] text-white rounded-xl shadow-xl transition-all"
               >
                 <span className="flex items-center gap-2">
                   Get Started Free

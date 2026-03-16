@@ -15,24 +15,24 @@ interface PropertySortProps {
 }
 
 const sortOptions = [
-  { value: 'newest', label: 'Newest First', icon: '🆕' },
-  { value: 'price-asc', label: 'Price: Low to High', icon: '💰' },
-  { value: 'price-desc', label: 'Price: High to Low', icon: '💎' },
-  { value: 'roi-desc', label: 'Highest ROI', icon: '📈' },
-  { value: 'area-desc', label: 'Largest Area', icon: '🏠' },
-  { value: 'popular', label: 'Most Popular', icon: '⭐' },
+  { value: 'newest', label: 'Newest First', icon: '\u{1F195}' },
+  { value: 'price-asc', label: 'Price: Low to High', icon: '\u{1F4B0}' },
+  { value: 'price-desc', label: 'Price: High to Low', icon: '\u{1F48E}' },
+  { value: 'roi-desc', label: 'Highest ROI', icon: '\u{1F4C8}' },
+  { value: 'area-desc', label: 'Largest Area', icon: '\u{1F3E0}' },
+  { value: 'popular', label: 'Most Popular', icon: '\u{2B50}' },
 ]
 
 export function PropertySort({ value, onChange }: PropertySortProps) {
   return (
     <div className="flex items-center gap-2">
-      <span className="text-sm text-gray-600 dark:text-gray-400 hidden sm:inline">
+      <span className="text-sm text-stone-600 hidden sm:inline">
         Sort by:
       </span>
       <Select value={value} onValueChange={onChange}>
-        <SelectTrigger className="w-[200px] bg-white dark:bg-gray-800">
+        <SelectTrigger className="w-[200px] bg-white">
           <div className="flex items-center gap-2">
-            <ArrowUpDown className="w-4 h-4 text-gray-500" />
+            <ArrowUpDown className="w-4 h-4 text-stone-500" />
             <SelectValue />
           </div>
         </SelectTrigger>

@@ -56,12 +56,12 @@ export function Navbar() {
   const isActive = (path: string) => pathname === path
 
   const portalLinks = [
-    { href: '/portal/dashboard', label: 'Dashboard', icon: <Home className="w-4 h-4" />, color: 'text-blue-600' },
+    { href: '/portal/dashboard', label: 'Dashboard', icon: <Home className="w-4 h-4" />, color: 'text-[#1B4965]' },
     { href: '/portal/market-analysis', label: 'Market Analysis', icon: <BarChart3 className="w-4 h-4" />, color: 'text-green-600' },
-    { href: '/portal/calculator', label: 'ROI Calculator', icon: <Calculator className="w-4 h-4" />, color: 'text-purple-600' },
+    { href: '/portal/calculator', label: 'ROI Calculator', icon: <Calculator className="w-4 h-4" />, color: 'text-[#C97B4B]' },
     { href: '/portal/portfolio', label: 'My Portfolio', icon: <DollarSign className="w-4 h-4" />, color: 'text-orange-600' },
     { href: '/portal/favorites', label: 'Saved Properties', icon: <Heart className="w-4 h-4" />, color: 'text-red-600' },
-    { href: '/portal/documents', label: 'Documents', icon: <FileText className="w-4 h-4" />, color: 'text-indigo-600' },
+    { href: '/portal/documents', label: 'Documents', icon: <FileText className="w-4 h-4" />, color: 'text-[#1B4965]' },
   ]
 
   const profileLinks = [
@@ -71,25 +71,24 @@ export function Navbar() {
 
   return (
     <nav className={`sticky top-0 z-50 transition-all duration-300 ${
-      isScrolled 
-        ? 'bg-white/95 dark:bg-gray-900/95 backdrop-blur-lg shadow-lg' 
-        : 'bg-white dark:bg-gray-900 shadow-sm'
-    } border-b border-gray-200 dark:border-gray-800`}>
+      isScrolled
+        ? 'bg-white/95 backdrop-blur-lg shadow-lg'
+        : 'bg-white shadow-sm'
+    } border-b border-stone-200`}>
       <div className="pg-container max-w-7xl mx-auto w-full">
         <div className="flex justify-between items-center h-16 w-full">
           {/* Logo */}
           <Link href="/" className="flex items-center space-x-3 group flex-shrink-0">
             <div className="relative">
-              <div className="absolute inset-0 bg-gradient-to-br from-blue-600 to-purple-600 rounded-xl blur-lg opacity-50 group-hover:opacity-75 transition-opacity" />
-              <div className="relative w-10 h-10 bg-gradient-to-br from-blue-600 to-purple-600 rounded-xl flex items-center justify-center transform group-hover:scale-110 transition-all duration-300 shadow-lg">
+              <div className="relative w-10 h-10 bg-[#1B4965] rounded-xl flex items-center justify-center transform group-hover:scale-110 transition-all duration-300 shadow-lg">
                 <Building2 className="w-5 h-5 text-white" />
               </div>
             </div>
             <div>
-              <span className="font-bold text-xl text-gray-900 dark:text-white block leading-tight">
+              <span className="font-bold text-xl text-stone-900 block leading-tight">
                 PropGroup
               </span>
-              <span className="text-xs text-gray-500 dark:text-gray-400">Smart Investments</span>
+              <span className="text-xs text-stone-500">Smart Investments</span>
             </div>
           </Link>
 
@@ -102,7 +101,7 @@ export function Navbar() {
             <NavLink href="/ai-search" icon={<Sparkles className="w-4 h-4" />} isActive={isActive('/ai-search')}>
               <span className="flex items-center gap-1.5">
                 AI Search
-                <span className="inline-flex items-center px-2 py-0.5 text-xs font-semibold bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-full">
+                <span className="inline-flex items-center px-2 py-0.5 text-xs font-semibold bg-[#C97B4B] text-white rounded-full">
                   NEW
                 </span>
               </span>
@@ -118,8 +117,8 @@ export function Navbar() {
                   aria-haspopup="true"
                   className={`px-4 py-2 rounded-lg font-medium transition-all flex items-center gap-1 whitespace-nowrap ${
                     pathname.startsWith('/portal')
-                      ? 'bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-900/20 dark:to-purple-900/20 text-blue-700 dark:text-blue-400'
-                      : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-gray-800'
+                      ? 'bg-[#E8F1F5] text-[#1B4965]'
+                      : 'text-stone-600 hover:text-stone-900 hover:bg-stone-50'
                   }`}
                 >
                   <Sparkles className="w-4 h-4" />
@@ -130,21 +129,21 @@ export function Navbar() {
                 </button>
 
                 {isPortalDropdownOpen && (
-                  <div role="menu" className="absolute top-full left-0 mt-2 w-64 bg-white dark:bg-gray-800 rounded-2xl shadow-2xl border border-gray-100 dark:border-gray-700 py-2 animate-in fade-in slide-in-from-top-2">
+                  <div role="menu" className="absolute top-full left-0 mt-2 w-64 bg-white rounded-2xl shadow-2xl border border-stone-100 py-2 animate-in fade-in slide-in-from-top-2">
                     {portalLinks.map((link, index) => (
                       <Link
                         key={link.href}
                         href={link.href}
                         role="menuitem"
-                        className="flex items-center gap-3 px-4 py-3 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors group"
+                        className="flex items-center gap-3 px-4 py-3 text-stone-700 hover:bg-stone-50 transition-colors group"
                         style={{ animationDelay: `${index * 50}ms` }}
                       >
-                        <div className={`p-2 rounded-lg bg-gray-100 dark:bg-gray-700 group-hover:bg-white dark:group-hover:bg-gray-600 transition-colors ${link.color}`}>
+                        <div className={`p-2 rounded-lg bg-stone-100 group-hover:bg-white transition-colors ${link.color}`}>
                           {link.icon}
                         </div>
                         <div>
                           <span className="font-medium block">{link.label}</span>
-                          <span className="text-xs text-gray-500 dark:text-gray-400">
+                          <span className="text-xs text-stone-500">
                             {link.href.includes('dashboard') && 'Overview & stats'}
                             {link.href.includes('market') && 'Live market data'}
                             {link.href.includes('calculator') && 'Calculate returns'}
@@ -177,7 +176,7 @@ export function Navbar() {
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="relative text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
+                    className="relative text-stone-600 hover:text-stone-900"
                   >
                     <Bell className="w-5 h-5" />
                   </Button>
@@ -190,26 +189,26 @@ export function Navbar() {
                     onBlur={() => setTimeout(() => setIsProfileDropdownOpen(false), 200)}
                     aria-expanded={isProfileDropdownOpen}
                     aria-haspopup="true"
-                    className="flex items-center gap-2 px-3 py-1.5 bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-700 rounded-full hover:shadow-md transition-all"
+                    className="flex items-center gap-2 px-3 py-1.5 bg-stone-50 rounded-full hover:shadow-md transition-all"
                   >
-                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-sm font-bold">
+                    <div className="w-8 h-8 rounded-full bg-[#1B4965] flex items-center justify-center text-white text-sm font-bold">
                       {user.email?.charAt(0).toUpperCase()}
                     </div>
-                    <span className="text-sm text-gray-700 dark:text-gray-300 font-medium">
+                    <span className="text-sm text-stone-700 font-medium">
                       {user.email?.split('@')[0]}
                     </span>
-                    <ChevronDown className={`w-3 h-3 text-gray-500 transition-transform ${
+                    <ChevronDown className={`w-3 h-3 text-stone-500 transition-transform ${
                       isProfileDropdownOpen ? 'rotate-180' : ''
                     }`} />
                   </button>
 
                   {isProfileDropdownOpen && (
-                    <div role="menu" className="absolute top-full right-0 mt-2 w-56 bg-white dark:bg-gray-800 rounded-2xl shadow-2xl border border-gray-100 dark:border-gray-700 py-2 animate-in fade-in slide-in-from-top-2">
-                      <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-700">
-                        <p className="text-sm font-medium text-gray-900 dark:text-white">
+                    <div role="menu" className="absolute top-full right-0 mt-2 w-56 bg-white rounded-2xl shadow-2xl border border-stone-100 py-2 animate-in fade-in slide-in-from-top-2">
+                      <div className="px-4 py-3 border-b border-stone-100">
+                        <p className="text-sm font-medium text-stone-900">
                           {user.email}
                         </p>
-                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                        <p className="text-xs text-stone-500 mt-1">
                           My Account
                         </p>
                       </div>
@@ -218,17 +217,17 @@ export function Navbar() {
                           key={link.href}
                           href={link.href}
                           role="menuitem"
-                          className="flex items-center gap-3 px-4 py-2.5 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                          className="flex items-center gap-3 px-4 py-2.5 text-stone-700 hover:bg-stone-50 transition-colors"
                         >
                           {link.icon}
                           <span className="font-medium">{link.label}</span>
                         </Link>
                       ))}
-                      <div className="border-t border-gray-100 dark:border-gray-700 mt-2 pt-2">
+                      <div className="border-t border-stone-100 mt-2 pt-2">
                         <button
                           onClick={signOut}
                           role="menuitem"
-                          className="flex items-center gap-3 px-4 py-2.5 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors w-full text-left"
+                          className="flex items-center gap-3 px-4 py-2.5 text-red-600 hover:bg-red-50 transition-colors w-full text-left"
                         >
                           <LogOut className="w-4 h-4" />
                           <span className="font-medium">Sign Out</span>
@@ -241,7 +240,7 @@ export function Navbar() {
                 {/* Admin Button for Admin/Super Admin users */}
                 {(user.role === 'ADMIN' || user.role === 'SUPER_ADMIN') && !pathname.startsWith('/admin') && (
                   <Link href="/admin">
-                    <Button size="sm" variant="outline" className="border-purple-600 text-purple-600 hover:bg-purple-50">
+                    <Button size="sm" variant="outline" className="border-[#1B4965] text-[#1B4965] hover:bg-[#E8F1F5]">
                       <Shield className="w-4 h-4 mr-2" />
                       Admin Panel
                     </Button>
@@ -250,7 +249,7 @@ export function Navbar() {
 
                 {!pathname.startsWith('/portal') && !pathname.startsWith('/admin') && (
                   <Link href="/portal/dashboard">
-                    <Button size="sm" className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 shadow-md hover:shadow-lg transition-all">
+                    <Button size="sm" className="bg-[#1B4965] hover:bg-[#2B6985] text-white shadow-md hover:shadow-lg transition-all">
                       <Sparkles className="w-4 h-4 mr-2" />
                       Go to Portal
                     </Button>
@@ -265,7 +264,7 @@ export function Navbar() {
                   </Button>
                 </AuthModal>
                 <AuthModal defaultMode="signup">
-                  <Button size="sm" className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 shadow-md hover:shadow-lg transition-all">
+                  <Button size="sm" className="bg-[#C97B4B] hover:bg-[#B86A3A] text-white shadow-md hover:shadow-lg transition-all">
                     <Sparkles className="w-4 h-4 mr-2" />
                     Get Started
                   </Button>
@@ -291,20 +290,20 @@ export function Navbar() {
         <div className={`lg:hidden transition-all duration-300 ease-in-out ${
           isMenuOpen ? 'max-h-screen opacity-100' : 'max-h-0 opacity-0 overflow-hidden'
         }`}>
-          <div className="py-4 space-y-1 border-t border-gray-200 dark:border-gray-700">
-            <MobileNavLink 
-              href="/properties" 
+          <div className="py-4 space-y-1 border-t border-stone-200">
+            <MobileNavLink
+              href="/properties"
               icon={<Building2 className="w-4 h-4" />}
               isActive={isActive('/properties')}
               onClick={() => setIsMenuOpen(false)}
             >
               Properties
             </MobileNavLink>
-            
+
             {/* Mobile Portal Links */}
             {user && (
               <>
-                <div className="px-4 py-2 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                <div className="px-4 py-2 text-xs font-semibold text-stone-500 uppercase tracking-wider">
                   Portal
                 </div>
                 {portalLinks.map((link) => (
@@ -318,48 +317,48 @@ export function Navbar() {
                     {link.label}
                   </MobileNavLink>
                 ))}
-                <div className="my-2 border-t border-gray-200 dark:border-gray-700"></div>
+                <div className="my-2 border-t border-stone-200"></div>
               </>
             )}
-            
-            <MobileNavLink 
-              href="/about" 
+
+            <MobileNavLink
+              href="/about"
               icon={<Info className="w-4 h-4" />}
               isActive={isActive('/about')}
               onClick={() => setIsMenuOpen(false)}
             >
               About
             </MobileNavLink>
-            <MobileNavLink 
-              href="/contact" 
+            <MobileNavLink
+              href="/contact"
               icon={<Phone className="w-4 h-4" />}
               isActive={isActive('/contact')}
               onClick={() => setIsMenuOpen(false)}
             >
               Contact
             </MobileNavLink>
-            
+
             {/* Mobile Auth Section */}
-            <div className="pt-4 px-4 border-t border-gray-200 dark:border-gray-700">
+            <div className="pt-4 px-4 border-t border-stone-200">
               {user ? (
                 <div className="space-y-3">
-                  <div className="flex items-center gap-3 px-3 py-2 bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-700 rounded-lg">
-                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-sm font-bold">
+                  <div className="flex items-center gap-3 px-3 py-2 bg-stone-50 rounded-lg">
+                    <div className="w-8 h-8 rounded-full bg-[#1B4965] flex items-center justify-center text-white text-sm font-bold">
                       {user.email?.charAt(0).toUpperCase()}
                     </div>
                     <div>
-                      <p className="text-sm font-medium text-gray-900 dark:text-white">
+                      <p className="text-sm font-medium text-stone-900">
                         {user.email?.split('@')[0]}
                       </p>
-                      <p className="text-xs text-gray-500 dark:text-gray-400">
+                      <p className="text-xs text-stone-500">
                         {user.email}
                       </p>
                     </div>
                   </div>
-                  <Button 
-                    onClick={signOut} 
-                    variant="outline" 
-                    size="sm" 
+                  <Button
+                    onClick={signOut}
+                    variant="outline"
+                    size="sm"
                     className="w-full"
                   >
                     <LogOut className="w-4 h-4 mr-2" />
@@ -368,7 +367,7 @@ export function Navbar() {
                 </div>
               ) : (
                 <AuthModal>
-                  <Button size="sm" className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700">
+                  <Button size="sm" className="w-full bg-[#C97B4B] hover:bg-[#B86A3A] text-white">
                     <Sparkles className="w-4 h-4 mr-2" />
                     Sign In / Get Started
                   </Button>
@@ -389,8 +388,8 @@ function NavLink({ href, icon, children, isActive }: any) {
       href={href}
       className={`px-4 py-2 rounded-lg font-medium transition-all flex items-center gap-2 whitespace-nowrap flex-shrink-0 ${
         isActive
-          ? 'bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-900/20 dark:to-purple-900/20 text-blue-700 dark:text-blue-400'
-          : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-gray-800'
+          ? 'bg-[#E8F1F5] text-[#1B4965]'
+          : 'text-stone-600 hover:text-stone-900 hover:bg-stone-50'
       }`}
     >
       {icon}
@@ -399,7 +398,7 @@ function NavLink({ href, icon, children, isActive }: any) {
   )
 }
 
-// Mobile Navigation Link Component  
+// Mobile Navigation Link Component
 function MobileNavLink({ href, icon, children, isActive, onClick }: any) {
   return (
     <Link
@@ -407,8 +406,8 @@ function MobileNavLink({ href, icon, children, isActive, onClick }: any) {
       onClick={onClick}
       className={`flex items-center gap-3 px-4 py-3 text-base font-medium transition-colors ${
         isActive
-          ? 'bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-900/20 dark:to-purple-900/20 text-blue-700 dark:text-blue-400 border-l-4 border-blue-600'
-          : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-white border-l-4 border-transparent'
+          ? 'bg-[#E8F1F5] text-[#1B4965] border-l-4 border-[#1B4965]'
+          : 'text-stone-600 hover:bg-stone-50 hover:text-stone-900 border-l-4 border-transparent'
       }`}
     >
       {icon}

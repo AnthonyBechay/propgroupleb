@@ -3,16 +3,15 @@
 import { useState } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
-import { 
-  Heart, 
-  MapPin, 
-  Bed, 
-  Bath, 
-  Square, 
-  TrendingUp, 
-  Home, 
+import {
+  Heart,
+  MapPin,
+  Bed,
+  Bath,
+  Square,
+  TrendingUp,
+  Home,
   BadgeCheck,
-  Star,
   Clock,
   Eye,
   ArrowRight,
@@ -108,7 +107,7 @@ export function PropertyCard({
   const handleFavorite = async (e: React.MouseEvent) => {
     e.preventDefault()
     e.stopPropagation()
-    
+
     if (!user) {
       setShowAuthModal(true)
       return
@@ -121,8 +120,8 @@ export function PropertyCard({
         setIsFavorited(result.isFavorited || false)
         toast({
           title: result.isFavorited ? 'Added to favorites' : 'Removed from favorites',
-          description: result.isFavorited 
-            ? 'You can view your favorites in your portal' 
+          description: result.isFavorited
+            ? 'You can view your favorites in your portal'
             : 'Property removed from your favorites',
         })
       } else {
@@ -186,56 +185,64 @@ export function PropertyCard({
   }
 
   const statusConfig = {
-    OFF_PLAN: { 
-      bg: 'from-purple-500 to-pink-600', 
+    OFF_PLAN: {
+      bg: 'bg-[#1B4965]',
       text: 'text-white',
       label: 'Off Plan',
       icon: Sparkles
     },
-    NEW_BUILD: { 
-      bg: 'from-green-500 to-emerald-600', 
+    NEW_BUILD: {
+      bg: 'bg-emerald-600',
       text: 'text-white',
       label: 'New Build',
       icon: Award
     },
-    RESALE: { 
-      bg: 'from-blue-500 to-cyan-600', 
+    RESALE: {
+      bg: 'bg-stone-600',
       text: 'text-white',
       label: 'Resale',
       icon: Shield
     },
-  }[status] || { bg: 'from-gray-500 to-gray-600', text: 'text-white', label: status, icon: Home }
+  }[status] || { bg: 'bg-stone-500', text: 'text-white', label: status, icon: Home }
 
   const defaultImage = '/placeholder-property.jpg'
   const mainImage = images && images.length > 0 ? images[currentImageIndex] : defaultImage
 
   // Calculate best metric to highlight
-  const bestMetric = investmentData ? 
+  const bestMetric = investmentData ?
     Math.max(
       investmentData.expectedROI || 0,
       investmentData.rentalYield || 0,
       investmentData.capitalGrowth || 0
     ) : 0
 
+  // Determine label for the best metric
+  const bestMetricLabel = (() => {
+    if (!investmentData || bestMetric === 0) return null
+    if (bestMetric === investmentData.expectedROI) return 'ROI'
+    if (bestMetric === investmentData.rentalYield) return 'Yield'
+    return 'Growth'
+  })()
+
   const StatusIcon = statusConfig.icon
 
   return (
     <>
-      <div className={`group relative bg-white dark:bg-gray-800 rounded-3xl overflow-hidden shadow-lg hover:shadow-2xl transition-all duration-500 transform hover:-translate-y-2 ${className} ${featured ? 'ring-2 ring-blue-500 ring-offset-2' : ''}`}>
+      <div className={`group relative bg-white rounded-2xl border border-stone-200 overflow-hidden shadow-sm hover:shadow-lg transition-all duration-500 transform hover:-translate-y-2 ${className} ${featured ? 'ring-2 ring-[#C97B4B] ring-offset-2' : ''}`}>
         {/* Featured ribbon */}
         {featured && (
-          <div className="absolute top-4 -right-8 bg-gradient-to-r from-yellow-400 to-orange-500 text-white text-xs font-bold py-1 px-12 rotate-45 z-20 shadow-lg">
+          <div className="absolute top-4 -right-8 bg-[#C97B4B] text-white text-xs font-bold py-1 px-12 rotate-45 z-20 shadow-lg">
             FEATURED
           </div>
         )}
 
         {/* Image Container */}
-        <div className="relative h-64 overflow-hidden bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-800">
+        <div className="relative aspect-[4/3] overflow-hidden bg-stone-100">
           <Link href={`/property/${id}`}>
             <div className="relative w-full h-full">
               {(mainImage === defaultImage || imageError) ? (
                 <div className="w-full h-full flex items-center justify-center">
-                  <Home className="w-16 h-16 text-gray-400 dark:text-gray-600" />
+                  <Home className="w-16 h-16 text-stone-400" />
                 </div>
               ) : (
                 <>
@@ -264,20 +271,20 @@ export function PropertyCard({
 
           {/* Top badges */}
           <div className="absolute top-4 left-4 flex flex-wrap gap-2">
-            <span className={`px-3 py-1.5 rounded-full text-xs font-bold bg-gradient-to-r ${statusConfig.bg} ${statusConfig.text} shadow-lg backdrop-blur-sm flex items-center gap-1`}>
+            <span className={`px-3 py-1.5 rounded-full text-xs font-bold ${statusConfig.bg} ${statusConfig.text} shadow-lg backdrop-blur-sm flex items-center gap-1`}>
               <StatusIcon className="w-3 h-3" />
               {statusConfig.label}
             </span>
-            
+
             {isGoldenVisaEligible && (
-              <span className="px-3 py-1.5 rounded-full text-xs font-bold bg-gradient-to-r from-yellow-400 to-amber-500 text-white shadow-lg backdrop-blur-sm flex items-center gap-1">
+              <span className="px-3 py-1.5 rounded-full text-xs font-bold bg-[#C97B4B] text-white shadow-lg backdrop-blur-sm flex items-center gap-1">
                 <BadgeCheck className="w-3 h-3" />
                 Golden Visa
               </span>
             )}
 
             {bestMetric > 15 && (
-              <span className="px-3 py-1.5 rounded-full text-xs font-bold bg-gradient-to-r from-green-500 to-emerald-600 text-white shadow-lg backdrop-blur-sm flex items-center gap-1">
+              <span className="px-3 py-1.5 rounded-full text-xs font-bold bg-emerald-600 text-white shadow-lg backdrop-blur-sm flex items-center gap-1">
                 <TrendingUp className="w-3 h-3" />
                 High ROI
               </span>
@@ -288,12 +295,12 @@ export function PropertyCard({
           <button
             onClick={handleFavorite}
             disabled={isLoadingFavorite}
-            className="absolute top-4 right-4 bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm p-2.5 rounded-full shadow-lg hover:shadow-xl transition-all hover:scale-110 group/fav"
+            className="absolute top-4 right-4 bg-white/90 hover:bg-white backdrop-blur-sm p-2.5 rounded-full shadow-lg hover:shadow-xl transition-all hover:scale-110 group/fav"
             aria-label={isFavorited ? 'Remove from favorites' : 'Add to favorites'}
           >
             <Heart
               className={`w-5 h-5 transition-all ${
-                isFavorited ? 'fill-red-500 text-red-500' : 'text-gray-600 dark:text-gray-400 group-hover/fav:text-red-500'
+                isFavorited ? 'fill-red-500 text-red-500' : 'text-stone-600 group-hover/fav:text-red-500'
               } ${isLoadingFavorite ? 'animate-pulse' : ''}`}
             />
           </button>
@@ -304,99 +311,62 @@ export function PropertyCard({
           {/* Title and Location */}
           <div>
             <Link href={`/property/${id}`}>
-              <h3 className="text-xl font-bold text-gray-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 transition-colors line-clamp-1 mb-1">
+              <h3 className="text-xl font-bold text-stone-900 hover:text-[#1B4965] transition-colors line-clamp-1 mb-1">
                 {title}
               </h3>
             </Link>
-            <div className="flex items-center text-gray-500 dark:text-gray-400 text-sm">
-              <MapPin className="w-4 h-4 mr-1.5 text-gray-400" />
+            <div className="flex items-center text-stone-500 text-sm">
+              <MapPin className="w-4 h-4 mr-1.5 text-stone-400" />
               {country.charAt(0).toUpperCase() + country.slice(1).toLowerCase()}
             </div>
           </div>
 
           {/* Description */}
-          <p className="text-gray-600 dark:text-gray-400 text-sm line-clamp-2 leading-relaxed">
+          <p className="text-stone-600 text-sm line-clamp-2 leading-relaxed">
             {description}
           </p>
 
           {/* Features */}
-          <div className="flex items-center gap-4 text-gray-600 dark:text-gray-400 text-sm">
-            <div className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
-              <Bed className="w-4 h-4 text-blue-500" />
+          <div className="flex items-center gap-4 text-stone-600 text-sm">
+            <div className="flex items-center gap-1.5 px-3 py-1.5 bg-stone-50 rounded-lg">
+              <Bed className="w-4 h-4 text-[#1B4965]" />
               <span className="font-medium">{bedrooms}</span>
             </div>
-            <div className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
-              <Bath className="w-4 h-4 text-blue-500" />
+            <div className="flex items-center gap-1.5 px-3 py-1.5 bg-stone-50 rounded-lg">
+              <Bath className="w-4 h-4 text-[#1B4965]" />
               <span className="font-medium">{bathrooms}</span>
             </div>
-            <div className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
-              <Square className="w-4 h-4 text-blue-500" />
+            <div className="flex items-center gap-1.5 px-3 py-1.5 bg-stone-50 rounded-lg">
+              <Square className="w-4 h-4 text-[#1B4965]" />
               <span className="font-medium">{area} m²</span>
             </div>
           </div>
 
-          {/* Investment Metrics */}
-          {investmentData && bestMetric > 0 && (
-            <div className="p-4 bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-900/20 dark:to-purple-900/20 rounded-xl space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider">
-                  Investment Metrics
-                </span>
-                <BarChart3 className="w-4 h-4 text-blue-500" />
-              </div>
-              <div className="grid grid-cols-3 gap-3">
-                {investmentData.expectedROI && (
-                  <div className="text-center">
-                    <div className="text-2xl font-bold text-green-600 dark:text-green-400">
-                      {investmentData.expectedROI}%
-                    </div>
-                    <div className="text-xs text-gray-600 dark:text-gray-400 font-medium">ROI</div>
-                  </div>
-                )}
-                {investmentData.rentalYield && (
-                  <div className="text-center">
-                    <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
-                      {investmentData.rentalYield}%
-                    </div>
-                    <div className="text-xs text-gray-600 dark:text-gray-400 font-medium">Rental</div>
-                  </div>
-                )}
-                {investmentData.capitalGrowth && (
-                  <div className="text-center">
-                    <div className="text-2xl font-bold text-purple-600 dark:text-purple-400">
-                      {investmentData.capitalGrowth}%
-                    </div>
-                    <div className="text-xs text-gray-600 dark:text-gray-400 font-medium">Growth</div>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
           {/* Price and Actions */}
-          <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
+          <div className="pt-4 border-t border-stone-200">
             <div className="flex items-end justify-between mb-4">
               <div>
-                <div className="text-3xl font-bold text-gray-900 dark:text-white">
-                  {formatPrice(price)}
+                <div className="flex items-center gap-2">
+                  <div className="text-3xl font-bold text-stone-900">
+                    {formatPrice(price)}
+                  </div>
+                  {investmentData && bestMetric > 0 && bestMetricLabel && (
+                    <span className="px-2 py-0.5 bg-emerald-50 text-emerald-700 text-xs font-semibold rounded-full">
+                      {bestMetric}% {bestMetricLabel}
+                    </span>
+                  )}
                 </div>
-                <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                <div className="text-xs text-stone-500 mt-0.5">
                   {area > 0 ? `${formatPrice(Math.round(price / area))}/m²` : ''}
                 </div>
               </div>
-              <div className="flex items-center gap-1 text-yellow-500">
-                {[...Array(5)].map((_, i) => (
-                  <Star key={i} className="w-4 h-4 fill-current" />
-                ))}
-                <span className="text-xs text-gray-600 dark:text-gray-400 ml-1">(4.8)</span>
-              </div>
             </div>
-            
+
             <div className="flex gap-3">
               <Link href={`/property/${id}`} className="flex-1">
                 <Button
                   variant="outline"
-                  className="w-full group/btn hover:bg-gray-50 dark:hover:bg-gray-700"
+                  className="w-full group/btn hover:bg-stone-50"
                 >
                   View Details
                   <ArrowRight className="w-4 h-4 ml-2 group-hover/btn:translate-x-1 transition-transform" />
@@ -407,18 +377,13 @@ export function PropertyCard({
                   e.stopPropagation()
                   setShowInquiryModal(true)
                 }}
-                className="flex-1 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 shadow-md"
+                className="flex-1 bg-[#1B4965] hover:bg-[#2B6985] text-white shadow-md"
               >
                 <DollarSign className="w-4 h-4 mr-2" />
                 Inquire Now
               </Button>
             </div>
           </div>
-        </div>
-
-        {/* Hover shine effect */}
-        <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none">
-          <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000" />
         </div>
       </div>
 
@@ -457,7 +422,7 @@ export function PropertyCard({
               <Input
                 id="email"
                 type="email"
-                {...register('email', { 
+                {...register('email', {
                   required: 'Email is required',
                   pattern: {
                     value: /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i,
@@ -503,10 +468,10 @@ export function PropertyCard({
               >
                 Cancel
               </Button>
-              <Button 
-                type="submit" 
+              <Button
+                type="submit"
                 disabled={isSubmittingInquiry}
-                className="flex-1 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
+                className="flex-1 bg-[#1B4965] hover:bg-[#2B6985] text-white"
               >
                 {isSubmittingInquiry ? (
                   <span className="flex items-center gap-2">

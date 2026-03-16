@@ -52,13 +52,13 @@ export function TestimonialsSection() {
   }
 
   return (
-    <section className="py-16 sm:py-20 bg-gray-50 dark:from-[#0a1628] dark:to-[#0f2439] relative overflow-hidden">
+    <section className="py-16 sm:py-20 bg-stone-50 relative overflow-hidden">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
         <div className="text-center mb-10 sm:mb-12">
-          <h2 className="text-3xl sm:text-4xl lg:text-5xl font-black text-gray-900 dark:text-white mb-3">
-            Investor <span className="bg-gradient-to-r from-cyan-600 to-blue-600 dark:from-cyan-400 dark:to-blue-500 bg-clip-text text-transparent">Success</span>
+          <h2 className="text-3xl sm:text-4xl lg:text-5xl font-black text-stone-900 mb-3">
+            Investor <span className="text-[#1B4965]">Success</span>
           </h2>
-          <p className="text-lg text-gray-600 dark:text-gray-400">
+          <p className="text-lg text-stone-600">
             Real results from real investors
           </p>
         </div>
@@ -66,28 +66,28 @@ export function TestimonialsSection() {
         <div className="max-w-4xl mx-auto">
           <div className="relative">
             {/* Quote icon */}
-            <Quote className="absolute -top-4 -left-4 w-16 h-16 text-blue-500/20 dark:text-blue-400/20" />
+            <Quote className="absolute -top-4 -left-4 w-16 h-16 text-[#1B4965]/15" />
 
             {/* Testimonial card */}
-            <div className="glass-card p-8 md:p-12 rounded-3xl shadow-2xl">
+            <div className="bg-white border border-stone-200 shadow-lg rounded-2xl p-8 md:p-12">
               <div className="grid md:grid-cols-3 gap-8 items-center">
                 {/* Author info */}
                 <div className="md:col-span-1 text-center md:text-left">
                   <div className="relative w-32 h-32 mx-auto md:mx-0 mb-4">
-                    <div className="w-32 h-32 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-3xl font-bold">
+                    <div className="w-32 h-32 rounded-full bg-[#1B4965] flex items-center justify-center text-white text-3xl font-bold">
                       {testimonials[currentIndex].name.split(' ').map(n => n[0]).join('')}
                     </div>
                   </div>
-                  <h3 className="text-xl font-bold text-gray-900 dark:text-white">
+                  <h3 className="text-xl font-bold text-stone-900">
                     {testimonials[currentIndex].name}
                   </h3>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                  <p className="text-sm text-stone-600">
                     {testimonials[currentIndex].role}
                   </p>
-                  <p className="text-sm text-gray-500 dark:text-gray-500">
+                  <p className="text-sm text-stone-500">
                     {testimonials[currentIndex].location}
                   </p>
-                  
+
                   {/* Rating */}
                   <div className="flex justify-center md:justify-start gap-1 mt-3">
                     {[...Array(5)].map((_, i) => (
@@ -96,7 +96,7 @@ export function TestimonialsSection() {
                         className={`w-5 h-5 ${
                           i < testimonials[currentIndex].rating
                             ? 'text-yellow-500 fill-yellow-500'
-                            : 'text-gray-300 dark:text-gray-600'
+                            : 'text-stone-300'
                         }`}
                       />
                     ))}
@@ -105,21 +105,21 @@ export function TestimonialsSection() {
 
                 {/* Testimonial content */}
                 <div className="md:col-span-2 space-y-4">
-                  <p className="text-lg text-gray-700 dark:text-gray-300 leading-relaxed italic">
+                  <p className="text-lg text-stone-700 leading-relaxed italic">
                     "{testimonials[currentIndex].text}"
                   </p>
-                  
+
                   {/* Investment stats */}
-                  <div className="flex flex-wrap gap-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+                  <div className="flex flex-wrap gap-4 pt-4 border-t border-stone-200">
                     <div className="flex items-center gap-2">
                       <div className="w-2 h-2 bg-green-500 rounded-full" />
-                      <span className="text-sm font-semibold text-gray-900 dark:text-white">
+                      <span className="text-sm font-semibold text-stone-900">
                         {testimonials[currentIndex].investment}
                       </span>
                     </div>
                     <div className="flex items-center gap-2">
-                      <div className="w-2 h-2 bg-blue-500 rounded-full" />
-                      <span className="text-sm font-semibold text-gray-900 dark:text-white">
+                      <div className="w-2 h-2 bg-[#1B4965] rounded-full" />
+                      <span className="text-sm font-semibold text-stone-900">
                         {testimonials[currentIndex].returns}
                       </span>
                     </div>
@@ -132,10 +132,10 @@ export function TestimonialsSection() {
             <div className="flex justify-center gap-4 mt-8">
               <button
                 onClick={prevTestimonial}
-                className="p-3 rounded-full bg-white dark:bg-gray-800 shadow-lg hover:shadow-xl transform hover:scale-110 transition-all"
+                className="p-3 rounded-full bg-white shadow-lg hover:shadow-xl transform hover:scale-110 transition-all"
                 aria-label="Previous testimonial"
               >
-                <ChevronLeft className="w-5 h-5 text-gray-600 dark:text-gray-400" />
+                <ChevronLeft className="w-5 h-5 text-stone-600" />
               </button>
 
               {/* Dots indicator */}
@@ -146,8 +146,8 @@ export function TestimonialsSection() {
                     onClick={() => setCurrentIndex(index)}
                     className={`h-2 transition-all duration-300 rounded-full ${
                       index === currentIndex
-                        ? 'w-8 bg-gradient-to-r from-blue-500 to-purple-600'
-                        : 'w-2 bg-gray-300 dark:bg-gray-600 hover:bg-gray-400 dark:hover:bg-gray-500'
+                        ? 'w-8 bg-[#1B4965]'
+                        : 'w-2 bg-stone-300 hover:bg-stone-400'
                     }`}
                     aria-label={`Go to testimonial ${index + 1}`}
                   />
@@ -156,10 +156,10 @@ export function TestimonialsSection() {
 
               <button
                 onClick={nextTestimonial}
-                className="p-3 rounded-full bg-white dark:bg-gray-800 shadow-lg hover:shadow-xl transform hover:scale-110 transition-all"
+                className="p-3 rounded-full bg-white shadow-lg hover:shadow-xl transform hover:scale-110 transition-all"
                 aria-label="Next testimonial"
               >
-                <ChevronRight className="w-5 h-5 text-gray-600 dark:text-gray-400" />
+                <ChevronRight className="w-5 h-5 text-stone-600" />
               </button>
             </div>
           </div>
@@ -167,14 +167,14 @@ export function TestimonialsSection() {
 
         {/* Trust badges */}
         <div className="mt-16 text-center">
-          <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">Trusted by investors from</p>
+          <p className="text-sm text-stone-500 mb-4">Trusted by investors from</p>
           <div className="flex flex-wrap justify-center gap-8 items-center">
             {['USA', 'UAE', 'UK', 'Singapore', 'Canada'].map((country) => (
               <div
                 key={country}
-                className="px-6 py-3 bg-white dark:bg-gray-800 rounded-lg shadow-md hover:shadow-lg transition-shadow"
+                className="px-6 py-3 bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow"
               >
-                <span className="font-semibold text-gray-700 dark:text-gray-300">{country}</span>
+                <span className="font-semibold text-stone-700">{country}</span>
               </div>
             ))}
           </div>

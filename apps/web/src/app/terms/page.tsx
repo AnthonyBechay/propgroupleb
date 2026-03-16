@@ -3,21 +3,21 @@ import { Building2 } from 'lucide-react'
 
 export default function TermsPage() {
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+    <div className="min-h-screen bg-stone-50">
       <div className="max-w-3xl mx-auto px-4 py-20">
         <div className="text-center">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-blue-600 to-purple-600 rounded-2xl mb-6">
+          <div className="inline-flex items-center justify-center w-16 h-16 bg-[#1B4965] rounded-2xl mb-6">
             <Building2 className="w-8 h-8 text-white" />
           </div>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-4">
+          <h1 className="text-3xl font-bold text-stone-900 mb-4">
             Terms of Service
           </h1>
-          <p className="text-gray-600 dark:text-gray-400 mb-8">
+          <p className="text-stone-600 mb-8">
             Our terms of service are currently being prepared and will be available soon.
           </p>
           <Link
             href="/"
-            className="inline-flex items-center px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white font-medium rounded-lg hover:from-blue-700 hover:to-purple-700 transition-all"
+            className="inline-flex items-center px-6 py-3 bg-[#1B4965] text-white font-medium rounded-lg hover:bg-[#163d55] transition-all"
           >
             Back to Home
           </Link>

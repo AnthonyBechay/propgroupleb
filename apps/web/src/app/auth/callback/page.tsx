@@ -59,32 +59,20 @@ function CallbackHandler() {
   }, [searchParams, router, refreshUser])
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#0a1628] via-[#0f2439] to-[#1e293b]">
-      {/* Background Effects */}
-      <div className="absolute inset-0 overflow-hidden">
-        <div
-          className="absolute top-0 -left-40 w-[600px] h-[600px] rounded-full opacity-15 blur-[120px]"
-          style={{ background: 'radial-gradient(circle, #2563eb 0%, transparent 70%)' }}
-        />
-        <div
-          className="absolute bottom-0 right-0 w-[500px] h-[500px] rounded-full opacity-15 blur-[120px]"
-          style={{ background: 'radial-gradient(circle, #8b5cf6 0%, transparent 70%)' }}
-        />
-      </div>
-
-      <div className="relative z-10 bg-white shadow-2xl rounded-2xl px-12 py-16 border-2 border-slate-100 max-w-md w-full mx-4">
+    <div className="min-h-screen flex items-center justify-center bg-stone-100">
+      <div className="relative z-10 bg-white shadow-2xl rounded-2xl px-12 py-16 border border-stone-200 max-w-md w-full mx-4">
         <div className="text-center">
           {status === 'loading' && (
             <>
               <div className="flex justify-center mb-6">
-                <div className="w-16 h-16 bg-gradient-to-br from-cyan-500 to-blue-600 rounded-full flex items-center justify-center shadow-lg">
+                <div className="w-16 h-16 bg-[#1B4965] rounded-full flex items-center justify-center shadow-lg">
                   <Loader2 className="h-8 w-8 text-white animate-spin" />
                 </div>
               </div>
-              <h2 className="text-2xl font-black text-gray-900 mb-2">
+              <h2 className="text-2xl font-bold text-stone-900 mb-2">
                 Completing Sign In
               </h2>
-              <p className="text-slate-600">
+              <p className="text-stone-600">
                 Please wait while we authenticate your account...
               </p>
             </>
@@ -93,17 +81,17 @@ function CallbackHandler() {
           {status === 'success' && (
             <>
               <div className="flex justify-center mb-6">
-                <div className="w-16 h-16 bg-gradient-to-br from-green-500 to-emerald-600 rounded-full flex items-center justify-center shadow-lg animate-in zoom-in">
+                <div className="w-16 h-16 bg-emerald-600 rounded-full flex items-center justify-center shadow-lg">
                   <CheckCircle className="h-8 w-8 text-white" />
                 </div>
               </div>
-              <h2 className="text-2xl font-black text-gray-900 mb-2">
+              <h2 className="text-2xl font-bold text-stone-900 mb-2">
                 Authentication Successful!
               </h2>
-              <p className="text-slate-600">
+              <p className="text-stone-600">
                 {message}
               </p>
-              <p className="text-sm text-slate-500 mt-4">
+              <p className="text-sm text-stone-500 mt-4">
                 Redirecting you now...
               </p>
             </>
@@ -112,17 +100,17 @@ function CallbackHandler() {
           {status === 'error' && (
             <>
               <div className="flex justify-center mb-6">
-                <div className="w-16 h-16 bg-gradient-to-br from-red-500 to-rose-600 rounded-full flex items-center justify-center shadow-lg animate-in zoom-in">
+                <div className="w-16 h-16 bg-red-600 rounded-full flex items-center justify-center shadow-lg">
                   <XCircle className="h-8 w-8 text-white" />
                 </div>
               </div>
-              <h2 className="text-2xl font-black text-gray-900 mb-2">
+              <h2 className="text-2xl font-bold text-stone-900 mb-2">
                 Authentication Failed
               </h2>
-              <p className="text-slate-600 mb-4">
+              <p className="text-stone-600 mb-4">
                 {message}
               </p>
-              <p className="text-sm text-slate-500">
+              <p className="text-sm text-stone-500">
                 Redirecting to login page...
               </p>
             </>
@@ -136,8 +124,8 @@ function CallbackHandler() {
 export default function CallbackPage() {
   return (
     <Suspense fallback={
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#0a1628] via-[#0f2439] to-[#1e293b]">
-        <Loader2 className="h-8 w-8 animate-spin text-cyan-400" />
+      <div className="min-h-screen flex items-center justify-center bg-stone-100">
+        <Loader2 className="h-8 w-8 animate-spin text-[#1B4965]" />
       </div>
     }>
       <CallbackHandler />

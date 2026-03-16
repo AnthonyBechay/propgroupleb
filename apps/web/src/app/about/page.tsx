@@ -12,15 +12,15 @@ export default async function AboutPage() {
   const content = await fetchSectionContent('about')
 
   return (
-    <main className="min-h-screen bg-white dark:bg-[#0a1628]">
+    <main className="min-h-screen bg-white">
       {/* Hero Section */}
-      <section className="relative py-20 sm:py-24 bg-gradient-to-br from-[#0a1628] to-[#1e293b] overflow-hidden">
+      <section className="relative py-20 sm:py-24 bg-[#1B4965] overflow-hidden">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
           <div className="max-w-3xl mx-auto text-center">
             <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black text-white mb-6">
-              {content['about-title'] || <>Smart Real Estate{' '}<span className="bg-gradient-to-r from-cyan-400 to-blue-500 bg-clip-text text-transparent">Investments</span></>}
+              {content['about-title'] || <>Smart Real Estate{' '}<span className="text-[#C97B4B]">Investments</span></>}
             </h1>
-            <p className="text-xl text-slate-300">
+            <p className="text-xl text-stone-300">
               {content['about-description'] || 'We help investors make data-driven real estate decisions with AI-powered analysis and verified ROI data'}
             </p>
           </div>
@@ -28,54 +28,54 @@ export default async function AboutPage() {
       </section>
 
       {/* Key Features */}
-      <section className="py-16 bg-white dark:bg-[#0a1628]">
+      <section className="py-16 bg-white">
         <div className="container mx-auto px-4">
           <div className="max-w-6xl mx-auto">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              <div className="bg-white dark:bg-slate-800/40 border border-gray-200 dark:border-slate-700/50 rounded-xl p-6">
-                <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-gradient-to-br from-cyan-500 to-blue-600 shadow-md mb-4">
+              <div className="bg-white border border-stone-200 rounded-xl p-6">
+                <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-[#1B4965] shadow-md mb-4">
                   <TrendingUp className="w-6 h-6 text-white" />
                 </div>
-                <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-2">
+                <h3 className="text-lg font-bold text-stone-900 mb-2">
                   Verified ROI
                 </h3>
-                <p className="text-sm text-gray-600 dark:text-slate-400">
+                <p className="text-sm text-stone-600">
                   Real projections backed by comprehensive market analysis
                 </p>
               </div>
 
-              <div className="bg-white dark:bg-slate-800/40 border border-gray-200 dark:border-slate-700/50 rounded-xl p-6">
-                <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-gradient-to-br from-green-500 to-emerald-600 shadow-md mb-4">
+              <div className="bg-white border border-stone-200 rounded-xl p-6">
+                <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-[#1B4965] shadow-md mb-4">
                   <Shield className="w-6 h-6 text-white" />
                 </div>
-                <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-2">
+                <h3 className="text-lg font-bold text-stone-900 mb-2">
                   Secure Process
                 </h3>
-                <p className="text-sm text-gray-600 dark:text-slate-400">
+                <p className="text-sm text-stone-600">
                   Bank-level security with comprehensive legal compliance
                 </p>
               </div>
 
-              <div className="bg-white dark:bg-slate-800/40 border border-gray-200 dark:border-slate-700/50 rounded-xl p-6">
-                <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-gradient-to-br from-purple-500 to-pink-600 shadow-md mb-4">
+              <div className="bg-white border border-stone-200 rounded-xl p-6">
+                <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-[#C97B4B] shadow-md mb-4">
                   <Globe className="w-6 h-6 text-white" />
                 </div>
-                <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-2">
+                <h3 className="text-lg font-bold text-stone-900 mb-2">
                   Global Markets
                 </h3>
-                <p className="text-sm text-gray-600 dark:text-slate-400">
+                <p className="text-sm text-stone-600">
                   Access premium international real estate opportunities
                 </p>
               </div>
 
-              <div className="bg-white dark:bg-slate-800/40 border border-gray-200 dark:border-slate-700/50 rounded-xl p-6">
-                <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-gradient-to-br from-orange-500 to-red-600 shadow-md mb-4">
+              <div className="bg-white border border-stone-200 rounded-xl p-6">
+                <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-[#C97B4B] shadow-md mb-4">
                   <Award className="w-6 h-6 text-white" />
                 </div>
-                <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-2">
+                <h3 className="text-lg font-bold text-stone-900 mb-2">
                   Expert Analysis
                 </h3>
-                <p className="text-sm text-gray-600 dark:text-slate-400">
+                <p className="text-sm text-stone-600">
                   AI-powered insights and professional market research
                 </p>
               </div>
@@ -85,20 +85,20 @@ export default async function AboutPage() {
       </section>
 
       {/* CTA Section */}
-      <section className="py-16 bg-gradient-to-br from-[#0a1628] to-[#1e293b]">
+      <section className="py-16 bg-[#1B4965]">
         <div className="container mx-auto px-4">
           <div className="max-w-4xl mx-auto text-center">
             <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">
               Ready to Start Investing?
             </h2>
-            <p className="text-xl text-slate-300 mb-8">
+            <p className="text-xl text-stone-300 mb-8">
               Browse verified properties with transparent ROI data
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Link href="/properties">
                 <Button
                   size="lg"
-                  className="w-full sm:w-auto h-14 px-10 text-base font-bold bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-white rounded-xl shadow-xl transition-all"
+                  className="w-full sm:w-auto h-14 px-10 text-base font-bold bg-[#C97B4B] hover:bg-[#b56a3a] text-white rounded-xl shadow-xl transition-all"
                 >
                   Browse Properties
                 </Button>

@@ -165,23 +165,23 @@ export function PortfolioClient({ initialPortfolio }: PortfolioClientProps) {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
+    <div className="min-h-screen bg-stone-50">
       <div className="max-w-7xl mx-auto p-4 md:p-8">
         {/* Header */}
         <div className="mb-8">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between">
             <div>
-              <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-2">
+              <h1 className="text-3xl md:text-4xl font-bold text-stone-900 mb-2">
                 My Portfolio
               </h1>
-              <p className="text-gray-600">
+              <p className="text-stone-600">
                 Track and manage your real estate investments
               </p>
             </div>
             <div className="flex gap-2 mt-4 md:mt-0">
               <Button
                 onClick={() => setShowAddModal(true)}
-                className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800"
+                className="bg-[#1B4965] hover:bg-[#2B6985]"
               >
                 <Plus className="w-4 h-4 mr-2" />
                 Add Property
@@ -232,7 +232,7 @@ export function PortfolioClient({ initialPortfolio }: PortfolioClientProps) {
           <select
             value={filterStatus}
             onChange={(e) => setFilterStatus(e.target.value)}
-            className="px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="px-4 py-2 bg-white border border-stone-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1B4965]"
           >
             <option value="all">All Properties</option>
             <option value="Rented">Rented</option>
@@ -242,7 +242,7 @@ export function PortfolioClient({ initialPortfolio }: PortfolioClientProps) {
           <select
             value={sortBy}
             onChange={(e) => setSortBy(e.target.value)}
-            className="px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="px-4 py-2 bg-white border border-stone-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1B4965]"
           >
             <option value="purchaseDate">Sort by Date</option>
             <option value="value">Sort by Value</option>
@@ -265,14 +265,14 @@ export function PortfolioClient({ initialPortfolio }: PortfolioClientProps) {
         {/* Empty State */}
         {filteredPortfolio.length === 0 && (
           <div className="bg-white rounded-2xl shadow-sm p-12 text-center">
-            <Home className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-xl font-semibold text-gray-900 mb-2">
+            <Home className="w-16 h-16 text-stone-400 mx-auto mb-4" />
+            <h3 className="text-xl font-semibold text-stone-900 mb-2">
               {portfolio.length === 0 
                 ? "No properties in your portfolio" 
                 : "No properties match your filters"
               }
             </h3>
-            <p className="text-gray-600 mb-6">
+            <p className="text-stone-600 mb-6">
               {portfolio.length === 0 
                 ? "Start building your portfolio by adding your first property"
                 : "Try adjusting your filters to see more properties"
@@ -281,7 +281,7 @@ export function PortfolioClient({ initialPortfolio }: PortfolioClientProps) {
             {portfolio.length === 0 && (
               <Button
                 onClick={() => setShowAddModal(true)}
-                className="bg-blue-600 hover:bg-blue-700"
+                className="bg-[#1B4965] hover:bg-[#2B6985]"
               >
                 <Plus className="w-4 h-4 mr-2" />
                 Add Your First Property
@@ -438,7 +438,7 @@ export function PortfolioClient({ initialPortfolio }: PortfolioClientProps) {
               >
                 Cancel
               </Button>
-              <Button type="submit" className="bg-blue-600 hover:bg-blue-700">
+              <Button type="submit" className="bg-[#1B4965] hover:bg-[#2B6985]">
                 {editingProperty ? 'Update Property' : 'Add Property'}
               </Button>
             </div>
@@ -452,26 +452,26 @@ export function PortfolioClient({ initialPortfolio }: PortfolioClientProps) {
 // Summary Card Component
 function SummaryCard({ icon, title, value, subtitle, color, trend }: any) {
   const colorClasses: Record<string, string> = {
-    blue: 'from-blue-500 to-blue-600',
-    green: 'from-green-500 to-green-600',
-    purple: 'from-purple-500 to-purple-600',
-    orange: 'from-orange-500 to-orange-600',
+    blue: 'bg-[#1B4965]',
+    green: 'bg-emerald-600',
+    purple: 'bg-[#C97B4B]',
+    orange: 'bg-stone-600',
   }
 
   return (
     <div className="bg-white rounded-xl shadow-sm p-6 hover:shadow-md transition-shadow">
       <div className="flex items-center justify-between mb-4">
-        <div className={`bg-gradient-to-br ${colorClasses[color] || colorClasses.blue} p-3 rounded-lg text-white`}>
+        <div className={`${colorClasses[color] || colorClasses.blue} p-3 rounded-lg text-white`}>
           {icon}
         </div>
         {trend !== undefined && (
-          trend > 0 ? <ArrowUpRight className="w-5 h-5 text-green-500" /> : 
+          trend > 0 ? <ArrowUpRight className="w-5 h-5 text-emerald-500" /> : 
           trend < 0 ? <ArrowDownRight className="w-5 h-5 text-red-500" /> : null
         )}
       </div>
-      <h3 className="text-sm text-gray-600 mb-1">{title}</h3>
-      <p className="text-2xl font-bold text-gray-900">{value}</p>
-      <p className="text-sm text-gray-500 mt-1">{subtitle}</p>
+      <h3 className="text-sm text-stone-600 mb-1">{title}</h3>
+      <p className="text-2xl font-bold text-stone-900">{value}</p>
+      <p className="text-sm text-stone-500 mt-1">{subtitle}</p>
     </div>
   )
 }
@@ -485,8 +485,8 @@ function PropertyCard({ property, onEdit, onDelete }: any) {
     <div className="bg-white rounded-xl shadow-sm p-6 hover:shadow-lg transition-all">
       <div className="flex justify-between items-start mb-4">
         <div>
-          <h3 className="text-lg font-semibold text-gray-900">{property.customName}</h3>
-          <p className="text-sm text-gray-500 flex items-center gap-1 mt-1">
+          <h3 className="text-lg font-semibold text-stone-900">{property.customName}</h3>
+          <p className="text-sm text-stone-500 flex items-center gap-1 mt-1">
             <MapPin className="w-3 h-3" />
             {property.location}
           </p>
@@ -513,34 +513,34 @@ function PropertyCard({ property, onEdit, onDelete }: any) {
 
       <div className="grid grid-cols-2 gap-4 mb-4">
         <div>
-          <p className="text-xs text-gray-500">Purchase Price</p>
+          <p className="text-xs text-stone-500">Purchase Price</p>
           <p className="text-sm font-semibold">${property.purchasePrice.toLocaleString()}</p>
         </div>
         <div>
-          <p className="text-xs text-gray-500">Current Value</p>
+          <p className="text-xs text-stone-500">Current Value</p>
           <p className="text-sm font-semibold">${property.currentValue.toLocaleString()}</p>
         </div>
         <div>
-          <p className="text-xs text-gray-500">Monthly Income</p>
-          <p className={`text-sm font-semibold ${isPositive ? 'text-green-600' : 'text-red-600'}`}>
+          <p className="text-xs text-stone-500">Monthly Income</p>
+          <p className={`text-sm font-semibold ${isPositive ? 'text-emerald-600' : 'text-red-600'}`}>
             ${netIncome.toLocaleString()}
           </p>
         </div>
         <div>
-          <p className="text-xs text-gray-500">ROI</p>
+          <p className="text-xs text-stone-500">ROI</p>
           <p className="text-sm font-semibold">{property.roi.toFixed(1)}%</p>
         </div>
       </div>
 
       <div className="flex items-center justify-between pt-4 border-t">
         <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-          property.status === 'Rented' ? 'bg-green-100 text-green-800' :
+          property.status === 'Rented' ? 'bg-emerald-100 text-emerald-800' :
           property.status === 'Vacant' ? 'bg-red-100 text-red-800' :
-          'bg-yellow-100 text-yellow-800'
+          'bg-amber-100 text-amber-800'
         }`}>
           {property.status}
         </span>
-        <span className="text-xs text-gray-500">
+        <span className="text-xs text-stone-500">
           Purchased {new Date(property.purchaseDate).toLocaleDateString()}
         </span>
       </div>
