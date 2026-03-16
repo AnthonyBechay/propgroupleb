@@ -79,29 +79,21 @@ export function AdminDashboardClient() {
       name: 'Total Properties',
       value: stats?.totalProperties || 0,
       icon: Building2,
-      change: '+12%',
-      changeType: 'positive' as const,
     },
     {
       name: 'Total Users',
       value: stats?.totalUsers || 0,
       icon: Users,
-      change: '+8%',
-      changeType: 'positive' as const,
     },
     {
       name: 'Favorites',
       value: stats?.totalFavorites || 0,
       icon: Heart,
-      change: '+15%',
-      changeType: 'positive' as const,
     },
     {
       name: 'Inquiries',
       value: stats?.totalInquiries || 0,
       icon: FileText,
-      change: '+23%',
-      changeType: 'positive' as const,
     },
   ]
 
@@ -140,14 +132,9 @@ export function AdminDashboardClient() {
             ]
             return (
               <div key={item.name} className="pg-stat-card">
-                <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center mb-4">
                   <div className={`w-12 h-12 ${gradients[index]} rounded-xl flex items-center justify-center shadow-lg`}>
                     <item.icon className="h-6 w-6 text-white" aria-hidden="true" />
-                  </div>
-                  <div className={`flex items-baseline text-sm font-bold px-3 py-1 rounded-lg ${
-                    item.changeType === 'positive' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
-                  }`}>
-                    {item.change}
                   </div>
                 </div>
                 <dt className="text-sm font-medium text-stone-600 mb-2">

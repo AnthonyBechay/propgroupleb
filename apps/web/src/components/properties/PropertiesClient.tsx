@@ -156,20 +156,8 @@ export function PropertiesClient({
               Hand-picked opportunities with verified returns
             </p>
 
-            {/* Quick stats - Compact */}
-            <div className="grid grid-cols-3 gap-3 sm:gap-6 max-w-lg mx-auto">
-              <div>
-                <div className="text-xl sm:text-2xl font-bold text-white mb-0.5">12.5%</div>
-                <div className="text-xs text-white/50">Avg ROI</div>
-              </div>
-              <div>
-                <div className="text-xl sm:text-2xl font-bold text-white mb-0.5">25+</div>
-                <div className="text-xs text-white/50">Countries</div>
-              </div>
-              <div>
-                <div className="text-xl sm:text-2xl font-bold text-white mb-0.5">{filteredProperties.length}</div>
-                <div className="text-xs text-white/50">Properties</div>
-              </div>
+            <div className="text-xl sm:text-2xl font-bold text-white">
+              {filteredProperties.length} <span className="text-sm font-normal text-white/60">properties available</span>
             </div>
           </div>
         </div>

@@ -46,7 +46,7 @@ interface AIPropertySearchProps {
 export function AIPropertySearch({
   variant = 'inline',
   onSearch,
-  placeholder = "Tell me what you're looking for... (e.g., 'I want a 3-bedroom apartment in Cyprus under $500k')"
+  placeholder = "Tell me what you're looking for... (e.g., 'I want a 2-bedroom apartment in Batumi under $150k')"
 }: AIPropertySearchProps) {
   const router = useRouter()
   const [query, setQuery] = useState('')
@@ -157,10 +157,10 @@ export function AIPropertySearch({
   }
 
   const quickSuggestions = [
-    { icon: Home, text: "3-bedroom apartment in Cyprus under $300k", color: "teal" },
-    { icon: TrendingUp, text: "Properties with highest ROI in Greece", color: "emerald" },
-    { icon: DollarSign, text: "Golden Visa eligible properties", color: "amber" },
-    { icon: MapPin, text: "New build properties in Georgia", color: "stone" }
+    { icon: Home, text: "2-bedroom apartment in Tbilisi under $100k", color: "teal" },
+    { icon: TrendingUp, text: "High ROI properties in Batumi", color: "emerald" },
+    { icon: DollarSign, text: "New build apartments in Georgia", color: "amber" },
+    { icon: MapPin, text: "Beachfront properties in Batumi under $150k", color: "stone" }
   ]
 
   if (variant === 'inline') {
@@ -180,7 +180,7 @@ export function AIPropertySearch({
               placeholder={placeholder}
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              onKeyPress={handleKeyPress}
+              onKeyDown={handleKeyPress}
               className="pl-16 pr-32 h-16 text-base bg-transparent border-0 focus:ring-2 focus:ring-[#1B4965] rounded-2xl text-stone-900 placeholder:text-stone-400"
             />
             <Button
@@ -321,7 +321,7 @@ export function AIPropertySearch({
               placeholder="Describe your ideal property..."
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              onKeyPress={handleKeyPress}
+              onKeyDown={handleKeyPress}
               disabled={isLoading}
               className="w-full bg-white border-2 border-stone-200 focus:border-[#1B4965] rounded-xl h-12"
             />
@@ -336,7 +336,7 @@ export function AIPropertySearch({
         </div>
         <p className="text-xs text-stone-500 mt-2 flex items-center gap-1">
           <Sparkles className="w-3 h-3 text-[#C97B4B]" />
-          <span>Try: &quot;2-bedroom in Cyprus under $400k&quot; or &quot;Golden Visa properties in Greece&quot;</span>
+          <span>Try: &quot;2-bedroom in Batumi under $150k&quot; or &quot;investment apartments in Tbilisi&quot;</span>
         </p>
       </div>
     </div>

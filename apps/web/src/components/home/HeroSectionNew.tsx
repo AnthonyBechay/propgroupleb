@@ -63,24 +63,8 @@ export function HeroSectionNew() {
 
               <AIPropertySearch
                 variant="inline"
-                placeholder="e.g., 3-bedroom villa in Cyprus under $500k with high ROI"
+                placeholder="e.g., 2-bedroom apartment in Batumi under $150k with high ROI"
               />
-            </div>
-          </div>
-
-          {/* Stats Row */}
-          <div className="grid grid-cols-3 gap-4 sm:gap-8 max-w-2xl mx-auto mb-8 text-center">
-            <div>
-              <div className="text-3xl sm:text-4xl font-bold text-stone-900 mb-1">{cms['hero-stat-roi'] || '12.5%'}</div>
-              <div className="text-sm text-stone-500">Avg ROI</div>
-            </div>
-            <div>
-              <div className="text-3xl sm:text-4xl font-bold text-stone-900 mb-1">{cms['hero-stat-countries'] || '25+'}</div>
-              <div className="text-sm text-stone-500">Countries</div>
-            </div>
-            <div>
-              <div className="text-3xl sm:text-4xl font-bold text-stone-900 mb-1">{cms['hero-stat-properties'] || '5K+'}</div>
-              <div className="text-sm text-stone-500">Properties</div>
             </div>
           </div>
 

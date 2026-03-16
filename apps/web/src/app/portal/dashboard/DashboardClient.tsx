@@ -71,16 +71,14 @@ export function DashboardClient({
             icon={<DollarSign className="w-6 h-6" />}
             title="Total Investment"
             value={`$${portfolioStats.totalInvestment.toLocaleString()}`}
-            change="+12.5%"
-            trend="up"
+            trend="neutral"
             color="blue"
           />
           <StatCard
             icon={<Building2 className="w-6 h-6" />}
             title="Properties Owned"
             value={portfolioStats.totalProperties}
-            change="+1 this month"
-            trend="up"
+            trend="neutral"
             color="green"
           />
           <StatCard

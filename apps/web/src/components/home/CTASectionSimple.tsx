@@ -21,12 +21,12 @@ export function CTASectionSimple() {
             {cms['cta-title'] || <>Ready to Start{' '}<span className="text-[#C97B4B]">Investing?</span></>}
           </h2>
 
-          <p className="text-lg sm:text-xl text-slate-300 mb-8 max-w-2xl mx-auto">
+          <p className="text-lg sm:text-xl text-stone-300 mb-8 max-w-2xl mx-auto">
             {cms['cta-subtitle'] || 'Join thousands of investors building wealth through verified real estate opportunities'}
           </p>
 
           {/* Benefits */}
-          <div className="flex flex-wrap justify-center gap-x-6 gap-y-3 mb-10 text-sm text-slate-300">
+          <div className="flex flex-wrap justify-center gap-x-6 gap-y-3 mb-10 text-sm text-stone-300">
             <div className="flex items-center gap-2">
               <CheckCircle2 className="w-4 h-4 text-green-400" />
               <span>No hidden fees</span>
