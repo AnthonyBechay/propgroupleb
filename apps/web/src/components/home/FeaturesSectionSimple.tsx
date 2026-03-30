@@ -8,19 +8,19 @@ const defaultFeatures = [
   {
     icon: Brain,
     title: 'AI-Powered Analysis',
-    description: 'Advanced algorithms analyze market trends and predict investment potential.',
+    description: 'Advanced algorithms analyze Georgian market trends and predict investment potential.',
     bgColor: 'bg-[#1B4965]',
   },
   {
     icon: TrendingUp,
-    title: 'Verified ROI Data',
-    description: 'Real projections backed by comprehensive market analysis and legal guarantees.',
+    title: 'ROI Projections',
+    description: 'Detailed return estimates backed by comprehensive Georgia market analysis.',
     bgColor: 'bg-emerald-600',
   },
   {
     icon: LineChart,
     title: 'Market Insights',
-    description: 'Real-time analytics with detailed performance metrics and forecasts.',
+    description: 'Real-time Georgia market analytics with detailed performance metrics and forecasts.',
     bgColor: 'bg-[#C97B4B]',
   },
   {

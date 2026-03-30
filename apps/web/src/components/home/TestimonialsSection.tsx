@@ -165,20 +165,6 @@ export function TestimonialsSection() {
           </div>
         </div>
 
-        {/* Trust badges */}
-        <div className="mt-16 text-center">
-          <p className="text-sm text-stone-500 mb-4">Trusted by investors from</p>
-          <div className="flex flex-wrap justify-center gap-8 items-center">
-            {['USA', 'UAE', 'UK', 'Singapore', 'Canada'].map((country) => (
-              <div
-                key={country}
-                className="px-6 py-3 bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow"
-              >
-                <span className="font-semibold text-stone-700">{country}</span>
-              </div>
-            ))}
-          </div>
-        </div>
       </div>
     </section>
   )

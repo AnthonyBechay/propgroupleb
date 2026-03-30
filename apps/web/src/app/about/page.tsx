@@ -37,10 +37,10 @@ export default async function AboutPage() {
                   <TrendingUp className="w-6 h-6 text-white" />
                 </div>
                 <h3 className="text-lg font-bold text-stone-900 mb-2">
-                  Verified ROI
+                  ROI Projections
                 </h3>
                 <p className="text-sm text-stone-600">
-                  Real projections backed by comprehensive market analysis
+                  Detailed return estimates backed by Georgia market analysis
                 </p>
               </div>
 

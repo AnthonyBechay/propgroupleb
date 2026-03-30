@@ -89,6 +89,9 @@ function LoginForm() {
         setError(error)
         return
       }
+
+      // signIn succeeded — allow the redirect useEffect to fire again
+      setHasCheckedRedirect(false)
     } catch (err) {
       console.error('Login error:', err)
       setError('An unexpected error occurred')

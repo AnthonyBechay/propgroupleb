@@ -38,10 +38,6 @@ export default function AISettingsPage() {
           </div>
           <h3 className="font-bold text-gray-900 mb-1">AI Searches</h3>
           <p className="text-sm text-slate-600 mb-3">Total searches this month</p>
-          <div className="flex items-center text-sm font-bold px-3 py-1 rounded-lg bg-green-100 text-green-700 w-fit">
-            <TrendingUp className="w-4 h-4 mr-1" />
-            <span>+23%</span>
-          </div>
         </div>
 
         <div className="bg-white rounded-lg shadow p-6">

@@ -49,7 +49,7 @@ export function HeroSectionNew() {
             </h1>
 
             <p className="text-lg sm:text-xl md:text-2xl text-stone-600 max-w-2xl mx-auto">
-              {cms['hero-subtitle'] || 'AI-powered property search with verified ROI data'}
+              {cms['hero-subtitle'] || 'Your gateway to Georgia real estate investment'}
             </p>
           </div>
 

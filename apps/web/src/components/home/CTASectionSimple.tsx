@@ -22,7 +22,7 @@ export function CTASectionSimple() {
           </h2>
 
           <p className="text-lg sm:text-xl text-stone-300 mb-8 max-w-2xl mx-auto">
-            {cms['cta-subtitle'] || 'Join thousands of investors building wealth through verified real estate opportunities'}
+            {cms['cta-subtitle'] || 'Start building wealth through Georgia\'s booming real estate market'}
           </p>
 
           {/* Benefits */}
