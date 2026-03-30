@@ -127,10 +127,6 @@ export default function CalculatorPage() {
                 <RefreshCw className="w-4 h-4" />
                 Reset
               </button>
-              <button className="px-4 py-2 bg-[#1B4965] text-white rounded-lg hover:bg-[#2B6985] transition-colors flex items-center gap-2">
-                <Download className="w-4 h-4" />
-                Export Report
-              </button>
             </div>
           </div>
         </div>

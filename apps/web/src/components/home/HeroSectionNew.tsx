@@ -1,39 +1,11 @@
-'use client'
-
-import { useState, useEffect } from 'react'
-import { Search, Sparkles, TrendingUp, ArrowRight } from 'lucide-react'
+import { Sparkles, ArrowRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { AIPropertySearch } from '@/components/ai/AIPropertySearch'
-import { fetchSectionContent } from '@/lib/content'
 import Link from 'next/link'
 
 export function HeroSectionNew() {
-  const [mounted, setMounted] = useState(false)
-  const [activeTab, setActiveTab] = useState<'ai' | 'traditional'>('ai')
-  const [cms, setCms] = useState<Record<string, string>>({})
-
-  useEffect(() => {
-    setMounted(true)
-    fetchSectionContent('hero').then(setCms)
-  }, [])
-
-  if (!mounted) {
-    return (
-      <section className="relative min-h-[85vh] flex items-center justify-center overflow-hidden bg-gradient-to-br from-stone-50 via-white to-[#E8F1F5] w-full">
-        <div className="relative z-10 container mx-auto px-4 sm:px-6 lg:px-8 py-16 w-full max-w-7xl">
-          <div className="max-w-5xl mx-auto text-center space-y-4 sm:space-y-6">
-            <div className="h-16 sm:h-20 md:h-24 lg:h-28 bg-stone-200 rounded-xl animate-pulse mx-auto max-w-xl" />
-            <div className="h-8 bg-stone-200 rounded-lg animate-pulse mx-auto max-w-md" />
-            <div className="h-40 bg-stone-200 rounded-2xl animate-pulse mx-auto max-w-3xl mt-10" />
-          </div>
-        </div>
-      </section>
-    )
-  }
-
   return (
     <section className="relative min-h-[85vh] flex items-center justify-center overflow-hidden bg-gradient-to-br from-stone-50 via-white to-[#E8F1F5] w-full">
-      {/* Main Content */}
       <div className="relative z-10 container mx-auto px-4 sm:px-6 lg:px-8 py-16 w-full max-w-7xl">
         <div className="max-w-5xl mx-auto">
 
@@ -41,15 +13,15 @@ export function HeroSectionNew() {
           <div className="text-center space-y-4 sm:space-y-6 mb-10 sm:mb-12">
             <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-black leading-tight">
               <span className="block text-stone-900 mb-2">
-                {(cms['hero-title'] || 'Smart Real Estate').split(' ').slice(0, -1).join(' ') || 'Smart Real Estate'}
+                Smart Real Estate
               </span>
               <span className="block bg-gradient-to-r from-[#1B4965] to-[#C97B4B] bg-clip-text text-transparent">
-                {cms['hero-title'] ? cms['hero-title'].split(' ').slice(-1)[0] : 'Investments'}
+                Investments
               </span>
             </h1>
 
             <p className="text-lg sm:text-xl md:text-2xl text-stone-600 max-w-2xl mx-auto">
-              {cms['hero-subtitle'] || 'Your gateway to Georgia real estate investment'}
+              Your gateway to Georgia real estate investment
             </p>
           </div>
 

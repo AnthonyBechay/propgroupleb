@@ -78,37 +78,8 @@ export function MarketAnalysisClient({ marketData, comparisonMetrics }: MarketAn
                 Real-time insights and trends across our investment markets
               </p>
             </div>
-            <div className="flex gap-2 mt-4 md:mt-0">
-              <button className="px-4 py-2 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-2">
-                <Filter className="w-4 h-4" />
-                Filter
-              </button>
-              <button className="px-4 py-2 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-2">
-                <Download className="w-4 h-4" />
-                Export
-              </button>
-            </div>
           </div>
 
-          {/* Time Range Selector */}
-          <div className="flex gap-2 flex-wrap">
-            {['1m', '3m', '6m', '1y', '3y'].map((range) => (
-              <button
-                key={range}
-                onClick={() => setTimeRange(range)}
-                className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                  timeRange === range
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-white text-gray-600 hover:bg-gray-50'
-                }`}
-              >
-                {range === '1m' ? '1 Month' :
-                 range === '3m' ? '3 Months' :
-                 range === '6m' ? '6 Months' :
-                 range === '1y' ? '1 Year' : '3 Years'}
-              </button>
-            ))}
-          </div>
         </div>
 
         {/* Market Overview Cards */}

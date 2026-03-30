@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -58,12 +58,23 @@ export default function SettingsPage() {
   const profileForm = useForm<ProfileFormData>({
     resolver: zodResolver(profileSchema),
     defaultValues: {
-      firstName: '',
-      lastName: '',
-      phone: '',
-      country: '',
+      firstName: user?.firstName || user?.email?.split('@')[0] || '',
+      lastName: user?.lastName || '',
+      phone: user?.phone || '',
+      country: user?.country || '',
     },
   })
+
+  useEffect(() => {
+    if (user) {
+      profileForm.reset({
+        firstName: user.firstName || user.email?.split('@')[0] || '',
+        lastName: user.lastName || '',
+        phone: user.phone || '',
+        country: user.country || '',
+      })
+    }
+  }, [user])
 
   const passwordForm = useForm<PasswordFormData>({
     resolver: zodResolver(passwordSchema),

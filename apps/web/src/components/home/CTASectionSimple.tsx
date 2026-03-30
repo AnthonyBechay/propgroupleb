@@ -1,31 +1,20 @@
-'use client'
-
-import { useState, useEffect } from 'react'
 import { ArrowRight, CheckCircle2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { fetchSectionContent } from '@/lib/content'
 import Link from 'next/link'
 
 export function CTASectionSimple() {
-  const [cms, setCms] = useState<Record<string, string>>({})
-
-  useEffect(() => {
-    fetchSectionContent('cta').then(setCms)
-  }, [])
-
   return (
     <section className="relative py-16 sm:py-20 bg-[#1B4965] overflow-hidden">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
         <div className="max-w-4xl mx-auto text-center">
           <h2 className="text-3xl sm:text-4xl lg:text-5xl font-black text-white mb-6">
-            {cms['cta-title'] || <>Ready to Start{' '}<span className="text-[#C97B4B]">Investing?</span></>}
+            Ready to Start <span className="text-[#C97B4B]">Investing?</span>
           </h2>
 
           <p className="text-lg sm:text-xl text-stone-300 mb-8 max-w-2xl mx-auto">
-            {cms['cta-subtitle'] || 'Start building wealth through Georgia\'s booming real estate market'}
+            Start building wealth through Georgia&apos;s booming real estate market
           </p>
 
-          {/* Benefits */}
           <div className="flex flex-wrap justify-center gap-x-6 gap-y-3 mb-10 text-sm text-stone-300">
             <div className="flex items-center gap-2">
               <CheckCircle2 className="w-4 h-4 text-green-400" />
@@ -33,7 +22,7 @@ export function CTASectionSimple() {
             </div>
             <div className="flex items-center gap-2">
               <CheckCircle2 className="w-4 h-4 text-green-400" />
-              <span>Verified properties</span>
+              <span>Curated properties</span>
             </div>
             <div className="flex items-center gap-2">
               <CheckCircle2 className="w-4 h-4 text-green-400" />
@@ -41,7 +30,6 @@ export function CTASectionSimple() {
             </div>
           </div>
 
-          {/* CTA Buttons */}
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
             <Link href="/auth/signup">
               <Button

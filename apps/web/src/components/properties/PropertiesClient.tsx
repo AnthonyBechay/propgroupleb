@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useMemo } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { PropertyCard } from '@/components/PropertyCard'
 import { PropertyFilters } from '@/components/properties/PropertyFilters'
@@ -56,13 +56,9 @@ export function PropertiesClient({
   const [viewMode, setViewMode] = useState<'grid' | 'map'>('grid')
   const [showFilters, setShowFilters] = useState(false)
   const [showAISearch, setShowAISearch] = useState(false)
-  const [filteredProperties, setFilteredProperties] = useState(initialProperties)
-
-  // Filter and sort properties based on search params
-  useEffect(() => {
+  const filteredProperties = useMemo(() => {
     let filtered = [...initialProperties]
 
-    // Apply filters
     if (searchParams.country) {
       filtered = filtered.filter(p =>
         p.country.toLowerCase() === searchParams.country.toLowerCase()
@@ -87,7 +83,6 @@ export function PropertiesClient({
       filtered = filtered.filter(p => p.isGoldenVisaEligible)
     }
 
-    // Apply sorting
     if (searchParams.sort) {
       switch (searchParams.sort) {
         case 'price-asc':
@@ -107,7 +102,7 @@ export function PropertiesClient({
       }
     }
 
-    setFilteredProperties(filtered)
+    return filtered
   }, [initialProperties, searchParams])
 
   const handleFilterChange = (filters: any) => {
