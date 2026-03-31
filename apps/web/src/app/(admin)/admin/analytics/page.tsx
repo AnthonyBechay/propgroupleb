@@ -67,7 +67,12 @@ export default async function AnalyticsPage() {
       prisma.propertyInquiry.findMany({
         take: 10,
         orderBy: { createdAt: 'desc' },
-        include: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          propertyTitle: true,
+          createdAt: true,
           property: { select: { title: true, country: true } },
           user: { select: { email: true, firstName: true, lastName: true } },
         },
@@ -441,7 +446,7 @@ export default async function AnalyticsPage() {
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-stone-900">{inq.name}</p>
                   <p className="text-xs text-stone-500 truncate">{inq.email}</p>
-                  <p className="text-xs text-[#1B4965] mt-1">Re: {inq.property.title}</p>
+                  <p className="text-xs text-[#1B4965] mt-1">Re: {inq.property?.title || inq.propertyTitle || 'Deleted Property'}</p>
                 </div>
                 <span className="text-xs text-stone-400 flex-shrink-0">
                   {new Date(inq.createdAt).toLocaleDateString()}

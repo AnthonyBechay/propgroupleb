@@ -9,7 +9,8 @@ import { useAuth } from '@/contexts/AuthContext'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Building2, Loader2, Mail, Lock, User as UserIcon } from 'lucide-react'
+import { Loader2, Mail, Lock, User as UserIcon } from 'lucide-react'
+import Image from 'next/image'
 import Link from 'next/link'
 
 const signupSchema = z.object({
@@ -108,9 +109,7 @@ function SignupForm() {
         <div className="bg-white shadow-lg rounded-2xl px-8 py-10 border border-stone-200">
           <div className="text-center">
             <div className="flex justify-center">
-              <div className="p-3 bg-[#1B4965] rounded-xl">
-                <Building2 className="h-8 w-8 text-white" />
-              </div>
+              <Image src="/logo.png" alt="PropGroup" width={56} height={56} />
             </div>
 
             <h1 className="mt-4 text-3xl font-bold text-stone-900">

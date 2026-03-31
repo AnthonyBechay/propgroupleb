@@ -83,7 +83,13 @@
       "Bash(docker exec:*)",
       "Bash(docker stop:*)",
       "Bash(docker port:*)",
-      "Bash(docker start:*)"
+      "Bash(docker start:*)",
+      "Bash(ls /Users/anthonybechay/development/propgroup/apps/web/public/*.png /Users/anthonybechay/development/propgroup/apps/web/public/*.PNG /Users/anthonybechay/development/propgroup/apps/web/public/*.svg)",
+      "Bash(sips -z 180 180 logo.png --out apple-touch-icon.png)",
+      "Bash(sips -z 32 32 logo.png --out favicon-32x32.png)",
+      "Bash(sips -z 16 16 logo.png --out favicon-16x16.png)",
+      "Bash(sips -z 192 192 logo.png --out icon-192x192.png)",
+      "Bash(sips -z 512 512 logo.png --out icon-512x512.png)"
     ],
     "deny": [],
     "ask": []

@@ -1,8 +1,8 @@
 'use client'
 
 import Link from 'next/link'
+import Image from 'next/image'
 import {
-  Building2,
   Phone,
   Mail,
   Facebook,
@@ -22,12 +22,16 @@ export function Footer() {
           {/* Company Info */}
           <div className="col-span-2 md:col-span-1">
             <div className="flex items-center gap-2 mb-3">
-              <div className="w-8 h-8 bg-[#C97B4B] rounded-lg flex items-center justify-center">
-                <Building2 className="w-4 h-4 text-white" />
-              </div>
+              <Image
+                src="/logo.png"
+                alt="PropGroup"
+                width={36}
+                height={36}
+                className="brightness-0 invert"
+              />
               <div>
                 <h3 className="font-bold text-base">PropGroup</h3>
-                <p className="text-xs text-stone-300">Smart Investments</p>
+                <p className="text-xs text-stone-300">Invest Smart</p>
               </div>
             </div>
             <p className="text-xs text-stone-300 mb-3">

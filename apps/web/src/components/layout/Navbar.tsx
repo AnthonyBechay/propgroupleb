@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 import { usePathname } from 'next/navigation'
 import { useAuth } from '@/contexts/AuthContext'
 import { AuthModal } from '@/components/auth/AuthModal'
@@ -59,12 +60,15 @@ export function Navbar() {
       <div className="pg-container max-w-7xl mx-auto w-full">
         <div className="flex justify-between items-center h-16 w-full">
           {/* Logo */}
-          <Link href="/" className="flex items-center space-x-3 group flex-shrink-0">
-            <div className="relative">
-              <div className="relative w-10 h-10 bg-[#1B4965] rounded-xl flex items-center justify-center transform group-hover:scale-110 transition-all duration-300 shadow-lg">
-                <Building2 className="w-5 h-5 text-white" />
-              </div>
-            </div>
+          <Link href="/" className="flex items-center space-x-2.5 group flex-shrink-0">
+            <Image
+              src="/logo.png"
+              alt="PropGroup"
+              width={40}
+              height={40}
+              className="transform group-hover:scale-110 transition-all duration-300"
+              priority
+            />
             <div>
               <span className="font-bold text-xl text-stone-900 block leading-tight">
                 PropGroup

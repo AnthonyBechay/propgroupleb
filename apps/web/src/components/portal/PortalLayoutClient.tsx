@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import Link from 'next/link'
+import Image from 'next/image'
 import { useAuth } from '@/contexts/AuthContext'
 import { Button } from '@/components/ui/button'
 import {
@@ -93,9 +94,13 @@ export function PortalLayoutClient({ children }: { children: React.ReactNode }) 
         {/* Logo */}
         <div className="px-6 py-5 border-b border-white/10">
           <Link href="/" className="flex items-center gap-3">
-            <div className="w-9 h-9 bg-white/15 rounded-lg flex items-center justify-center">
-              <Building2 className="w-5 h-5 text-white" />
-            </div>
+            <Image
+              src="/logo.png"
+              alt="PropGroup"
+              width={36}
+              height={36}
+              className="brightness-0 invert"
+            />
             <div>
               <span className="font-bold text-white text-lg block leading-tight">PropGroup</span>
               <span className="text-xs text-white/50">My Portal</span>
@@ -172,7 +177,7 @@ export function PortalLayoutClient({ children }: { children: React.ReactNode }) 
             <Menu className="w-5 h-5 text-stone-700" />
           </button>
           <Link href="/" className="flex items-center gap-2">
-            <Building2 className="w-5 h-5 text-[#1B4965]" />
+            <Image src="/logo.png" alt="PropGroup" width={28} height={28} />
             <span className="font-bold text-stone-900">PropGroup</span>
           </Link>
           <div className="w-9" /> {/* Spacer for centering */}

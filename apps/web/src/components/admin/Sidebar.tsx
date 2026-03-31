@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import Image from 'next/image'
 import { usePathname } from 'next/navigation'
 import {
   Home,
@@ -41,9 +42,13 @@ export function Sidebar() {
       <div className="flex grow flex-col gap-y-5 overflow-y-auto bg-[#1B4965] px-6 pb-4 border-r border-[#153B52]">
         <div className="flex h-16 shrink-0 items-center">
           <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 bg-[#C97B4B] rounded-xl flex items-center justify-center">
-              <Shield className="text-white font-bold w-6 h-6" />
-            </div>
+            <Image
+              src="/logo.png"
+              alt="PropGroup"
+              width={40}
+              height={40}
+              className="brightness-0 invert"
+            />
             <div>
               <span className="font-bold text-lg text-white block leading-tight">
                 Admin Panel
