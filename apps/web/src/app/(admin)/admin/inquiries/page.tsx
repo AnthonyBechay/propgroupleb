@@ -2,7 +2,22 @@
 
 import { useAuth } from '@/contexts/AuthContext'
 import { useEffect, useState } from 'react'
-import { MessageSquare, ExternalLink, Search } from 'lucide-react'
+import {
+  MessageSquare,
+  ExternalLink,
+  Search,
+  Trash2,
+  Mail,
+  Phone,
+  User,
+  Building2,
+  MapPin,
+  Calendar,
+  ChevronDown,
+  ChevronUp,
+  X,
+  Loader2,
+} from 'lucide-react'
 import { apiClient } from '@/lib/api/client'
 
 interface Inquiry {
@@ -16,9 +31,12 @@ interface Inquiry {
     id: string
     title: string
     country: string
+    price?: number
+    currency?: string
   }
   user?: {
     id: string
+    email: string
     firstName: string | null
     lastName: string | null
   } | null
@@ -41,7 +59,10 @@ export default function AdminInquiriesPage() {
   const [loading, setLoading] = useState(true)
   const [page, setPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
+  const [totalCount, setTotalCount] = useState(0)
   const [searchQuery, setSearchQuery] = useState('')
+  const [expandedId, setExpandedId] = useState<string | null>(null)
+  const [deleting, setDeleting] = useState<string | null>(null)
 
   useEffect(() => {
     fetchInquiries()
@@ -49,15 +70,32 @@ export default function AdminInquiriesPage() {
 
   async function fetchInquiries() {
     try {
+      setLoading(true)
       const response = await apiClient.getInquiries({ page, limit: 20 }) as ApiResponse
       setInquiries(response.data || [])
       if (response.pagination) {
         setTotalPages(response.pagination.totalPages)
+        setTotalCount(response.pagination.total)
       }
     } catch (error) {
       console.error('Failed to fetch inquiries:', error)
     } finally {
       setLoading(false)
+    }
+  }
+
+  async function handleDelete(id: string) {
+    if (!confirm('Are you sure you want to delete this inquiry?')) return
+    setDeleting(id)
+    try {
+      await apiClient.deleteInquiry(id)
+      setInquiries(prev => prev.filter(inq => inq.id !== id))
+      setTotalCount(prev => prev - 1)
+    } catch (error) {
+      console.error('Failed to delete inquiry:', error)
+      alert('Failed to delete inquiry')
+    } finally {
+      setDeleting(null)
     }
   }
 
@@ -74,79 +112,212 @@ export default function AdminInquiriesPage() {
     : inquiries
 
   if (!user || (user.role !== 'ADMIN' && user.role !== 'SUPER_ADMIN')) {
-    return <div className="p-8 text-center text-gray-500">Access denied</div>
+    return <div className="p-8 text-center text-stone-500">Access denied</div>
+  }
+
+  function timeAgo(dateStr: string) {
+    const now = new Date()
+    const date = new Date(dateStr)
+    const diffMs = now.getTime() - date.getTime()
+    const diffMins = Math.floor(diffMs / 60000)
+    if (diffMins < 60) return `${diffMins}m ago`
+    const diffHours = Math.floor(diffMins / 60)
+    if (diffHours < 24) return `${diffHours}h ago`
+    const diffDays = Math.floor(diffHours / 24)
+    if (diffDays < 30) return `${diffDays}d ago`
+    return new Date(dateStr).toLocaleDateString()
   }
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">Inquiries</h1>
-        <p className="text-gray-500 mt-1">Manage property inquiries from users</p>
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-stone-900 flex items-center gap-2">
+            <div className="w-10 h-10 bg-[#C97B4B] rounded-xl flex items-center justify-center shadow-md">
+              <MessageSquare className="h-5 w-5 text-white" />
+            </div>
+            Inquiries
+          </h1>
+          <p className="text-stone-600 mt-1">
+            {totalCount} total {totalCount === 1 ? 'inquiry' : 'inquiries'} from potential investors
+          </p>
+        </div>
       </div>
 
       {/* Search */}
       <div className="relative max-w-sm">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400" />
         <input
           type="text"
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          placeholder="Search inquiries..."
-          className="w-full pl-10 pr-3 py-2 border rounded-lg text-sm"
+          placeholder="Search by name, email, property..."
+          className="w-full pl-10 pr-3 py-2.5 border rounded-xl text-sm bg-white"
         />
       </div>
 
       {loading ? (
-        <div className="text-center py-12 text-gray-500">Loading...</div>
-      ) : filtered.length === 0 ? (
         <div className="text-center py-12">
-          <MessageSquare className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-          <p className="text-gray-500">No inquiries found</p>
+          <Loader2 className="w-8 h-8 animate-spin text-[#1B4965] mx-auto mb-2" />
+          <p className="text-stone-500">Loading inquiries...</p>
+        </div>
+      ) : filtered.length === 0 ? (
+        <div className="text-center py-12 bg-white rounded-xl border">
+          <MessageSquare className="w-12 h-12 text-stone-300 mx-auto mb-4" />
+          <h3 className="text-lg font-medium text-stone-900 mb-1">No inquiries found</h3>
+          <p className="text-stone-500">
+            {inquiries.length === 0
+              ? 'Inquiries from potential investors will appear here.'
+              : 'Try adjusting your search.'}
+          </p>
         </div>
       ) : (
         <>
-          <div className="bg-white rounded-xl border overflow-hidden">
-            <table className="w-full text-sm">
-              <thead className="bg-gray-50 border-b">
-                <tr>
-                  <th className="text-left px-4 py-3 font-medium text-gray-600">Contact</th>
-                  <th className="text-left px-4 py-3 font-medium text-gray-600">Property</th>
-                  <th className="text-left px-4 py-3 font-medium text-gray-600">Message</th>
-                  <th className="text-left px-4 py-3 font-medium text-gray-600">Date</th>
-                  <th className="text-left px-4 py-3 font-medium text-gray-600">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y">
-                {filtered.map(inq => (
-                  <tr key={inq.id} className="hover:bg-gray-50">
-                    <td className="px-4 py-3">
-                      <div className="font-medium text-gray-900">{inq.name}</div>
-                      <div className="text-gray-500 text-xs">{inq.email}</div>
-                      {inq.phone && <div className="text-gray-500 text-xs">{inq.phone}</div>}
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="text-gray-900">{inq.property.title}</div>
-                      <div className="text-gray-500 text-xs">{inq.property.country}</div>
-                    </td>
-                    <td className="px-4 py-3 max-w-xs">
-                      <p className="text-gray-600 truncate">{inq.message || '-'}</p>
-                    </td>
-                    <td className="px-4 py-3 text-gray-500 whitespace-nowrap">
-                      {new Date(inq.createdAt).toLocaleDateString()}
-                    </td>
-                    <td className="px-4 py-3">
-                      <a
-                        href={`/admin/properties?id=${inq.property.id}`}
-                        className="text-blue-600 hover:text-blue-800 inline-flex items-center gap-1 text-xs"
-                      >
-                        <ExternalLink className="w-3.5 h-3.5" />
-                        View Property
-                      </a>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          {/* Inquiry Cards */}
+          <div className="space-y-3">
+            {filtered.map(inq => {
+              const isExpanded = expandedId === inq.id
+              return (
+                <div key={inq.id} className="bg-white rounded-xl border hover:shadow-md transition-all">
+                  <div
+                    className="flex items-center gap-4 p-4 cursor-pointer"
+                    onClick={() => setExpandedId(isExpanded ? null : inq.id)}
+                  >
+                    {/* Avatar */}
+                    <div className="w-10 h-10 bg-[#1B4965] rounded-full flex items-center justify-center text-white text-sm font-bold flex-shrink-0">
+                      {inq.name.charAt(0).toUpperCase()}
+                    </div>
+
+                    {/* Main info */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <p className="font-semibold text-stone-900">{inq.name}</p>
+                        {inq.user && (
+                          <span className="text-xs px-1.5 py-0.5 bg-emerald-100 text-emerald-700 rounded font-medium">
+                            Registered
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-sm text-stone-500 truncate">{inq.email}</p>
+                    </div>
+
+                    {/* Property */}
+                    <div className="hidden sm:block text-right flex-shrink-0 max-w-[200px]">
+                      <p className="text-sm font-medium text-[#1B4965] truncate">{inq.property.title}</p>
+                      <p className="text-xs text-stone-400 flex items-center justify-end gap-1">
+                        <MapPin className="w-3 h-3" /> {inq.property.country}
+                      </p>
+                    </div>
+
+                    {/* Time */}
+                    <div className="hidden md:block text-right flex-shrink-0">
+                      <p className="text-xs text-stone-400">{timeAgo(inq.createdAt)}</p>
+                    </div>
+
+                    {/* Expand toggle */}
+                    <div className="text-stone-400 flex-shrink-0">
+                      {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                    </div>
+                  </div>
+
+                  {/* Expanded Details */}
+                  {isExpanded && (
+                    <div className="px-4 pb-4 pt-0 border-t">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
+                        {/* Contact Info */}
+                        <div className="space-y-2">
+                          <h4 className="text-xs font-bold text-stone-500 uppercase tracking-wider">Contact Details</h4>
+                          <div className="flex items-center gap-2 text-sm text-stone-700">
+                            <Mail className="w-4 h-4 text-stone-400" />
+                            <a href={`mailto:${inq.email}`} className="text-[#1B4965] hover:underline">{inq.email}</a>
+                          </div>
+                          {inq.phone && (
+                            <div className="flex items-center gap-2 text-sm text-stone-700">
+                              <Phone className="w-4 h-4 text-stone-400" />
+                              <a href={`tel:${inq.phone}`} className="text-[#1B4965] hover:underline">{inq.phone}</a>
+                            </div>
+                          )}
+                          {inq.user && (
+                            <div className="flex items-center gap-2 text-sm text-stone-700">
+                              <User className="w-4 h-4 text-stone-400" />
+                              <span>
+                                {inq.user.firstName} {inq.user.lastName}
+                                <span className="text-stone-400 ml-1">({inq.user.email})</span>
+                              </span>
+                            </div>
+                          )}
+                          <div className="flex items-center gap-2 text-sm text-stone-500">
+                            <Calendar className="w-4 h-4 text-stone-400" />
+                            {new Date(inq.createdAt).toLocaleString()}
+                          </div>
+                        </div>
+
+                        {/* Property Info */}
+                        <div className="space-y-2">
+                          <h4 className="text-xs font-bold text-stone-500 uppercase tracking-wider">Property</h4>
+                          <div className="flex items-center gap-2 text-sm text-stone-700">
+                            <Building2 className="w-4 h-4 text-stone-400" />
+                            <span className="font-medium">{inq.property.title}</span>
+                          </div>
+                          <div className="flex items-center gap-2 text-sm text-stone-500">
+                            <MapPin className="w-4 h-4 text-stone-400" />
+                            {inq.property.country}
+                          </div>
+                          {inq.property.price && (
+                            <p className="text-sm text-stone-500">
+                              Price: {inq.property.currency || '$'}{inq.property.price.toLocaleString()}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Message */}
+                      {inq.message && (
+                        <div className="mt-4">
+                          <h4 className="text-xs font-bold text-stone-500 uppercase tracking-wider mb-2">Message</h4>
+                          <div className="bg-stone-50 rounded-lg p-3 text-sm text-stone-700 whitespace-pre-wrap">
+                            {inq.message}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Actions */}
+                      <div className="flex items-center gap-2 mt-4 pt-3 border-t">
+                        <a
+                          href={`mailto:${inq.email}?subject=Re: ${encodeURIComponent(inq.property.title)} Inquiry`}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white bg-[#1B4965] rounded-lg hover:bg-[#2B6985] transition-colors"
+                        >
+                          <Mail className="w-3.5 h-3.5" />
+                          Reply via Email
+                        </a>
+                        <a
+                          href={`/property/${inq.property.id}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-stone-700 bg-stone-100 rounded-lg hover:bg-stone-200 transition-colors"
+                        >
+                          <ExternalLink className="w-3.5 h-3.5" />
+                          View Property
+                        </a>
+                        <button
+                          onClick={() => handleDelete(inq.id)}
+                          disabled={deleting === inq.id}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-red-600 bg-red-50 rounded-lg hover:bg-red-100 transition-colors ml-auto disabled:opacity-50"
+                        >
+                          {deleting === inq.id ? (
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          ) : (
+                            <Trash2 className="w-3.5 h-3.5" />
+                          )}
+                          Delete
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )
+            })}
           </div>
 
           {/* Pagination */}
@@ -155,17 +326,17 @@ export default function AdminInquiriesPage() {
               <button
                 onClick={() => setPage(p => Math.max(1, p - 1))}
                 disabled={page === 1}
-                className="px-3 py-1.5 border rounded-lg text-sm disabled:opacity-50 hover:bg-gray-50"
+                className="px-4 py-2 border rounded-lg text-sm font-medium disabled:opacity-50 hover:bg-stone-50 transition-colors"
               >
                 Previous
               </button>
-              <span className="text-sm text-gray-600">
+              <span className="text-sm text-stone-600 px-3">
                 Page {page} of {totalPages}
               </span>
               <button
                 onClick={() => setPage(p => Math.min(totalPages, p + 1))}
                 disabled={page === totalPages}
-                className="px-3 py-1.5 border rounded-lg text-sm disabled:opacity-50 hover:bg-gray-50"
+                className="px-4 py-2 border rounded-lg text-sm font-medium disabled:opacity-50 hover:bg-stone-50 transition-colors"
               >
                 Next
               </button>

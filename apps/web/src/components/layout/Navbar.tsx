@@ -17,7 +17,8 @@ import {
   Settings,
   Bell,
   Sparkles,
-  Shield
+  Shield,
+  LayoutDashboard
 } from 'lucide-react'
 
 export function Navbar() {
@@ -165,6 +166,16 @@ export function Navbar() {
                   )}
                 </div>
 
+                {/* Portal Button */}
+                {!pathname.startsWith('/portal') && !pathname.startsWith('/admin') && (
+                  <Link href="/portal/dashboard">
+                    <Button size="sm" variant="ghost" className="text-stone-600 hover:text-[#1B4965] hover:bg-[#E8F1F5]">
+                      <LayoutDashboard className="w-4 h-4 mr-1.5" />
+                      Portal
+                    </Button>
+                  </Link>
+                )}
+
                 {/* Admin Button for Admin/Super Admin users */}
                 {(user.role === 'ADMIN' || user.role === 'SUPER_ADMIN') && !pathname.startsWith('/admin') && (
                   <Link href="/admin">
@@ -254,6 +265,14 @@ export function Navbar() {
                       </p>
                     </div>
                   </div>
+                  {!pathname.startsWith('/portal') && !pathname.startsWith('/admin') && (
+                    <Link href="/portal/dashboard" onClick={() => setIsMenuOpen(false)}>
+                      <Button variant="outline" size="sm" className="w-full border-[#1B4965] text-[#1B4965]">
+                        <LayoutDashboard className="w-4 h-4 mr-2" />
+                        My Portal
+                      </Button>
+                    </Link>
+                  )}
                   <Button
                     onClick={signOut}
                     variant="outline"

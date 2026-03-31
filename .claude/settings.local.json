@@ -76,7 +76,8 @@
       "Bash(pnpm --filter propgroup-backend add @aws-sdk/client-s3 @aws-sdk/s3-request-presigner multer)",
       "Bash(pnpm --filter propgroup-backend add -D @types/multer)",
       "Bash(grep -r e.preventDefault\\\\\\(\\\\\\) /Users/anthonybechay/development/propgroup/apps/web/src --include=*.tsx --include=*.ts -B3 -A1)",
-      "Bash(wc -l /Users/anthonybechay/development/propgroup/apps/web/src/components/**/*.tsx)"
+      "Bash(wc -l /Users/anthonybechay/development/propgroup/apps/web/src/components/**/*.tsx)",
+      "Bash(pnpm --filter backend run build)"
     ],
     "deny": [],
     "ask": []

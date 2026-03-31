@@ -12,6 +12,10 @@ import {
   MapPin,
   Building2,
   TrendingUp,
+  CheckSquare,
+  Square,
+  AlertTriangle,
+  X,
 } from 'lucide-react'
 
 type PropertyTableProps = {
@@ -21,6 +25,9 @@ type PropertyTableProps = {
 export function PropertyTable({ properties }: PropertyTableProps) {
   const [selectedProperty, setSelectedProperty] = useState<Property | null>(null)
   const [editModalOpen, setEditModalOpen] = useState(false)
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false)
+  const [bulkDeleting, setBulkDeleting] = useState(false)
 
   const formatCurrency = (amount: number, currency: string) => {
     return new Intl.NumberFormat('en-US', {
@@ -37,6 +44,23 @@ export function PropertyTable({ properties }: PropertyTableProps) {
       RESALE: 'bg-purple-100 text-purple-700',
     }
     return styles[status] || 'bg-gray-100 text-gray-700'
+  }
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  const toggleSelectAll = () => {
+    if (selectedIds.size === properties.length) {
+      setSelectedIds(new Set())
+    } else {
+      setSelectedIds(new Set(properties.map(p => p.id)))
+    }
   }
 
   const handleEdit = (property: Property) => {
@@ -67,9 +91,38 @@ export function PropertyTable({ properties }: PropertyTableProps) {
     }
   }
 
+  const handleBulkDelete = async () => {
+    if (selectedIds.size === 0) return
+    setBulkDeleting(true)
+    try {
+      const { normalizeApiUrl } = await import('@/lib/utils/api-url')
+      const apiUrl = normalizeApiUrl(process.env.NEXT_PUBLIC_API_URL || '')
+      const response = await fetch(`${apiUrl}/api/properties/bulk-delete`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ ids: Array.from(selectedIds) }),
+      })
+      if (response.ok) {
+        window.location.reload()
+      } else {
+        const error = await response.json()
+        alert(`Failed to delete properties: ${error.message || error.error}`)
+      }
+    } catch (error) {
+      console.error('Error bulk deleting properties:', error)
+      alert('Failed to delete properties. Please try again.')
+    } finally {
+      setBulkDeleting(false)
+      setBulkDeleteOpen(false)
+    }
+  }
+
   const handleView = (property: Property) => {
     window.open(`/property/${property.id}`, '_blank')
   }
+
+  const allSelected = properties.length > 0 && selectedIds.size === properties.length
 
   return (
     <>
@@ -79,10 +132,99 @@ export function PropertyTable({ properties }: PropertyTableProps) {
         onOpenChange={setEditModalOpen}
       />
 
+      {/* Bulk Delete Confirmation Modal */}
+      {bulkDeleteOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="fixed inset-0 bg-black/50" onClick={() => !bulkDeleting && setBulkDeleteOpen(false)} />
+          <div className="relative bg-white rounded-2xl shadow-2xl max-w-md w-full mx-4 p-6">
+            <button
+              onClick={() => !bulkDeleting && setBulkDeleteOpen(false)}
+              className="absolute top-4 right-4 text-stone-400 hover:text-stone-600"
+            >
+              <X className="w-5 h-5" />
+            </button>
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-12 h-12 bg-red-100 rounded-xl flex items-center justify-center">
+                <AlertTriangle className="w-6 h-6 text-red-600" />
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-stone-900">Delete Properties</h3>
+                <p className="text-sm text-stone-500">This action cannot be undone</p>
+              </div>
+            </div>
+            <p className="text-stone-700 mb-2">
+              Are you sure you want to delete <span className="font-bold text-red-600">{selectedIds.size}</span> {selectedIds.size === 1 ? 'property' : 'properties'}?
+            </p>
+            <p className="text-sm text-stone-500 mb-6">
+              All associated documents, inquiries, favorites, and related data will be permanently removed.
+            </p>
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => setBulkDeleteOpen(false)}
+                disabled={bulkDeleting}
+                className="px-4 py-2 text-sm font-medium text-stone-700 bg-stone-100 rounded-lg hover:bg-stone-200 transition-colors disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleBulkDelete}
+                disabled={bulkDeleting}
+                className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 flex items-center gap-2"
+              >
+                {bulkDeleting ? (
+                  <>
+                    <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    Deleting...
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="w-4 h-4" />
+                    Delete {selectedIds.size} {selectedIds.size === 1 ? 'Property' : 'Properties'}
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Bulk Action Bar */}
+      {selectedIds.size > 0 && (
+        <div className="mb-4 flex items-center justify-between bg-red-50 border border-red-200 rounded-xl px-4 py-3">
+          <span className="text-sm font-medium text-red-800">
+            {selectedIds.size} {selectedIds.size === 1 ? 'property' : 'properties'} selected
+          </span>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setSelectedIds(new Set())}
+              className="text-sm text-stone-600 hover:text-stone-800 px-3 py-1.5 rounded-lg hover:bg-white transition-colors"
+            >
+              Clear Selection
+            </button>
+            <button
+              onClick={() => setBulkDeleteOpen(true)}
+              className="text-sm font-medium text-white bg-red-600 hover:bg-red-700 px-4 py-1.5 rounded-lg flex items-center gap-1.5 transition-colors"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              Delete Selected
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="bg-white rounded-xl border overflow-hidden">
         <table className="w-full text-sm">
           <thead className="bg-gray-50 border-b">
             <tr>
+              <th className="px-4 py-3 w-10">
+                <button onClick={toggleSelectAll} className="text-stone-400 hover:text-stone-700">
+                  {allSelected ? (
+                    <CheckSquare className="w-4.5 h-4.5 text-[#1B4965]" />
+                  ) : (
+                    <Square className="w-4.5 h-4.5" />
+                  )}
+                </button>
+              </th>
               <th className="text-left px-4 py-3 font-medium text-gray-600">Property</th>
               <th className="text-left px-4 py-3 font-medium text-gray-600">Price</th>
               <th className="text-left px-4 py-3 font-medium text-gray-600">Location</th>
@@ -94,7 +236,16 @@ export function PropertyTable({ properties }: PropertyTableProps) {
           </thead>
           <tbody className="divide-y">
             {properties.map((property) => (
-              <tr key={property.id} className="hover:bg-gray-50">
+              <tr key={property.id} className={`hover:bg-gray-50 ${selectedIds.has(property.id) ? 'bg-blue-50/50' : ''}`}>
+                <td className="px-4 py-3">
+                  <button onClick={() => toggleSelect(property.id)} className="text-stone-400 hover:text-stone-700">
+                    {selectedIds.has(property.id) ? (
+                      <CheckSquare className="w-4.5 h-4.5 text-[#1B4965]" />
+                    ) : (
+                      <Square className="w-4.5 h-4.5" />
+                    )}
+                  </button>
+                </td>
                 <td className="px-4 py-3">
                   <div className="font-medium text-gray-900 max-w-[200px] truncate">{property.title}</div>
                   {property.developer && (

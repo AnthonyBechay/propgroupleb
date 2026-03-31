@@ -21,6 +21,7 @@ import aiSearchRoutes from './routes/ai-search.js';
 import contentRoutes from './routes/content.js';
 import contactRoutes from './routes/contact.js';
 import uploadRoutes from './routes/upload.js';
+import documentRoutes from './routes/documents.js';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -155,6 +156,7 @@ app.use('/api/ai-search', aiSearchRoutes);
 app.use('/api/content', contentRoutes);
 app.use('/api/contact', contactRoutes);
 app.use('/api/upload', uploadRoutes);
+app.use('/api/documents', documentRoutes);
 
 // Global error handler
 app.use(errorHandler);
