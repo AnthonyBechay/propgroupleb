@@ -18,7 +18,7 @@ export default async function AdminPropertiesPage() {
     const apiUrl = normalizeApiUrl(process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001')
 
     // Fetch all properties
-    const propertiesResponse = await fetch(`${apiUrl}/api/properties?limit=1000`, {
+    const propertiesResponse = await fetch(`${apiUrl}/api/properties?limit=1000&visibility=all&availabilityStatus=all`, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',

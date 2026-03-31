@@ -21,8 +21,18 @@ router.get(
     // Build where clause
     const where: Record<string, unknown> = {};
 
-    where.visibility = query.visibility || 'PUBLIC';
-    where.availabilityStatus = query.availabilityStatus || 'AVAILABLE';
+    // "all" skips the filter (used by admin panel to see everything)
+    if (query.visibility && query.visibility !== 'all') {
+      where.visibility = query.visibility;
+    } else if (!query.visibility) {
+      where.visibility = 'PUBLIC';
+    }
+
+    if (query.availabilityStatus && query.availabilityStatus !== 'all') {
+      where.availabilityStatus = query.availabilityStatus;
+    } else if (!query.availabilityStatus) {
+      where.availabilityStatus = 'AVAILABLE';
+    }
 
     if (query.country) where.country = query.country;
     if (query.city) where.city = { contains: query.city, mode: 'insensitive' };
