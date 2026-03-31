@@ -15,6 +15,7 @@ import {
   MessageSquare,
   PenTool,
   ArrowLeft,
+  Inbox,
 } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 
@@ -27,6 +28,7 @@ export function Sidebar() {
     { name: 'Properties', href: '/admin/properties', icon: Building2 },
     { name: 'User Management', href: '/admin/users', icon: Users },
     { name: 'Inquiries', href: '/admin/inquiries', icon: MessageSquare },
+    { name: 'Contact Messages', href: '/admin/contacts', icon: Inbox },
     { name: 'Site Content', href: '/admin/content', icon: PenTool },
     { name: 'Analytics', href: '/admin/analytics', icon: BarChart3 },
     { name: 'AI Settings', href: '/admin/ai-settings', icon: Bot },

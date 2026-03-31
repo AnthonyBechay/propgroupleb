@@ -77,7 +77,13 @@
       "Bash(pnpm --filter propgroup-backend add -D @types/multer)",
       "Bash(grep -r e.preventDefault\\\\\\(\\\\\\) /Users/anthonybechay/development/propgroup/apps/web/src --include=*.tsx --include=*.ts -B3 -A1)",
       "Bash(wc -l /Users/anthonybechay/development/propgroup/apps/web/src/components/**/*.tsx)",
-      "Bash(pnpm --filter backend run build)"
+      "Bash(pnpm --filter backend run build)",
+      "Bash(ls /Users/anthonybechay/development/propgroup/.env* /Users/anthonybechay/development/propgroup/packages/db/.env* /Users/anthonybechay/development/propgroup/apps/backend/.env*)",
+      "Bash(DATABASE_URL=\"postgresql://postgres:postgres@localhost:5433/propgroup\" npx prisma migrate deploy)",
+      "Bash(docker exec:*)",
+      "Bash(docker stop:*)",
+      "Bash(docker port:*)",
+      "Bash(docker start:*)"
     ],
     "deny": [],
     "ask": []

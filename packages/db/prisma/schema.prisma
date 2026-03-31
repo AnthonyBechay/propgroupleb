@@ -434,19 +434,33 @@ model FavoriteProperty {
 }
 
 model PropertyInquiry {
-  id         String   @id @default(cuid())
-  userId     String?
-  propertyId String
-  name       String
-  email      String
-  phone      String?
-  message    String?
-  createdAt  DateTime @default(now())
+  id            String   @id @default(cuid())
+  userId        String?
+  propertyId    String?
+  propertyTitle String?
+  name          String
+  email         String
+  phone         String?
+  message       String?
+  createdAt     DateTime @default(now())
 
-  user     User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
-  property Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  user     User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
+  property Property? @relation(fields: [propertyId], references: [id], onDelete: SetNull)
 
   @@map("property_inquiries")
+}
+
+model ContactMessage {
+  id        String   @id @default(cuid())
+  name      String
+  email     String
+  phone     String?
+  subject   String?
+  message   String
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@map("contact_messages")
 }
 
 model UserOwnedProperty {

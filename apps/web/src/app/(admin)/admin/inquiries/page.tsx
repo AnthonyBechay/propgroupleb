@@ -26,6 +26,7 @@ interface Inquiry {
   email: string
   phone: string | null
   message: string | null
+  propertyTitle: string | null
   createdAt: string
   property: {
     id: string
@@ -33,7 +34,7 @@ interface Inquiry {
     country: string
     price?: number
     currency?: string
-  }
+  } | null
   user?: {
     id: string
     email: string
@@ -99,6 +100,10 @@ export default function AdminInquiriesPage() {
     }
   }
 
+  const getPropertyName = (inq: Inquiry) => {
+    return inq.property?.title || inq.propertyTitle || 'Deleted Property'
+  }
+
   const filtered = searchQuery
     ? inquiries.filter(inq => {
         const q = searchQuery.toLowerCase()
@@ -106,7 +111,7 @@ export default function AdminInquiriesPage() {
           inq.name.toLowerCase().includes(q) ||
           inq.email.toLowerCase().includes(q) ||
           (inq.message?.toLowerCase().includes(q) ?? false) ||
-          inq.property.title.toLowerCase().includes(q)
+          getPropertyName(inq).toLowerCase().includes(q)
         )
       })
     : inquiries
@@ -204,10 +209,16 @@ export default function AdminInquiriesPage() {
 
                     {/* Property */}
                     <div className="hidden sm:block text-right flex-shrink-0 max-w-[200px]">
-                      <p className="text-sm font-medium text-[#1B4965] truncate">{inq.property.title}</p>
-                      <p className="text-xs text-stone-400 flex items-center justify-end gap-1">
-                        <MapPin className="w-3 h-3" /> {inq.property.country}
+                      <p className={`text-sm font-medium truncate ${inq.property ? 'text-[#1B4965]' : 'text-stone-400 italic'}`}>
+                        {getPropertyName(inq)}
                       </p>
+                      {inq.property ? (
+                        <p className="text-xs text-stone-400 flex items-center justify-end gap-1">
+                          <MapPin className="w-3 h-3" /> {inq.property.country}
+                        </p>
+                      ) : (
+                        <p className="text-xs text-red-400">Property deleted</p>
+                      )}
                     </div>
 
                     {/* Time */}
@@ -258,16 +269,25 @@ export default function AdminInquiriesPage() {
                           <h4 className="text-xs font-bold text-stone-500 uppercase tracking-wider">Property</h4>
                           <div className="flex items-center gap-2 text-sm text-stone-700">
                             <Building2 className="w-4 h-4 text-stone-400" />
-                            <span className="font-medium">{inq.property.title}</span>
+                            <span className={`font-medium ${!inq.property ? 'text-stone-400 italic' : ''}`}>
+                              {getPropertyName(inq)}
+                            </span>
+                            {!inq.property && (
+                              <span className="text-xs px-1.5 py-0.5 bg-red-100 text-red-600 rounded font-medium">Deleted</span>
+                            )}
                           </div>
-                          <div className="flex items-center gap-2 text-sm text-stone-500">
-                            <MapPin className="w-4 h-4 text-stone-400" />
-                            {inq.property.country}
-                          </div>
-                          {inq.property.price && (
-                            <p className="text-sm text-stone-500">
-                              Price: {inq.property.currency || '$'}{inq.property.price.toLocaleString()}
-                            </p>
+                          {inq.property && (
+                            <>
+                              <div className="flex items-center gap-2 text-sm text-stone-500">
+                                <MapPin className="w-4 h-4 text-stone-400" />
+                                {inq.property.country}
+                              </div>
+                              {inq.property.price && (
+                                <p className="text-sm text-stone-500">
+                                  Price: {inq.property.currency || '$'}{inq.property.price.toLocaleString()}
+                                </p>
+                              )}
+                            </>
                           )}
                         </div>
                       </div>
@@ -285,21 +305,23 @@ export default function AdminInquiriesPage() {
                       {/* Actions */}
                       <div className="flex items-center gap-2 mt-4 pt-3 border-t">
                         <a
-                          href={`mailto:${inq.email}?subject=Re: ${encodeURIComponent(inq.property.title)} Inquiry`}
+                          href={`mailto:${inq.email}?subject=Re: ${encodeURIComponent(getPropertyName(inq))} Inquiry`}
                           className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white bg-[#1B4965] rounded-lg hover:bg-[#2B6985] transition-colors"
                         >
                           <Mail className="w-3.5 h-3.5" />
                           Reply via Email
                         </a>
-                        <a
-                          href={`/property/${inq.property.id}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-stone-700 bg-stone-100 rounded-lg hover:bg-stone-200 transition-colors"
-                        >
-                          <ExternalLink className="w-3.5 h-3.5" />
-                          View Property
-                        </a>
+                        {inq.property && (
+                          <a
+                            href={`/property/${inq.property.id}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-stone-700 bg-stone-100 rounded-lg hover:bg-stone-200 transition-colors"
+                          >
+                            <ExternalLink className="w-3.5 h-3.5" />
+                            View Property
+                          </a>
+                        )}
                         <button
                           onClick={() => handleDelete(inq.id)}
                           disabled={deleting === inq.id}

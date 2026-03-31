@@ -80,10 +80,11 @@ export async function GET(request: NextRequest) {
         where: { userId },
         take: 5,
         orderBy: { createdAt: 'desc' },
-        include: {
-          property: {
-            select: { title: true }
-          }
+        select: {
+          id: true,
+          propertyTitle: true,
+          createdAt: true,
+          property: { select: { title: true } }
         }
       })
     ])
@@ -100,7 +101,7 @@ export async function GET(request: NextRequest) {
       ...recentInquiries.map((inq: any) => ({
         id: inq.id,
         type: 'inquiry' as const,
-        property: inq.property.title,
+        property: inq.property?.title || inq.propertyTitle || 'Deleted Property',
         date: timeAgo(new Date(inq.createdAt)),
         timestamp: new Date(inq.createdAt).getTime()
       }))

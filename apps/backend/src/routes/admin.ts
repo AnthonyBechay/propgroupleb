@@ -20,8 +20,10 @@ router.get(
       totalProperties,
       totalInquiries,
       totalFavorites,
+      totalContactMessages,
       recentUsers,
       recentInquiries,
+      recentProperties,
       userStats,
       propertyStats,
     ] = await Promise.all([
@@ -29,6 +31,7 @@ router.get(
       prisma.property.count(),
       prisma.propertyInquiry.count(),
       prisma.favoriteProperty.count(),
+      prisma.contactMessage.count(),
       prisma.user.findMany({
         where: { createdAt: { gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) } },
         select: { id: true, email: true, firstName: true, lastName: true, role: true, createdAt: true },
@@ -37,20 +40,30 @@ router.get(
       }),
       prisma.propertyInquiry.findMany({
         where: { createdAt: { gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) } },
-        include: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          propertyTitle: true,
+          createdAt: true,
           property: { select: { id: true, title: true, price: true, currency: true } },
           user: { select: { id: true, email: true, firstName: true, lastName: true } },
         },
         orderBy: { createdAt: 'desc' },
         take: 5,
       }),
+      prisma.property.findMany({
+        take: 5,
+        orderBy: { createdAt: 'desc' },
+        select: { id: true, title: true, country: true, price: true, currency: true, createdAt: true },
+      }),
       prisma.user.groupBy({ by: ['role'], _count: { role: true } }),
       prisma.property.groupBy({ by: ['country'], _count: { country: true } }),
     ]);
 
     sendSuccess(res, {
-      overview: { totalUsers, totalProperties, totalInquiries, totalFavorites },
-      recent: { users: recentUsers, inquiries: recentInquiries },
+      overview: { totalUsers, totalProperties, totalInquiries, totalFavorites, totalContactMessages },
+      recent: { users: recentUsers, inquiries: recentInquiries, properties: recentProperties },
       statistics: { usersByRole: userStats, propertiesByCountry: propertyStats },
     });
   })

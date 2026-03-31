@@ -31,6 +31,7 @@ router.post(
     const inquiry = await prisma.propertyInquiry.create({
       data: {
         ...validatedData,
+        propertyTitle: property.title,
         userId: maybeReq.user?.id,
       },
       include: {
@@ -75,7 +76,14 @@ router.get(
     const [inquiries, total] = await Promise.all([
       prisma.propertyInquiry.findMany({
         where,
-        include: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          phone: true,
+          message: true,
+          propertyTitle: true,
+          createdAt: true,
           property: { select: { id: true, title: true, price: true, currency: true, country: true } },
           user: { select: { id: true, email: true, firstName: true, lastName: true } },
         },

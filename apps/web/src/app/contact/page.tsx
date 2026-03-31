@@ -9,8 +9,7 @@ const contactFormSchema = z.object({
   email: z.string().email('Invalid email address'),
   name: z.string().min(1, 'Name is required'),
   phone: z.string().optional(),
-  message: z.string().optional(),
-  propertyId: z.string().optional(),
+  message: z.string().min(1, 'Message is required'),
 })
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -29,8 +28,7 @@ type ContactFormData = {
   email: string
   name: string
   phone?: string
-  message?: string
-  propertyId?: string
+  message: string
 }
 
 export default function ContactPage() {
@@ -45,7 +43,6 @@ export default function ContactPage() {
       name: '',
       phone: '',
       message: '',
-      propertyId: undefined,
     },
   })
 

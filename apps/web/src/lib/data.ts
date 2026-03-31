@@ -14,32 +14,27 @@ export const CACHE_TAGS = {
 } as const
 
 // Optimized property queries with proper includes
-export const getFeaturedProperties = unstable_cache(
-  async (limit: number = 6) => {
-    return prisma.property.findMany({
-      take: limit,
-      orderBy: [
-        { createdAt: 'desc' },
-      ],
-      include: {
-        investmentData: true,
-        developer: true,
-        locationGuide: {
-          select: {
-            id: true,
-            title: true,
-            country: true,
-          }
-        },
+// No cache wrapper — the page is already force-dynamic, and we need
+// fresh results immediately after admin creates/deletes properties.
+export async function getFeaturedProperties(limit: number = 6) {
+  return prisma.property.findMany({
+    take: limit,
+    orderBy: [
+      { createdAt: 'desc' },
+    ],
+    include: {
+      investmentData: true,
+      developer: true,
+      locationGuide: {
+        select: {
+          id: true,
+          title: true,
+          country: true,
+        }
       },
-    })
-  },
-  ['featured-properties'],
-  {
-    revalidate: 3600, // 1 hour
-    tags: [CACHE_TAGS.properties],
-  }
-)
+    },
+  })
+}
 
 export const getPropertyById = unstable_cache(
   async (id: string) => {
