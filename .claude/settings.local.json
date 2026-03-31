@@ -89,7 +89,9 @@
       "Bash(sips -z 32 32 logo.png --out favicon-32x32.png)",
       "Bash(sips -z 16 16 logo.png --out favicon-16x16.png)",
       "Bash(sips -z 192 192 logo.png --out icon-192x192.png)",
-      "Bash(sips -z 512 512 logo.png --out icon-512x512.png)"
+      "Bash(sips -z 512 512 logo.png --out icon-512x512.png)",
+      "Bash(ls -la /Users/anthonybechay/development/propgroup/apps/web/public/favicon* /Users/anthonybechay/development/propgroup/apps/web/public/icon* /Users/anthonybechay/development/propgroup/apps/web/app/favicon*)",
+      "Bash(npx --yes png-to-ico /Users/anthonybechay/development/propgroup/apps/web/public/favicon-32x32.png)"
     ],
     "deny": [],
     "ask": []

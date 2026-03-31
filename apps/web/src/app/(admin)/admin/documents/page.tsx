@@ -12,6 +12,7 @@ import {
   Image,
   FileSpreadsheet,
   ExternalLink,
+  Download,
   Filter,
   Loader2,
 } from 'lucide-react'
@@ -390,9 +391,17 @@ export default function DocumentsPage() {
                         target="_blank"
                         rel="noopener noreferrer"
                         className="p-1.5 rounded-lg text-stone-400 hover:text-[#1B4965] hover:bg-[#E8F1F5] transition-colors"
-                        title="Open"
+                        title="View"
                       >
                         <ExternalLink className="w-4 h-4" />
+                      </a>
+                      <a
+                        href={doc.fileUrl}
+                        download={`${doc.title}${doc.mimeType ? '.' + doc.mimeType.split('/').pop()?.replace('vnd.openxmlformats-officedocument.wordprocessingml.document', 'docx').replace('vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'xlsx').replace('vnd.ms-excel', 'xls').replace('msword', 'doc').replace('jpeg', 'jpg') : ''}`}
+                        className="p-1.5 rounded-lg text-stone-400 hover:text-emerald-600 hover:bg-emerald-50 transition-colors"
+                        title="Download"
+                      >
+                        <Download className="w-4 h-4" />
                       </a>
                       <button
                         onClick={() => handleDelete(doc)}

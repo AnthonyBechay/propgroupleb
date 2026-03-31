@@ -54,7 +54,7 @@ export function HeroSectionNew() {
               </Button>
             </Link>
 
-            <Link href="/auth/signup">
+            <Link href="/get-started">
               <Button
                 size="lg"
                 variant="outline"

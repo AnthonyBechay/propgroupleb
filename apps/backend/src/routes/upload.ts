@@ -34,6 +34,7 @@ const videoUpload = multer({
 });
 
 // POST /api/upload — Upload single image (field: "file")
+// Optional query param: ?propertySlug=my-property for organized storage
 router.post(
   '/',
   authenticateToken,
@@ -46,12 +47,16 @@ router.post(
       return;
     }
 
-    const result = await uploadFile(file.buffer, file.originalname, file.mimetype, 'properties');
+    const propertySlug = req.body.propertySlug || req.query.propertySlug;
+    const result = await uploadFile(file.buffer, file.originalname, file.mimetype, 'properties', {
+      propertySlug: propertySlug as string | undefined,
+    });
     res.status(201).json({ url: result.url, key: result.key });
   })
 );
 
 // POST /api/upload/video — Upload single video
+// Optional query param: ?propertySlug=my-property for organized storage
 router.post(
   '/video',
   authenticateToken,
@@ -64,7 +69,10 @@ router.post(
       return;
     }
 
-    const result = await uploadFile(file.buffer, file.originalname, file.mimetype, 'videos');
+    const propertySlug = req.body.propertySlug || req.query.propertySlug;
+    const result = await uploadFile(file.buffer, file.originalname, file.mimetype, 'videos', {
+      propertySlug: propertySlug as string | undefined,
+    });
     res.status(201).json({ url: result.url, key: result.key });
   })
 );

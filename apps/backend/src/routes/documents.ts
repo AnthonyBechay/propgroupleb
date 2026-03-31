@@ -86,7 +86,7 @@ router.post(
     // Verify property exists
     const property = await prisma.property.findUnique({
       where: { id: propertyId },
-      select: { id: true, title: true },
+      select: { id: true, title: true, slug: true },
     });
 
     if (!property) {
@@ -98,8 +98,12 @@ router.post(
     const validTypes = ['FLOOR_PLAN', 'BROCHURE', 'CONTRACT', 'LEGAL_DOCUMENT', 'CERTIFICATE', 'OTHER'];
     const docType = validTypes.includes(type) ? type : 'OTHER';
 
-    // Upload file to R2
-    const uploaded = await uploadFile(file.buffer, file.originalname, file.mimetype, 'documents');
+    // Upload file to R2 with organized path: properties/{slug}/documents/{type}/{file}
+    const uploaded = await uploadFile(file.buffer, file.originalname, file.mimetype, 'documents', {
+      propertySlug: property.slug || property.title,
+      documentType: docType,
+      customName: title,
+    });
 
     const document = await prisma.propertyDocument.create({
       data: {
@@ -128,6 +132,27 @@ router.post(
     }, authReq);
 
     sendCreated(res, document, 'Document uploaded successfully');
+  })
+);
+
+// Get a single document's download URL (admin only)
+router.get(
+  '/:id/download',
+  authenticateToken,
+  requireAdmin,
+  asyncHandler(async (req: Request, res: Response) => {
+    const document = await prisma.propertyDocument.findUnique({
+      where: { id: req.params.id },
+      select: { id: true, title: true, fileUrl: true, mimeType: true },
+    });
+
+    if (!document) {
+      sendNotFound(res, 'Document');
+      return;
+    }
+
+    // Redirect to the file URL for download
+    res.redirect(document.fileUrl);
   })
 );
 

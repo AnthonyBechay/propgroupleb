@@ -31,7 +31,7 @@ export function CTASectionSimple() {
           </div>
 
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-            <Link href="/auth/signup">
+            <Link href="/get-started">
               <Button
                 size="lg"
                 className="w-full sm:w-auto h-14 px-10 text-base font-bold bg-[#C97B4B] hover:bg-[#B86A3A] text-white rounded-xl shadow-xl transition-all"
