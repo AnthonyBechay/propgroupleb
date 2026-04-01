@@ -15,6 +15,8 @@ import {
   Download,
   Filter,
   Loader2,
+  Pencil,
+  Save,
 } from 'lucide-react'
 import { apiClient } from '@/lib/api/client'
 
@@ -94,6 +96,14 @@ export default function DocumentsPage() {
   const [uploadType, setUploadType] = useState('OTHER')
   const [uploadPropertyId, setUploadPropertyId] = useState('')
   const [uploadIsPublic, setUploadIsPublic] = useState(false)
+
+  // Edit state
+  const [editingDoc, setEditingDoc] = useState<PropertyDocument | null>(null)
+  const [editTitle, setEditTitle] = useState('')
+  const [editDescription, setEditDescription] = useState('')
+  const [editType, setEditType] = useState('')
+  const [editIsPublic, setEditIsPublic] = useState(false)
+  const [saving, setSaving] = useState(false)
 
   useEffect(() => {
     fetchDocuments()
@@ -196,6 +206,56 @@ export default function DocumentsPage() {
     } catch (error) {
       console.error('Delete error:', error)
       alert('Failed to delete document')
+    }
+  }
+
+  function startEditing(doc: PropertyDocument) {
+    setEditingDoc(doc)
+    setEditTitle(doc.title)
+    setEditDescription(doc.description || '')
+    setEditType(doc.type)
+    setEditIsPublic(doc.isPublic)
+  }
+
+  function cancelEditing() {
+    setEditingDoc(null)
+  }
+
+  async function handleSaveEdit() {
+    if (!editingDoc || !editTitle.trim()) return
+    setSaving(true)
+    try {
+      const { normalizeApiUrl } = await import('@/lib/utils/api-url')
+      const apiUrl = normalizeApiUrl(process.env.NEXT_PUBLIC_API_URL || '')
+      const response = await fetch(`${apiUrl}/api/documents/${editingDoc.id}`, {
+        method: 'PUT',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: editTitle,
+          description: editDescription || null,
+          type: editType,
+          isPublic: editIsPublic,
+        }),
+      })
+      if (response.ok) {
+        setDocuments(prev =>
+          prev.map(d =>
+            d.id === editingDoc.id
+              ? { ...d, title: editTitle, description: editDescription || null, type: editType, isPublic: editIsPublic }
+              : d
+          )
+        )
+        setEditingDoc(null)
+      } else {
+        const err = await response.json().catch(() => ({}))
+        alert(`Failed to update: ${err.message || err.error || 'Unknown error'}`)
+      }
+    } catch (error) {
+      console.error('Edit error:', error)
+      alert('Failed to update document')
+    } finally {
+      setSaving(false)
     }
   }
 
@@ -386,6 +446,13 @@ export default function DocumentsPage() {
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex items-center justify-end gap-1">
+                      <button
+                        onClick={() => startEditing(doc)}
+                        className="p-1.5 rounded-lg text-stone-400 hover:text-[#C97B4B] hover:bg-orange-50 transition-colors"
+                        title="Edit"
+                      >
+                        <Pencil className="w-4 h-4" />
+                      </button>
                       <a
                         href={doc.fileUrl}
                         target="_blank"
@@ -416,6 +483,100 @@ export default function DocumentsPage() {
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {/* Edit Modal */}
+      {editingDoc && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="fixed inset-0 bg-black/50" onClick={() => !saving && cancelEditing()} />
+          <div className="relative bg-white rounded-2xl shadow-2xl max-w-lg w-full mx-4 p-6">
+            <button
+              onClick={() => !saving && cancelEditing()}
+              className="absolute top-4 right-4 text-stone-400 hover:text-stone-600"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <h3 className="text-lg font-bold text-stone-900 mb-6 flex items-center gap-2">
+              <Pencil className="w-5 h-5 text-[#C97B4B]" />
+              Edit Document
+            </h3>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-stone-700 mb-1">
+                  Title <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={editTitle}
+                  onChange={(e) => setEditTitle(e.target.value)}
+                  className="w-full px-3 py-2 border rounded-lg text-sm"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-stone-700 mb-1">Description</label>
+                <textarea
+                  value={editDescription}
+                  onChange={(e) => setEditDescription(e.target.value)}
+                  rows={2}
+                  className="w-full px-3 py-2 border rounded-lg text-sm resize-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-stone-700 mb-1">Document Type</label>
+                <select
+                  value={editType}
+                  onChange={(e) => setEditType(e.target.value)}
+                  className="w-full px-3 py-2 border rounded-lg text-sm bg-white"
+                >
+                  {DOCUMENT_TYPES.map(t => (
+                    <option key={t.value} value={t.value}>{t.label}</option>
+                  ))}
+                </select>
+              </div>
+
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={editIsPublic}
+                  onChange={(e) => setEditIsPublic(e.target.checked)}
+                  className="rounded border-stone-300"
+                />
+                <span className="text-sm text-stone-700">Make publicly visible to users</span>
+              </label>
+            </div>
+
+            <div className="flex gap-3 justify-end mt-6 pt-4 border-t">
+              <button
+                onClick={cancelEditing}
+                disabled={saving}
+                className="px-4 py-2 text-sm font-medium text-stone-700 bg-stone-100 rounded-lg hover:bg-stone-200 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSaveEdit}
+                disabled={saving || !editTitle.trim()}
+                className="px-4 py-2 text-sm font-medium text-white bg-[#1B4965] rounded-lg hover:bg-[#2B6985] transition-colors disabled:opacity-50 flex items-center gap-2"
+              >
+                {saving ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <Save className="w-4 h-4" />
+                    Save Changes
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

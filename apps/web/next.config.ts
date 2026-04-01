@@ -18,6 +18,10 @@ const nextConfig: NextConfig = {
       {
         protocol: 'https',
         hostname: 'propgroup-assets.s3.amazonaws.com',
+      },
+      {
+        protocol: 'https',
+        hostname: 'api.bechays.com',
       }
     ],
   },

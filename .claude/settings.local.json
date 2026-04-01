@@ -103,7 +103,11 @@
       "Bash(ls -la apps/web/public/favicon* apps/web/public/icon-* apps/web/public/apple-touch-icon*)",
       "Bash(sips -z 48 48 apps/web/public/logo.png --out /tmp/icon-48.png)",
       "Bash(cp /tmp/icon-48.png apps/web/src/app/icon.png)",
-      "Bash(npm --version)"
+      "Bash(npm --version)",
+      "WebFetch(domain:bechays.com)",
+      "Bash(ls /Users/anthonybechay/development/propgroup/apps/web/.next/server/app/page*)",
+      "Bash(ls /Users/anthonybechay/development/propgroup/apps/web/.next/server/app/index*)",
+      "Bash(2)"
     ],
     "deny": [],
     "ask": []

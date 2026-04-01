@@ -156,6 +156,47 @@ router.get(
   })
 );
 
+// Update document metadata (admin only)
+router.put(
+  '/:id',
+  authenticateToken,
+  requireAdmin,
+  asyncHandler(async (req: Request, res: Response) => {
+    const authReq = req as AuthenticatedRequest;
+    const { title, description, type, isPublic } = req.body;
+
+    const document = await prisma.propertyDocument.findUnique({
+      where: { id: req.params.id },
+      select: { id: true, title: true },
+    });
+
+    if (!document) {
+      sendNotFound(res, 'Document');
+      return;
+    }
+
+    const updated = await prisma.propertyDocument.update({
+      where: { id: req.params.id },
+      data: {
+        ...(title !== undefined && { title }),
+        ...(description !== undefined && { description }),
+        ...(type !== undefined && { type }),
+        ...(isPublic !== undefined && { isPublic }),
+      },
+      include: {
+        property: { select: { id: true, title: true, country: true } },
+      },
+    });
+
+    await logAdminAction('UPDATE_DOCUMENT', 'document', req.params.id, {
+      title: updated.title,
+      propertyId: updated.property.id,
+    }, authReq);
+
+    sendSuccess(res, updated, 'Document updated successfully');
+  })
+);
+
 // Delete a document (admin only)
 router.delete(
   '/:id',
