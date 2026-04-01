@@ -15,56 +15,81 @@ router.get(
   authenticateToken,
   requireAdmin,
   asyncHandler(async (_req: Request, res: Response) => {
+    const now = new Date();
+    const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+
     const [
       totalUsers,
       totalProperties,
       totalInquiries,
       totalFavorites,
       totalContactMessages,
+      totalDocuments,
+      newUsersThisWeek,
+      newInquiriesThisWeek,
+      newUsersThisMonth,
+      newInquiriesThisMonth,
       recentUsers,
       recentInquiries,
       recentProperties,
+      recentContacts,
       userStats,
       propertyStats,
+      inquiryStatusStats,
+      propertyStatusStats,
     ] = await Promise.all([
       prisma.user.count(),
       prisma.property.count(),
       prisma.propertyInquiry.count(),
       prisma.favoriteProperty.count(),
       prisma.contactMessage.count(),
+      prisma.propertyDocument.count(),
+      prisma.user.count({ where: { createdAt: { gte: sevenDaysAgo } } }),
+      prisma.propertyInquiry.count({ where: { createdAt: { gte: sevenDaysAgo } } }),
+      prisma.user.count({ where: { createdAt: { gte: thirtyDaysAgo } } }),
+      prisma.propertyInquiry.count({ where: { createdAt: { gte: thirtyDaysAgo } } }),
       prisma.user.findMany({
-        where: { createdAt: { gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) } },
+        where: { createdAt: { gte: sevenDaysAgo } },
         select: { id: true, email: true, firstName: true, lastName: true, role: true, createdAt: true },
         orderBy: { createdAt: 'desc' },
         take: 5,
       }),
       prisma.propertyInquiry.findMany({
-        where: { createdAt: { gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) } },
+        orderBy: { createdAt: 'desc' },
+        take: 5,
         select: {
           id: true,
           name: true,
           email: true,
           propertyTitle: true,
+          status: true,
           createdAt: true,
           property: { select: { id: true, title: true, price: true, currency: true } },
           user: { select: { id: true, email: true, firstName: true, lastName: true } },
         },
-        orderBy: { createdAt: 'desc' },
-        take: 5,
       }),
       prisma.property.findMany({
         take: 5,
         orderBy: { createdAt: 'desc' },
-        select: { id: true, title: true, country: true, price: true, currency: true, createdAt: true },
+        select: { id: true, title: true, country: true, price: true, currency: true, status: true, availabilityStatus: true, createdAt: true },
+      }),
+      prisma.contactMessage.findMany({
+        take: 5,
+        orderBy: { createdAt: 'desc' },
+        select: { id: true, name: true, email: true, subject: true, createdAt: true },
       }),
       prisma.user.groupBy({ by: ['role'], _count: { role: true } }),
       prisma.property.groupBy({ by: ['country'], _count: { country: true } }),
+      prisma.propertyInquiry.groupBy({ by: ['status'], _count: { status: true } }),
+      prisma.property.groupBy({ by: ['availabilityStatus'], _count: { availabilityStatus: true } }),
     ]);
 
     sendSuccess(res, {
-      overview: { totalUsers, totalProperties, totalInquiries, totalFavorites, totalContactMessages },
-      recent: { users: recentUsers, inquiries: recentInquiries, properties: recentProperties },
-      statistics: { usersByRole: userStats, propertiesByCountry: propertyStats },
+      overview: { totalUsers, totalProperties, totalInquiries, totalFavorites, totalContactMessages, totalDocuments },
+      trends: { newUsersThisWeek, newInquiriesThisWeek, newUsersThisMonth, newInquiriesThisMonth },
+      recent: { users: recentUsers, inquiries: recentInquiries, properties: recentProperties, contacts: recentContacts },
+      statistics: { usersByRole: userStats, propertiesByCountry: propertyStats, inquiriesByStatus: inquiryStatusStats, propertiesByStatus: propertyStatusStats },
     });
   })
 );

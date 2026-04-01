@@ -65,6 +65,23 @@ export function errorHandler(err: Error, req: Request, res: Response, _next: Nex
     return;
   }
 
+  // Multer errors (file upload)
+  if (err.message?.includes('File too large') || (err as any).code === 'LIMIT_FILE_SIZE') {
+    res.status(413).json({
+      error: 'File Too Large',
+      message: 'The uploaded file exceeds the maximum allowed size',
+    });
+    return;
+  }
+
+  if (err.message?.startsWith('Invalid') && (err.message?.includes('type') || err.message?.includes('file'))) {
+    res.status(400).json({
+      error: 'Invalid File',
+      message: err.message,
+    });
+    return;
+  }
+
   // Unknown errors
   console.error('Unhandled error:', err);
   res.status(500).json({

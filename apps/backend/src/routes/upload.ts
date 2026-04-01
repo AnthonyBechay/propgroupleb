@@ -24,11 +24,11 @@ const videoUpload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 100 * 1024 * 1024 }, // 100MB per video
   fileFilter: (_req, file, cb) => {
-    const allowed = ['video/mp4', 'video/webm'];
+    const allowed = ['video/mp4', 'video/webm', 'video/quicktime', 'video/x-msvideo', 'video/x-matroska'];
     if (allowed.includes(file.mimetype)) {
       cb(null, true);
     } else {
-      cb(new Error(`Invalid video type: ${file.mimetype}. Allowed: mp4, webm`));
+      cb(new Error(`Invalid video type: ${file.mimetype}. Allowed: mp4, webm, mov, avi, mkv`));
     }
   },
 });

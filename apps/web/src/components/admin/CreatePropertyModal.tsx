@@ -16,6 +16,18 @@ const PROPERTY_TYPES = [
 const COUNTRIES = ['GEORGIA', 'CYPRUS', 'GREECE', 'LEBANON'] as const
 const STATUSES = ['OFF_PLAN', 'NEW_BUILD', 'RESALE'] as const
 const CURRENCIES = ['USD', 'EUR', 'GBP', 'AED'] as const
+const FURNISHING = ['UNFURNISHED', 'SEMI_FURNISHED', 'FULLY_FURNISHED'] as const
+const OWNERSHIP = ['FREEHOLD', 'LEASEHOLD'] as const
+
+const AMENITY_OPTIONS = [
+  { key: 'hasPool', label: 'Swimming Pool' },
+  { key: 'hasGym', label: 'Gym' },
+  { key: 'hasGarden', label: 'Garden' },
+  { key: 'hasBalcony', label: 'Balcony' },
+  { key: 'hasSecurity', label: '24/7 Security' },
+  { key: 'hasElevator', label: 'Elevator' },
+  { key: 'hasCentralAC', label: 'Central A/C' },
+] as const
 
 type Developer = {
   id: string
@@ -66,8 +78,23 @@ export function CreatePropertyModal({
     district: '',
     address: '',
     location: '',
-    amenities: '',
     nearbyFacilities: '',
+    // Structured fields
+    builtYear: '' as string | number,
+    floors: '' as string | number,
+    floor: '' as string | number,
+    parkingSpaces: '' as string | number,
+    furnishingStatus: '' as string,
+    ownershipType: '' as string,
+    // Amenities
+    hasPool: false,
+    hasGym: false,
+    hasGarden: false,
+    hasBalcony: false,
+    hasSecurity: false,
+    hasElevator: false,
+    hasCentralAC: false,
+    // Investment
     expectedROI: '' as string | number,
     rentalYield: '' as string | number,
     capitalGrowth: '' as string | number,
@@ -103,8 +130,20 @@ export function CreatePropertyModal({
       district: '',
       address: '',
       location: '',
-      amenities: '',
       nearbyFacilities: '',
+      builtYear: '',
+      floors: '',
+      floor: '',
+      parkingSpaces: '',
+      furnishingStatus: '',
+      ownershipType: '',
+      hasPool: false,
+      hasGym: false,
+      hasGarden: false,
+      hasBalcony: false,
+      hasSecurity: false,
+      hasElevator: false,
+      hasCentralAC: false,
       expectedROI: '',
       rentalYield: '',
       capitalGrowth: '',
@@ -157,8 +196,20 @@ export function CreatePropertyModal({
         district: form.district || null,
         address: form.address || null,
         location: form.location || null,
-        amenities: form.amenities || null,
         nearbyFacilities: form.nearbyFacilities || null,
+        builtYear: form.builtYear ? Number(form.builtYear) : null,
+        floors: form.floors ? Number(form.floors) : null,
+        floor: form.floor ? Number(form.floor) : null,
+        parkingSpaces: form.parkingSpaces ? Number(form.parkingSpaces) : null,
+        furnishingStatus: form.furnishingStatus || null,
+        ownershipType: form.ownershipType || null,
+        hasPool: form.hasPool,
+        hasGym: form.hasGym,
+        hasGarden: form.hasGarden,
+        hasBalcony: form.hasBalcony,
+        hasSecurity: form.hasSecurity,
+        hasElevator: form.hasElevator,
+        hasCentralAC: form.hasCentralAC,
       }
 
       if (form.developerId) data.developerId = form.developerId
@@ -401,25 +452,69 @@ export function CreatePropertyModal({
                 </div>
               </section>
 
-              {/* Additional Details */}
+              {/* Property Details */}
               <section>
-                <h3 className="text-sm font-semibold text-blue-600 uppercase tracking-wider mb-4">Additional Details</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <h3 className="text-sm font-semibold text-blue-600 uppercase tracking-wider mb-4">Property Details</h3>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   <div>
-                    <label className={labelClass}>Amenities</label>
-                    <textarea className={`${inputClass} resize-none`} rows={2} value={form.amenities} onChange={(e) => updateField('amenities', e.target.value)} placeholder="e.g., Swimming pool, Gym, Parking" />
+                    <label className={labelClass}>Built Year</label>
+                    <input className={inputClass} type="number" value={form.builtYear} onChange={(e) => updateField('builtYear', e.target.value)} placeholder="e.g. 2024" />
                   </div>
                   <div>
+                    <label className={labelClass}>Total Floors</label>
+                    <input className={inputClass} type="number" value={form.floors} onChange={(e) => updateField('floors', e.target.value)} placeholder="e.g. 12" />
+                  </div>
+                  <div>
+                    <label className={labelClass}>Floor</label>
+                    <input className={inputClass} type="number" value={form.floor} onChange={(e) => updateField('floor', e.target.value)} placeholder="e.g. 5" />
+                  </div>
+                  <div>
+                    <label className={labelClass}>Parking Spaces</label>
+                    <input className={inputClass} type="number" value={form.parkingSpaces} onChange={(e) => updateField('parkingSpaces', e.target.value)} placeholder="0" />
+                  </div>
+                  <div>
+                    <label className={labelClass}>Furnishing</label>
+                    <select className={selectClass} value={form.furnishingStatus} onChange={(e) => updateField('furnishingStatus', e.target.value)}>
+                      <option value="">Not specified</option>
+                      {FURNISHING.map((f) => <option key={f} value={f}>{f.replace(/_/g, ' ').toLowerCase().replace(/^\w/, c => c.toUpperCase())}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className={labelClass}>Ownership</label>
+                    <select className={selectClass} value={form.ownershipType} onChange={(e) => updateField('ownershipType', e.target.value)}>
+                      <option value="">Not specified</option>
+                      {OWNERSHIP.map((o) => <option key={o} value={o}>{o.charAt(0) + o.slice(1).toLowerCase()}</option>)}
+                    </select>
+                  </div>
+                  <div className="col-span-2">
                     <label className={labelClass}>Nearby Facilities</label>
                     <textarea className={`${inputClass} resize-none`} rows={2} value={form.nearbyFacilities} onChange={(e) => updateField('nearbyFacilities', e.target.value)} placeholder="e.g., Schools, Hospitals, Shopping" />
                   </div>
                 </div>
               </section>
 
+              {/* Amenities */}
+              <section>
+                <h3 className="text-sm font-semibold text-blue-600 uppercase tracking-wider mb-4">Amenities</h3>
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                  {AMENITY_OPTIONS.map((amenity) => (
+                    <label key={amenity.key} className="flex items-center gap-2.5 p-2.5 rounded-lg border border-gray-200 hover:bg-gray-50 cursor-pointer transition-colors">
+                      <input
+                        type="checkbox"
+                        checked={form[amenity.key as keyof typeof form] as boolean}
+                        onChange={(e) => updateField(amenity.key, e.target.checked)}
+                        className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                      />
+                      <span className="text-sm text-gray-700">{amenity.label}</span>
+                    </label>
+                  ))}
+                </div>
+              </section>
+
               {/* Images */}
               <section>
                 <h3 className="text-sm font-semibold text-blue-600 uppercase tracking-wider mb-4">Property Images</h3>
-                <ImageUpload value={imageUrls} onChange={setImageUrls} maxFiles={10} disabled={isSubmitting} />
+                <ImageUpload value={imageUrls} onChange={setImageUrls} maxFiles={10} disabled={isSubmitting} propertySlug={form.title || undefined} />
                 <div className="mt-2">
                   <button type="button" onClick={() => setShowManualUrl(!showManualUrl)}
                     className="text-xs text-gray-500 hover:text-blue-600 flex items-center gap-1 transition-colors">
@@ -440,7 +535,7 @@ export function CreatePropertyModal({
               {/* Video */}
               <section>
                 <h3 className="text-sm font-semibold text-blue-600 uppercase tracking-wider mb-4">Property Video</h3>
-                <VideoUpload value={videoUrl} onChange={setVideoUrl} disabled={isSubmitting} />
+                <VideoUpload value={videoUrl} onChange={setVideoUrl} disabled={isSubmitting} propertySlug={form.title || undefined} />
               </section>
             </form>
 

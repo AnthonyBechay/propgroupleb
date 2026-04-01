@@ -18,6 +18,7 @@ type ImageUploadProps = {
   onChange: (urls: string[]) => void
   maxFiles?: number
   disabled?: boolean
+  propertySlug?: string
 }
 
 export function ImageUpload({
@@ -25,6 +26,7 @@ export function ImageUpload({
   onChange,
   maxFiles = 10,
   disabled = false,
+  propertySlug,
 }: ImageUploadProps) {
   const [isDragging, setIsDragging] = useState(false)
   const [isUploading, setIsUploading] = useState(false)
@@ -64,6 +66,7 @@ export function ImageUpload({
         for (const file of files) {
           const formData = new FormData()
           formData.append('file', file)
+          if (propertySlug) formData.append('propertySlug', propertySlug)
 
           const res = await fetch(`${API_BASE_URL}/api/upload`, {
             method: 'POST',
@@ -235,12 +238,14 @@ type VideoUploadProps = {
   value: string
   onChange: (url: string) => void
   disabled?: boolean
+  propertySlug?: string
 }
 
 export function VideoUpload({
   value,
   onChange,
   disabled = false,
+  propertySlug,
 }: VideoUploadProps) {
   const [isDragging, setIsDragging] = useState(false)
   const [isUploading, setIsUploading] = useState(false)
@@ -265,6 +270,7 @@ export function VideoUpload({
       try {
         const formData = new FormData()
         formData.append('file', file)
+        if (propertySlug) formData.append('propertySlug', propertySlug)
 
         const res = await fetch(`${API_BASE_URL}/api/upload/video`, {
           method: 'POST',

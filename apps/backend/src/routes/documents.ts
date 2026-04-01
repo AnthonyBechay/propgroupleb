@@ -99,11 +99,18 @@ router.post(
     const docType = validTypes.includes(type) ? type : 'OTHER';
 
     // Upload file to R2 with organized path: properties/{slug}/documents/{type}/{file}
-    const uploaded = await uploadFile(file.buffer, file.originalname, file.mimetype, 'documents', {
-      propertySlug: property.slug || property.title,
-      documentType: docType,
-      customName: title,
-    });
+    let uploaded;
+    try {
+      uploaded = await uploadFile(file.buffer, file.originalname, file.mimetype, 'documents', {
+        propertySlug: property.slug || property.title,
+        documentType: docType,
+        customName: title,
+      });
+    } catch (uploadErr) {
+      console.error('R2 upload failed:', uploadErr);
+      res.status(500).json({ error: 'Upload failed', message: 'Failed to upload file to storage. Please try again.' });
+      return;
+    }
 
     const document = await prisma.propertyDocument.create({
       data: {

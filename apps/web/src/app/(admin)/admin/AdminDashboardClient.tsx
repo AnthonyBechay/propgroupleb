@@ -8,227 +8,359 @@ import {
   Heart,
   FileText,
   Shield,
+  MessageSquare,
+  Inbox,
+  TrendingUp,
+  ArrowUpRight,
+  Clock,
+  Globe,
 } from 'lucide-react'
 import { apiClient } from '@/lib/api/client'
+import Link from 'next/link'
 
-interface DashboardStats {
-  totalProperties: number
-  totalUsers: number
-  totalFavorites: number
-  totalInquiries: number
+interface DashboardData {
+  overview: {
+    totalProperties: number
+    totalUsers: number
+    totalFavorites: number
+    totalInquiries: number
+    totalContactMessages: number
+    totalDocuments: number
+  }
+  trends: {
+    newUsersThisWeek: number
+    newInquiriesThisWeek: number
+    newUsersThisMonth: number
+    newInquiriesThisMonth: number
+  }
+  recent: {
+    users: Array<{ id: string; email: string; firstName?: string; lastName?: string; role: string; createdAt: string }>
+    inquiries: Array<{ id: string; name: string; email: string; propertyTitle: string; status: string; createdAt: string; property?: { id: string; title: string; price: number; currency: string } }>
+    properties: Array<{ id: string; title: string; country: string; price: number; currency: string; status?: string; availabilityStatus?: string; createdAt: string }>
+    contacts: Array<{ id: string; name: string; email: string; subject?: string; createdAt: string }>
+  }
+  statistics: {
+    usersByRole: Array<{ role: string; _count: { role: number } }>
+    propertiesByCountry: Array<{ country: string; _count: { country: number } }>
+    inquiriesByStatus: Array<{ status: string; _count: { status: number } }>
+    propertiesByStatus: Array<{ availabilityStatus: string; _count: { availabilityStatus: number } }>
+  }
 }
 
-interface Property {
-  id: string
-  title: string
-  country: string
-  currency: string
-  price: number
-  createdAt: string
+function formatCurrency(price: number, currency: string) {
+  return `${currency} ${price.toLocaleString()}`
 }
 
-interface User {
-  id: string
-  email: string
-  firstName?: string
-  lastName?: string
-  createdAt: string
+function timeAgo(dateStr: string) {
+  const diff = Date.now() - new Date(dateStr).getTime()
+  const mins = Math.floor(diff / 60000)
+  if (mins < 60) return `${mins}m ago`
+  const hrs = Math.floor(mins / 60)
+  if (hrs < 24) return `${hrs}h ago`
+  const days = Math.floor(hrs / 24)
+  return `${days}d ago`
+}
+
+const statusColors: Record<string, string> = {
+  PENDING: 'bg-amber-100 text-amber-700',
+  RESPONDED: 'bg-blue-100 text-blue-700',
+  CLOSED: 'bg-stone-100 text-stone-600',
+  CONVERTED: 'bg-emerald-100 text-emerald-700',
+  AVAILABLE: 'bg-emerald-100 text-emerald-700',
+  RESERVED: 'bg-amber-100 text-amber-700',
+  SOLD: 'bg-red-100 text-red-700',
+  OFF_MARKET: 'bg-stone-100 text-stone-600',
 }
 
 export function AdminDashboardClient() {
   const { user } = useAuth()
-  const [stats, setStats] = useState<DashboardStats | null>(null)
-  const [recentProperties, setRecentProperties] = useState<Property[]>([])
-  const [recentUsers, setRecentUsers] = useState<User[]>([])
+  const [data, setData] = useState<DashboardData | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     async function fetchDashboardData() {
       try {
         const response = await apiClient.getAdminStats() as any
-        const stats = response.data || response
-        setStats({
-          totalProperties: stats.overview?.totalProperties ?? 0,
-          totalUsers: stats.overview?.totalUsers ?? 0,
-          totalFavorites: stats.overview?.totalFavorites ?? 0,
-          totalInquiries: stats.overview?.totalInquiries ?? 0,
-        })
-        setRecentProperties(stats.recent?.properties || [])
-        setRecentUsers(stats.recent?.users || [])
+        const raw = response.data || response
+        setData(raw)
       } catch (error) {
         console.error('Error fetching dashboard data:', error)
       } finally {
         setLoading(false)
       }
     }
-
     fetchDashboardData()
   }, [])
 
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
-        <div className="text-stone-600">Loading dashboard...</div>
+        <div className="text-stone-500 text-sm">Loading dashboard...</div>
       </div>
     )
   }
 
-  const statItems = [
-    {
-      name: 'Total Properties',
-      value: stats?.totalProperties || 0,
-      icon: Building2,
-    },
-    {
-      name: 'Total Users',
-      value: stats?.totalUsers || 0,
-      icon: Users,
-    },
-    {
-      name: 'Favorites',
-      value: stats?.totalFavorites || 0,
-      icon: Heart,
-    },
-    {
-      name: 'Inquiries',
-      value: stats?.totalInquiries || 0,
-      icon: FileText,
-    },
+  if (!data) return null
+
+  const { overview, trends, recent, statistics } = data
+
+  const statCards = [
+    { label: 'Properties', value: overview.totalProperties, icon: Building2, color: 'bg-[#1B4965]', href: '/admin/properties' },
+    { label: 'Users', value: overview.totalUsers, icon: Users, color: 'bg-emerald-600', href: '/admin/users', trend: trends.newUsersThisWeek, trendLabel: 'this week' },
+    { label: 'Inquiries', value: overview.totalInquiries, icon: MessageSquare, color: 'bg-[#C97B4B]', href: '/admin/inquiries', trend: trends.newInquiriesThisWeek, trendLabel: 'this week' },
+    { label: 'Favorites', value: overview.totalFavorites, icon: Heart, color: 'bg-rose-500' },
+    { label: 'Messages', value: overview.totalContactMessages, icon: Inbox, color: 'bg-violet-600', href: '/admin/contacts' },
+    { label: 'Documents', value: overview.totalDocuments, icon: FileText, color: 'bg-sky-600', href: '/admin/documents' },
   ]
 
   return (
     <div className="min-h-screen bg-stone-50">
-      <div className="pg-container max-w-7xl mx-auto py-6 sm:py-8 lg:py-12">
-        <div className="mb-8 sm:mb-12">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-            <div>
-              <h1 className="pg-text-3xl sm:pg-text-4xl lg:pg-text-5xl font-black text-stone-900">
-                Admin <span className="pg-gradient-text">Dashboard</span>
-              </h1>
-              <p className="pg-text-lg text-stone-600 mt-2">Welcome back! Here's what's happening with your platform.</p>
-            </div>
-            <div className="flex items-center gap-3">
-              <span className={`inline-flex items-center px-4 py-2 rounded-xl text-sm font-bold shadow-md
-                ${user?.role === 'SUPER_ADMIN'
-                  ? 'bg-[#C97B4B] text-white'
-                  : 'bg-[#1B4965] text-white'}`}>
-                <Shield className="h-4 w-4 mr-2" />
-                {user?.role.replace('_', ' ')}
-              </span>
-            </div>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h1 className="text-2xl font-bold text-stone-900">Dashboard</h1>
+            <p className="text-sm text-stone-500 mt-0.5">Platform overview</p>
           </div>
+          <span className={`inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-semibold ${
+            user?.role === 'SUPER_ADMIN' ? 'bg-[#C97B4B] text-white' : 'bg-[#1B4965] text-white'
+          }`}>
+            <Shield className="h-3.5 w-3.5 mr-1.5" />
+            {user?.role?.replace('_', ' ')}
+          </span>
         </div>
 
-        {/* Stats Grid - Updated with gradient theme */}
-        <div className="pg-grid pg-grid-cols-1 sm:pg-grid-cols-2 lg:pg-grid-cols-4 mb-8 sm:mb-12">
-          {statItems.map((item, index) => {
-            const gradients = [
-              'bg-[#1B4965]',
-              'bg-emerald-600',
-              'bg-[#C97B4B]',
-              'bg-red-600'
-            ]
-            return (
-              <div key={item.name} className="pg-stat-card">
-                <div className="flex items-center mb-4">
-                  <div className={`w-12 h-12 ${gradients[index]} rounded-xl flex items-center justify-center shadow-lg`}>
-                    <item.icon className="h-6 w-6 text-white" aria-hidden="true" />
+        {/* Stat Cards - compact 6-col grid */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
+          {statCards.map((item) => {
+            const content = (
+              <>
+                <div className="flex items-center justify-between mb-2">
+                  <div className={`w-8 h-8 ${item.color} rounded-lg flex items-center justify-center`}>
+                    <item.icon className="h-4 w-4 text-white" />
                   </div>
+                  {item.href && <ArrowUpRight className="h-3.5 w-3.5 text-stone-300 group-hover:text-stone-500 transition-colors" />}
                 </div>
-                <dt className="text-sm font-medium text-stone-600 mb-2">
-                  {item.name}
-                </dt>
-                <dd className="pg-text-3xl sm:pg-text-4xl font-black text-stone-900">
-                  {item.value.toLocaleString()}
-                </dd>
-              </div>
+                <p className="text-2xl font-bold text-stone-900">{item.value.toLocaleString()}</p>
+                <p className="text-xs text-stone-500 mt-0.5">{item.label}</p>
+                {item.trend !== undefined && item.trend > 0 && (
+                  <p className="text-xs text-emerald-600 font-medium mt-1 flex items-center gap-0.5">
+                    <TrendingUp className="h-3 w-3" />+{item.trend} {item.trendLabel}
+                  </p>
+                )}
+              </>
+            )
+            const cls = "bg-white rounded-xl border border-stone-200 p-4 hover:shadow-md transition-shadow group"
+            return item.href ? (
+              <Link key={item.label} href={item.href} className={cls}>{content}</Link>
+            ) : (
+              <div key={item.label} className={cls}>{content}</div>
             )
           })}
         </div>
 
-        <div className="pg-grid pg-grid-cols-1 lg:pg-grid-cols-2">
-          {/* Recent Properties - Updated styling */}
-          <div className="pg-card">
-            <div className="pg-card-header">
-              <h3 className="pg-text-lg font-bold text-stone-900 flex items-center gap-3">
-                <div className="w-8 h-8 bg-[#1B4965] rounded-lg flex items-center justify-center shadow-md">
-                  <Building2 className="h-5 w-5 text-white" />
-                </div>
-                Recent Properties
-              </h3>
-            </div>
-            <div className="pg-card-content">
-              <div className="flow-root">
-                <ul className="-my-3 divide-y divide-stone-100">
-                  {recentProperties.map((property) => (
-                    <li key={property.id} className="py-4 hover:bg-stone-50 -mx-2 px-2 rounded-lg transition-colors">
-                      <div className="flex items-center space-x-4">
-                        <div className="flex-shrink-0">
-                          <div className="h-12 w-12 rounded-xl bg-[#1B4965] flex items-center justify-center shadow-md">
-                            <Building2 className="h-6 w-6 text-white" />
-                          </div>
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-bold text-stone-900 truncate">
-                            {property.title}
-                          </p>
-                          <p className="text-sm text-stone-600">
-                            {property.country} • {property.currency} {property.price.toLocaleString()}
-                          </p>
-                        </div>
-                        <div className="flex-shrink-0 text-xs font-medium text-stone-500 bg-stone-100 px-3 py-1 rounded-lg">
-                          {new Date(property.createdAt).toLocaleDateString()}
-                        </div>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              </div>
+        {/* Two-column breakdown */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
+          {/* Properties by Country */}
+          <div className="bg-white rounded-xl border border-stone-200 p-4">
+            <h3 className="text-sm font-semibold text-stone-700 mb-3 flex items-center gap-2">
+              <Globe className="h-4 w-4 text-stone-400" />
+              Properties by Country
+            </h3>
+            <div className="space-y-2">
+              {statistics.propertiesByCountry.map((s) => {
+                const pct = overview.totalProperties > 0 ? (s._count.country / overview.totalProperties * 100) : 0
+                return (
+                  <div key={s.country} className="flex items-center gap-3">
+                    <span className="text-xs font-medium text-stone-600 w-20 truncate">{s.country}</span>
+                    <div className="flex-1 h-2 bg-stone-100 rounded-full overflow-hidden">
+                      <div className="h-full bg-[#1B4965] rounded-full" style={{ width: `${pct}%` }} />
+                    </div>
+                    <span className="text-xs font-semibold text-stone-700 w-8 text-right">{s._count.country}</span>
+                  </div>
+                )
+              })}
+              {statistics.propertiesByCountry.length === 0 && (
+                <p className="text-xs text-stone-400">No properties yet</p>
+              )}
             </div>
           </div>
 
-          {/* Recent Users - Updated styling */}
-          <div className="pg-card">
-            <div className="pg-card-header">
-              <h3 className="pg-text-lg font-bold text-stone-900 flex items-center gap-3">
-                <div className="w-8 h-8 bg-emerald-600 rounded-lg flex items-center justify-center shadow-md">
-                  <Users className="h-5 w-5 text-white" />
+          {/* Property Availability */}
+          <div className="bg-white rounded-xl border border-stone-200 p-4">
+            <h3 className="text-sm font-semibold text-stone-700 mb-3 flex items-center gap-2">
+              <Building2 className="h-4 w-4 text-stone-400" />
+              Availability Status
+            </h3>
+            <div className="space-y-2">
+              {statistics.propertiesByStatus?.map((s) => (
+                <div key={s.availabilityStatus} className="flex items-center justify-between">
+                  <span className={`text-xs font-medium px-2 py-0.5 rounded ${statusColors[s.availabilityStatus] || 'bg-stone-100 text-stone-600'}`}>
+                    {s.availabilityStatus?.replace('_', ' ') || 'N/A'}
+                  </span>
+                  <span className="text-sm font-semibold text-stone-700">{s._count.availabilityStatus}</span>
                 </div>
-                Recent Users
-              </h3>
+              ))}
+              {(!statistics.propertiesByStatus || statistics.propertiesByStatus.length === 0) && (
+                <p className="text-xs text-stone-400">No data</p>
+              )}
             </div>
-            <div className="pg-card-content">
-              <div className="flow-root">
-                <ul className="-my-3 divide-y divide-stone-100">
-                  {recentUsers.map((user) => (
-                    <li key={user.id} className="py-4 hover:bg-stone-50 -mx-2 px-2 rounded-lg transition-colors">
-                      <div className="flex items-center space-x-4">
-                        <div className="flex-shrink-0">
-                          <div className="h-12 w-12 rounded-full bg-emerald-600 flex items-center justify-center shadow-md">
-                            <span className="text-sm font-bold text-white">
-                              {user.email.charAt(0).toUpperCase()}
-                            </span>
-                          </div>
+          </div>
+
+          {/* Inquiry Status */}
+          <div className="bg-white rounded-xl border border-stone-200 p-4">
+            <h3 className="text-sm font-semibold text-stone-700 mb-3 flex items-center gap-2">
+              <MessageSquare className="h-4 w-4 text-stone-400" />
+              Inquiry Status
+            </h3>
+            <div className="space-y-2">
+              {statistics.inquiriesByStatus?.map((s) => (
+                <div key={s.status} className="flex items-center justify-between">
+                  <span className={`text-xs font-medium px-2 py-0.5 rounded ${statusColors[s.status] || 'bg-stone-100 text-stone-600'}`}>
+                    {s.status?.replace('_', ' ') || 'N/A'}
+                  </span>
+                  <span className="text-sm font-semibold text-stone-700">{s._count.status}</span>
+                </div>
+              ))}
+              {(!statistics.inquiriesByStatus || statistics.inquiriesByStatus.length === 0) && (
+                <p className="text-xs text-stone-400">No inquiries yet</p>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Activity Feed — Recent Inquiries + Recent Properties + Recent Contacts */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          {/* Recent Inquiries */}
+          <div className="bg-white rounded-xl border border-stone-200">
+            <div className="px-4 py-3 border-b border-stone-100 flex items-center justify-between">
+              <h3 className="text-sm font-semibold text-stone-700 flex items-center gap-2">
+                <MessageSquare className="h-4 w-4 text-[#C97B4B]" />
+                Recent Inquiries
+              </h3>
+              <Link href="/admin/inquiries" className="text-xs text-[#1B4965] hover:underline font-medium">View all</Link>
+            </div>
+            <div className="divide-y divide-stone-50">
+              {recent.inquiries.length === 0 ? (
+                <p className="px-4 py-6 text-sm text-stone-400 text-center">No inquiries yet</p>
+              ) : (
+                recent.inquiries.map((inq) => (
+                  <div key={inq.id} className="px-4 py-3 hover:bg-stone-50 transition-colors">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-stone-900 truncate">{inq.name || inq.email}</p>
+                        <p className="text-xs text-stone-500 truncate">{inq.propertyTitle || inq.property?.title || 'General inquiry'}</p>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${statusColors[inq.status] || 'bg-stone-100 text-stone-600'}`}>
+                          {inq.status}
+                        </span>
+                        <span className="text-[10px] text-stone-400 flex items-center gap-0.5">
+                          <Clock className="h-2.5 w-2.5" />{timeAgo(inq.createdAt)}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+
+          {/* Recent Properties */}
+          <div className="bg-white rounded-xl border border-stone-200">
+            <div className="px-4 py-3 border-b border-stone-100 flex items-center justify-between">
+              <h3 className="text-sm font-semibold text-stone-700 flex items-center gap-2">
+                <Building2 className="h-4 w-4 text-[#1B4965]" />
+                Recent Properties
+              </h3>
+              <Link href="/admin/properties" className="text-xs text-[#1B4965] hover:underline font-medium">View all</Link>
+            </div>
+            <div className="divide-y divide-stone-50">
+              {recent.properties.length === 0 ? (
+                <p className="px-4 py-6 text-sm text-stone-400 text-center">No properties yet</p>
+              ) : (
+                recent.properties.map((prop) => (
+                  <div key={prop.id} className="px-4 py-3 hover:bg-stone-50 transition-colors">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-stone-900 truncate">{prop.title}</p>
+                        <p className="text-xs text-stone-500">{prop.country} &middot; {formatCurrency(prop.price, prop.currency)}</p>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        {prop.availabilityStatus && (
+                          <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${statusColors[prop.availabilityStatus] || 'bg-stone-100 text-stone-600'}`}>
+                            {prop.availabilityStatus.replace('_', ' ')}
+                          </span>
+                        )}
+                        <span className="text-[10px] text-stone-400">{timeAgo(prop.createdAt)}</span>
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+
+          {/* Recent Users */}
+          <div className="bg-white rounded-xl border border-stone-200">
+            <div className="px-4 py-3 border-b border-stone-100 flex items-center justify-between">
+              <h3 className="text-sm font-semibold text-stone-700 flex items-center gap-2">
+                <Users className="h-4 w-4 text-emerald-600" />
+                New Users (7 days)
+              </h3>
+              <Link href="/admin/users" className="text-xs text-[#1B4965] hover:underline font-medium">View all</Link>
+            </div>
+            <div className="divide-y divide-stone-50">
+              {recent.users.length === 0 ? (
+                <p className="px-4 py-6 text-sm text-stone-400 text-center">No new users this week</p>
+              ) : (
+                recent.users.map((u) => (
+                  <div key={u.id} className="px-4 py-3 hover:bg-stone-50 transition-colors">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div className="w-7 h-7 rounded-full bg-emerald-600 flex items-center justify-center shrink-0">
+                          <span className="text-[10px] font-bold text-white">{u.email.charAt(0).toUpperCase()}</span>
                         </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-bold text-stone-900 truncate">
-                            {user.firstName && user.lastName
-                              ? `${user.firstName} ${user.lastName}`
-                              : user.email
-                            }
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium text-stone-900 truncate">
+                            {u.firstName && u.lastName ? `${u.firstName} ${u.lastName}` : u.email}
                           </p>
-                          <p className="text-sm text-stone-600">
-                            {user.email}
-                          </p>
-                        </div>
-                        <div className="flex-shrink-0 text-xs font-medium text-stone-500 bg-stone-100 px-3 py-1 rounded-lg">
-                          {new Date(user.createdAt).toLocaleDateString()}
+                          {u.firstName && <p className="text-xs text-stone-500 truncate">{u.email}</p>}
                         </div>
                       </div>
-                    </li>
-                  ))}
-                </ul>
-              </div>
+                      <span className="text-[10px] text-stone-400 shrink-0">{timeAgo(u.createdAt)}</span>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+
+          {/* Recent Contact Messages */}
+          <div className="bg-white rounded-xl border border-stone-200">
+            <div className="px-4 py-3 border-b border-stone-100 flex items-center justify-between">
+              <h3 className="text-sm font-semibold text-stone-700 flex items-center gap-2">
+                <Inbox className="h-4 w-4 text-violet-600" />
+                Recent Messages
+              </h3>
+              <Link href="/admin/contacts" className="text-xs text-[#1B4965] hover:underline font-medium">View all</Link>
+            </div>
+            <div className="divide-y divide-stone-50">
+              {recent.contacts?.length === 0 ? (
+                <p className="px-4 py-6 text-sm text-stone-400 text-center">No messages yet</p>
+              ) : (
+                recent.contacts?.map((msg) => (
+                  <div key={msg.id} className="px-4 py-3 hover:bg-stone-50 transition-colors">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-stone-900 truncate">{msg.name}</p>
+                        <p className="text-xs text-stone-500 truncate">{msg.subject || msg.email}</p>
+                      </div>
+                      <span className="text-[10px] text-stone-400 shrink-0">{timeAgo(msg.createdAt)}</span>
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
           </div>
         </div>

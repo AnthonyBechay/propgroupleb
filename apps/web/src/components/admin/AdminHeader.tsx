@@ -1,9 +1,8 @@
 'use client'
 
 import { useAuth } from '@/contexts/AuthContext'
-import { Bell, Search, Menu, X, Home, Building2, Users, Shield, FileText, Settings, BarChart3, LogOut, Bot, MessageSquare, Inbox, PenTool } from 'lucide-react'
+import { Bell, Menu, X, Home, Building2, Users, Shield, FileText, Settings, BarChart3, LogOut, Bot, MessageSquare, Inbox, PenTool } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
@@ -39,16 +38,7 @@ export function AdminHeader() {
           {mobileMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
         </Button>
 
-        <div className="flex flex-1 gap-x-4 self-stretch lg:gap-x-6">
-          <div className="relative flex flex-1 items-center max-w-md">
-            <Search className="pointer-events-none absolute inset-y-0 left-0 h-full w-5 text-stone-400 pl-3" />
-            <Input
-              className="block h-10 w-full border border-stone-200 rounded-lg py-0 pl-10 pr-4 text-stone-900 placeholder:text-stone-400 focus:ring-2 focus:ring-[#1B4965] focus:border-[#1B4965] sm:text-sm bg-stone-50"
-              placeholder="Search..."
-              type="search"
-              name="search"
-            />
-          </div>
+        <div className="flex flex-1 gap-x-4 self-stretch lg:gap-x-6 justify-end">
           <div className="flex items-center gap-x-4 lg:gap-x-6">
             <Button
               variant="ghost"
