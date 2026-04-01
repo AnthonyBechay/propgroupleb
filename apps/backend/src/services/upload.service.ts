@@ -179,7 +179,8 @@ export async function fileExists(key: string): Promise<boolean> {
 }
 
 /**
- * Extract the R2 key from a full public URL or a proxied URL
+ * Extract the R2 key from a full public URL or a proxied URL.
+ * Returns null for external URLs (e.g. unsplash) that are not stored in R2.
  */
 export function extractKeyFromUrl(url: string): string | null {
   // Handle R2 public URL format
@@ -189,5 +190,9 @@ export function extractKeyFromUrl(url: string): string | null {
   // Handle proxy URL format: /api/files/properties/slug/images/file.jpg
   const proxyMatch = url.match(/\/api\/files\/(.+)$/);
   if (proxyMatch) return proxyMatch[1];
+  // Handle raw R2 key format (no URL prefix, just path like "properties/...")
+  if (!url.startsWith('http') && !url.startsWith('/')) {
+    return url;
+  }
   return null;
 }

@@ -91,6 +91,39 @@ router.get(
   })
 );
 
+// Get property by share token (PUBLIC — no auth required)
+router.get(
+  '/shared/:token',
+  asyncHandler(async (req: Request, res: Response) => {
+    const property = await prisma.property.findUnique({
+      where: { shareToken: req.params.token },
+      include: {
+        ...PROPERTY_DETAIL_INCLUDE,
+        documents: {
+          where: { isPublic: true },
+          select: {
+            id: true,
+            title: true,
+            description: true,
+            fileUrl: true,
+            fileSize: true,
+            mimeType: true,
+            type: true,
+            createdAt: true,
+          },
+        },
+      },
+    });
+
+    if (!property) {
+      res.status(404).json({ error: 'Share link is invalid or has been revoked' });
+      return;
+    }
+
+    sendSuccess(res, property);
+  })
+);
+
 // Get single property (public)
 router.get(
   '/:id',
@@ -285,6 +318,66 @@ router.delete(
     }, authReq);
 
     sendSuccess(res, null, 'Property deleted successfully');
+  })
+);
+
+// Generate / get share link (admin only)
+router.post(
+  '/:id/share',
+  authenticateToken,
+  requireAdmin,
+  asyncHandler(async (req: Request, res: Response) => {
+    const authReq = req as AuthenticatedRequest;
+    const property = await prisma.property.findUnique({
+      where: { id: req.params.id },
+      select: { id: true, title: true, shareToken: true },
+    });
+
+    if (!property) { sendNotFound(res, 'Property'); return; }
+
+    let { shareToken } = property;
+    if (!shareToken) {
+      // Generate a URL-safe random token
+      const { randomBytes } = await import('crypto');
+      shareToken = randomBytes(24).toString('base64url');
+      await prisma.property.update({
+        where: { id: req.params.id },
+        data: { shareToken },
+      });
+
+      await logAdminAction('GENERATE_SHARE_LINK', 'property', req.params.id, {
+        title: property.title,
+      }, authReq);
+    }
+
+    sendSuccess(res, { shareToken }, 'Share link generated');
+  })
+);
+
+// Revoke share link (admin only)
+router.delete(
+  '/:id/share',
+  authenticateToken,
+  requireAdmin,
+  asyncHandler(async (req: Request, res: Response) => {
+    const authReq = req as AuthenticatedRequest;
+    const property = await prisma.property.findUnique({
+      where: { id: req.params.id },
+      select: { id: true, title: true },
+    });
+
+    if (!property) { sendNotFound(res, 'Property'); return; }
+
+    await prisma.property.update({
+      where: { id: req.params.id },
+      data: { shareToken: null },
+    });
+
+    await logAdminAction('REVOKE_SHARE_LINK', 'property', req.params.id, {
+      title: property.title,
+    }, authReq);
+
+    sendSuccess(res, null, 'Share link revoked');
   })
 );
 

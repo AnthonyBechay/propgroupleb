@@ -99,7 +99,10 @@
       "Bash(node -e \":*)",
       "Bash(DATABASE_URL=\"postgresql://postgres:postgres@localhost:5433/propgroup\" npx prisma migrate dev --name add-payment-plan-details --schema packages/db/prisma/schema.prisma)",
       "Bash(DATABASE_URL=\"postgresql://postgres:postgres@localhost:5433/propgroup\" npx prisma migrate diff --from-schema-datamodel packages/db/prisma/schema.prisma --to-schema-datamodel packages/db/prisma/schema.prisma --script)",
-      "Bash(DATABASE_URL=\"postgresql://postgres:postgres@localhost:5433/propgroup\" npx prisma generate --schema packages/db/prisma/schema.prisma)"
+      "Bash(DATABASE_URL=\"postgresql://postgres:postgres@localhost:5433/propgroup\" npx prisma generate --schema packages/db/prisma/schema.prisma)",
+      "Bash(ls -la apps/web/public/favicon* apps/web/public/icon-* apps/web/public/apple-touch-icon*)",
+      "Bash(sips -z 48 48 apps/web/public/logo.png --out /tmp/icon-48.png)",
+      "Bash(cp /tmp/icon-48.png apps/web/src/app/icon.png)"
     ],
     "deny": [],
     "ask": []

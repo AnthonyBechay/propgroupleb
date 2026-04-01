@@ -68,10 +68,11 @@ router.get(
   requireAdmin,
   asyncHandler(async (req: Request, res: Response) => {
     const { page, limit, skip } = parsePagination(req.query as Record<string, string>);
-    const { propertyId } = req.query;
+    const { propertyId, status } = req.query;
 
     const where: Record<string, unknown> = {};
     if (propertyId) where.propertyId = propertyId;
+    if (status && status !== 'ALL') where.status = status;
 
     const [inquiries, total] = await Promise.all([
       prisma.propertyInquiry.findMany({
@@ -83,7 +84,12 @@ router.get(
           phone: true,
           message: true,
           propertyTitle: true,
+          status: true,
+          adminNotes: true,
+          repliedAt: true,
+          repliedBy: true,
           createdAt: true,
+          updatedAt: true,
           property: { select: { id: true, title: true, price: true, currency: true, country: true } },
           user: { select: { id: true, email: true, firstName: true, lastName: true } },
         },
@@ -114,6 +120,52 @@ router.get(
 
     if (!inquiry) { sendNotFound(res, 'Inquiry'); return; }
     sendSuccess(res, inquiry);
+  })
+);
+
+// Update inquiry status / notes (admin only)
+router.patch(
+  '/:id',
+  authenticateToken,
+  requireAdmin,
+  asyncHandler(async (req: Request, res: Response) => {
+    const authReq = req as AuthenticatedRequest;
+    const { status, adminNotes } = req.body as { status?: string; adminNotes?: string };
+
+    const existing = await prisma.propertyInquiry.findUnique({ where: { id: req.params.id } });
+    if (!existing) { sendNotFound(res, 'Inquiry'); return; }
+
+    const validStatuses = ['NEW', 'IN_PROGRESS', 'REPLIED', 'CANCELLED', 'CLOSED'];
+    if (status && !validStatuses.includes(status)) {
+      res.status(400).json({ error: `Invalid status. Must be one of: ${validStatuses.join(', ')}` });
+      return;
+    }
+
+    const updateData: Record<string, unknown> = {};
+    if (status !== undefined) updateData.status = status;
+    if (adminNotes !== undefined) updateData.adminNotes = adminNotes;
+
+    // Auto-set repliedAt/repliedBy when marking as REPLIED
+    if (status === 'REPLIED' && !existing.repliedAt) {
+      updateData.repliedAt = new Date();
+      updateData.repliedBy = authReq.user.email || authReq.user.id;
+    }
+
+    const inquiry = await prisma.propertyInquiry.update({
+      where: { id: req.params.id },
+      data: updateData,
+      include: {
+        property: { select: { id: true, title: true, price: true, currency: true, country: true } },
+        user: { select: { id: true, email: true, firstName: true, lastName: true } },
+      },
+    });
+
+    await logAdminAction('UPDATE_INQUIRY', 'inquiry', req.params.id, {
+      status: inquiry.status,
+      previousStatus: existing.status,
+    }, authReq);
+
+    sendSuccess(res, inquiry, 'Inquiry updated successfully');
   })
 );
 

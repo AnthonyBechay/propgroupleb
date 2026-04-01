@@ -18,6 +18,11 @@ export const CACHE_TAGS = {
 // fresh results immediately after admin creates/deletes properties.
 export async function getFeaturedProperties(limit: number = 6) {
   return prisma.property.findMany({
+    where: {
+      featured: true,
+      visibility: 'PUBLIC',
+      availabilityStatus: { not: 'OFF_MARKET' },
+    },
     take: limit,
     orderBy: [
       { createdAt: 'desc' },

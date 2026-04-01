@@ -91,6 +91,11 @@ router.delete(
     }
 
     if (!fileKey) {
+      // External URL (e.g., unsplash) — not stored in R2, just acknowledge removal
+      if (url && url.startsWith('http')) {
+        res.json({ success: true, message: 'External URL removed (not stored in R2)' });
+        return;
+      }
       res.status(400).json({ error: 'Provide a file URL or key to delete' });
       return;
     }
