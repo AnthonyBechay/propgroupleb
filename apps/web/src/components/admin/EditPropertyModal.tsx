@@ -494,8 +494,7 @@ export function EditPropertyModal({ property, open, onOpenChange }: EditProperty
             onClick={handleSubmit}
             className="px-5 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
           >
-            {isSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
-            {isSubmitting ? 'Updating...' : 'Update Property'}
+            {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Update Property'}
           </button>
         </div>
       </div>

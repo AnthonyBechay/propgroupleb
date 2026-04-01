@@ -247,13 +247,6 @@ export function PropertyCard({
   return (
     <>
       <div className={`group relative bg-white rounded-2xl border border-stone-200 overflow-hidden shadow-sm hover:shadow-lg transition-all duration-500 transform hover:-translate-y-2 ${className} ${featured ? 'ring-2 ring-[#C97B4B] ring-offset-2' : ''}`}>
-        {/* Featured ribbon */}
-        {featured && (
-          <div className="absolute top-4 -right-8 bg-[#C97B4B] text-white text-xs font-bold py-1 px-12 rotate-45 z-20 shadow-lg">
-            FEATURED
-          </div>
-        )}
-
         {/* Image Container */}
         <div className="relative aspect-[4/3] overflow-hidden bg-stone-100">
           <Link href={`/property/${id}`}>
@@ -287,15 +280,22 @@ export function PropertyCard({
             </div>
           )}
 
-          {/* Top badges */}
-          <div className="absolute top-4 left-4 flex flex-wrap gap-2">
+          {/* Top-left badges */}
+          <div className="absolute top-4 left-4 flex flex-wrap gap-2 max-w-[calc(100%-70px)]">
+            {featured && (
+              <span className="px-3 py-1.5 rounded-full text-xs font-bold bg-[#C97B4B] text-white shadow-lg backdrop-blur-sm flex items-center gap-1">
+                <Sparkles className="w-3 h-3" />
+                Featured
+              </span>
+            )}
+
             <span className={`px-3 py-1.5 rounded-full text-xs font-bold ${statusConfig.bg} ${statusConfig.text} shadow-lg backdrop-blur-sm flex items-center gap-1`}>
               <StatusIcon className="w-3 h-3" />
               {statusConfig.label}
             </span>
 
             {isGoldenVisaEligible && (
-              <span className="px-3 py-1.5 rounded-full text-xs font-bold bg-[#C97B4B] text-white shadow-lg backdrop-blur-sm flex items-center gap-1">
+              <span className="px-3 py-1.5 rounded-full text-xs font-bold bg-[#C97B4B]/90 text-white shadow-lg backdrop-blur-sm flex items-center gap-1">
                 <BadgeCheck className="w-3 h-3" />
                 Golden Visa
               </span>
@@ -313,7 +313,7 @@ export function PropertyCard({
           <button
             onClick={handleFavorite}
             disabled={isLoadingFavorite}
-            className="absolute top-4 right-4 z-30 bg-white/90 hover:bg-white backdrop-blur-sm p-2.5 rounded-full shadow-lg hover:shadow-xl transition-all hover:scale-110 group/fav"
+            className="absolute top-4 right-4 z-10 bg-white/90 hover:bg-white backdrop-blur-sm p-2.5 rounded-full shadow-lg hover:shadow-xl transition-all hover:scale-110 group/fav"
             aria-label={isFavorited ? 'Remove from favorites' : 'Add to favorites'}
           >
             <Heart

@@ -1,4 +1,4 @@
-import express, { type Request, type Response, type Router } from 'express';
+import express, { type Request, type Response, type NextFunction, type Router } from 'express';
 import multer from 'multer';
 import { prisma } from '@propgroup/db';
 import { authenticateToken, requireAdmin, logAdminAction } from '../middleware/auth.js';
@@ -62,7 +62,16 @@ router.post(
   '/',
   authenticateToken,
   requireAdmin,
-  documentUpload.single('file'),
+  (req: Request, res: Response, next: NextFunction) => {
+    documentUpload.single('file')(req, res, (err) => {
+      if (err) {
+        const status = (err as any).code === 'LIMIT_FILE_SIZE' ? 413 : 400;
+        res.status(status).json({ error: 'Upload error', message: err.message });
+        return;
+      }
+      next();
+    });
+  },
   asyncHandler(async (req: Request, res: Response) => {
     const authReq = req as AuthenticatedRequest;
     const file = req.file;
@@ -106,9 +115,19 @@ router.post(
         documentType: docType,
         customName: title,
       });
-    } catch (uploadErr) {
-      console.error('R2 upload failed:', uploadErr);
-      res.status(500).json({ error: 'Upload failed', message: 'Failed to upload file to storage. Please try again.' });
+    } catch (uploadErr: any) {
+      console.error('R2 upload failed for document:', {
+        error: uploadErr?.message || uploadErr,
+        fileName: file.originalname,
+        mimeType: file.mimetype,
+        fileSize: file.size,
+        propertySlug: property.slug || property.title,
+        docType,
+      });
+      res.status(500).json({
+        error: 'Upload failed',
+        message: `Failed to upload file to storage: ${uploadErr?.message || 'Unknown error'}. Please try again.`,
+      });
       return;
     }
 
