@@ -107,7 +107,8 @@
       "WebFetch(domain:bechays.com)",
       "Bash(ls /Users/anthonybechay/development/propgroup/apps/web/.next/server/app/page*)",
       "Bash(ls /Users/anthonybechay/development/propgroup/apps/web/.next/server/app/index*)",
-      "Bash(2)"
+      "Bash(2)",
+      "Bash(ls -la /Users/anthonybechay/development/propgroup/apps/web/src/app/\\\\\\(admin\\\\\\)/admin/inquiries/)"
     ],
     "deny": [],
     "ask": []

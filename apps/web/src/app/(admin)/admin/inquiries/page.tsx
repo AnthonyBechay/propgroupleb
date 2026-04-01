@@ -7,6 +7,8 @@ import {
   ExternalLink,
   Search,
   Trash2,
+  CheckSquare,
+  Square,
   Mail,
   Phone,
   User,
@@ -77,6 +79,8 @@ export default function AdminInquiriesPage() {
   const [updatingId, setUpdatingId] = useState<string | null>(null)
   const [editingNotesId, setEditingNotesId] = useState<string | null>(null)
   const [notesText, setNotesText] = useState('')
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [bulkDeleting, setBulkDeleting] = useState(false)
 
   useEffect(() => {
     fetchInquiries()
@@ -158,6 +162,49 @@ export default function AdminInquiriesPage() {
     }
   }
 
+  async function handleBulkDelete() {
+    if (selectedIds.size === 0) return
+    if (!confirm(`Delete ${selectedIds.size} selected ${selectedIds.size === 1 ? 'inquiry' : 'inquiries'}? This cannot be undone.`)) return
+    setBulkDeleting(true)
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/inquiries/bulk-delete`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: Array.from(selectedIds) }),
+      })
+      if (res.ok) {
+        setInquiries(prev => prev.filter(inq => !selectedIds.has(inq.id)))
+        setTotalCount(prev => prev - selectedIds.size)
+        setSelectedIds(new Set())
+      } else {
+        alert('Failed to delete inquiries')
+      }
+    } catch (error) {
+      console.error('Bulk delete failed:', error)
+      alert('Failed to delete inquiries')
+    } finally {
+      setBulkDeleting(false)
+    }
+  }
+
+  function toggleSelect(id: string) {
+    setSelectedIds(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  function toggleSelectAll() {
+    if (selectedIds.size === filtered.length) {
+      setSelectedIds(new Set())
+    } else {
+      setSelectedIds(new Set(filtered.map(inq => inq.id)))
+    }
+  }
+
   const getPropertyName = (inq: Inquiry) => inq.property?.title || inq.propertyTitle || 'Deleted Property'
 
   const filtered = searchQuery
@@ -208,6 +255,33 @@ export default function AdminInquiriesPage() {
           </p>
         </div>
       </div>
+
+      {/* Bulk actions bar */}
+      {selectedIds.size > 0 && (
+        <div className="flex items-center gap-3 bg-red-50 border border-red-200 rounded-xl px-4 py-3">
+          <span className="text-sm font-medium text-red-700">
+            {selectedIds.size} selected
+          </span>
+          <button
+            onClick={handleBulkDelete}
+            disabled={bulkDeleting}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50"
+          >
+            {bulkDeleting ? (
+              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+            ) : (
+              <Trash2 className="w-3.5 h-3.5" />
+            )}
+            Delete Selected
+          </button>
+          <button
+            onClick={() => setSelectedIds(new Set())}
+            className="text-sm text-stone-500 hover:text-stone-700"
+          >
+            Clear
+          </button>
+        </div>
+      )}
 
       {/* Status Tabs + Search */}
       <div className="flex flex-col sm:flex-row gap-4">
@@ -263,6 +337,18 @@ export default function AdminInquiriesPage() {
         </div>
       ) : (
         <>
+          {/* Select all */}
+          <div className="flex items-center gap-2 px-1">
+            <button onClick={toggleSelectAll} className="text-stone-400 hover:text-stone-600 transition-colors">
+              {selectedIds.size === filtered.length && filtered.length > 0 ? (
+                <CheckSquare className="w-5 h-5 text-[#1B4965]" />
+              ) : (
+                <Square className="w-5 h-5" />
+              )}
+            </button>
+            <span className="text-xs text-stone-500">Select all</span>
+          </div>
+
           {/* Inquiry Cards */}
           <div className="space-y-3">
             {filtered.map(inq => {
@@ -275,6 +361,18 @@ export default function AdminInquiriesPage() {
                     className="flex items-center gap-4 p-4 cursor-pointer"
                     onClick={() => setExpandedId(isExpanded ? null : inq.id)}
                   >
+                    {/* Checkbox */}
+                    <button
+                      onClick={(e) => { e.stopPropagation(); toggleSelect(inq.id) }}
+                      className="text-stone-400 hover:text-stone-600 flex-shrink-0"
+                    >
+                      {selectedIds.has(inq.id) ? (
+                        <CheckSquare className="w-5 h-5 text-[#1B4965]" />
+                      ) : (
+                        <Square className="w-5 h-5" />
+                      )}
+                    </button>
+
                     {/* Avatar */}
                     <div className="w-10 h-10 bg-[#1B4965] rounded-full flex items-center justify-center text-white text-sm font-bold flex-shrink-0">
                       {inq.name.charAt(0).toUpperCase()}

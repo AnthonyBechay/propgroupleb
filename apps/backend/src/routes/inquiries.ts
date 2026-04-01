@@ -169,6 +169,32 @@ router.patch(
   })
 );
 
+// Bulk delete inquiries (admin only)
+router.post(
+  '/bulk-delete',
+  authenticateToken,
+  requireAdmin,
+  asyncHandler(async (req: Request, res: Response) => {
+    const authReq = req as AuthenticatedRequest;
+    const { ids } = req.body as { ids: string[] };
+
+    if (!ids || !Array.isArray(ids) || ids.length === 0) {
+      res.status(400).json({ error: 'Please provide an array of inquiry IDs to delete' });
+      return;
+    }
+
+    const count = await prisma.propertyInquiry.deleteMany({
+      where: { id: { in: ids } },
+    });
+
+    await logAdminAction('BULK_DELETE_INQUIRIES', 'inquiry', ids.join(','), {
+      count: count.count,
+    }, authReq);
+
+    sendSuccess(res, { deleted: count.count }, `${count.count} inquiries deleted successfully`);
+  })
+);
+
 // Delete inquiry (admin only)
 router.delete(
   '/:id',

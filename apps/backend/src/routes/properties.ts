@@ -6,6 +6,7 @@ import { sendSuccess, sendCreated, sendPaginated, sendNotFound } from '../utils/
 import { buildPaginationResponse } from '../utils/pagination.js';
 import { PROPERTY_LIST_INCLUDE, PROPERTY_DETAIL_INCLUDE } from '../utils/prisma-includes.js';
 import { propertySchema, propertyQuerySchema, extractInvestmentData, buildInvestmentDataPayload } from '../schemas/index.js';
+import { deleteFile, extractKeyFromUrl } from '../services/upload.service.js';
 import type { AuthenticatedRequest } from '../types/index.js';
 
 const router: Router = express.Router();
@@ -282,6 +283,9 @@ router.post(
       return;
     }
 
+    // Clean up R2 files for all properties
+    await Promise.all(properties.map(p => cleanupPropertyFiles(p.id)));
+
     await prisma.property.deleteMany({ where: { id: { in: ids } } });
 
     await logAdminAction('BULK_DELETE_PROPERTIES', 'property', ids.join(','), {
@@ -292,6 +296,33 @@ router.post(
     sendSuccess(res, { deleted: properties.length }, `${properties.length} properties deleted successfully`);
   })
 );
+
+// Helper: clean up R2 files for a property (images + documents)
+async function cleanupPropertyFiles(propertyId: string) {
+  try {
+    const property = await prisma.property.findUnique({
+      where: { id: propertyId },
+      select: { images: true, documents: { select: { fileUrl: true } } },
+    });
+    if (!property) return;
+
+    const urlsToDelete: string[] = [
+      ...(property.images || []),
+      ...property.documents.map(d => d.fileUrl),
+    ];
+
+    for (const url of urlsToDelete) {
+      try {
+        const key = extractKeyFromUrl(url);
+        if (key) await deleteFile(key);
+      } catch (err) {
+        console.error(`Failed to delete R2 file: ${url}`, err);
+      }
+    }
+  } catch (err) {
+    console.error(`Failed to cleanup files for property ${propertyId}:`, err);
+  }
+}
 
 // Delete property (admin only)
 router.delete(
@@ -310,6 +341,9 @@ router.delete(
       sendNotFound(res, 'Property');
       return;
     }
+
+    // Clean up R2 files before deleting from DB
+    await cleanupPropertyFiles(req.params.id);
 
     await prisma.property.delete({ where: { id: req.params.id } });
 
