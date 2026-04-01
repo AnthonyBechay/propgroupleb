@@ -102,7 +102,12 @@ export function Navbar() {
 
           {/* Desktop Auth Section */}
           <div className="hidden lg:flex items-center space-x-2 flex-shrink-0">
-            {user ? (
+            {loading ? (
+              <div className="flex items-center space-x-2" data-testid="loading-skeleton">
+                <div className="w-8 h-8 rounded-full bg-stone-200 animate-pulse" />
+                <div className="w-16 h-4 rounded bg-stone-200 animate-pulse" />
+              </div>
+            ) : user ? (
               <div className="flex items-center space-x-2 flex-shrink-0">
                 {/* Notification Bell */}
                 <Link href="/portal/notifications">
@@ -254,7 +259,12 @@ export function Navbar() {
 
             {/* Mobile Auth Section */}
             <div className="pt-4 px-4 border-t border-stone-200">
-              {user ? (
+              {loading ? (
+                <div className="flex items-center gap-3 px-3 py-2">
+                  <div className="w-8 h-8 rounded-full bg-stone-200 animate-pulse" />
+                  <div className="w-24 h-4 rounded bg-stone-200 animate-pulse" />
+                </div>
+              ) : user ? (
                 <div className="space-y-3">
                   <div className="flex items-center gap-3 px-3 py-2 bg-stone-50 rounded-lg">
                     <div className="w-8 h-8 rounded-full bg-[#1B4965] flex items-center justify-center text-white text-sm font-bold">

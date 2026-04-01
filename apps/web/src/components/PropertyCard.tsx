@@ -122,7 +122,7 @@ export function PropertyCard({
         credentials: 'include',
       })
       const checkData = await checkRes.json()
-      const currentlyFavorited = checkData?.data?.isFavorited ?? isFavorited
+      const currentlyFavorited = checkData?.isFavorited ?? checkData?.data?.isFavorited ?? isFavorited
 
       // Toggle: if currently favorited, DELETE; otherwise, POST
       const method = currentlyFavorited ? 'DELETE' : 'POST'
@@ -313,7 +313,7 @@ export function PropertyCard({
           <button
             onClick={handleFavorite}
             disabled={isLoadingFavorite}
-            className="absolute top-4 right-4 bg-white/90 hover:bg-white backdrop-blur-sm p-2.5 rounded-full shadow-lg hover:shadow-xl transition-all hover:scale-110 group/fav"
+            className="absolute top-4 right-4 z-30 bg-white/90 hover:bg-white backdrop-blur-sm p-2.5 rounded-full shadow-lg hover:shadow-xl transition-all hover:scale-110 group/fav"
             aria-label={isFavorited ? 'Remove from favorites' : 'Add to favorites'}
           >
             <Heart

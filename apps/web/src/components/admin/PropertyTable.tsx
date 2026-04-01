@@ -33,6 +33,24 @@ export function PropertyTable({ properties }: PropertyTableProps) {
   const [bulkDeleting, setBulkDeleting] = useState(false)
   const [copiedId, setCopiedId] = useState<string | null>(null)
 
+  const copyToClipboard = async (text: string) => {
+    // Try modern API first, fall back to execCommand
+    try {
+      await navigator.clipboard.writeText(text)
+      return true
+    } catch {
+      const textarea = document.createElement('textarea')
+      textarea.value = text
+      textarea.style.position = 'fixed'
+      textarea.style.opacity = '0'
+      document.body.appendChild(textarea)
+      textarea.select()
+      const ok = document.execCommand('copy')
+      document.body.removeChild(textarea)
+      return ok
+    }
+  }
+
   const handleShare = async (property: Property) => {
     try {
       const apiUrl = normalizeApiUrl(process.env.NEXT_PUBLIC_API_URL)
@@ -46,9 +64,14 @@ export function PropertyTable({ properties }: PropertyTableProps) {
       }
       const json = await res.json()
       const shareUrl = `${window.location.origin}/share/${json.data.shareToken}`
-      await navigator.clipboard.writeText(shareUrl)
-      setCopiedId(property.id)
-      setTimeout(() => setCopiedId(null), 2000)
+      const copied = await copyToClipboard(shareUrl)
+      if (copied) {
+        setCopiedId(property.id)
+        setTimeout(() => setCopiedId(null), 2000)
+      } else {
+        // If clipboard fails entirely, show the URL in a prompt
+        window.prompt('Share link (copy it):', shareUrl)
+      }
     } catch (error) {
       console.error('Failed to share:', error)
       alert(`Failed to generate share link: ${error instanceof Error ? error.message : 'Unknown error'}`)

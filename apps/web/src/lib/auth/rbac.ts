@@ -41,13 +41,14 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
       cache: 'no-store', // Don't cache auth responses
     })
 
+    const text = await response.text()
+
     if (!response.ok) {
-      const errorText = await response.text()
-      console.error(`[rbac] Auth check failed with status ${response.status}:`, errorText)
+      console.error(`[rbac] Auth check failed with status ${response.status}:`, text)
       return null
     }
 
-    const data = await response.json()
+    const data = JSON.parse(text)
 
     if (data.success && data.user) {
       console.log(`[rbac] Successfully authenticated user: ${data.user.email} (${data.user.role})`)

@@ -21,7 +21,14 @@ const plusJakarta = Plus_Jakarta_Sans({
 
 // Determine the base URL for metadata
 const getMetadataBase = () => {
-  // In production on Vercel, use VERCEL_URL
+  // Always prefer the canonical domain
+  if (process.env.NEXT_PUBLIC_SITE_URL) {
+    return process.env.NEXT_PUBLIC_SITE_URL;
+  }
+  // Production on Vercel — use canonical domain, not deployment URL
+  if (process.env.VERCEL_ENV === 'production') {
+    return 'https://bechays.com';
+  }
   if (process.env.VERCEL_URL) {
     return `https://${process.env.VERCEL_URL}`;
   }
@@ -30,7 +37,7 @@ const getMetadataBase = () => {
     return 'http://localhost:3000';
   }
   // Fallback
-  return 'https://localhost:3000';
+  return 'https://bechays.com';
 };
 
 export const metadata: Metadata = {
@@ -71,9 +78,13 @@ export const metadata: Metadata = {
   icons: {
     icon: [
       { url: '/favicon.ico', sizes: 'any' },
+      { url: '/favicon-16x16.png', type: 'image/png', sizes: '16x16' },
+      { url: '/favicon-32x32.png', type: 'image/png', sizes: '32x32' },
       { url: '/icon.png', type: 'image/png', sizes: '48x48' },
+      { url: '/icon-192x192.png', type: 'image/png', sizes: '192x192' },
+      { url: '/icon-512x512.png', type: 'image/png', sizes: '512x512' },
     ],
-    apple: '/apple-icon.png',
+    apple: '/apple-touch-icon.png',
   },
 };
 

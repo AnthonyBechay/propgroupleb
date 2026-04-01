@@ -35,10 +35,14 @@ class ApiClient {
 
     try {
       const response = await fetch(url, config);
+      const text = await response.text();
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        const errorMessage = errorData.message || errorData.error || `HTTP error! status: ${response.status}`;
+        let errorMessage = `HTTP error! status: ${response.status}`;
+        try {
+          const errorData = JSON.parse(text);
+          errorMessage = errorData.message || errorData.error || errorMessage;
+        } catch {}
 
         // Log detailed error for debugging
         if (response.status === 401) {
@@ -50,7 +54,7 @@ class ApiClient {
         throw new Error(errorMessage);
       }
 
-      return await response.json();
+      return JSON.parse(text);
     } catch (error: any) {
       // Enhanced error logging
       if (error.message?.includes('fetch')) {
