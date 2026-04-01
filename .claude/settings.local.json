@@ -108,7 +108,12 @@
       "Bash(ls /Users/anthonybechay/development/propgroup/apps/web/.next/server/app/page*)",
       "Bash(ls /Users/anthonybechay/development/propgroup/apps/web/.next/server/app/index*)",
       "Bash(2)",
-      "Bash(ls -la /Users/anthonybechay/development/propgroup/apps/web/src/app/\\\\\\(admin\\\\\\)/admin/inquiries/)"
+      "Bash(ls -la /Users/anthonybechay/development/propgroup/apps/web/src/app/\\\\\\(admin\\\\\\)/admin/inquiries/)",
+      "Bash(curl -sI http://localhost:3999/favicon.ico)",
+      "Bash(curl -sI http://localhost:3999/favicon-32x32.png)",
+      "Bash(curl -s http://localhost:3999/)",
+      "Bash(curl -s http://localhost:3999/admin)",
+      "Bash(kill 6322)"
     ],
     "deny": [],
     "ask": []
