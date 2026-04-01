@@ -30,6 +30,9 @@ export default function CalculatorPage() {
   const [vacancyRate, setVacancyRate] = useState(5) // percentage
   const [closingCosts, setClosingCosts] = useState(7000)
 
+  // Projection period
+  const [projectionYears, setProjectionYears] = useState(10)
+
   // Calculated values
   const [monthlyPayment, setMonthlyPayment] = useState(0)
   const [totalInterest, setTotalInterest] = useState(0)
@@ -38,6 +41,15 @@ export default function CalculatorPage() {
   const [capRate, setCapRate] = useState(0)
   const [totalROI, setTotalROI] = useState(0)
   const [breakEvenMonth, setBreakEvenMonth] = useState(0)
+  const [compoundProjection, setCompoundProjection] = useState<{
+    year: number
+    propertyValue: number
+    cumulativeRent: number
+    cumulativeMortgage: number
+    equity: number
+    totalReturn: number
+    annualizedReturn: number
+  }[]>([])
 
   // Calculate mortgage payment
   useEffect(() => {
@@ -69,10 +81,58 @@ export default function CalculatorPage() {
     const capRateValue = (netOperatingIncome / propertyPrice) * 100
     setCapRate(capRateValue)
 
-    // Total ROI (including appreciation)
-    const annualAppreciation = propertyPrice * (propertyAppreciation / 100)
-    const totalAnnualReturn = annualNetIncome + annualAppreciation
-    const roi = (totalAnnualReturn / totalCashInvested) * 100
+    // Compound projection over N years
+    const projection = []
+    let cumulativeRent = 0
+    let cumulativeMortgage = 0
+    let currentPropertyValue = propertyPrice
+    const annualMortgagePayment = monthlyPayment * 12
+
+    for (let yr = 1; yr <= projectionYears; yr++) {
+      // Compound appreciation on property value each year
+      currentPropertyValue = currentPropertyValue * (1 + propertyAppreciation / 100)
+
+      // Rental income grows with appreciation (rents increase over time)
+      const yearlyRentGrowth = Math.pow(1 + (propertyAppreciation * 0.6) / 100, yr - 1) // rent grows at 60% of appreciation
+      const yearEffectiveRent = (monthlyRent * yearlyRentGrowth) * 12 * (1 - vacancyRate / 100)
+      const yearExpenses = (maintenanceCost + propertyTax + insurance) * 12 + yearEffectiveRent * (managementFee / 100)
+
+      cumulativeRent += yearEffectiveRent - yearExpenses
+      cumulativeMortgage += annualMortgagePayment
+
+      // Remaining loan balance (amortization)
+      const monthlyRate = interestRate / 100 / 12
+      const totalPayments = loanTerm * 12
+      const paymentsMade = yr * 12
+      let remainingBalance = loanAmount
+      if (monthlyRate > 0 && loanAmount > 0) {
+        remainingBalance = loanAmount * (Math.pow(1 + monthlyRate, totalPayments) - Math.pow(1 + monthlyRate, paymentsMade)) / (Math.pow(1 + monthlyRate, totalPayments) - 1)
+        if (remainingBalance < 0) remainingBalance = 0
+      } else if (loanAmount > 0) {
+        remainingBalance = Math.max(0, loanAmount - (loanAmount / totalPayments) * paymentsMade)
+      }
+
+      const equity = currentPropertyValue - remainingBalance
+      const totalReturn = equity + cumulativeRent - cumulativeMortgage - totalCashInvested
+      const annualizedReturn = totalCashInvested > 0
+        ? (Math.pow((totalCashInvested + totalReturn) / totalCashInvested, 1 / yr) - 1) * 100
+        : 0
+
+      projection.push({
+        year: yr,
+        propertyValue: currentPropertyValue,
+        cumulativeRent,
+        cumulativeMortgage,
+        equity,
+        totalReturn,
+        annualizedReturn,
+      })
+    }
+    setCompoundProjection(projection)
+
+    // Total ROI uses compound projection for the selected period
+    const finalProjection = projection[projectionYears - 1]
+    const roi = finalProjection ? finalProjection.annualizedReturn : 0
     setTotalROI(roi)
 
     // Break-even point
@@ -82,8 +142,9 @@ export default function CalculatorPage() {
     } else {
       setBreakEvenMonth(0)
     }
-  }, [propertyPrice, downPayment, monthlyRent, monthlyPayment, maintenanceCost, 
-      propertyTax, insurance, managementFee, vacancyRate, closingCosts, propertyAppreciation])
+  }, [propertyPrice, downPayment, monthlyRent, monthlyPayment, maintenanceCost,
+      propertyTax, insurance, managementFee, vacancyRate, closingCosts, propertyAppreciation,
+      loanAmount, interestRate, loanTerm, projectionYears])
 
   // Update loan amount when down payment changes
   useEffect(() => {
@@ -103,6 +164,7 @@ export default function CalculatorPage() {
     setManagementFee(10)
     setVacancyRate(5)
     setClosingCosts(7000)
+    setProjectionYears(10)
   }
 
   return (
@@ -308,7 +370,7 @@ export default function CalculatorPage() {
                   isPositive={capRate > 6}
                 />
                 <MetricDisplay
-                  label="Total ROI (w/ appreciation)"
+                  label={`Annualized ROI (${projectionYears}yr compound)`}
                   value={`${totalROI.toFixed(2)}%`}
                   isPositive={totalROI > 10}
                 />
@@ -326,20 +388,88 @@ export default function CalculatorPage() {
                 <PieChart className="w-5 h-5 text-[#C97B4B]" />
                 Financial Summary
               </h3>
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-stone-700 mb-2">
+                  Projection Period
+                </label>
+                <select
+                  value={projectionYears}
+                  onChange={(e) => setProjectionYears(parseInt(e.target.value))}
+                  className="w-full px-3 py-2 border border-stone-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1B4965] text-sm"
+                >
+                  {[3, 5, 7, 10, 15, 20].map(y => (
+                    <option key={y} value={y}>{y} years</option>
+                  ))}
+                </select>
+              </div>
               <div className="space-y-3">
-                <SummaryRow label="Total Investment" value={`$${(downPayment + closingCosts).toLocaleString()}`} />
-                <SummaryRow label="Annual Rental Income" value={`$${(monthlyRent * 12 * (1 - vacancyRate/100)).toFixed(0)}`} />
-                <SummaryRow label="Annual Net Income" value={`$${(netMonthlyIncome * 12).toFixed(0)}`} />
+                <SummaryRow label="Total Cash Invested" value={`$${(downPayment + closingCosts).toLocaleString()}`} />
+                <SummaryRow label="Year 1 Net Income" value={`$${(netMonthlyIncome * 12).toFixed(0)}`} />
                 <SummaryRow label="Total Interest Paid" value={`$${totalInterest.toFixed(0)}`} />
-                <div className="pt-3 border-t">
-                  <SummaryRow 
-                    label="10-Year Property Value" 
-                    value={`$${(propertyPrice * Math.pow(1 + propertyAppreciation/100, 10)).toFixed(0)}`}
-                    highlight={true}
-                  />
-                </div>
+                {compoundProjection.length > 0 && (
+                  <div className="pt-3 border-t space-y-3">
+                    <SummaryRow
+                      label={`${projectionYears}-Year Property Value`}
+                      value={`$${compoundProjection[compoundProjection.length - 1].propertyValue.toLocaleString(undefined, { maximumFractionDigits: 0 })}`}
+                      highlight={true}
+                    />
+                    <SummaryRow
+                      label={`${projectionYears}-Year Total Return`}
+                      value={`$${compoundProjection[compoundProjection.length - 1].totalReturn.toLocaleString(undefined, { maximumFractionDigits: 0 })}`}
+                      highlight={true}
+                    />
+                    <SummaryRow
+                      label="Annualized Return (CAGR)"
+                      value={`${compoundProjection[compoundProjection.length - 1].annualizedReturn.toFixed(1)}%`}
+                      highlight={true}
+                    />
+                  </div>
+                )}
               </div>
             </div>
+
+            {/* Compound Growth Projection */}
+            {compoundProjection.length > 0 && (
+              <div className="bg-white rounded-2xl shadow-sm p-6">
+                <h3 className="text-lg font-semibold text-stone-900 mb-4 flex items-center gap-2">
+                  <TrendingUp className="w-5 h-5 text-[#1B4965]" />
+                  Compound Growth
+                </h3>
+                <div className="overflow-x-auto -mx-2">
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="border-b text-stone-500">
+                        <th className="text-left py-2 px-2">Year</th>
+                        <th className="text-right py-2 px-2">Value</th>
+                        <th className="text-right py-2 px-2">Equity</th>
+                        <th className="text-right py-2 px-2">Return</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {compoundProjection
+                        .filter((_, i) => {
+                          if (projectionYears <= 5) return true
+                          if (projectionYears <= 10) return i % 2 === 0 || i === compoundProjection.length - 1
+                          return i % 3 === 0 || i === compoundProjection.length - 1
+                        })
+                        .map(p => (
+                        <tr key={p.year} className="border-b border-stone-100">
+                          <td className="py-1.5 px-2 text-stone-600">Yr {p.year}</td>
+                          <td className="py-1.5 px-2 text-right font-medium">${(p.propertyValue / 1000).toFixed(0)}k</td>
+                          <td className="py-1.5 px-2 text-right font-medium">${(p.equity / 1000).toFixed(0)}k</td>
+                          <td className={`py-1.5 px-2 text-right font-bold ${p.annualizedReturn > 0 ? 'text-emerald-600' : 'text-red-500'}`}>
+                            {p.annualizedReturn.toFixed(1)}%
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <p className="text-xs text-stone-400 mt-3">
+                  Projections use compound appreciation. Rent growth estimated at 60% of property appreciation rate.
+                </p>
+              </div>
+            )}
 
             {/* Investment Grade */}
             <div className="bg-white rounded-2xl shadow-sm p-6">

@@ -1,9 +1,10 @@
 import { notFound } from 'next/navigation'
-import { normalizeApiUrl } from '@/lib/utils/api-url'
+import { normalizeApiUrl, normalizeFileUrl } from '@/lib/utils/api-url'
 import { RoiCalculator } from '@/components/RoiCalculator'
-import { Button } from '@/components/ui/button'
 import { PropertyImageGallery } from '@/components/PropertyImageGallery'
-import { MapPin, Bed, Bath, Maximize, TrendingUp, DollarSign, Shield, Building2 } from 'lucide-react'
+import { PropertyDescription } from '@/components/property/PropertyDescription'
+import { PropertySidebar } from '@/components/property/PropertySidebar'
+import { MapPin, Bed, Bath, Maximize, TrendingUp, DollarSign, Shield, Building2, CreditCard } from 'lucide-react'
 
 type PropertyPageProps = {
   params: Promise<{
@@ -26,6 +27,23 @@ async function getProperty(slug: string) {
   return data.data || data.property || data
 }
 
+/**
+ * Returns true if the investment data has at least one meaningful value
+ * (non-null, non-zero for numeric fields, or non-empty for strings).
+ */
+function hasInvestmentData(investmentData: any): boolean {
+  if (!investmentData) return false
+  const { rentalYield, capitalGrowth, expectedROI, averageRentPerMonth, paymentPlan, downPaymentPercentage } = investmentData
+  return (
+    (rentalYield != null && rentalYield > 0) ||
+    (capitalGrowth != null && capitalGrowth > 0) ||
+    (expectedROI != null && expectedROI > 0) ||
+    (averageRentPerMonth != null && averageRentPerMonth > 0) ||
+    (typeof paymentPlan === 'string' && paymentPlan.length > 0) ||
+    (downPaymentPercentage != null && downPaymentPercentage > 0)
+  )
+}
+
 export default async function PropertyPage({ params }: PropertyPageProps) {
   const { slug } = await params;
   const property = await getProperty(slug)
@@ -44,6 +62,8 @@ export default async function PropertyPage({ params }: PropertyPageProps) {
     'NEW_BUILD': 'bg-emerald-600 text-white',
     'RESALE': 'bg-stone-600 text-white',
   }
+
+  const showInvestmentSection = hasInvestmentData(property.investmentData)
 
   return (
     <div className="min-h-screen bg-stone-50">
@@ -72,9 +92,7 @@ export default async function PropertyPage({ params }: PropertyPageProps) {
           <h1 className="text-3xl md:text-4xl font-bold text-stone-900 mb-3">
             {property.title}
           </h1>
-          <p className="text-lg text-stone-600 max-w-3xl leading-relaxed">
-            {property.description}
-          </p>
+          <PropertyDescription description={property.description || ''} />
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -157,25 +175,29 @@ export default async function PropertyPage({ params }: PropertyPageProps) {
               )}
             </div>
 
-            {/* Investment Dashboard */}
-            {property.investmentData && (
+            {/* Investment Dashboard - only show if there is meaningful data */}
+            {showInvestmentSection && (
               <div className="bg-white rounded-xl border border-stone-200 p-6">
                 <h2 className="text-xl font-semibold text-stone-900 mb-6">Investment Overview</h2>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="text-center p-5 bg-emerald-50 rounded-xl border border-emerald-100">
-                    <TrendingUp className="w-7 h-7 text-emerald-600 mx-auto mb-2" />
-                    <div className="text-2xl font-bold text-emerald-700 mb-1">
-                      {property.investmentData.rentalYield?.toFixed(1) || 'N/A'}%
+                  {property.investmentData.rentalYield != null && property.investmentData.rentalYield > 0 && (
+                    <div className="text-center p-5 bg-emerald-50 rounded-xl border border-emerald-100">
+                      <TrendingUp className="w-7 h-7 text-emerald-600 mx-auto mb-2" />
+                      <div className="text-2xl font-bold text-emerald-700 mb-1">
+                        {property.investmentData.rentalYield.toFixed(1)}%
+                      </div>
+                      <div className="text-sm text-emerald-600">Rental Yield</div>
                     </div>
-                    <div className="text-sm text-emerald-600">Rental Yield</div>
-                  </div>
-                  <div className="text-center p-5 bg-[#E8F1F5] rounded-xl border border-[#BBD9E8]">
-                    <DollarSign className="w-7 h-7 text-[#1B4965] mx-auto mb-2" />
-                    <div className="text-2xl font-bold text-[#1B4965] mb-1">
-                      {property.investmentData.capitalGrowth?.toFixed(1) || 'N/A'}%
+                  )}
+                  {property.investmentData.capitalGrowth != null && property.investmentData.capitalGrowth > 0 && (
+                    <div className="text-center p-5 bg-[#E8F1F5] rounded-xl border border-[#BBD9E8]">
+                      <DollarSign className="w-7 h-7 text-[#1B4965] mx-auto mb-2" />
+                      <div className="text-2xl font-bold text-[#1B4965] mb-1">
+                        {property.investmentData.capitalGrowth.toFixed(1)}%
+                      </div>
+                      <div className="text-sm text-[#2B6985]">Capital Growth YoY</div>
                     </div>
-                    <div className="text-sm text-[#2B6985]">Capital Growth YoY</div>
-                  </div>
+                  )}
                   <div className="text-center p-5 bg-[#FBF0E7] rounded-xl border border-[#E9C09A]">
                     <Shield className="w-7 h-7 text-[#C97B4B] mx-auto mb-2" />
                     <div className="text-2xl font-bold text-[#C97B4B] mb-1">
@@ -185,31 +207,139 @@ export default async function PropertyPage({ params }: PropertyPageProps) {
                   </div>
                 </div>
 
+                {/* Payment Plan Card */}
+                {(property.investmentData.paymentPlan || property.investmentData.paymentPlanDetails) && (
+                  <div className="mt-4 p-5 bg-stone-50 rounded-xl border border-stone-200">
+                    <div className="flex items-center gap-2 mb-3">
+                      <CreditCard className="w-5 h-5 text-[#1B4965]" />
+                      <h3 className="font-semibold text-stone-900">Payment Plan</h3>
+                    </div>
+
+                    {/* Summary text */}
+                    {(property.investmentData.paymentPlanDetails?.summary || property.investmentData.paymentPlan) && (
+                      <p className="text-sm text-stone-700 mb-3">
+                        {property.investmentData.paymentPlanDetails?.summary || property.investmentData.paymentPlan}
+                      </p>
+                    )}
+
+                    {/* Structured milestones visualization */}
+                    {property.investmentData.paymentPlanDetails?.milestones?.length > 0 && (
+                      <div className="mb-3">
+                        {/* Progress bar */}
+                        <div className="flex rounded-full overflow-hidden h-3 mb-3">
+                          {property.investmentData.paymentPlanDetails.milestones.map((milestone: any, i: number) => {
+                            const colors = ['bg-[#1B4965]', 'bg-[#2B6985]', 'bg-[#C97B4B]', 'bg-emerald-500', 'bg-amber-500', 'bg-stone-400']
+                            return (
+                              <div
+                                key={i}
+                                className={`${colors[i % colors.length]} transition-all`}
+                                style={{ width: `${milestone.percentage}%` }}
+                                title={`${milestone.label}: ${milestone.percentage}%`}
+                              />
+                            )
+                          })}
+                        </div>
+
+                        {/* Milestone details */}
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm">
+                          {property.investmentData.paymentPlanDetails.milestones.map((milestone: any, i: number) => (
+                            <div key={i} className="bg-white rounded-lg p-3 border border-stone-100">
+                              <div className="text-stone-500 text-xs mb-1">{milestone.label}</div>
+                              <div className="font-semibold text-[#1B4965] text-lg">{milestone.percentage}%</div>
+                              {milestone.description && (
+                                <div className="text-stone-500 text-xs mt-1">{milestone.description}</div>
+                              )}
+                              {milestone.dueDate && (
+                                <div className="text-stone-400 text-xs mt-0.5">
+                                  {new Date(milestone.dueDate).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Fallback: simple down payment / completion / installments cards */}
+                    {!property.investmentData.paymentPlanDetails && (
+                      <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm">
+                        {property.investmentData.downPaymentPercentage != null && property.investmentData.downPaymentPercentage > 0 && (
+                          <div className="bg-white rounded-lg p-3 border border-stone-100">
+                            <div className="text-stone-500 text-xs mb-1">Down Payment</div>
+                            <div className="font-semibold text-[#1B4965]">
+                              {property.investmentData.downPaymentPercentage}%
+                            </div>
+                          </div>
+                        )}
+                        {property.investmentData.completionDate && (
+                          <div className="bg-white rounded-lg p-3 border border-stone-100">
+                            <div className="text-stone-500 text-xs mb-1">Completion</div>
+                            <div className="font-semibold text-[#1B4965]">
+                              {new Date(property.investmentData.completionDate).toLocaleDateString('en-US', {
+                                month: 'short',
+                                year: 'numeric',
+                              })}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Installment details for structured plans */}
+                    {property.investmentData.paymentPlanDetails?.installmentFrequency && (
+                      <div className="mt-3 pt-3 border-t border-stone-200 flex flex-wrap gap-4 text-sm">
+                        {property.investmentData.paymentPlanDetails.installmentFrequency && (
+                          <div>
+                            <span className="text-stone-500">Frequency:</span>{' '}
+                            <span className="font-medium text-stone-800 capitalize">{property.investmentData.paymentPlanDetails.installmentFrequency}</span>
+                          </div>
+                        )}
+                        {property.investmentData.paymentPlanDetails.totalInstallments && (
+                          <div>
+                            <span className="text-stone-500">Total Installments:</span>{' '}
+                            <span className="font-medium text-stone-800">{property.investmentData.paymentPlanDetails.totalInstallments}</span>
+                          </div>
+                        )}
+                        {property.investmentData.paymentPlanDetails.installmentAmount && (
+                          <div>
+                            <span className="text-stone-500">Per Installment:</span>{' '}
+                            <span className="font-medium text-stone-800">${property.investmentData.paymentPlanDetails.installmentAmount.toLocaleString()}</span>
+                          </div>
+                        )}
+                        {property.investmentData.paymentPlanDetails.postHandoverMonths && (
+                          <div>
+                            <span className="text-stone-500">Post-Handover:</span>{' '}
+                            <span className="font-medium text-stone-800">{property.investmentData.paymentPlanDetails.postHandoverMonths} months</span>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Completion date from main investment data */}
+                    {property.investmentData.paymentPlanDetails && property.investmentData.completionDate && (
+                      <div className="mt-3 pt-3 border-t border-stone-200 text-sm">
+                        <span className="text-stone-500">Expected Completion:</span>{' '}
+                        <span className="font-medium text-stone-800">
+                          {new Date(property.investmentData.completionDate).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 {/* Extra investment details */}
-                {(property.investmentData.expectedROI || property.investmentData.paymentPlan || property.investmentData.averageRentPerMonth) && (
+                {(property.investmentData.expectedROI || property.investmentData.averageRentPerMonth) && (
                   <div className="mt-6 pt-6 border-t border-stone-200 grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
-                    {property.investmentData.expectedROI && (
+                    {property.investmentData.expectedROI != null && property.investmentData.expectedROI > 0 && (
                       <div>
                         <span className="text-stone-500">Expected ROI:</span>{' '}
                         <span className="font-semibold text-stone-800">{property.investmentData.expectedROI}%</span>
                       </div>
                     )}
-                    {property.investmentData.averageRentPerMonth && (
+                    {property.investmentData.averageRentPerMonth != null && property.investmentData.averageRentPerMonth > 0 && (
                       <div>
                         <span className="text-stone-500">Avg Rent/mo:</span>{' '}
                         <span className="font-semibold text-stone-800">${property.investmentData.averageRentPerMonth.toLocaleString()}</span>
-                      </div>
-                    )}
-                    {property.investmentData.paymentPlan && (
-                      <div>
-                        <span className="text-stone-500">Payment Plan:</span>{' '}
-                        <span className="font-semibold text-stone-800">{property.investmentData.paymentPlan}</span>
-                      </div>
-                    )}
-                    {property.investmentData.downPaymentPercentage && (
-                      <div>
-                        <span className="text-stone-500">Down Payment:</span>{' '}
-                        <span className="font-semibold text-stone-800">{property.investmentData.downPaymentPercentage}%</span>
                       </div>
                     )}
                   </div>
@@ -224,43 +354,20 @@ export default async function PropertyPage({ params }: PropertyPageProps) {
             />
           </div>
 
-          {/* Sidebar */}
-          <div className="space-y-6">
-            {/* Price Card */}
-            <div className="bg-white rounded-xl border border-stone-200 p-6 sticky top-24">
-              <div className="text-center mb-6">
-                <div className="text-3xl font-bold text-stone-900 mb-1">
-                  {property.currency} {property.price?.toLocaleString()}
-                </div>
-                {property.area > 0 && (
-                  <div className="text-sm text-stone-500">
-                    {property.currency} {Math.round(property.price / property.area).toLocaleString()} / m²
-                  </div>
-                )}
-                {property.investmentData?.expectedROI && (
-                  <div className="mt-2 inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 text-sm font-medium">
-                    <TrendingUp className="w-3.5 h-3.5" />
-                    {property.investmentData.expectedROI}% ROI
-                  </div>
-                )}
-              </div>
+          {/* Sidebar - Client Component for interactivity */}
+          <div>
+            <PropertySidebar
+              propertyId={property.id}
+              title={property.title}
+              price={property.price}
+              currency={property.currency}
+              area={property.area}
+              expectedROI={property.investmentData?.expectedROI}
+            />
 
-              <div className="space-y-3">
-                <Button className="w-full bg-[#1B4965] hover:bg-[#2B6985] text-white">
-                  Request Information
-                </Button>
-                <Button variant="outline" className="w-full border-[#1B4965] text-[#1B4965] hover:bg-[#E8F1F5]">
-                  Schedule Viewing
-                </Button>
-                <Button variant="outline" className="w-full border-stone-300 text-stone-700 hover:bg-stone-50">
-                  Add to Favorites
-                </Button>
-              </div>
-            </div>
-
-            {/* Developer Info */}
+            {/* Developer Info (server-rendered, no interactivity needed) */}
             {property.developer && (
-              <div className="bg-white rounded-xl border border-stone-200 p-6">
+              <div className="bg-white rounded-xl border border-stone-200 p-6 mt-6">
                 <h3 className="text-base font-semibold text-stone-900 mb-4 flex items-center gap-2">
                   <Building2 className="w-4 h-4 text-[#1B4965]" />
                   Developer
@@ -268,7 +375,7 @@ export default async function PropertyPage({ params }: PropertyPageProps) {
                 <div className="flex items-center gap-3">
                   {property.developer.logo && (
                     <img
-                      src={property.developer.logo}
+                      src={normalizeFileUrl(property.developer.logo)}
                       alt={property.developer.name}
                       className="w-12 h-12 rounded-lg object-cover border border-stone-200"
                     />
@@ -294,7 +401,7 @@ export default async function PropertyPage({ params }: PropertyPageProps) {
 
             {/* Location Guide */}
             {property.locationGuide && (
-              <div className="bg-white rounded-xl border border-stone-200 p-6">
+              <div className="bg-white rounded-xl border border-stone-200 p-6 mt-6">
                 <h3 className="text-base font-semibold text-stone-900 mb-3">Location Guide</h3>
                 <div className="font-medium text-stone-800 mb-2">
                   {property.locationGuide.title}

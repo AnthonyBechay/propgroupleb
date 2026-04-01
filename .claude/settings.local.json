@@ -91,7 +91,15 @@
       "Bash(sips -z 192 192 logo.png --out icon-192x192.png)",
       "Bash(sips -z 512 512 logo.png --out icon-512x512.png)",
       "Bash(ls -la /Users/anthonybechay/development/propgroup/apps/web/public/favicon* /Users/anthonybechay/development/propgroup/apps/web/public/icon* /Users/anthonybechay/development/propgroup/apps/web/app/favicon*)",
-      "Bash(npx --yes png-to-ico /Users/anthonybechay/development/propgroup/apps/web/public/favicon-32x32.png)"
+      "Bash(npx --yes png-to-ico /Users/anthonybechay/development/propgroup/apps/web/public/favicon-32x32.png)",
+      "Bash(git -C /Users/anthonybechay/development/propgroup diff --stat)",
+      "WebFetch(domain:pub-fc6e8f66807b461d9a41177bb2e2ddda.r2.dev)",
+      "Bash(curl -sI \"https://pub-fc6e8f66807b461d9a41177bb2e2ddda.r2.dev\")",
+      "Bash(curl -sI \"https://pub-fc6e8f66807b461d9a41177bb2e2ddda.r2.dev/properties/1775033761330-anthony-copy-0d74cd8d.jpeg\")",
+      "Bash(node -e \":*)",
+      "Bash(DATABASE_URL=\"postgresql://postgres:postgres@localhost:5433/propgroup\" npx prisma migrate dev --name add-payment-plan-details --schema packages/db/prisma/schema.prisma)",
+      "Bash(DATABASE_URL=\"postgresql://postgres:postgres@localhost:5433/propgroup\" npx prisma migrate diff --from-schema-datamodel packages/db/prisma/schema.prisma --to-schema-datamodel packages/db/prisma/schema.prisma --script)",
+      "Bash(DATABASE_URL=\"postgresql://postgres:postgres@localhost:5433/propgroup\" npx prisma generate --schema packages/db/prisma/schema.prisma)"
     ],
     "deny": [],
     "ask": []

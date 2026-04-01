@@ -387,6 +387,7 @@ model PropertyInvestmentData {
   maxInvestment         Float?
   downPaymentPercentage Float?
   paymentPlan           String?
+  paymentPlanDetails    Json?
   installmentYears      Int?
 
   // Golden Visa

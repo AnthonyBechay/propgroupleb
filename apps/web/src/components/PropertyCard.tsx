@@ -22,9 +22,9 @@ import {
   Award,
   Camera
 } from 'lucide-react'
-import { toggleFavorite } from '@/actions/favorite-actions'
 import { submitInquiry } from '@/actions/inquiry-actions'
 import { useAuth } from '@/contexts/AuthContext'
+import { normalizeApiUrl, normalizeFileUrl } from '@/lib/utils/api-url'
 import { AuthModal } from '@/components/auth/AuthModal'
 import { Button } from '@/components/ui/button'
 import {
@@ -104,6 +104,8 @@ export function PropertyCard({
     },
   })
 
+  const apiUrl = normalizeApiUrl(process.env.NEXT_PUBLIC_API_URL)
+
   const handleFavorite = async (e: React.MouseEvent) => {
     e.preventDefault()
     e.stopPropagation()
@@ -115,19 +117,35 @@ export function PropertyCard({
 
     setIsLoadingFavorite(true)
     try {
-      const result = await toggleFavorite(id)
-      if (result.success) {
-        setIsFavorited(result.isFavorited || false)
+      // Check current favorite status from the backend
+      const checkRes = await fetch(`${apiUrl}/api/favorites/check/${id}`, {
+        credentials: 'include',
+      })
+      const checkData = await checkRes.json()
+      const currentlyFavorited = checkData?.data?.isFavorited ?? isFavorited
+
+      // Toggle: if currently favorited, DELETE; otherwise, POST
+      const method = currentlyFavorited ? 'DELETE' : 'POST'
+      const toggleRes = await fetch(`${apiUrl}/api/favorites/${id}`, {
+        method,
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+      })
+
+      if (toggleRes.ok) {
+        const newFavorited = !currentlyFavorited
+        setIsFavorited(newFavorited)
         toast({
-          title: result.isFavorited ? 'Added to favorites' : 'Removed from favorites',
-          description: result.isFavorited
+          title: newFavorited ? 'Added to favorites' : 'Removed from favorites',
+          description: newFavorited
             ? 'You can view your favorites in your portal'
             : 'Property removed from your favorites',
         })
       } else {
+        const errData = await toggleRes.json().catch(() => ({}))
         toast({
           title: 'Error',
-          description: result.error || 'Failed to update favorite status',
+          description: errData.message || errData.error || 'Failed to update favorite status',
           variant: 'destructive',
         })
       }
@@ -206,7 +224,7 @@ export function PropertyCard({
   }[status] || { bg: 'bg-stone-500', text: 'text-white', label: status, icon: Home }
 
   const defaultImage = '/placeholder-property.jpg'
-  const mainImage = images && images.length > 0 ? images[currentImageIndex] : defaultImage
+  const mainImage = images && images.length > 0 ? normalizeFileUrl(images[currentImageIndex]) : defaultImage
 
   // Calculate best metric to highlight
   const bestMetric = investmentData ?

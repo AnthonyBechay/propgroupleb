@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { ImageUpload, VideoUpload } from '@/components/ui/ImageUpload'
 import { X, ChevronDown, ChevronUp, Loader2, Plus } from 'lucide-react'
 import { normalizeApiUrl } from '@/lib/utils/api-url'
+import { PaymentPlanBuilder, type PaymentPlanDetails } from './PaymentPlanBuilder'
 
 const API_BASE_URL = normalizeApiUrl(process.env.NEXT_PUBLIC_API_URL)
 
@@ -59,6 +60,8 @@ export function CreatePropertyModal({
     country: 'GEORGIA' as string,
     status: 'NEW_BUILD' as string,
     isGoldenVisaEligible: false,
+    featured: false,
+    featuredUntil: '',
     city: '',
     district: '',
     address: '',
@@ -71,6 +74,7 @@ export function CreatePropertyModal({
     minInvestment: '' as string | number,
     maxInvestment: '' as string | number,
     paymentPlan: '',
+    paymentPlanDetails: null as PaymentPlanDetails | null,
     completionDate: '',
     developerId: '',
     locationGuideId: '',
@@ -93,6 +97,8 @@ export function CreatePropertyModal({
       country: 'GEORGIA',
       status: 'NEW_BUILD',
       isGoldenVisaEligible: false,
+      featured: false,
+      featuredUntil: '',
       city: '',
       district: '',
       address: '',
@@ -105,6 +111,7 @@ export function CreatePropertyModal({
       minInvestment: '',
       maxInvestment: '',
       paymentPlan: '',
+      paymentPlanDetails: null,
       completionDate: '',
       developerId: '',
       locationGuideId: '',
@@ -142,6 +149,8 @@ export function CreatePropertyModal({
         country: form.country,
         status: form.status,
         isGoldenVisaEligible: form.isGoldenVisaEligible,
+        featured: form.featured,
+        featuredUntil: form.featuredUntil || null,
         images: imageUrls,
         videoUrl: videoUrl || null,
         city: form.city || null,
@@ -156,13 +165,18 @@ export function CreatePropertyModal({
       if (form.locationGuideId) data.locationGuideId = form.locationGuideId
 
       // Add investment data if any field is set
-      if (form.expectedROI || form.rentalYield || form.capitalGrowth) {
+      const hasInvestment = form.expectedROI || form.rentalYield || form.capitalGrowth || form.paymentPlan || form.paymentPlanDetails || form.completionDate
+      if (hasInvestment) {
         data.expectedROI = form.expectedROI ? Number(form.expectedROI) : undefined
         data.rentalYield = form.rentalYield ? Number(form.rentalYield) : undefined
         data.capitalGrowth = form.capitalGrowth ? Number(form.capitalGrowth) : undefined
         data.minInvestment = form.minInvestment ? Number(form.minInvestment) : undefined
         data.maxInvestment = form.maxInvestment ? Number(form.maxInvestment) : undefined
-        data.paymentPlan = form.paymentPlan || undefined
+        data.paymentPlan = form.paymentPlanDetails?.summary || form.paymentPlan || undefined
+        data.paymentPlanDetails = form.paymentPlanDetails || undefined
+        data.downPaymentPercentage = form.paymentPlanDetails?.milestones?.[0]?.percentage
+          ? Number(form.paymentPlanDetails.milestones[0].percentage)
+          : undefined
         data.completionDate = form.completionDate || undefined
       }
 
@@ -302,6 +316,22 @@ export function CreatePropertyModal({
                     />
                     <label htmlFor="createGoldenVisa" className="text-sm text-gray-700">Golden Visa Eligible</label>
                   </div>
+                  <div className="md:col-span-2 flex items-center gap-3">
+                    <input
+                      type="checkbox"
+                      id="createFeatured"
+                      checked={form.featured}
+                      onChange={(e) => updateField('featured', e.target.checked)}
+                      className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    />
+                    <label htmlFor="createFeatured" className="text-sm text-gray-700">Featured Property</label>
+                  </div>
+                  {form.featured && (
+                    <div className="md:col-span-2">
+                      <label className={labelClass}>Featured Until</label>
+                      <input className={inputClass} type="date" value={form.featuredUntil} onChange={(e) => updateField('featuredUntil', e.target.value)} />
+                    </div>
+                  )}
                 </div>
               </section>
 
@@ -361,8 +391,12 @@ export function CreatePropertyModal({
                     <input className={inputClass} type="date" value={form.completionDate} onChange={(e) => updateField('completionDate', e.target.value)} />
                   </div>
                   <div className="md:col-span-3">
-                    <label className={labelClass}>Payment Plan</label>
-                    <textarea className={`${inputClass} resize-none`} rows={2} value={form.paymentPlan} onChange={(e) => updateField('paymentPlan', e.target.value)} placeholder="e.g., 30% down, 70% on completion" />
+                    <PaymentPlanBuilder
+                      value={form.paymentPlanDetails}
+                      onChange={(details) => updateField('paymentPlanDetails', details)}
+                      labelClass={labelClass}
+                      inputClass={inputClass}
+                    />
                   </div>
                 </div>
               </section>

@@ -39,3 +39,22 @@ export function getApiUrl(endpoint: string): string {
   return `${baseUrl}${normalizedEndpoint}`;
 }
 
+/**
+ * Rewrites R2 public URLs to use the backend proxy.
+ * Old files stored with pub-*.r2.dev URLs will be proxied through /api/files/*.
+ * New files already use the proxy URL.
+ */
+export function normalizeFileUrl(url: string): string {
+  if (!url) return url;
+
+  // Match R2 public URL pattern: https://pub-*.r2.dev/path/to/file
+  const r2Match = url.match(/^https:\/\/pub-[a-f0-9]+\.r2\.dev\/(.+)$/);
+  if (r2Match) {
+    const key = r2Match[1];
+    const apiBase = normalizeApiUrl(process.env.NEXT_PUBLIC_API_URL);
+    return `${apiBase}/api/files/${key}`;
+  }
+
+  return url;
+}
+

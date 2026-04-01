@@ -5,6 +5,7 @@ import { Property } from '@/lib/types/api'
 import { ImageUpload, VideoUpload } from '@/components/ui/ImageUpload'
 import { X, ChevronDown, ChevronUp, Loader2 } from 'lucide-react'
 import { normalizeApiUrl } from '@/lib/utils/api-url'
+import { PaymentPlanBuilder, type PaymentPlanDetails } from './PaymentPlanBuilder'
 
 const API_BASE_URL = normalizeApiUrl(process.env.NEXT_PUBLIC_API_URL)
 
@@ -22,6 +23,8 @@ const PROPERTY_TYPES = [
 const COUNTRIES = ['GEORGIA', 'CYPRUS', 'GREECE', 'LEBANON'] as const
 const STATUSES = ['OFF_PLAN', 'NEW_BUILD', 'RESALE'] as const
 const CURRENCIES = ['USD', 'EUR', 'GBP', 'AED'] as const
+
+
 
 export function EditPropertyModal({ property, open, onOpenChange }: EditPropertyModalProps) {
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -53,7 +56,10 @@ export function EditPropertyModal({ property, open, onOpenChange }: EditProperty
     minInvestment: '' as string | number,
     maxInvestment: '' as string | number,
     paymentPlan: '',
+    paymentPlanDetails: null as PaymentPlanDetails | null,
     completionDate: '',
+    featured: false,
+    featuredUntil: '',
   })
 
   // Populate form when property changes
@@ -80,7 +86,10 @@ export function EditPropertyModal({ property, open, onOpenChange }: EditProperty
         minInvestment: property.investmentData?.minInvestment || '',
         maxInvestment: property.investmentData?.maxInvestment || '',
         paymentPlan: property.investmentData?.paymentPlan || '',
+        paymentPlanDetails: (property.investmentData as any)?.paymentPlanDetails || null,
         completionDate: property.investmentData?.completionDate || '',
+        featured: (property as any).featured || false,
+        featuredUntil: (property as any).featuredUntil ? new Date((property as any).featuredUntil).toISOString().split('T')[0] : '',
       })
       setImageUrls(property.images || [])
       setVideoUrl((property as any).videoUrl || '')
@@ -121,6 +130,8 @@ export function EditPropertyModal({ property, open, onOpenChange }: EditProperty
         country: form.country,
         status: form.status,
         isGoldenVisaEligible: form.isGoldenVisaEligible,
+        featured: form.featured,
+        featuredUntil: form.featuredUntil || null,
         images: imageUrls,
         videoUrl: videoUrl || null,
         city: form.city || null,
@@ -129,13 +140,18 @@ export function EditPropertyModal({ property, open, onOpenChange }: EditProperty
       }
 
       // Add investment data if any field is set
-      if (form.expectedROI || form.rentalYield || form.capitalGrowth) {
+      const hasInvestment = form.expectedROI || form.rentalYield || form.capitalGrowth || form.paymentPlan || form.paymentPlanDetails || form.completionDate
+      if (hasInvestment) {
         data.expectedROI = form.expectedROI ? Number(form.expectedROI) : undefined
         data.rentalYield = form.rentalYield ? Number(form.rentalYield) : undefined
         data.capitalGrowth = form.capitalGrowth ? Number(form.capitalGrowth) : undefined
         data.minInvestment = form.minInvestment ? Number(form.minInvestment) : undefined
         data.maxInvestment = form.maxInvestment ? Number(form.maxInvestment) : undefined
-        data.paymentPlan = form.paymentPlan || undefined
+        data.paymentPlan = form.paymentPlanDetails?.summary || form.paymentPlan || undefined
+        data.paymentPlanDetails = form.paymentPlanDetails || undefined
+        data.downPaymentPercentage = form.paymentPlanDetails?.milestones?.[0]?.percentage
+          ? Number(form.paymentPlanDetails.milestones[0].percentage)
+          : undefined
         data.completionDate = form.completionDate || undefined
       }
 
@@ -268,6 +284,22 @@ export function EditPropertyModal({ property, open, onOpenChange }: EditProperty
                 />
                 <label htmlFor="goldenVisa" className="text-sm text-gray-700">Golden Visa Eligible</label>
               </div>
+              <div className="md:col-span-2 flex items-center gap-3">
+                <input
+                  type="checkbox"
+                  id="featured"
+                  checked={form.featured}
+                  onChange={(e) => updateField('featured', e.target.checked)}
+                  className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                />
+                <label htmlFor="featured" className="text-sm text-gray-700">Featured Property</label>
+              </div>
+              {form.featured && (
+                <div className="md:col-span-2">
+                  <label className={labelClass}>Featured Until</label>
+                  <input className={inputClass} type="date" value={form.featuredUntil} onChange={(e) => updateField('featuredUntil', e.target.value)} />
+                </div>
+              )}
             </div>
           </section>
 
@@ -300,8 +332,12 @@ export function EditPropertyModal({ property, open, onOpenChange }: EditProperty
                 <input className={inputClass} type="date" value={form.completionDate} onChange={(e) => updateField('completionDate', e.target.value)} />
               </div>
               <div className="md:col-span-3">
-                <label className={labelClass}>Payment Plan</label>
-                <textarea className={`${inputClass} resize-none`} rows={2} value={form.paymentPlan} onChange={(e) => updateField('paymentPlan', e.target.value)} placeholder="e.g., 30% down, 70% on completion" />
+                <PaymentPlanBuilder
+                  value={form.paymentPlanDetails}
+                  onChange={(details) => updateField('paymentPlanDetails', details)}
+                  labelClass={labelClass}
+                  inputClass={inputClass}
+                />
               </div>
             </div>
           </section>

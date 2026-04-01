@@ -41,6 +41,7 @@ const investmentFields = {
   maxInvestment: z.number().nullish(),
   downPaymentPercentage: z.number().nullish(),
   paymentPlan: z.string().nullish(),
+  paymentPlanDetails: z.any().nullish(),
   installmentYears: z.number().nullish(),
   completionDate: z.string().nullish(),
   handoverDate: z.string().nullish(),

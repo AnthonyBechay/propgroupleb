@@ -3,14 +3,17 @@
 import { useState } from 'react'
 import Image from 'next/image'
 import { ChevronLeft, ChevronRight, ImageIcon } from 'lucide-react'
+import { normalizeFileUrl } from '@/lib/utils/api-url'
 
 interface PropertyImageGalleryProps {
   images: string[]
   title: string
 }
 
-export function PropertyImageGallery({ images, title }: PropertyImageGalleryProps) {
+export function PropertyImageGallery({ images: rawImages, title }: PropertyImageGalleryProps) {
   const [activeIndex, setActiveIndex] = useState(0)
+  // Normalize R2 public URLs to use the backend proxy
+  const images = rawImages.map(normalizeFileUrl)
 
   if (!images || images.length === 0) {
     return (

@@ -1,4 +1,5 @@
-import { S3Client, PutObjectCommand, DeleteObjectCommand, HeadObjectCommand } from '@aws-sdk/client-s3';
+import { S3Client, PutObjectCommand, DeleteObjectCommand, GetObjectCommand, HeadObjectCommand } from '@aws-sdk/client-s3';
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { randomUUID } from 'crypto';
 import path from 'path';
 
@@ -13,6 +14,24 @@ const s3Client = new S3Client({
 
 const BUCKET_NAME = process.env.R2_BUCKET_NAME || '';
 const PUBLIC_URL = process.env.R2_PUBLIC_URL || '';
+
+/**
+ * Get the base URL for file access.
+ * Uses NEXT_PUBLIC_API_URL env var if set, otherwise falls back to R2 public URL.
+ * The /api/files/ proxy endpoint ensures files are always accessible.
+ */
+function getFileBaseUrl(): string {
+  // Prefer explicit API URL (e.g., https://api.bechays.com)
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL || process.env.API_URL;
+  if (apiUrl) {
+    return `${apiUrl}/api/files`;
+  }
+  // Fall back to R2 public URL (only works if R2.dev public access is enabled)
+  if (PUBLIC_URL) {
+    return PUBLIC_URL;
+  }
+  return 'http://localhost:3001/api/files';
+}
 
 /**
  * Sanitize a string for use in file paths (slug-like)
@@ -82,7 +101,7 @@ export async function uploadFile(
     })
   );
 
-  const url = `${PUBLIC_URL}/${key}`;
+  const url = `${getFileBaseUrl()}/${key}`;
   return { url, key };
 }
 
@@ -109,7 +128,7 @@ export async function uploadFileSimple(
     })
   );
 
-  const url = `${PUBLIC_URL}/${key}`;
+  const url = `${getFileBaseUrl()}/${key}`;
   return { url, key };
 }
 
@@ -126,9 +145,49 @@ export async function deleteFile(key: string): Promise<void> {
 }
 
 /**
- * Extract the R2 key from a full public URL
+ * Generate a signed URL for reading an object (valid for 1 hour)
+ */
+export async function getSignedFileUrl(key: string, expiresIn = 3600): Promise<string> {
+  const command = new GetObjectCommand({
+    Bucket: BUCKET_NAME,
+    Key: key,
+  });
+  return getSignedUrl(s3Client, command, { expiresIn });
+}
+
+/**
+ * Get the file stream from R2 for proxying
+ */
+export async function getFileStream(key: string) {
+  const command = new GetObjectCommand({
+    Bucket: BUCKET_NAME,
+    Key: key,
+  });
+  return s3Client.send(command);
+}
+
+/**
+ * Check if a file exists in R2
+ */
+export async function fileExists(key: string): Promise<boolean> {
+  try {
+    await s3Client.send(new HeadObjectCommand({ Bucket: BUCKET_NAME, Key: key }));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Extract the R2 key from a full public URL or a proxied URL
  */
 export function extractKeyFromUrl(url: string): string | null {
-  if (!PUBLIC_URL || !url.startsWith(PUBLIC_URL)) return null;
-  return url.replace(`${PUBLIC_URL}/`, '');
+  // Handle R2 public URL format
+  if (PUBLIC_URL && url.startsWith(PUBLIC_URL)) {
+    return url.replace(`${PUBLIC_URL}/`, '');
+  }
+  // Handle proxy URL format: /api/files/properties/slug/images/file.jpg
+  const proxyMatch = url.match(/\/api\/files\/(.+)$/);
+  if (proxyMatch) return proxyMatch[1];
+  return null;
 }
