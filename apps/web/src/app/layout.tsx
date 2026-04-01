@@ -68,7 +68,13 @@ export const metadata: Metadata = {
     index: true,
     follow: true,
   },
-  // Favicon handled by app/icon.png and app/favicon.ico (App Router convention)
+  icons: {
+    icon: [
+      { url: '/favicon.ico', sizes: 'any' },
+      { url: '/icon.png', type: 'image/png', sizes: '48x48' },
+    ],
+    apple: '/apple-icon.png',
+  },
 };
 
 export default function RootLayout({

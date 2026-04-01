@@ -40,7 +40,10 @@ export function PropertyTable({ properties }: PropertyTableProps) {
         method: 'POST',
         credentials: 'include',
       })
-      if (!res.ok) throw new Error('Failed to generate share link')
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error(err.error || err.message || `Server error ${res.status}`)
+      }
       const json = await res.json()
       const shareUrl = `${window.location.origin}/share/${json.data.shareToken}`
       await navigator.clipboard.writeText(shareUrl)
@@ -48,7 +51,7 @@ export function PropertyTable({ properties }: PropertyTableProps) {
       setTimeout(() => setCopiedId(null), 2000)
     } catch (error) {
       console.error('Failed to share:', error)
-      alert('Failed to generate share link')
+      alert(`Failed to generate share link: ${error instanceof Error ? error.message : 'Unknown error'}`)
     }
   }
 
