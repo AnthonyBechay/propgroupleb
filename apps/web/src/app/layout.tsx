@@ -75,17 +75,6 @@ export const metadata: Metadata = {
     index: true,
     follow: true,
   },
-  icons: {
-    icon: [
-      { url: '/favicon.ico?v=2', sizes: 'any' },
-      { url: '/favicon-16x16.png?v=2', type: 'image/png', sizes: '16x16' },
-      { url: '/favicon-32x32.png?v=2', type: 'image/png', sizes: '32x32' },
-      { url: '/icon.png?v=2', type: 'image/png', sizes: '48x48' },
-      { url: '/icon-192x192.png?v=2', type: 'image/png', sizes: '192x192' },
-      { url: '/icon-512x512.png?v=2', type: 'image/png', sizes: '512x512' },
-    ],
-    apple: '/apple-touch-icon.png?v=2',
-  },
 };
 
 export default function RootLayout({
@@ -96,10 +85,9 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${inter.variable} ${plusJakarta.variable} overflow-x-hidden`}>
       <head>
-        <link rel="icon" href="/favicon.ico?v=2" sizes="any" />
-        <link rel="icon" href="/favicon-32x32.png?v=2" type="image/png" sizes="32x32" />
-        <link rel="icon" href="/favicon-16x16.png?v=2" type="image/png" sizes="16x16" />
-        <link rel="apple-touch-icon" href="/apple-touch-icon.png?v=2" />
+        <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png?v=3" />
+        <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png?v=3" />
+        <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png?v=3" />
       </head>
       <body className="font-plus-jakarta antialiased min-h-screen flex flex-col bg-stone-50 overflow-x-hidden">
         <AuthProvider>
