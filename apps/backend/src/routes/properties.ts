@@ -125,6 +125,12 @@ router.post(
     const validatedData = propertySchema.parse(req.body);
     const { investmentData: investFields, propertyData } = extractInvestmentData(validatedData);
 
+    // Convert date strings to proper DateTime objects for Prisma
+    const pd = propertyData as Record<string, unknown>;
+    if (pd.featuredUntil && typeof pd.featuredUntil === 'string') {
+      pd.featuredUntil = new Date(pd.featuredUntil);
+    }
+
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const result = await prisma.$transaction(async (tx: any) => {
       const createData = {
@@ -179,11 +185,17 @@ router.put(
 
     const { investmentData: investFields, propertyData } = extractInvestmentData(validatedData);
 
+    // Convert date strings to proper DateTime objects for Prisma
+    const pd = propertyData as Record<string, unknown>;
+    if (pd.featuredUntil && typeof pd.featuredUntil === 'string') {
+      pd.featuredUntil = new Date(pd.featuredUntil);
+    }
+
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const result = await prisma.$transaction(async (tx: any) => {
       const property = await tx.property.update({
         where: { id: req.params.id },
-        data: propertyData as Record<string, unknown>,
+        data: pd,
       });
 
       const hasInvestmentData = Object.values(investFields).some((v) => v !== undefined);
