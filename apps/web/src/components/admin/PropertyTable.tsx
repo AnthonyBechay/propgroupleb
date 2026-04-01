@@ -16,7 +16,10 @@ import {
   Square,
   AlertTriangle,
   X,
+  Share2,
+  Check,
 } from 'lucide-react'
+import { normalizeApiUrl } from '@/lib/utils/api-url'
 
 type PropertyTableProps = {
   properties: Property[]
@@ -28,6 +31,26 @@ export function PropertyTable({ properties }: PropertyTableProps) {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false)
   const [bulkDeleting, setBulkDeleting] = useState(false)
+  const [copiedId, setCopiedId] = useState<string | null>(null)
+
+  const handleShare = async (property: Property) => {
+    try {
+      const apiUrl = normalizeApiUrl(process.env.NEXT_PUBLIC_API_URL)
+      const res = await fetch(`${apiUrl}/api/properties/${property.id}/share`, {
+        method: 'POST',
+        credentials: 'include',
+      })
+      if (!res.ok) throw new Error('Failed to generate share link')
+      const json = await res.json()
+      const shareUrl = `${window.location.origin}/share/${json.data.shareToken}`
+      await navigator.clipboard.writeText(shareUrl)
+      setCopiedId(property.id)
+      setTimeout(() => setCopiedId(null), 2000)
+    } catch (error) {
+      console.error('Failed to share:', error)
+      alert('Failed to generate share link')
+    }
+  }
 
   const formatCurrency = (amount: number, currency: string) => {
     return new Intl.NumberFormat('en-US', {
@@ -307,6 +330,17 @@ export function PropertyTable({ properties }: PropertyTableProps) {
                       title="View"
                     >
                       <Eye className="h-4 w-4" />
+                    </button>
+                    <button
+                      onClick={() => handleShare(property)}
+                      className={`p-1.5 rounded-lg transition-colors ${
+                        copiedId === property.id
+                          ? 'text-emerald-600 bg-emerald-50'
+                          : 'text-gray-400 hover:text-[#C97B4B] hover:bg-orange-50'
+                      }`}
+                      title={copiedId === property.id ? 'Link copied!' : 'Share public link'}
+                    >
+                      {copiedId === property.id ? <Check className="h-4 w-4" /> : <Share2 className="h-4 w-4" />}
                     </button>
                     <button
                       onClick={() => handleEdit(property)}

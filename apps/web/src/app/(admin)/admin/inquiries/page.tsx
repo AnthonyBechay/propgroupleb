@@ -15,10 +15,25 @@ import {
   Calendar,
   ChevronDown,
   ChevronUp,
-  X,
   Loader2,
+  CheckCircle2,
+  Clock,
+  XCircle,
+  Archive,
+  StickyNote,
 } from 'lucide-react'
-import { apiClient } from '@/lib/api/client'
+import { normalizeApiUrl } from '@/lib/utils/api-url'
+
+const API_BASE_URL = normalizeApiUrl(process.env.NEXT_PUBLIC_API_URL)
+
+const STATUSES = [
+  { value: 'ALL', label: 'All', icon: MessageSquare, color: 'text-stone-600', bg: 'bg-stone-100' },
+  { value: 'NEW', label: 'New', icon: Clock, color: 'text-blue-600', bg: 'bg-blue-100' },
+  { value: 'IN_PROGRESS', label: 'In Progress', icon: Loader2, color: 'text-amber-600', bg: 'bg-amber-100' },
+  { value: 'REPLIED', label: 'Replied', icon: CheckCircle2, color: 'text-emerald-600', bg: 'bg-emerald-100' },
+  { value: 'CANCELLED', label: 'Cancelled', icon: XCircle, color: 'text-red-600', bg: 'bg-red-100' },
+  { value: 'CLOSED', label: 'Closed', icon: Archive, color: 'text-stone-500', bg: 'bg-stone-200' },
+] as const
 
 interface Inquiry {
   id: string
@@ -26,8 +41,13 @@ interface Inquiry {
   email: string
   phone: string | null
   message: string | null
+  status: string
+  adminNotes: string | null
+  repliedAt: string | null
+  repliedBy: string | null
   propertyTitle: string | null
   createdAt: string
+  updatedAt: string
   property: {
     id: string
     title: string
@@ -43,17 +63,6 @@ interface Inquiry {
   } | null
 }
 
-interface ApiResponse {
-  success: boolean
-  data: Inquiry[]
-  pagination?: {
-    page: number
-    limit: number
-    total: number
-    totalPages: number
-  }
-}
-
 export default function AdminInquiriesPage() {
   const { user } = useAuth()
   const [inquiries, setInquiries] = useState<Inquiry[]>([])
@@ -62,21 +71,29 @@ export default function AdminInquiriesPage() {
   const [totalPages, setTotalPages] = useState(1)
   const [totalCount, setTotalCount] = useState(0)
   const [searchQuery, setSearchQuery] = useState('')
+  const [statusFilter, setStatusFilter] = useState('ALL')
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [deleting, setDeleting] = useState<string | null>(null)
+  const [updatingId, setUpdatingId] = useState<string | null>(null)
+  const [editingNotesId, setEditingNotesId] = useState<string | null>(null)
+  const [notesText, setNotesText] = useState('')
 
   useEffect(() => {
     fetchInquiries()
-  }, [page])
+  }, [page, statusFilter])
 
   async function fetchInquiries() {
     try {
       setLoading(true)
-      const response = await apiClient.getInquiries({ page, limit: 20 }) as ApiResponse
-      setInquiries(response.data || [])
-      if (response.pagination) {
-        setTotalPages(response.pagination.totalPages)
-        setTotalCount(response.pagination.total)
+      const params = new URLSearchParams({ page: String(page), limit: '20' })
+      if (statusFilter !== 'ALL') params.set('status', statusFilter)
+
+      const res = await fetch(`${API_BASE_URL}/api/inquiries?${params}`, { credentials: 'include' })
+      const json = await res.json()
+      setInquiries(json.data || [])
+      if (json.pagination) {
+        setTotalPages(json.pagination.totalPages)
+        setTotalCount(json.pagination.total)
       }
     } catch (error) {
       console.error('Failed to fetch inquiries:', error)
@@ -85,11 +102,52 @@ export default function AdminInquiriesPage() {
     }
   }
 
+  async function handleStatusChange(id: string, newStatus: string) {
+    setUpdatingId(id)
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/inquiries/${id}`, {
+        method: 'PATCH',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: newStatus }),
+      })
+      if (res.ok) {
+        const json = await res.json()
+        setInquiries(prev => prev.map(inq => inq.id === id ? { ...inq, ...json.data } : inq))
+      }
+    } catch (error) {
+      console.error('Failed to update status:', error)
+    } finally {
+      setUpdatingId(null)
+    }
+  }
+
+  async function handleSaveNotes(id: string) {
+    setUpdatingId(id)
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/inquiries/${id}`, {
+        method: 'PATCH',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ adminNotes: notesText }),
+      })
+      if (res.ok) {
+        const json = await res.json()
+        setInquiries(prev => prev.map(inq => inq.id === id ? { ...inq, ...json.data } : inq))
+        setEditingNotesId(null)
+      }
+    } catch (error) {
+      console.error('Failed to save notes:', error)
+    } finally {
+      setUpdatingId(null)
+    }
+  }
+
   async function handleDelete(id: string) {
     if (!confirm('Are you sure you want to delete this inquiry?')) return
     setDeleting(id)
     try {
-      await apiClient.deleteInquiry(id)
+      await fetch(`${API_BASE_URL}/api/inquiries/${id}`, { method: 'DELETE', credentials: 'include' })
       setInquiries(prev => prev.filter(inq => inq.id !== id))
       setTotalCount(prev => prev - 1)
     } catch (error) {
@@ -100,9 +158,7 @@ export default function AdminInquiriesPage() {
     }
   }
 
-  const getPropertyName = (inq: Inquiry) => {
-    return inq.property?.title || inq.propertyTitle || 'Deleted Property'
-  }
+  const getPropertyName = (inq: Inquiry) => inq.property?.title || inq.propertyTitle || 'Deleted Property'
 
   const filtered = searchQuery
     ? inquiries.filter(inq => {
@@ -116,9 +172,8 @@ export default function AdminInquiriesPage() {
       })
     : inquiries
 
-  if (!user || (user.role !== 'ADMIN' && user.role !== 'SUPER_ADMIN')) {
-    return <div className="p-8 text-center text-stone-500">Access denied</div>
-  }
+  const getStatusConfig = (status: string) =>
+    STATUSES.find(s => s.value === status) || STATUSES[1]
 
   function timeAgo(dateStr: string) {
     const now = new Date()
@@ -131,6 +186,10 @@ export default function AdminInquiriesPage() {
     const diffDays = Math.floor(diffHours / 24)
     if (diffDays < 30) return `${diffDays}d ago`
     return new Date(dateStr).toLocaleDateString()
+  }
+
+  if (!user || (user.role !== 'ADMIN' && user.role !== 'SUPER_ADMIN')) {
+    return <div className="p-8 text-center text-stone-500">Access denied</div>
   }
 
   return (
@@ -150,16 +209,41 @@ export default function AdminInquiriesPage() {
         </div>
       </div>
 
-      {/* Search */}
-      <div className="relative max-w-sm">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400" />
-        <input
-          type="text"
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          placeholder="Search by name, email, property..."
-          className="w-full pl-10 pr-3 py-2.5 border rounded-xl text-sm bg-white"
-        />
+      {/* Status Tabs + Search */}
+      <div className="flex flex-col sm:flex-row gap-4">
+        {/* Status filter tabs */}
+        <div className="flex gap-1 bg-stone-100 p-1 rounded-xl overflow-x-auto">
+          {STATUSES.map(s => {
+            const Icon = s.icon
+            const isActive = statusFilter === s.value
+            return (
+              <button
+                key={s.value}
+                onClick={() => { setStatusFilter(s.value); setPage(1) }}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium whitespace-nowrap transition-all ${
+                  isActive
+                    ? 'bg-white shadow-sm text-stone-900'
+                    : 'text-stone-500 hover:text-stone-700'
+                }`}
+              >
+                <Icon className={`w-3.5 h-3.5 ${isActive ? s.color : ''}`} />
+                {s.label}
+              </button>
+            )
+          })}
+        </div>
+
+        {/* Search */}
+        <div className="relative flex-1 max-w-sm">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search by name, email, property..."
+            className="w-full pl-10 pr-3 py-2.5 border rounded-xl text-sm bg-white"
+          />
+        </div>
       </div>
 
       {loading ? (
@@ -174,7 +258,7 @@ export default function AdminInquiriesPage() {
           <p className="text-stone-500">
             {inquiries.length === 0
               ? 'Inquiries from potential investors will appear here.'
-              : 'Try adjusting your search.'}
+              : 'Try adjusting your search or filter.'}
           </p>
         </div>
       ) : (
@@ -183,6 +267,8 @@ export default function AdminInquiriesPage() {
           <div className="space-y-3">
             {filtered.map(inq => {
               const isExpanded = expandedId === inq.id
+              const statusCfg = getStatusConfig(inq.status)
+              const StatusIcon = statusCfg.icon
               return (
                 <div key={inq.id} className="bg-white rounded-xl border hover:shadow-md transition-all">
                   <div
@@ -207,8 +293,14 @@ export default function AdminInquiriesPage() {
                       <p className="text-sm text-stone-500 truncate">{inq.email}</p>
                     </div>
 
+                    {/* Status badge */}
+                    <div className={`hidden sm:flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium ${statusCfg.bg} ${statusCfg.color}`}>
+                      <StatusIcon className="w-3 h-3" />
+                      {statusCfg.label}
+                    </div>
+
                     {/* Property */}
-                    <div className="hidden sm:block text-right flex-shrink-0 max-w-[200px]">
+                    <div className="hidden md:block text-right flex-shrink-0 max-w-[180px]">
                       <p className={`text-sm font-medium truncate ${inq.property ? 'text-[#1B4965]' : 'text-stone-400 italic'}`}>
                         {getPropertyName(inq)}
                       </p>
@@ -222,7 +314,7 @@ export default function AdminInquiriesPage() {
                     </div>
 
                     {/* Time */}
-                    <div className="hidden md:block text-right flex-shrink-0">
+                    <div className="hidden lg:block text-right flex-shrink-0">
                       <p className="text-xs text-stone-400">{timeAgo(inq.createdAt)}</p>
                     </div>
 
@@ -302,10 +394,97 @@ export default function AdminInquiriesPage() {
                         </div>
                       )}
 
+                      {/* Status Changer */}
+                      <div className="mt-4 pt-3 border-t">
+                        <h4 className="text-xs font-bold text-stone-500 uppercase tracking-wider mb-2">Update Status</h4>
+                        <div className="flex flex-wrap gap-2">
+                          {STATUSES.filter(s => s.value !== 'ALL').map(s => {
+                            const Icon = s.icon
+                            const isActive = inq.status === s.value
+                            return (
+                              <button
+                                key={s.value}
+                                onClick={(e) => { e.stopPropagation(); handleStatusChange(inq.id, s.value) }}
+                                disabled={isActive || updatingId === inq.id}
+                                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all border ${
+                                  isActive
+                                    ? `${s.bg} ${s.color} border-current`
+                                    : 'bg-white text-stone-500 border-stone-200 hover:border-stone-300 hover:text-stone-700'
+                                } disabled:opacity-60`}
+                              >
+                                <Icon className="w-3.5 h-3.5" />
+                                {s.label}
+                              </button>
+                            )
+                          })}
+                        </div>
+                        {inq.repliedAt && (
+                          <p className="text-xs text-stone-400 mt-2">
+                            Replied {new Date(inq.repliedAt).toLocaleString()}
+                            {inq.repliedBy && ` by ${inq.repliedBy}`}
+                          </p>
+                        )}
+                      </div>
+
+                      {/* Admin Notes */}
+                      <div className="mt-4 pt-3 border-t">
+                        <div className="flex items-center justify-between mb-2">
+                          <h4 className="text-xs font-bold text-stone-500 uppercase tracking-wider flex items-center gap-1">
+                            <StickyNote className="w-3.5 h-3.5" /> Admin Notes
+                          </h4>
+                          {editingNotesId !== inq.id && (
+                            <button
+                              onClick={() => { setEditingNotesId(inq.id); setNotesText(inq.adminNotes || '') }}
+                              className="text-xs text-[#1B4965] hover:underline"
+                            >
+                              {inq.adminNotes ? 'Edit' : 'Add note'}
+                            </button>
+                          )}
+                        </div>
+                        {editingNotesId === inq.id ? (
+                          <div className="space-y-2">
+                            <textarea
+                              className="w-full border rounded-lg p-2.5 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-[#1B4965]/20"
+                              rows={3}
+                              value={notesText}
+                              onChange={(e) => setNotesText(e.target.value)}
+                              placeholder="Add internal notes about this inquiry..."
+                            />
+                            <div className="flex gap-2">
+                              <button
+                                onClick={() => handleSaveNotes(inq.id)}
+                                disabled={updatingId === inq.id}
+                                className="px-3 py-1.5 text-xs font-medium text-white bg-[#1B4965] rounded-lg hover:bg-[#2B6985] disabled:opacity-50"
+                              >
+                                {updatingId === inq.id ? 'Saving...' : 'Save'}
+                              </button>
+                              <button
+                                onClick={() => setEditingNotesId(null)}
+                                className="px-3 py-1.5 text-xs font-medium text-stone-600 bg-stone-100 rounded-lg hover:bg-stone-200"
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          </div>
+                        ) : inq.adminNotes ? (
+                          <div className="bg-amber-50 border border-amber-200 rounded-lg p-2.5 text-sm text-stone-700 whitespace-pre-wrap">
+                            {inq.adminNotes}
+                          </div>
+                        ) : (
+                          <p className="text-xs text-stone-400 italic">No notes yet</p>
+                        )}
+                      </div>
+
                       {/* Actions */}
                       <div className="flex items-center gap-2 mt-4 pt-3 border-t">
                         <a
                           href={`mailto:${inq.email}?subject=Re: ${encodeURIComponent(getPropertyName(inq))} Inquiry`}
+                          onClick={() => {
+                            // Auto-mark as replied when clicking Reply
+                            if (inq.status === 'NEW' || inq.status === 'IN_PROGRESS') {
+                              handleStatusChange(inq.id, 'REPLIED')
+                            }
+                          }}
                           className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white bg-[#1B4965] rounded-lg hover:bg-[#2B6985] transition-colors"
                         >
                           <Mail className="w-3.5 h-3.5" />
