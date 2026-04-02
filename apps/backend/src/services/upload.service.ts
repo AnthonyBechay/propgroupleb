@@ -90,13 +90,16 @@ export async function uploadFile(
     key = `${folder}/${timestamp}-${baseName}-${shortId}${ext}`;
   }
 
+  // Sanitize filename for Content-Disposition to avoid R2 signature issues with special chars
+  const safeFilename = path.basename(originalName).replace(/[^\w.\-]/g, '_');
+
   await s3Client.send(
     new PutObjectCommand({
       Bucket: BUCKET_NAME,
       Key: key,
       Body: buffer,
       ContentType: contentType,
-      ContentDisposition: `inline; filename="${path.basename(originalName)}"`,
+      ContentDisposition: `inline; filename="${safeFilename}"`,
       CacheControl: 'public, max-age=31536000, immutable',
     })
   );

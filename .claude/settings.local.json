@@ -134,7 +134,10 @@
       "Bash(curl -sL \"https://bechays.com/icon-512x512.png?v=2\" -o /tmp/prod-icon512.png)",
       "Bash(curl -sL \"https://bechays.com/icon.png?v=2\" -o /tmp/prod-icon48.png)",
       "Bash(export PATH=\"/opt/homebrew/bin:/opt/homebrew/Cellar/node/25.2.1/bin:$PATH\")",
-      "Bash(export PATH=\"/opt/homebrew/bin:$PATH\")"
+      "Bash(export PATH=\"/opt/homebrew/bin:$PATH\")",
+      "Bash(find /Users/anthonybechay/development/propgroup -path \"*/app/\\(main\\)/page.tsx\" -o -path \"*/app/page.tsx\")",
+      "Bash(pnpm --filter propgroup-backend add @anthropic-ai/sdk)",
+      "Bash(pnpm --filter propgroup-backend remove @google/generative-ai)"
     ],
     "deny": [],
     "ask": []

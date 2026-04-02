@@ -1,5 +1,5 @@
 import express, { type Request, type Response, type Router } from 'express';
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import Anthropic from '@anthropic-ai/sdk';
 import { prisma } from '@propgroup/db';
 import { asyncHandler } from '../utils/errors.js';
 import { sendSuccess } from '../utils/response.js';
@@ -8,9 +8,9 @@ import { aiSearchSchema } from '../schemas/index.js';
 
 const router: Router = express.Router();
 
-// Initialize Google Gemini AI
-const genAI = process.env.GOOGLE_GEMINI_API_KEY
-  ? new GoogleGenerativeAI(process.env.GOOGLE_GEMINI_API_KEY)
+// Initialize Anthropic client
+const anthropic = process.env.ANTHROPIC_API_KEY
+  ? new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
   : null;
 
 interface SearchFilters {
@@ -23,13 +23,13 @@ interface SearchFilters {
   maxBedrooms?: number;
   bathrooms?: number;
   status?: string;
+  propertyType?: string;
   goal?: string;
   isGoldenVisaEligible?: boolean;
   sortBy?: string;
-  propertyType?: string;
 }
 
-// Natural language query parser (fallback when Gemini is unavailable)
+// Regex fallback when AI is unavailable
 function parseNaturalLanguageQuery(query: string): SearchFilters {
   const filters: SearchFilters = {};
   const lowerQuery = query.toLowerCase();
@@ -44,16 +44,16 @@ function parseNaturalLanguageQuery(query: string): SearchFilters {
 
   // Cities
   const cities: Record<string, string> = {
-    tbilisi: 'Tbilisi', batumi: 'Batumi', kutaisi: 'Kutaisi', gudauri: 'Gudauri', bakuriani: 'Bakuriani'
+    tbilisi: 'Tbilisi', batumi: 'Batumi', kutaisi: 'Kutaisi', gudauri: 'Gudauri', bakuriani: 'Bakuriani',
   };
   for (const [key, value] of Object.entries(cities)) {
-    if (lowerQuery.includes(key)) { filters.city = value; break; }
+    if (lowerQuery.includes(key)) { filters.city = value; if (!filters.country) filters.country = 'GEORGIA'; break; }
   }
 
   // Property types
   const propertyTypes: Record<string, string> = {
     apartment: 'APARTMENT', villa: 'VILLA', penthouse: 'PENTHOUSE', studio: 'STUDIO',
-    townhouse: 'TOWNHOUSE', duplex: 'DUPLEX', commercial: 'COMMERCIAL', office: 'OFFICE', land: 'LAND'
+    townhouse: 'TOWNHOUSE', duplex: 'DUPLEX', commercial: 'COMMERCIAL', office: 'OFFICE', land: 'LAND',
   };
   for (const [key, value] of Object.entries(propertyTypes)) {
     if (lowerQuery.includes(key)) { filters.propertyType = value; break; }
@@ -61,22 +61,23 @@ function parseNaturalLanguageQuery(query: string): SearchFilters {
 
   // Price
   const pricePatterns = [
-    { pattern: /(?:under|below|less than|max|maximum)\s*\$?([0-9,]+)k?/i, type: 'max' as const },
-    { pattern: /(?:above|over|more than|min|minimum)\s*\$?([0-9,]+)k?/i, type: 'min' as const },
-    { pattern: /between\s*\$?([0-9,]+)k?\s*(?:and|to|-)\s*\$?([0-9,]+)k?/i, type: 'range' as const },
+    { pattern: /(?:under|below|less than|max|maximum|up to)\s*\$?([0-9,]+)\s*k?/i, type: 'max' as const },
+    { pattern: /(?:above|over|more than|min|minimum|at least)\s*\$?([0-9,]+)\s*k?/i, type: 'min' as const },
+    { pattern: /(?:between|from)\s*\$?([0-9,]+)\s*k?\s*(?:and|to|-)\s*\$?([0-9,]+)\s*k?/i, type: 'range' as const },
+    { pattern: /\$([0-9,]+)\s*k?\s*(?:to|-)\s*\$?([0-9,]+)\s*k?/i, type: 'range' as const },
   ];
 
   for (const { pattern, type } of pricePatterns) {
     const match = lowerQuery.match(pattern);
     if (match) {
-      const hasK = lowerQuery.includes('k') || lowerQuery.includes('thousand');
+      const hasK = /k\b/i.test(match[0]) || lowerQuery.includes('thousand');
       if (type === 'range') {
         let min = parseInt(match[1].replace(/,/g, '')), max = parseInt(match[2].replace(/,/g, ''));
-        if (hasK) { min *= 1000; max *= 1000; }
+        if (hasK || min < 1000) { min *= 1000; max *= 1000; }
         filters.minPrice = min; filters.maxPrice = max;
       } else {
         let price = parseInt(match[1].replace(/,/g, ''));
-        if (hasK) price *= 1000;
+        if (hasK || price < 1000) price *= 1000;
         if (type === 'max') filters.maxPrice = price; else filters.minPrice = price;
       }
       break;
@@ -84,7 +85,7 @@ function parseNaturalLanguageQuery(query: string): SearchFilters {
   }
 
   // Bedrooms
-  const bedMatch = lowerQuery.match(/(\d+)(?:\s*-\s*(\d+))?\s*(?:bed|bedroom|br)/i);
+  const bedMatch = lowerQuery.match(/(\d+)(?:\s*(?:-|to)\s*(\d+))?\s*(?:bed|bedroom|br|bd)/i);
   if (bedMatch) {
     if (bedMatch[2]) { filters.minBedrooms = parseInt(bedMatch[1]); filters.maxBedrooms = parseInt(bedMatch[2]); }
     else filters.bedrooms = parseInt(bedMatch[1]);
@@ -94,10 +95,10 @@ function parseNaturalLanguageQuery(query: string): SearchFilters {
   if (lowerQuery.includes('golden visa') || lowerQuery.includes('residency')) {
     filters.goal = 'GOLDEN_VISA'; filters.isGoldenVisaEligible = true;
   }
-  if (lowerQuery.includes('roi') || lowerQuery.includes('highest return')) {
+  if (lowerQuery.includes('roi') || lowerQuery.includes('highest return') || lowerQuery.includes('best return')) {
     filters.goal = 'HIGH_ROI'; filters.sortBy = 'roi';
   }
-  if (lowerQuery.includes('rental') || lowerQuery.includes('passive income')) {
+  if (lowerQuery.includes('rental') || lowerQuery.includes('passive income') || lowerQuery.includes('yield')) {
     filters.goal = 'PASSIVE_INCOME'; filters.sortBy = 'rentalYield';
   }
 
@@ -110,7 +111,10 @@ function parseNaturalLanguageQuery(query: string): SearchFilters {
 }
 
 function buildWhereClause(filters: SearchFilters): Record<string, unknown> {
-  const where: Record<string, unknown> = {};
+  const where: Record<string, unknown> = {
+    visibility: 'PUBLIC',
+    availabilityStatus: { not: 'SOLD' },
+  };
 
   if (filters.country) where.country = filters.country;
   if (filters.minPrice !== undefined || filters.maxPrice !== undefined) {
@@ -142,76 +146,93 @@ function buildOrderBy(filters: SearchFilters) {
   return orderBy;
 }
 
-async function parseQueryWithGemini(query: string): Promise<SearchFilters | null> {
-  if (!genAI) return null;
+async function parseQueryWithClaude(query: string): Promise<SearchFilters | null> {
+  if (!anthropic) return null;
 
   try {
-    const model = genAI.getGenerativeModel({ model: 'gemini-pro' });
-    const prompt = `You are a property search filter parser. Extract search criteria from the user's natural language query and return ONLY a valid JSON object (no markdown, no code blocks, just raw JSON).
+    const message = await anthropic.messages.create({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 300,
+      messages: [{
+        role: 'user',
+        content: `Extract property search filters from this query. Return ONLY a JSON object, no other text.
 
-Available countries: GEORGIA, CYPRUS, GREECE, LEBANON
-Available cities in Georgia: Tbilisi, Batumi, Kutaisi, Gudauri, Bakuriani
-Available property statuses: OFF_PLAN, NEW_BUILD, RESALE
-Available property types: APARTMENT, VILLA, PENTHOUSE, STUDIO, TOWNHOUSE, DUPLEX, COMMERCIAL, OFFICE, LAND
+Available values:
+- country: GEORGIA, CYPRUS, GREECE, LEBANON
+- city: Tbilisi, Batumi, Kutaisi, Gudauri, Bakuriani (if a Georgian city is mentioned, also set country to GEORGIA)
+- status: OFF_PLAN, NEW_BUILD, RESALE
+- propertyType: APARTMENT, VILLA, PENTHOUSE, STUDIO, TOWNHOUSE, DUPLEX, COMMERCIAL, OFFICE, LAND
+- goal: GOLDEN_VISA, HIGH_ROI, PASSIVE_INCOME
+- sortBy: price, roi, rentalYield
 
-User query: "${query}"
+Query: "${query}"
 
-Return a JSON object with these possible fields (only include fields mentioned in the query):
-{ "country": "COUNTRY_CODE", "city": "CityName", "minPrice": number, "maxPrice": number, "bedrooms": number, "minBedrooms": number, "maxBedrooms": number, "bathrooms": number, "status": "STATUS", "propertyType": "TYPE", "goal": "GOLDEN_VISA|HIGH_ROI|PASSIVE_INCOME", "isGoldenVisaEligible": boolean, "sortBy": "price|roi|rentalYield" }
+JSON fields (only include what's mentioned): { "country", "city", "minPrice", "maxPrice", "bedrooms", "minBedrooms", "maxBedrooms", "bathrooms", "status", "propertyType", "goal", "isGoldenVisaEligible", "sortBy" }
+Convert prices like "300k" to 300000. Return ONLY the JSON.`,
+      }],
+    });
 
-If a city like Tbilisi or Batumi is mentioned, set the city field AND set country to GEORGIA. For prices like "300k", convert to 300000. Return ONLY the JSON object.`;
-
-    const result = await model.generateContent(prompt);
-    const response = await result.response;
-    const text = response.text().trim();
+    const text = (message.content[0] as { type: string; text: string }).text.trim();
     const jsonText = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
     return JSON.parse(jsonText);
-  } catch {
+  } catch (err) {
+    console.error('[ai-search] Claude parsing failed:', err);
     return null;
   }
 }
 
 function generateFallbackSummary(filters: SearchFilters, count: number): string {
-  if (count === 0) return "I couldn't find any properties matching your criteria. Try adjusting your requirements.";
+  if (count === 0) return "I couldn't find any properties matching your criteria. Try broadening your search.";
 
-  const parts = [`I found ${count} ${count === 1 ? 'property' : 'properties'} matching your search`];
+  const parts = [`I found ${count} ${count === 1 ? 'property' : 'properties'}`];
   const criteria: string[] = [];
 
   if (filters.bedrooms) criteria.push(`${filters.bedrooms} bedroom${filters.bedrooms > 1 ? 's' : ''}`);
-  if (filters.country) criteria.push(`in ${filters.country.charAt(0) + filters.country.slice(1).toLowerCase()}`);
+  if (filters.minBedrooms && filters.maxBedrooms) criteria.push(`${filters.minBedrooms}-${filters.maxBedrooms} bedrooms`);
+  if (filters.propertyType) criteria.push(filters.propertyType.toLowerCase().replace('_', ' '));
+  if (filters.city) criteria.push(`in ${filters.city}`);
+  else if (filters.country) criteria.push(`in ${filters.country.charAt(0) + filters.country.slice(1).toLowerCase()}`);
   if (filters.maxPrice) criteria.push(`under $${filters.maxPrice.toLocaleString()}`);
   else if (filters.minPrice) criteria.push(`above $${filters.minPrice.toLocaleString()}`);
-  if (filters.goal === 'GOLDEN_VISA') criteria.push('eligible for Golden Visa programs');
+  if (filters.status) criteria.push(filters.status.toLowerCase().replace('_', ' '));
+  if (filters.goal === 'GOLDEN_VISA') criteria.push('eligible for Golden Visa');
 
-  if (criteria.length > 0) parts.push(`with: ${criteria.join(', ')}`);
+  if (criteria.length > 0) parts[0] += ` matching: ${criteria.join(', ')}`;
   return `${parts.join(' ')}.`;
 }
 
 async function generateAISummary(query: string, filters: SearchFilters, count: number): Promise<string> {
-  if (!genAI) return generateFallbackSummary(filters, count);
+  if (!anthropic) return generateFallbackSummary(filters, count);
 
   try {
-    const model = genAI.getGenerativeModel({ model: 'gemini-pro' });
-    const prompt = `You are a friendly real estate assistant. Generate a concise response (2-3 sentences max) about property search results.
-User searched for: "${query}"
-Filters: ${JSON.stringify(filters)}
-Properties found: ${count}
-Keep it brief and friendly. No emojis.`;
+    const message = await anthropic.messages.create({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 150,
+      messages: [{
+        role: 'user',
+        content: `You are a friendly real estate assistant for PropGroup (Georgia-focused investment platform). Write a 1-2 sentence response about search results. Be concise and helpful. No emojis.
 
-    const result = await model.generateContent(prompt);
-    return result.response.text().trim();
-  } catch {
+Search: "${query}"
+Filters applied: ${JSON.stringify(filters)}
+Results found: ${count}`,
+      }],
+    });
+
+    return (message.content[0] as { type: string; text: string }).text.trim();
+  } catch (err) {
+    console.error('[ai-search] Claude summary failed:', err);
     return generateFallbackSummary(filters, count);
   }
 }
 
-// POST /api/ai-search - AI-powered property search
+// POST /api/ai-search
 router.post(
   '/',
   asyncHandler(async (req: Request, res: Response) => {
     const { query } = aiSearchSchema.parse(req.body);
 
-    let filters = await parseQueryWithGemini(query);
+    let filters = await parseQueryWithClaude(query);
+    const aiPowered = filters !== null;
     if (!filters) filters = parseNaturalLanguageQuery(query);
 
     const where = buildWhereClause(filters);
@@ -232,7 +253,7 @@ router.post(
       summary,
       properties,
       count: properties.length,
-      aiPowered: genAI !== null,
+      aiPowered,
     });
   })
 );
