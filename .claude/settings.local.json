@@ -137,7 +137,12 @@
       "Bash(export PATH=\"/opt/homebrew/bin:$PATH\")",
       "Bash(find /Users/anthonybechay/development/propgroup -path \"*/app/\\(main\\)/page.tsx\" -o -path \"*/app/page.tsx\")",
       "Bash(pnpm --filter propgroup-backend add @anthropic-ai/sdk)",
-      "Bash(pnpm --filter propgroup-backend remove @google/generative-ai)"
+      "Bash(pnpm --filter propgroup-backend remove @google/generative-ai)",
+      "Bash(echo $PATH)",
+      "Bash(source ~/.zshrc)",
+      "Read(//usr/local/**)",
+      "Bash(export PATH=\"/opt/homebrew/bin:/opt/homebrew/Cellar/node/25.2.1/bin:$HOME/Library/pnpm:$PATH\")",
+      "Bash(pnpm --filter @propgroup/backend run build)"
     ],
     "deny": [],
     "ask": []

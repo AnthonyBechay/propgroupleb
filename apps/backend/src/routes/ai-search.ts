@@ -8,10 +8,16 @@ import { aiSearchSchema } from '../schemas/index.js';
 
 const router: Router = express.Router();
 
-// Initialize Anthropic client
-const anthropic = process.env.ANTHROPIC_API_KEY
-  ? new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
-  : null;
+// Lazy Anthropic client — picks up env var at request time, not module load
+let _anthropic: Anthropic | null = null;
+function getAnthropic(): Anthropic | null {
+  if (!process.env.ANTHROPIC_API_KEY) return null;
+  if (!_anthropic) {
+    _anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+    console.log('[ai-search] Anthropic client initialized');
+  }
+  return _anthropic;
+}
 
 interface SearchFilters {
   country?: string;
@@ -147,10 +153,11 @@ function buildOrderBy(filters: SearchFilters) {
 }
 
 async function parseQueryWithClaude(query: string): Promise<SearchFilters | null> {
-  if (!anthropic) return null;
+  const client = getAnthropic();
+  if (!client) return null;
 
   try {
-    const message = await anthropic.messages.create({
+    const message = await client.messages.create({
       model: 'claude-haiku-4-5-20251001',
       max_tokens: 300,
       messages: [{
@@ -202,10 +209,11 @@ function generateFallbackSummary(filters: SearchFilters, count: number): string 
 }
 
 async function generateAISummary(query: string, filters: SearchFilters, count: number): Promise<string> {
-  if (!anthropic) return generateFallbackSummary(filters, count);
+  const client = getAnthropic();
+  if (!client) return generateFallbackSummary(filters, count);
 
   try {
-    const message = await anthropic.messages.create({
+    const message = await client.messages.create({
       model: 'claude-haiku-4-5-20251001',
       max_tokens: 150,
       messages: [{
