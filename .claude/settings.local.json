@@ -142,7 +142,8 @@
       "Bash(source ~/.zshrc)",
       "Read(//usr/local/**)",
       "Bash(export PATH=\"/opt/homebrew/bin:/opt/homebrew/Cellar/node/25.2.1/bin:$HOME/Library/pnpm:$PATH\")",
-      "Bash(pnpm --filter @propgroup/backend run build)"
+      "Bash(pnpm --filter @propgroup/backend run build)",
+      "WebFetch(domain:propgrp.com)"
     ],
     "deny": [],
     "ask": []
