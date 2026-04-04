@@ -114,16 +114,45 @@ Rules:
 - "mortgage" or "bank financing" → mortgageAvailable: true
 - If query asks for "best" or "top" properties → featured: true`;
 
-async function parseQueryWithClaude(query: string): Promise<SearchFilters | null> {
+interface ConversationMessage {
+  role: 'user' | 'assistant';
+  content: string;
+}
+
+async function parseQueryWithClaude(
+  query: string,
+  conversationHistory?: ConversationMessage[],
+  previousFilters?: Record<string, unknown>,
+): Promise<SearchFilters | null> {
   const client = getAnthropic();
   if (!client) return null;
 
   try {
+    // Build messages array with conversation context
+    const messages: { role: 'user' | 'assistant'; content: string }[] = [];
+
+    if (conversationHistory && conversationHistory.length > 0 && previousFilters) {
+      // Include conversation context so Claude understands follow-ups
+      const contextMsg = `Previous conversation context:
+${conversationHistory.map(m => `${m.role}: ${m.content}`).join('\n')}
+
+Previous filters that were applied: ${JSON.stringify(previousFilters)}
+
+Now the user has a follow-up query. Merge or refine the previous filters based on this new query. If the user asks to narrow down, ADD filters. If they ask to broaden, REMOVE filters. If they ask about specific properties or details, keep the same filters but adjust as needed.
+
+New query: "${query}"
+
+Return ONLY the JSON object with the updated/merged filters.`;
+      messages.push({ role: 'user', content: contextMsg });
+    } else {
+      messages.push({ role: 'user', content: `Query: "${query}"\n\nReturn ONLY the JSON object.` });
+    }
+
     const message = await client.messages.create({
       model: 'claude-haiku-4-5-20251001',
       max_tokens: 400,
       system: CLAUDE_SYSTEM_PROMPT,
-      messages: [{ role: 'user', content: `Query: "${query}"\n\nReturn ONLY the JSON object.` }],
+      messages,
     });
 
     const text = (message.content[0] as { type: string; text: string }).text.trim();
@@ -426,23 +455,44 @@ function generateFallbackSummary(filters: SearchFilters, count: number): string 
     : `I found ${count} ${label} that match your search.`;
 }
 
-async function generateAISummary(query: string, filters: SearchFilters, count: number): Promise<string> {
+async function generateAISummary(
+  query: string,
+  filters: SearchFilters,
+  count: number,
+  properties: any[],
+  conversationHistory?: ConversationMessage[],
+): Promise<string> {
   const client = getAnthropic();
   if (!client) return generateFallbackSummary(filters, count);
 
   try {
+    // Build a brief property summary so AI can reference actual results
+    const propertySnippets = properties.slice(0, 6).map((p, i) => {
+      const roi = p.investmentData?.expectedROI;
+      const yield_ = p.investmentData?.rentalYield;
+      return `${i + 1}. ${p.title} — $${p.price.toLocaleString()}, ${p.city}${roi ? `, ROI ${roi}%` : ''}${yield_ ? `, yield ${yield_}%` : ''}`;
+    }).join('\n');
+
+    const isFollowUp = conversationHistory && conversationHistory.length > 0;
+    const conversationContext = isFollowUp
+      ? `\nPrevious conversation:\n${conversationHistory!.map(m => `${m.role}: ${m.content}`).join('\n')}\n`
+      : '';
+
     const message = await client.messages.create({
       model: 'claude-haiku-4-5-20251001',
-      max_tokens: 200,
+      max_tokens: 300,
       messages: [{
         role: 'user',
-        content: `You are a concise real estate assistant for PropGroup (Georgia-focused investment platform).
-Write a 1-2 sentence summary of the search results. Be helpful and specific. No emojis. No markdown.
-If 0 results, suggest broadening the search.
-
-User searched: "${query}"
+        content: `You are a helpful real estate assistant for PropGroup (Georgia-focused investment platform).
+${isFollowUp ? 'This is a follow-up question in an ongoing conversation.' : 'This is a new search.'}
+Write a concise, helpful response (2-3 sentences). Be specific about what was found. Reference actual property names or details when relevant. No emojis. No markdown.
+If 0 results, suggest broadening the search or trying different criteria.
+If the user asked a question about the results (e.g. "which has a pool?", "tell me about the cheapest one"), answer it directly.
+${conversationContext}
+User query: "${query}"
 Filters applied: ${JSON.stringify(filters)}
-Results found: ${count}`,
+Results found: ${count}
+${count > 0 ? `Top results:\n${propertySnippets}` : ''}`,
       }],
     });
 
@@ -459,9 +509,9 @@ Results found: ${count}`,
 router.post(
   '/',
   asyncHandler(async (req: Request, res: Response) => {
-    const { query } = aiSearchSchema.parse(req.body);
+    const { query, conversationHistory, previousFilters } = aiSearchSchema.parse(req.body);
 
-    let filters = await parseQueryWithClaude(query);
+    let filters = await parseQueryWithClaude(query, conversationHistory, previousFilters as Record<string, unknown> | undefined);
     const aiPowered = filters !== null;
     if (!filters) filters = parseNaturalLanguageQuery(query);
 
@@ -475,7 +525,7 @@ router.post(
       take: 50,
     });
 
-    const summary = await generateAISummary(query, filters, properties.length);
+    const summary = await generateAISummary(query, filters, properties.length, properties, conversationHistory);
 
     sendSuccess(res, {
       query,

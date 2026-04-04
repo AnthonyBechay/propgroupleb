@@ -1,13 +1,12 @@
 'use client'
 
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { PropertyCard } from '@/components/PropertyCard'
 import {
   Search,
   Sparkles,
   Send,
-  X,
   Loader2,
   TrendingUp,
   Home,
@@ -17,6 +16,8 @@ import {
   MessageSquare,
   ArrowRight,
   RotateCcw,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react'
 
 interface Message {
@@ -89,14 +90,8 @@ export function AIPropertySearch({
   const [query, setQuery] = useState('')
   const [messages, setMessages] = useState<Message[]>([])
   const [isLoading, setIsLoading] = useState(false)
-  const messagesEndRef = useRef<HTMLDivElement>(null)
+  const [expandedCards, setExpandedCards] = useState<Record<string, boolean>>({})
   const inputRef = useRef<HTMLInputElement>(null)
-
-  useEffect(() => {
-    if (messages.length > 0) {
-      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-    }
-  }, [messages])
 
   const navigateToResults = (filters: PropertyFilters, searchQuery: string) => {
     const params = new URLSearchParams()
@@ -119,6 +114,25 @@ export function AIPropertySearch({
     }
   }
 
+  // Build conversation history for backend context
+  const getConversationHistory = () => {
+    return messages
+      .filter(m => m.role === 'user' || m.role === 'assistant')
+      .map(m => ({ role: m.role, content: m.content }))
+  }
+
+  // Get the latest filters from the conversation
+  const getLatestFilters = () => {
+    const lastAssistant = [...messages].reverse().find(m => m.role === 'assistant' && m.filters)
+    return lastAssistant?.filters
+  }
+
+  // Get property IDs from last result
+  const getLatestPropertyIds = () => {
+    const lastAssistant = [...messages].reverse().find(m => m.role === 'assistant' && m.properties)
+    return lastAssistant?.properties?.map(p => p.id) || []
+  }
+
   const handleSearch = async (searchText?: string) => {
     const q = (searchText || query).trim()
     if (!q) return
@@ -137,10 +151,19 @@ export function AIPropertySearch({
     try {
       const { normalizeApiUrl } = await import('@/lib/utils/api-url')
       const apiUrl = normalizeApiUrl(process.env.NEXT_PUBLIC_API_URL)
+
+      const isFollowUp = messages.length > 0
+      const body: Record<string, unknown> = { query: q }
+      if (isFollowUp) {
+        body.conversationHistory = getConversationHistory()
+        body.previousFilters = getLatestFilters()
+        body.previousPropertyIds = getLatestPropertyIds()
+      }
+
       const response = await fetch(`${apiUrl}/api/ai-search`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query: q }),
+        body: JSON.stringify(body),
       })
 
       if (!response.ok) throw new Error('Search failed')
@@ -184,8 +207,13 @@ export function AIPropertySearch({
 
   const handleNewSearch = () => {
     setMessages([])
+    setExpandedCards({})
     setQuery('')
     inputRef.current?.focus()
+  }
+
+  const toggleExpanded = (messageId: string) => {
+    setExpandedCards(prev => ({ ...prev, [messageId]: !prev[messageId] }))
   }
 
   // Get the latest assistant message with results
@@ -240,14 +268,13 @@ export function AIPropertySearch({
           </div>
         )}
 
-        {/* Inline AI Answer */}
+        {/* Inline AI Answer — compact, latest only */}
         {latestResult && (
           <div className="mt-4 animate-in fade-in slide-in-from-top-2">
-            <AIResultCard
+            <InlineResultSummary
               message={latestResult}
               onViewAll={() => navigateToResults(latestResult.filters!, latestResult.content)}
               onNewSearch={handleNewSearch}
-              compact
             />
           </div>
         )}
@@ -255,12 +282,13 @@ export function AIPropertySearch({
     )
   }
 
-  // ── Page variant ───────────────────────
+  // ── Page variant — full conversational flow ───────────────────────
+  const hasConversation = messages.length > 0
+
   return (
     <div className="space-y-6">
       {/* Search box — always visible at top */}
       <div className="bg-white rounded-2xl shadow-xl border border-stone-200 overflow-hidden">
-        {/* Input area */}
         <div className="px-5 py-4">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 bg-[#1B4965] rounded-xl flex items-center justify-center shrink-0">
@@ -270,7 +298,7 @@ export function AIPropertySearch({
               <input
                 ref={inputRef}
                 type="text"
-                placeholder="Describe your ideal property..."
+                placeholder={hasConversation ? "Ask a follow-up question..." : "Describe your ideal property..."}
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 onKeyDown={handleKeyPress}
@@ -286,21 +314,45 @@ export function AIPropertySearch({
                   <Loader2 className="w-4 h-4 animate-spin" />
                 ) : (
                   <>
-                    <Search className="w-4 h-4" />
-                    <span className="hidden sm:inline">Search</span>
+                    <Send className="w-4 h-4" />
+                    <span className="hidden sm:inline">Ask</span>
                   </>
                 )}
               </button>
             </div>
+            {hasConversation && (
+              <button
+                onClick={handleNewSearch}
+                className="h-9 px-3 text-xs font-medium text-stone-500 hover:text-[#1B4965] hover:bg-stone-100 rounded-lg transition-colors flex items-center gap-1 shrink-0"
+                title="Start new search"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+              </button>
+            )}
           </div>
-          <p className="text-[10px] text-stone-400 mt-2 flex items-center gap-1 pl-12">
-            <Sparkles className="w-2.5 h-2.5 text-[#C97B4B]" />
-            Powered by AI &middot; Describe what you want in plain English
-          </p>
+          {!hasConversation && (
+            <p className="text-[10px] text-stone-400 mt-2 flex items-center gap-1 pl-12">
+              <Sparkles className="w-2.5 h-2.5 text-[#C97B4B]" />
+              Powered by AI &middot; Ask anything about our properties
+            </p>
+          )}
+          {hasConversation && (
+            <div className="mt-2 pl-12 flex flex-wrap gap-1.5">
+              {['Which has a pool?', 'Show only under $60k', 'Which has the highest ROI?', 'Off-plan only'].map((hint, i) => (
+                <button
+                  key={i}
+                  onClick={() => handleSearch(hint)}
+                  className="px-2.5 py-1 text-[10px] font-medium bg-stone-50 border border-stone-200 rounded-full text-stone-500 hover:border-[#1B4965] hover:text-[#1B4965] transition-all"
+                >
+                  {hint}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
-        {/* Quick suggestions — only when no results yet */}
-        {messages.length === 0 && (
+        {/* Quick suggestions — only when no conversation yet */}
+        {!hasConversation && (
           <div className="px-5 pb-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               {quickSuggestions.map((s, i) => (
@@ -330,211 +382,202 @@ export function AIPropertySearch({
         </div>
       )}
 
-      {/* AI Answer + Property Results — outside the chat box */}
-      {latestResult && (
-        <div className="animate-in fade-in slide-in-from-bottom-3 space-y-6">
-          {/* AI Summary card */}
-          <div className="bg-white border border-stone-200 rounded-2xl p-5 shadow-sm">
-            <div className="flex items-start gap-3">
-              <div className="w-9 h-9 bg-[#1B4965] rounded-lg flex items-center justify-center shrink-0 mt-0.5">
-                <Bot className="w-5 h-5 text-white" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 mb-1.5">
-                  <span className="text-sm font-bold text-[#1B4965]">PropGroup AI</span>
-                  {latestResult.aiPowered && (
-                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-semibold bg-[#C97B4B]/10 text-[#C97B4B] rounded-full">
-                      <Sparkles className="w-2.5 h-2.5" />
-                      AI
-                    </span>
+      {/* Conversation thread */}
+      {hasConversation && (
+        <div className="space-y-4">
+          {messages.map((msg) => (
+            <div key={msg.id}>
+              {/* User message */}
+              {msg.role === 'user' && (
+                <div className="flex justify-end mb-4">
+                  <div className="max-w-[80%] rounded-2xl px-4 py-2.5 bg-[#1B4965] text-white text-sm shadow-sm">
+                    <p className="leading-relaxed">{msg.content}</p>
+                  </div>
+                </div>
+              )}
+
+              {/* AI response */}
+              {msg.role === 'assistant' && (
+                <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2">
+                  {/* Summary card */}
+                  <div className="bg-white border border-stone-200 rounded-2xl p-5 shadow-sm">
+                    <div className="flex items-start gap-3">
+                      <div className="w-9 h-9 bg-[#1B4965] rounded-lg flex items-center justify-center shrink-0 mt-0.5">
+                        <Bot className="w-5 h-5 text-white" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1.5">
+                          <span className="text-sm font-bold text-[#1B4965]">PropGroup AI</span>
+                          {msg.aiPowered && (
+                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-semibold bg-[#C97B4B]/10 text-[#C97B4B] rounded-full">
+                              <Sparkles className="w-2.5 h-2.5" />
+                              AI
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-sm text-stone-700 leading-relaxed whitespace-pre-wrap">{msg.content}</p>
+
+                        {/* Actions */}
+                        {msg.count !== undefined && (
+                          <div className="mt-3 flex flex-wrap items-center gap-2">
+                            <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold ${
+                              (msg.properties?.length || 0) > 0
+                                ? 'bg-[#1B4965]/10 text-[#1B4965]'
+                                : 'bg-stone-100 text-stone-500'
+                            }`}>
+                              <Search className="w-3 h-3" />
+                              {msg.count} {msg.count === 1 ? 'property' : 'properties'} found
+                            </span>
+
+                            {(msg.properties?.length || 0) > 3 && (
+                              <button
+                                onClick={() => toggleExpanded(msg.id)}
+                                className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-semibold text-[#1B4965] hover:bg-[#1B4965]/5 rounded-lg transition-colors"
+                              >
+                                {expandedCards[msg.id] ? (
+                                  <>Show less <ChevronUp className="w-3 h-3" /></>
+                                ) : (
+                                  <>Show all {msg.properties!.length} <ChevronDown className="w-3 h-3" /></>
+                                )}
+                              </button>
+                            )}
+
+                            {msg.filters && (msg.properties?.length || 0) > 0 && (
+                              <button
+                                onClick={() => navigateToResults(msg.filters!, msg.content)}
+                                className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-stone-500 hover:text-stone-700 hover:bg-stone-100 rounded-lg transition-colors"
+                              >
+                                Open in listings
+                                <ArrowRight className="w-3 h-3" />
+                              </button>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Property cards — show 3 by default, expand to all */}
+                  {(msg.properties?.length || 0) > 0 && (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+                      {msg.properties!
+                        .slice(0, expandedCards[msg.id] ? undefined : 3)
+                        .map((property: Property, index: number) => (
+                        <div
+                          key={property.id}
+                          className="animate-in fade-in slide-in-from-bottom-2"
+                          style={{ animationDelay: `${index * 60}ms` }}
+                        >
+                          <PropertyCard
+                            id={property.id}
+                            title={property.title}
+                            description={property.description}
+                            price={property.price}
+                            currency={property.currency}
+                            bedrooms={property.bedrooms}
+                            bathrooms={property.bathrooms}
+                            area={property.area}
+                            country={property.country.toLowerCase()}
+                            status={property.status}
+                            images={property.images}
+                            isGoldenVisaEligible={property.isGoldenVisaEligible}
+                            investmentData={{
+                              expectedROI: property.investmentData?.expectedROI,
+                              rentalYield: property.investmentData?.rentalYield,
+                              capitalGrowth: property.investmentData?.capitalGrowth,
+                            }}
+                            isFavorited={property.favoriteProperties?.length ? property.favoriteProperties.length > 0 : false}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Show more button below cards */}
+                  {(msg.properties?.length || 0) > 3 && !expandedCards[msg.id] && (
+                    <div className="text-center">
+                      <button
+                        onClick={() => toggleExpanded(msg.id)}
+                        className="inline-flex items-center gap-2 px-5 py-2.5 text-sm font-semibold text-[#1B4965] bg-white border-2 border-[#1B4965]/20 hover:border-[#1B4965] hover:bg-[#E8F1F5] rounded-xl transition-all"
+                      >
+                        Show all {msg.properties!.length} properties
+                        <ChevronDown className="w-4 h-4" />
+                      </button>
+                    </div>
                   )}
                 </div>
-                <p className="text-sm text-stone-700 leading-relaxed whitespace-pre-wrap">{latestResult.content}</p>
-
-                {/* Actions row */}
-                <div className="mt-3 flex flex-wrap items-center gap-2">
-                  {latestResult.count !== undefined && (
-                    <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold ${
-                      (latestResult.properties?.length || 0) > 0
-                        ? 'bg-[#1B4965]/10 text-[#1B4965]'
-                        : 'bg-stone-100 text-stone-500'
-                    }`}>
-                      <Search className="w-3 h-3" />
-                      {latestResult.count} {latestResult.count === 1 ? 'property' : 'properties'} found
-                    </span>
-                  )}
-                  <button
-                    onClick={handleNewSearch}
-                    className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-stone-500 hover:text-stone-700 hover:bg-stone-100 rounded-lg transition-colors"
-                  >
-                    <RotateCcw className="w-3 h-3" />
-                    New search
-                  </button>
-                </div>
-              </div>
+              )}
             </div>
-          </div>
-
-          {/* Property cards — full-width grid */}
-          {(latestResult.properties?.length || 0) > 0 && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-              {latestResult.properties!.map((property: Property, index: number) => (
-                <div
-                  key={property.id}
-                  className="animate-in fade-in slide-in-from-bottom-2"
-                  style={{ animationDelay: `${index * 80}ms` }}
-                >
-                  <PropertyCard
-                    id={property.id}
-                    title={property.title}
-                    description={property.description}
-                    price={property.price}
-                    currency={property.currency}
-                    bedrooms={property.bedrooms}
-                    bathrooms={property.bathrooms}
-                    area={property.area}
-                    country={property.country.toLowerCase()}
-                    status={property.status}
-                    images={property.images}
-                    isGoldenVisaEligible={property.isGoldenVisaEligible}
-                    investmentData={{
-                      expectedROI: property.investmentData?.expectedROI,
-                      rentalYield: property.investmentData?.rentalYield,
-                      capitalGrowth: property.investmentData?.capitalGrowth,
-                    }}
-                    isFavorited={property.favoriteProperties?.length ? property.favoriteProperties.length > 0 : false}
-                  />
-                </div>
-              ))}
-            </div>
-          )}
+          ))}
         </div>
       )}
-
-      <div ref={messagesEndRef} />
     </div>
   )
 }
 
 
-// ── AI Result Card — shows summary + property cards ──────────────
+// ── Compact inline result summary (for hero/properties page) ──────
 
-function AIResultCard({
+function InlineResultSummary({
   message,
   onViewAll,
   onNewSearch,
-  compact = false,
 }: {
   message: Message
   onViewAll?: () => void
   onNewSearch: () => void
-  compact?: boolean
 }) {
   const properties = message.properties || []
   const hasResults = properties.length > 0
-  const displayLimit = compact ? 3 : 6
 
   return (
-    <div className="space-y-3">
-      {/* AI Summary */}
-      <div className="bg-stone-50 border border-stone-200 rounded-2xl p-4">
-        <div className="flex items-start gap-3">
-          <div className="w-8 h-8 bg-[#1B4965] rounded-lg flex items-center justify-center shrink-0 mt-0.5">
-            <Bot className="w-4 h-4 text-white" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 mb-1">
-              <span className="text-xs font-semibold text-[#1B4965]">PropGroup AI</span>
-              {message.aiPowered && (
-                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-semibold bg-[#C97B4B]/10 text-[#C97B4B] rounded-full">
-                  <Sparkles className="w-2.5 h-2.5" />
-                  AI
-                </span>
-              )}
-            </div>
-            <p className="text-sm text-stone-700 leading-relaxed whitespace-pre-wrap">{message.content}</p>
-
-            {/* Result count badge */}
-            {message.count !== undefined && (
-              <div className="mt-3 flex flex-wrap items-center gap-2">
-                <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold ${
-                  hasResults
-                    ? 'bg-[#1B4965]/10 text-[#1B4965]'
-                    : 'bg-stone-100 text-stone-500'
-                }`}>
-                  <Search className="w-3 h-3" />
-                  {hasResults ? `${message.count} ${message.count === 1 ? 'property' : 'properties'} found` : 'No matches'}
-                </span>
-
-                {hasResults && onViewAll && properties.length > displayLimit && (
-                  <button
-                    onClick={onViewAll}
-                    className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-semibold text-[#1B4965] hover:bg-[#1B4965]/5 rounded-lg transition-colors"
-                  >
-                    View all in listings
-                    <ArrowRight className="w-3 h-3" />
-                  </button>
-                )}
-
-                <button
-                  onClick={onNewSearch}
-                  className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-stone-500 hover:text-stone-700 hover:bg-stone-100 rounded-lg transition-colors"
-                >
-                  <RotateCcw className="w-3 h-3" />
-                  New search
-                </button>
-              </div>
+    <div className="bg-stone-50 border border-stone-200 rounded-2xl p-4">
+      <div className="flex items-start gap-3">
+        <div className="w-8 h-8 bg-[#1B4965] rounded-lg flex items-center justify-center shrink-0 mt-0.5">
+          <Bot className="w-4 h-4 text-white" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 mb-1">
+            <span className="text-xs font-semibold text-[#1B4965]">PropGroup AI</span>
+            {message.aiPowered && (
+              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-semibold bg-[#C97B4B]/10 text-[#C97B4B] rounded-full">
+                <Sparkles className="w-2.5 h-2.5" />
+                AI
+              </span>
             )}
           </div>
+          <p className="text-sm text-stone-700 leading-relaxed whitespace-pre-wrap">{message.content}</p>
+
+          {message.count !== undefined && (
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold ${
+                hasResults ? 'bg-[#1B4965]/10 text-[#1B4965]' : 'bg-stone-100 text-stone-500'
+              }`}>
+                <Search className="w-3 h-3" />
+                {hasResults ? `${message.count} ${message.count === 1 ? 'property' : 'properties'} found` : 'No matches'}
+              </span>
+
+              {hasResults && onViewAll && (
+                <button
+                  onClick={onViewAll}
+                  className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-semibold text-[#1B4965] hover:bg-[#1B4965]/5 rounded-lg transition-colors"
+                >
+                  View properties
+                  <ArrowRight className="w-3 h-3" />
+                </button>
+              )}
+
+              <button
+                onClick={onNewSearch}
+                className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-stone-500 hover:text-stone-700 hover:bg-stone-100 rounded-lg transition-colors"
+              >
+                <RotateCcw className="w-3 h-3" />
+                New search
+              </button>
+            </div>
+          )}
         </div>
       </div>
-
-      {/* Property Cards Grid */}
-      {hasResults && (
-        <div className={`grid gap-4 ${compact ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3' : 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3'}`}>
-          {properties.slice(0, displayLimit).map((property: Property, index: number) => (
-            <div
-              key={property.id}
-              className="animate-in fade-in slide-in-from-bottom-2"
-              style={{ animationDelay: `${index * 80}ms` }}
-            >
-              <PropertyCard
-                id={property.id}
-                title={property.title}
-                description={property.description}
-                price={property.price}
-                currency={property.currency}
-                bedrooms={property.bedrooms}
-                bathrooms={property.bathrooms}
-                area={property.area}
-                country={property.country.toLowerCase()}
-                status={property.status}
-                images={property.images}
-                isGoldenVisaEligible={property.isGoldenVisaEligible}
-                investmentData={{
-                  expectedROI: property.investmentData?.expectedROI,
-                  rentalYield: property.investmentData?.rentalYield,
-                  capitalGrowth: property.investmentData?.capitalGrowth,
-                }}
-                isFavorited={property.favoriteProperties?.length ? property.favoriteProperties.length > 0 : false}
-              />
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Show more link */}
-      {hasResults && properties.length > displayLimit && onViewAll && (
-        <div className="text-center pt-2">
-          <button
-            onClick={onViewAll}
-            className="inline-flex items-center gap-2 px-5 py-2.5 text-sm font-semibold text-white bg-[#1B4965] hover:bg-[#2B6985] rounded-xl shadow-md transition-all"
-          >
-            View all {properties.length} properties
-            <ArrowRight className="w-4 h-4" />
-          </button>
-        </div>
-      )}
     </div>
   )
 }
