@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import { PropertyCard } from '@/components/PropertyCard'
 import {
   Search,
   Sparkles,
@@ -15,6 +16,7 @@ import {
   Bot,
   MessageSquare,
   ArrowRight,
+  RotateCcw,
 } from 'lucide-react'
 
 interface Message {
@@ -24,6 +26,8 @@ interface Message {
   timestamp: Date
   filters?: PropertyFilters
   count?: number
+  properties?: Property[]
+  aiPowered?: boolean
 }
 
 interface PropertyFilters {
@@ -39,6 +43,28 @@ interface PropertyFilters {
   status?: string
   propertyType?: string
   isGoldenVisaEligible?: boolean
+  [key: string]: unknown
+}
+
+interface Property {
+  id: string
+  title: string
+  description: string
+  price: number
+  currency: string
+  bedrooms: number
+  bathrooms: number
+  area: number
+  country: string
+  status: string
+  images: string[]
+  isGoldenVisaEligible?: boolean
+  investmentData?: {
+    expectedROI?: number | null
+    rentalYield?: number | null
+    capitalGrowth?: number | null
+  }
+  favoriteProperties?: any[]
 }
 
 interface AIPropertySearchProps {
@@ -49,9 +75,9 @@ interface AIPropertySearchProps {
 
 const quickSuggestions = [
   { icon: Home, text: '2-bedroom apartment in Batumi under $100k' },
-  { icon: TrendingUp, text: 'High ROI properties in Tbilisi' },
-  { icon: DollarSign, text: 'New build apartments with payment plans' },
-  { icon: MapPin, text: 'Beachfront properties in Batumi under $150k' },
+  { icon: TrendingUp, text: 'High ROI properties above 12%' },
+  { icon: DollarSign, text: 'Affordable apartments under $50k' },
+  { icon: MapPin, text: 'Beachfront properties with sea views' },
 ]
 
 export function AIPropertySearch({
@@ -67,20 +93,22 @@ export function AIPropertySearch({
   const inputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+    if (messages.length > 0) {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+    }
   }, [messages])
 
   const navigateToResults = (filters: PropertyFilters, searchQuery: string) => {
     const params = new URLSearchParams()
-    if (filters.country) params.append('country', filters.country)
-    if (filters.city) params.append('city', filters.city)
-    if (filters.minPrice) params.append('minPrice', filters.minPrice.toString())
-    if (filters.maxPrice) params.append('maxPrice', filters.maxPrice.toString())
-    if (filters.bedrooms) params.append('bedrooms', filters.bedrooms.toString())
-    if (filters.minBedrooms) params.append('minBedrooms', filters.minBedrooms.toString())
-    if (filters.maxBedrooms) params.append('maxBedrooms', filters.maxBedrooms.toString())
-    if (filters.status) params.append('status', filters.status)
-    if (filters.propertyType) params.append('propertyType', filters.propertyType)
+    if (filters.country) params.append('country', String(filters.country))
+    if (filters.city) params.append('city', String(filters.city))
+    if (filters.minPrice) params.append('minPrice', String(filters.minPrice))
+    if (filters.maxPrice) params.append('maxPrice', String(filters.maxPrice))
+    if (filters.bedrooms) params.append('bedrooms', String(filters.bedrooms))
+    if (filters.minBedrooms) params.append('minBedrooms', String(filters.minBedrooms))
+    if (filters.maxBedrooms) params.append('maxBedrooms', String(filters.maxBedrooms))
+    if (filters.status) params.append('status', String(filters.status))
+    if (filters.propertyType) params.append('propertyType', String(filters.propertyType))
     if (filters.isGoldenVisaEligible) params.append('goldenVisa', 'true')
     params.append('q', searchQuery)
 
@@ -118,7 +146,7 @@ export function AIPropertySearch({
       if (!response.ok) throw new Error('Search failed')
 
       const data = await response.json()
-      const { filters, summary, count } = data.data
+      const { filters, summary, properties, count, aiPowered } = data.data
 
       const assistantMessage: Message = {
         id: (Date.now() + 1).toString(),
@@ -127,13 +155,12 @@ export function AIPropertySearch({
         timestamp: new Date(),
         filters,
         count,
+        properties: properties || [],
+        aiPowered,
       }
 
       setMessages(prev => [...prev, assistantMessage])
       setIsLoading(false)
-
-      // Auto-navigate after a short delay
-      setTimeout(() => navigateToResults(filters, q), 1500)
     } catch {
       setMessages(prev => [
         ...prev,
@@ -155,7 +182,16 @@ export function AIPropertySearch({
     }
   }
 
-  // ── Inline variant (used in hero) ──────────────────────
+  const handleNewSearch = () => {
+    setMessages([])
+    setQuery('')
+    inputRef.current?.focus()
+  }
+
+  // Get the latest assistant message with results
+  const latestResult = [...messages].reverse().find(m => m.role === 'assistant' && m.properties)
+
+  // ── Inline variant (used in hero and properties page) ──────
   if (variant === 'inline') {
     return (
       <div className="w-full">
@@ -188,54 +224,85 @@ export function AIPropertySearch({
           </button>
         </div>
 
-        {/* Quick suggestions */}
-        <div className="mt-4 flex flex-wrap gap-2">
-          {quickSuggestions.map((s, i) => (
-            <button
-              key={i}
-              onClick={() => { setQuery(s.text); handleSearch(s.text) }}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-white/80 border border-stone-200 rounded-full text-stone-600 hover:border-[#1B4965] hover:text-[#1B4965] transition-all"
-            >
-              <s.icon className="w-3 h-3" />
-              {s.text}
-            </button>
-          ))}
-        </div>
+        {/* Quick suggestions — hide when we have results */}
+        {!latestResult && (
+          <div className="mt-4 flex flex-wrap gap-2">
+            {quickSuggestions.map((s, i) => (
+              <button
+                key={i}
+                onClick={() => { setQuery(s.text); handleSearch(s.text) }}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-white/80 border border-stone-200 rounded-full text-stone-600 hover:border-[#1B4965] hover:text-[#1B4965] transition-all"
+              >
+                <s.icon className="w-3 h-3" />
+                {s.text}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* Inline AI Answer */}
+        {latestResult && (
+          <div className="mt-4 animate-in fade-in slide-in-from-top-2">
+            <AIResultCard
+              message={latestResult}
+              onViewAll={() => navigateToResults(latestResult.filters!, latestResult.content)}
+              onNewSearch={handleNewSearch}
+              compact
+            />
+          </div>
+        )}
       </div>
     )
   }
 
-  // ── Chat variant (modal + page) ───────────────────────
+  // ── Page variant ───────────────────────
   return (
-    <div className={`flex flex-col ${variant === 'page' ? 'h-[600px]' : 'h-[500px]'} bg-white rounded-2xl shadow-xl border border-stone-200 overflow-hidden`}>
-      {/* Header */}
-      <div className="flex items-center justify-between px-5 py-3.5 border-b border-stone-100 bg-stone-50">
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 bg-[#1B4965] rounded-xl flex items-center justify-center">
-            <Bot className="w-5 h-5 text-white" />
-          </div>
-          <div>
-            <h3 className="font-semibold text-sm text-stone-900">PropGroup AI</h3>
-            <p className="text-[10px] text-stone-500">Ask anything about properties</p>
-          </div>
-        </div>
-        {variant === 'modal' && (
-          <button onClick={() => {}} className="p-1.5 text-stone-400 hover:text-stone-600 hover:bg-stone-100 rounded-lg transition-colors">
-            <X className="w-4 h-4" />
-          </button>
-        )}
-      </div>
-
-      {/* Messages */}
-      <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
-        {messages.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-full text-center">
-            <div className="w-14 h-14 bg-[#E8F1F5] rounded-2xl flex items-center justify-center mb-4">
-              <MessageSquare className="w-7 h-7 text-[#1B4965]" />
+    <div className="space-y-6">
+      {/* Search box — always visible at top */}
+      <div className="bg-white rounded-2xl shadow-xl border border-stone-200 overflow-hidden">
+        {/* Input area */}
+        <div className="px-5 py-4">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 bg-[#1B4965] rounded-xl flex items-center justify-center shrink-0">
+              <Bot className="w-5 h-5 text-white" />
             </div>
-            <h4 className="text-base font-semibold text-stone-900 mb-1">What are you looking for?</h4>
-            <p className="text-sm text-stone-500 mb-6 max-w-sm">Describe your ideal property in plain English and I'll find matches from our listings.</p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 w-full max-w-lg">
+            <div className="flex-1 flex items-center gap-2">
+              <input
+                ref={inputRef}
+                type="text"
+                placeholder="Describe your ideal property..."
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                onKeyDown={handleKeyPress}
+                disabled={isLoading}
+                className="flex-1 h-12 px-4 text-sm bg-stone-50 border border-stone-200 rounded-xl outline-none focus:border-[#1B4965] focus:ring-1 focus:ring-[#1B4965]/20 transition-all disabled:opacity-50"
+              />
+              <button
+                onClick={() => handleSearch()}
+                disabled={!query.trim() || isLoading}
+                className="h-12 px-5 bg-[#1B4965] hover:bg-[#2B6985] text-white font-medium rounded-xl shadow-md transition-all disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2 shrink-0 text-sm"
+              >
+                {isLoading ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <>
+                    <Search className="w-4 h-4" />
+                    <span className="hidden sm:inline">Search</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+          <p className="text-[10px] text-stone-400 mt-2 flex items-center gap-1 pl-12">
+            <Sparkles className="w-2.5 h-2.5 text-[#C97B4B]" />
+            Powered by AI &middot; Describe what you want in plain English
+          </p>
+        </div>
+
+        {/* Quick suggestions — only when no results yet */}
+        {messages.length === 0 && (
+          <div className="px-5 pb-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               {quickSuggestions.map((s, i) => (
                 <button
                   key={i}
@@ -250,66 +317,224 @@ export function AIPropertySearch({
               ))}
             </div>
           </div>
-        ) : (
-          messages.map((msg) => (
-            <div key={msg.id} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-              <div className={`max-w-[85%] rounded-2xl px-4 py-2.5 ${
-                msg.role === 'user'
-                  ? 'bg-[#1B4965] text-white text-sm'
-                  : 'bg-stone-100 text-stone-800 text-sm'
-              }`}>
-                <p className="whitespace-pre-wrap leading-relaxed">{msg.content}</p>
-                {msg.role === 'assistant' && msg.count !== undefined && msg.count > 0 && msg.filters && (
+        )}
+      </div>
+
+      {/* Loading state */}
+      {isLoading && (
+        <div className="flex justify-center">
+          <div className="bg-white border border-stone-200 rounded-2xl px-6 py-4 flex items-center gap-3 shadow-sm">
+            <Loader2 className="w-5 h-5 animate-spin text-[#1B4965]" />
+            <span className="text-sm text-stone-600 font-medium">Searching properties...</span>
+          </div>
+        </div>
+      )}
+
+      {/* AI Answer + Property Results — outside the chat box */}
+      {latestResult && (
+        <div className="animate-in fade-in slide-in-from-bottom-3 space-y-6">
+          {/* AI Summary card */}
+          <div className="bg-white border border-stone-200 rounded-2xl p-5 shadow-sm">
+            <div className="flex items-start gap-3">
+              <div className="w-9 h-9 bg-[#1B4965] rounded-lg flex items-center justify-center shrink-0 mt-0.5">
+                <Bot className="w-5 h-5 text-white" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 mb-1.5">
+                  <span className="text-sm font-bold text-[#1B4965]">PropGroup AI</span>
+                  {latestResult.aiPowered && (
+                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-semibold bg-[#C97B4B]/10 text-[#C97B4B] rounded-full">
+                      <Sparkles className="w-2.5 h-2.5" />
+                      AI
+                    </span>
+                  )}
+                </div>
+                <p className="text-sm text-stone-700 leading-relaxed whitespace-pre-wrap">{latestResult.content}</p>
+
+                {/* Actions row */}
+                <div className="mt-3 flex flex-wrap items-center gap-2">
+                  {latestResult.count !== undefined && (
+                    <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold ${
+                      (latestResult.properties?.length || 0) > 0
+                        ? 'bg-[#1B4965]/10 text-[#1B4965]'
+                        : 'bg-stone-100 text-stone-500'
+                    }`}>
+                      <Search className="w-3 h-3" />
+                      {latestResult.count} {latestResult.count === 1 ? 'property' : 'properties'} found
+                    </span>
+                  )}
                   <button
-                    onClick={() => navigateToResults(msg.filters!, query || msg.content)}
-                    className="mt-2 flex items-center gap-1.5 text-xs font-semibold text-[#1B4965] hover:underline"
+                    onClick={handleNewSearch}
+                    className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-stone-500 hover:text-stone-700 hover:bg-stone-100 rounded-lg transition-colors"
                   >
-                    View {msg.count} {msg.count === 1 ? 'property' : 'properties'}
+                    <RotateCcw className="w-3 h-3" />
+                    New search
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Property cards — full-width grid */}
+          {(latestResult.properties?.length || 0) > 0 && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+              {latestResult.properties!.map((property: Property, index: number) => (
+                <div
+                  key={property.id}
+                  className="animate-in fade-in slide-in-from-bottom-2"
+                  style={{ animationDelay: `${index * 80}ms` }}
+                >
+                  <PropertyCard
+                    id={property.id}
+                    title={property.title}
+                    description={property.description}
+                    price={property.price}
+                    currency={property.currency}
+                    bedrooms={property.bedrooms}
+                    bathrooms={property.bathrooms}
+                    area={property.area}
+                    country={property.country.toLowerCase()}
+                    status={property.status}
+                    images={property.images}
+                    isGoldenVisaEligible={property.isGoldenVisaEligible}
+                    investmentData={{
+                      expectedROI: property.investmentData?.expectedROI,
+                      rentalYield: property.investmentData?.rentalYield,
+                      capitalGrowth: property.investmentData?.capitalGrowth,
+                    }}
+                    isFavorited={property.favoriteProperties?.length ? property.favoriteProperties.length > 0 : false}
+                  />
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      <div ref={messagesEndRef} />
+    </div>
+  )
+}
+
+
+// ── AI Result Card — shows summary + property cards ──────────────
+
+function AIResultCard({
+  message,
+  onViewAll,
+  onNewSearch,
+  compact = false,
+}: {
+  message: Message
+  onViewAll?: () => void
+  onNewSearch: () => void
+  compact?: boolean
+}) {
+  const properties = message.properties || []
+  const hasResults = properties.length > 0
+  const displayLimit = compact ? 3 : 6
+
+  return (
+    <div className="space-y-3">
+      {/* AI Summary */}
+      <div className="bg-stone-50 border border-stone-200 rounded-2xl p-4">
+        <div className="flex items-start gap-3">
+          <div className="w-8 h-8 bg-[#1B4965] rounded-lg flex items-center justify-center shrink-0 mt-0.5">
+            <Bot className="w-4 h-4 text-white" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 mb-1">
+              <span className="text-xs font-semibold text-[#1B4965]">PropGroup AI</span>
+              {message.aiPowered && (
+                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-semibold bg-[#C97B4B]/10 text-[#C97B4B] rounded-full">
+                  <Sparkles className="w-2.5 h-2.5" />
+                  AI
+                </span>
+              )}
+            </div>
+            <p className="text-sm text-stone-700 leading-relaxed whitespace-pre-wrap">{message.content}</p>
+
+            {/* Result count badge */}
+            {message.count !== undefined && (
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold ${
+                  hasResults
+                    ? 'bg-[#1B4965]/10 text-[#1B4965]'
+                    : 'bg-stone-100 text-stone-500'
+                }`}>
+                  <Search className="w-3 h-3" />
+                  {hasResults ? `${message.count} ${message.count === 1 ? 'property' : 'properties'} found` : 'No matches'}
+                </span>
+
+                {hasResults && onViewAll && properties.length > displayLimit && (
+                  <button
+                    onClick={onViewAll}
+                    className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-semibold text-[#1B4965] hover:bg-[#1B4965]/5 rounded-lg transition-colors"
+                  >
+                    View all in listings
                     <ArrowRight className="w-3 h-3" />
                   </button>
                 )}
-              </div>
-            </div>
-          ))
-        )}
 
-        {isLoading && (
-          <div className="flex justify-start">
-            <div className="bg-stone-100 rounded-2xl px-4 py-2.5 flex items-center gap-2">
-              <Loader2 className="w-4 h-4 animate-spin text-[#1B4965]" />
-              <span className="text-sm text-stone-500">Searching properties...</span>
-            </div>
+                <button
+                  onClick={onNewSearch}
+                  className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-stone-500 hover:text-stone-700 hover:bg-stone-100 rounded-lg transition-colors"
+                >
+                  <RotateCcw className="w-3 h-3" />
+                  New search
+                </button>
+              </div>
+            )}
           </div>
-        )}
-        <div ref={messagesEndRef} />
+        </div>
       </div>
 
-      {/* Input */}
-      <div className="px-4 py-3 border-t border-stone-100 bg-white">
-        <div className="flex items-center gap-2">
-          <input
-            ref={inputRef}
-            type="text"
-            placeholder="Describe your ideal property..."
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            onKeyDown={handleKeyPress}
-            disabled={isLoading}
-            className="flex-1 h-10 px-4 text-sm bg-stone-50 border border-stone-200 rounded-xl outline-none focus:border-[#1B4965] focus:ring-1 focus:ring-[#1B4965]/20 transition-all disabled:opacity-50"
-          />
+      {/* Property Cards Grid */}
+      {hasResults && (
+        <div className={`grid gap-4 ${compact ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3' : 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3'}`}>
+          {properties.slice(0, displayLimit).map((property: Property, index: number) => (
+            <div
+              key={property.id}
+              className="animate-in fade-in slide-in-from-bottom-2"
+              style={{ animationDelay: `${index * 80}ms` }}
+            >
+              <PropertyCard
+                id={property.id}
+                title={property.title}
+                description={property.description}
+                price={property.price}
+                currency={property.currency}
+                bedrooms={property.bedrooms}
+                bathrooms={property.bathrooms}
+                area={property.area}
+                country={property.country.toLowerCase()}
+                status={property.status}
+                images={property.images}
+                isGoldenVisaEligible={property.isGoldenVisaEligible}
+                investmentData={{
+                  expectedROI: property.investmentData?.expectedROI,
+                  rentalYield: property.investmentData?.rentalYield,
+                  capitalGrowth: property.investmentData?.capitalGrowth,
+                }}
+                isFavorited={property.favoriteProperties?.length ? property.favoriteProperties.length > 0 : false}
+              />
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Show more link */}
+      {hasResults && properties.length > displayLimit && onViewAll && (
+        <div className="text-center pt-2">
           <button
-            onClick={() => handleSearch()}
-            disabled={!query.trim() || isLoading}
-            className="h-10 w-10 bg-[#1B4965] hover:bg-[#2B6985] text-white rounded-xl flex items-center justify-center transition-all disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
+            onClick={onViewAll}
+            className="inline-flex items-center gap-2 px-5 py-2.5 text-sm font-semibold text-white bg-[#1B4965] hover:bg-[#2B6985] rounded-xl shadow-md transition-all"
           >
-            {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+            View all {properties.length} properties
+            <ArrowRight className="w-4 h-4" />
           </button>
         </div>
-        <p className="text-[10px] text-stone-400 mt-1.5 flex items-center gap-1 px-1">
-          <Sparkles className="w-2.5 h-2.5 text-[#C97B4B]" />
-          Powered by AI &middot; Try: &quot;apartments in Batumi under $150k&quot;
-        </p>
-      </div>
+      )}
     </div>
   )
 }

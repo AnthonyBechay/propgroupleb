@@ -41,6 +41,18 @@ export default async function PropertiesPage({ searchParams }: PropertiesPagePro
       queryParams.maxPrice = parseInt(params.budget);
     }
 
+    if (params.bedrooms) {
+      queryParams.bedrooms = parseInt(params.bedrooms);
+    }
+
+    if (params.minBedrooms) {
+      queryParams.minBedrooms = parseInt(params.minBedrooms);
+    }
+
+    if (params.propertyType) {
+      queryParams.propertyType = params.propertyType.toUpperCase();
+    }
+
     // Handle goal parameter
     if (params.goal === 'GOLDEN_VISA') {
       queryParams.isGoldenVisaEligible = true;

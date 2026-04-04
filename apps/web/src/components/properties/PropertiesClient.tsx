@@ -309,17 +309,28 @@ export function PropertiesClient({
           </div>
         )}
 
-        {/* Results summary - Compact */}
+        {/* Results summary */}
         {(searchParams.q || searchParams.goal || searchParams.budget) && (
-          <div className="mb-4 p-3 bg-[#E8F1F5] border border-[#1B4965]/20 rounded-lg shadow-sm">
+          <div className="mb-4 p-4 bg-[#E8F1F5] border border-[#1B4965]/20 rounded-xl shadow-sm">
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 bg-[#1B4965] rounded-lg flex items-center justify-center">
-                  <Search className="w-4 h-4 text-white" />
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 bg-[#1B4965] rounded-lg flex items-center justify-center shrink-0">
+                  {searchParams.q ? <Bot className="w-4 h-4 text-white" /> : <Search className="w-4 h-4 text-white" />}
                 </div>
-                <span className="text-sm font-bold text-stone-900">
-                  Search Results
-                </span>
+                <div>
+                  <span className="text-sm font-bold text-stone-900 flex items-center gap-2">
+                    {searchParams.q ? 'AI Search Results' : 'Search Results'}
+                    {searchParams.q && (
+                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-semibold bg-[#C97B4B]/10 text-[#C97B4B] rounded-full">
+                        <Sparkles className="w-2.5 h-2.5" />
+                        AI
+                      </span>
+                    )}
+                  </span>
+                  {searchParams.q && (
+                    <p className="text-xs text-stone-600 mt-0.5">&quot;{searchParams.q}&quot;</p>
+                  )}
+                </div>
               </div>
               <span className="text-xs font-medium text-stone-700 bg-white px-3 py-1.5 rounded-md">
                 <span className="font-bold text-[#1B4965]">{filteredProperties.length}</span> found

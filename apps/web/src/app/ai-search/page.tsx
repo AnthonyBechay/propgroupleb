@@ -29,7 +29,7 @@ export default function AISearchPage() {
       {/* Search */}
       <section className="py-8">
         <div className="container mx-auto px-4">
-          <div className="max-w-3xl mx-auto">
+          <div className="max-w-5xl mx-auto">
             <AIPropertySearch variant="page" />
           </div>
         </div>
