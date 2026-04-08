@@ -133,16 +133,22 @@ async function parseQueryWithClaude(
 
     if (conversationHistory && conversationHistory.length > 0 && previousFilters) {
       // Include conversation context so Claude understands follow-ups
-      const contextMsg = `Previous conversation context:
+      const contextMsg = `Previous conversation:
 ${conversationHistory.map(m => `${m.role}: ${m.content}`).join('\n')}
 
-Previous filters that were applied: ${JSON.stringify(previousFilters)}
+Previous filters: ${JSON.stringify(previousFilters)}
 
-Now the user has a follow-up query. Merge or refine the previous filters based on this new query. If the user asks to narrow down, ADD filters. If they ask to broaden, REMOVE filters. If they ask about specific properties or details, keep the same filters but adjust as needed.
+The user now says: "${query}"
 
-New query: "${query}"
+IMPORTANT: You must return a NEW complete JSON filter object that reflects ALL constraints — both from the previous filters AND from this new message.
+- "below 100k" or "under 100k" → maxPrice: 100000
+- "highest ROI" or "best return" → sortBy: "roi"
+- "cheapest" → sortBy: "price_asc"
+- "only off-plan" → status: "OFF_PLAN"
+- "with pool" → hasPool: true
+Do NOT just repeat previous filters unchanged — actually parse the new query for new constraints and merge them.
 
-Return ONLY the JSON object with the updated/merged filters.`;
+Return ONLY the JSON object.`;
       messages.push({ role: 'user', content: contextMsg });
     } else {
       messages.push({ role: 'user', content: `Query: "${query}"\n\nReturn ONLY the JSON object.` });

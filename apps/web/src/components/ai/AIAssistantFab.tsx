@@ -28,9 +28,24 @@ interface FabMessage {
   content: string
   count?: number
   aiPowered?: boolean
+  filters?: Record<string, unknown>
 }
 
-const WHATSAPP_NUMBER = '995599000000' // Replace with your actual WhatsApp number
+const WHATSAPP_NUMBER = '96171934001'
+
+function buildFilterUrl(filters?: Record<string, unknown>): string {
+  if (!filters) return '/properties'
+  const params = new URLSearchParams()
+  const keys = ['country', 'city', 'minPrice', 'maxPrice', 'bedrooms', 'minBedrooms', 'status', 'propertyType']
+  for (const key of keys) {
+    if (filters[key] !== undefined && filters[key] !== null) {
+      params.append(key, String(filters[key]))
+    }
+  }
+  if (filters.isGoldenVisaEligible) params.append('goldenVisa', 'true')
+  const qs = params.toString()
+  return qs ? `/properties?${qs}` : '/properties'
+}
 
 export function AIAssistantFab() {
   const [isOpen, setIsOpen] = useState(false)
@@ -64,6 +79,10 @@ export function AIAssistantFab() {
       const body: Record<string, unknown> = { query: q }
       if (conversationHistory.length > 0) {
         body.conversationHistory = conversationHistory
+        const lastAssistant = [...messages].reverse().find(m => m.role === 'assistant' && m.filters)
+        if (lastAssistant?.filters) {
+          body.previousFilters = lastAssistant.filters
+        }
       }
 
       const response = await fetch(`${apiUrl}/api/ai-search`, {
@@ -75,7 +94,7 @@ export function AIAssistantFab() {
       if (!response.ok) throw new Error('Search failed')
 
       const data = await response.json()
-      const { summary, count, aiPowered } = data.data
+      const { summary, count, aiPowered, filters } = data.data
 
       const assistantMsg: FabMessage = {
         id: (Date.now() + 1).toString(),
@@ -83,6 +102,7 @@ export function AIAssistantFab() {
         content: summary,
         count,
         aiPowered,
+        filters,
       }
 
       setMessages(prev => [...prev, assistantMsg])
@@ -228,7 +248,7 @@ export function AIAssistantFab() {
                         <p className="leading-relaxed whitespace-pre-wrap">{msg.content}</p>
                         {msg.role === 'assistant' && msg.count !== undefined && msg.count > 0 && (
                           <a
-                            href={`/properties`}
+                            href={buildFilterUrl(msg.filters)}
                             className="mt-2 flex items-center gap-1 text-xs font-semibold text-[#1B3A5C] hover:underline"
                           >
                             <Search className="w-3 h-3" />
