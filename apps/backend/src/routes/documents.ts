@@ -3,6 +3,7 @@ import multer from 'multer';
 import { prisma } from '@propgroup/db';
 import { authenticateToken, requireAdmin, logAdminAction } from '../middleware/auth.js';
 import { asyncHandler } from '../utils/errors.js';
+import { logger } from '../utils/logger.js';
 import { sendSuccess, sendCreated, sendNotFound } from '../utils/response.js';
 import { uploadFile, deleteFile, extractKeyFromUrl } from '../services/upload.service.js';
 import type { AuthenticatedRequest } from '../types/index.js';
@@ -116,8 +117,7 @@ router.post(
         customName: title,
       });
     } catch (uploadErr: any) {
-      console.error('R2 upload failed for document:', {
-        error: uploadErr?.message || uploadErr,
+      logger.error('R2 upload failed for document', uploadErr, {
         fileName: file.originalname,
         mimeType: file.mimetype,
         fileSize: file.size,
@@ -246,7 +246,7 @@ router.delete(
       const key = extractKeyFromUrl(document.fileUrl);
       if (key) await deleteFile(key);
     } catch (err) {
-      console.error('Failed to delete file from storage:', err);
+      logger.error('Failed to delete file from storage', err);
     }
 
     await prisma.propertyDocument.delete({ where: { id: req.params.id } });

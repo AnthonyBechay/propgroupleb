@@ -134,7 +134,7 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
     )
   );
 } else {
-  console.log('Google OAuth not configured - skipping Google Strategy');
+  // Google OAuth not configured — skipping Google Strategy
 }
 
 export default passport;

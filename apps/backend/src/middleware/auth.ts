@@ -2,6 +2,7 @@ import type { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { prisma } from '@propgroup/db';
 import type { AuthenticatedRequest, AuthUser } from '../types/index.js';
+import { logger } from '../utils/logger.js';
 
 // Middleware to prevent caching of user-specific data
 export function noCache(_req: Request, res: Response, next: NextFunction) {
@@ -89,7 +90,7 @@ export async function authenticateToken(req: Request, res: Response, next: NextF
       }
     }
 
-    console.error('Auth middleware error:', error);
+    logger.error('Auth middleware error', error);
     res.status(500).json({
       error: 'Internal Server Error',
       message: 'Authentication failed',
@@ -159,6 +160,6 @@ export async function logAdminAction(
       },
     });
   } catch (error) {
-    console.error('Error logging admin action:', error);
+    logger.error('Error logging admin action', error);
   }
 }

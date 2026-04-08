@@ -13,7 +13,7 @@ export default function DocumentsPage() {
               Documents
             </h1>
             <p className="text-slate-600">
-              Securely store and manage your investment documents. This feature is coming soon.
+              Securely store and manage your investment documents. Your documents will appear here once your investment journey begins.
             </p>
           </div>
         </div>

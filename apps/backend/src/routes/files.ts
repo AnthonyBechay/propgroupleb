@@ -1,6 +1,7 @@
 import express, { type Request, type Response, type Router } from 'express';
 import { getFileStream, getSignedFileUrl, extractKeyFromUrl } from '../services/upload.service.js';
 import { asyncHandler } from '../utils/errors.js';
+import { logger } from '../utils/logger.js';
 import { Readable } from 'stream';
 
 const router: Router = express.Router();
@@ -73,7 +74,7 @@ router.get(
         res.status(404).json({ error: 'File not found' });
         return;
       }
-      console.error('File proxy error:', err);
+      logger.error('File proxy error', err);
       res.status(500).json({ error: 'Failed to retrieve file' });
     }
   })
@@ -103,7 +104,7 @@ router.get(
       const signedUrl = await getSignedFileUrl(key, 3600); // 1 hour
       res.redirect(signedUrl);
     } catch (err: any) {
-      console.error('Signed URL error:', err);
+      logger.error('Signed URL error', err);
       res.status(404).json({ error: 'File not found' });
     }
   })

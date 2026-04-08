@@ -27,9 +27,7 @@
     "deploy": "pnpm run build",
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md,sql}\"",
     "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,md,sql}\"",
-    "db:seed": "pnpm --filter @propgroup/db run seed",
-    "db:migrate": "node packages/db/migrate.js",
-    "db:check": "node packages/db/check-database.js",
+    "db:migrate": "pnpm --filter @propgroup/db run db:migrate:deploy",
     "mobile:ios": "pnpm --filter mobile-capacitor cap:ios",
     "mobile:android": "pnpm --filter mobile-capacitor cap:android",
     "mobile:sync": "pnpm --filter mobile-capacitor cap:sync"

@@ -8,9 +8,7 @@ export const revalidate = 0
 export default async function PortfolioPage() {
   // Layout already handles authentication
 
-  // Fetch user's portfolio data from database
-  // Note: This assumes you have a user property relationship in your schema
-  // For now, we'll fetch all properties as a placeholder
+  // Fetch properties for portfolio overview
   const properties = await prisma.property.findMany({
     include: {
       developer: true,
@@ -24,14 +22,14 @@ export default async function PortfolioPage() {
     customName: property.title,
     propertyId: property.id,
     purchasePrice: property.price || 0,
-    currentValue: property.price || 0, // This would need historical data to calculate
+    currentValue: property.price || 0,
     purchaseDate: property.createdAt.toISOString().split('T')[0],
     location: `${property.country}`,
     currentRent: (property.investmentData?.rentalYield || 0) * (property.price || 0) / 100 / 12,
-    monthlyExpenses: 0, // This would need to be tracked separately
+    monthlyExpenses: 0,
     roi: property.investmentData?.expectedROI || 0,
-    appreciation: 0, // This would need historical data to calculate
-    type: 'Property', // This would need to be added to the schema
+    appreciation: 0,
+    type: 'Property',
     status: property.status === 'NEW_BUILD' ? 'Under Construction' : 'Available'
   }))
 

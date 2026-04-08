@@ -3,6 +3,7 @@ import { prisma } from '@propgroup/db';
 import rateLimit from 'express-rate-limit';
 import { authenticateToken, requireAdmin, logAdminAction } from '../middleware/auth.js';
 import { asyncHandler } from '../utils/errors.js';
+import { logger } from '../utils/logger.js';
 import { sendSuccess, sendCreated, sendPaginated, sendNotFound } from '../utils/response.js';
 import { parsePagination, buildPaginationResponse } from '../utils/pagination.js';
 import { PROPERTY_WITH_STATS_INCLUDE } from '../utils/prisma-includes.js';
@@ -45,7 +46,7 @@ router.post(
     sendInquiryConfirmation(validatedData.email, {
       name: validatedData.name,
       propertyTitle: property.title,
-    }).catch(err => console.error('Failed to send inquiry confirmation:', err));
+    }).catch(err => logger.error('Failed to send inquiry confirmation', err));
 
     notifyAdminOfInquiry({
       name: validatedData.name,
@@ -53,7 +54,7 @@ router.post(
       phone: validatedData.phone,
       message: validatedData.message,
       propertyTitle: property.title,
-    }).catch(err => console.error('Failed to send admin notification:', err));
+    }).catch(err => logger.error('Failed to send admin notification', err));
 
     sendCreated(res, inquiry, 'Inquiry submitted successfully');
   })

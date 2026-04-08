@@ -13,11 +13,9 @@ import {
   Home,
   BadgeCheck,
   Clock,
-  Eye,
   ArrowRight,
   Sparkles,
   DollarSign,
-  BarChart3,
   Shield,
   Award,
   Camera

@@ -358,12 +358,3 @@ export async function getSimilarProperties(
     },
   })
 }
-
-// Performance monitoring helper
-export async function getDatabaseMetrics() {
-  // Note: $metrics is not available in the current Prisma version
-  // This is a placeholder for future implementation
-  return {
-    message: 'Database metrics not available in current Prisma version'
-  }
-}

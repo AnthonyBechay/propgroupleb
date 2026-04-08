@@ -1,5 +1,6 @@
 import type { Request, Response, NextFunction } from 'express';
 import { ZodError } from 'zod';
+import { logger } from './logger.js';
 
 export class AppError extends Error {
   statusCode: number;
@@ -27,10 +28,16 @@ export function asyncHandler(
 
 /**
  * Global error handling middleware. Handles ZodError, AppError, and unknown errors.
+ * Logs structured errors for production debugging.
  */
 export function errorHandler(err: Error, req: Request, res: Response, _next: NextFunction) {
   // Zod validation errors
   if (err instanceof ZodError) {
+    logger.warn('Validation error', {
+      method: req.method,
+      path: req.originalUrl,
+      errors: err.errors.map((e) => ({ path: e.path.join('.'), message: e.message })),
+    });
     res.status(400).json({
       error: 'Validation Error',
       message: 'Invalid input data',
@@ -41,6 +48,9 @@ export function errorHandler(err: Error, req: Request, res: Response, _next: Nex
 
   // Known operational errors
   if (err instanceof AppError) {
+    if (err.statusCode >= 500) {
+      logger.requestError('Operational server error', err, req);
+    }
     res.status(err.statusCode).json({
       error: err.statusCode >= 500 ? 'Internal Server Error' : 'Error',
       message: err.message,
@@ -82,8 +92,8 @@ export function errorHandler(err: Error, req: Request, res: Response, _next: Nex
     return;
   }
 
-  // Unknown errors
-  console.error('Unhandled error:', err);
+  // Unknown / unexpected errors — always log fully
+  logger.requestError('Unhandled error', err, req);
   res.status(500).json({
     error: 'Internal Server Error',
     message: process.env.NODE_ENV === 'production' ? 'Something went wrong' : err.message,

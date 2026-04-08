@@ -1,4 +1,5 @@
 import { Resend } from 'resend';
+import { logger } from '../utils/logger.js';
 
 const FROM_EMAIL = process.env.FROM_EMAIL || 'PropGroup <noreply@propgroup.com>';
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'invest@propgroup.com';
@@ -56,7 +57,7 @@ export async function sendWelcomeEmail(to: string, firstName?: string) {
       `,
     });
   } catch (error) {
-    console.error('Failed to send welcome email:', error);
+    logger.error('Failed to send welcome email', error);
   }
 }
 
@@ -100,7 +101,7 @@ export async function sendPasswordResetEmail(to: string, resetToken: string) {
       `,
     });
   } catch (error) {
-    console.error('Failed to send password reset email:', error);
+    logger.error('Failed to send password reset email', error);
   }
 }
 
@@ -140,7 +141,7 @@ export async function sendInquiryConfirmation(
       `,
     });
   } catch (error) {
-    console.error('Failed to send inquiry confirmation:', error);
+    logger.error('Failed to send inquiry confirmation', error);
   }
 }
 
@@ -185,7 +186,7 @@ export async function notifyAdminOfInquiry(data: {
       `,
     });
   } catch (error) {
-    console.error('Failed to send admin notification:', error);
+    logger.error('Failed to send admin notification', error);
   }
 }
 
@@ -218,6 +219,6 @@ export async function sendContactConfirmation(to: string, name: string) {
       `,
     });
   } catch (error) {
-    console.error('Failed to send contact confirmation:', error);
+    logger.error('Failed to send contact confirmation', error);
   }
 }

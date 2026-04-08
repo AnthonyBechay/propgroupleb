@@ -19,18 +19,12 @@
     "db:migrate:deploy": "prisma migrate deploy",
     "db:studio": "prisma studio",
     "db:push": "prisma db push",
-    "db:seed": "tsx prisma/seed.ts",
     "db:reset": "prisma migrate reset",
     "vercel-build": "prisma generate && tsc"
   },
-  "prisma": {
-    "seed": "tsx prisma/seed.ts"
-  },
   "dependencies": {
     "@prisma/client": "^5.0.0",
-    "prisma": "^5.0.0",
-    "bcryptjs": "^2.4.3",
-    "tsx": "^4.0.0"
+    "prisma": "^5.0.0"
   },
   "devDependencies": {
     "typescript": "^5.0.0",

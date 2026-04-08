@@ -2,6 +2,7 @@ import express, { type Request, type Response, type Router } from 'express';
 import Anthropic from '@anthropic-ai/sdk';
 import { prisma } from '@propgroup/db';
 import { asyncHandler } from '../utils/errors.js';
+import { logger } from '../utils/logger.js';
 import { sendSuccess } from '../utils/response.js';
 import { PROPERTY_LIST_INCLUDE } from '../utils/prisma-includes.js';
 import { aiSearchSchema } from '../schemas/index.js';
@@ -14,7 +15,6 @@ function getAnthropic(): Anthropic | null {
   if (!process.env.ANTHROPIC_API_KEY) return null;
   if (!_anthropic) {
     _anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-    console.log('[ai-search] Anthropic client initialized');
   }
   return _anthropic;
 }
@@ -171,7 +171,7 @@ Return ONLY the JSON object.`;
 
     return parsed;
   } catch (err) {
-    console.error('[ai-search] Claude parsing failed:', err);
+    logger.error('AI search: Claude parsing failed', err);
     return null;
   }
 }
@@ -504,7 +504,7 @@ ${count > 0 ? `Top results:\n${propertySnippets}` : ''}`,
 
     return (message.content[0] as { type: string; text: string }).text.trim();
   } catch (err) {
-    console.error('[ai-search] Claude summary failed:', err);
+    logger.error('AI search: Claude summary failed', err);
     return generateFallbackSummary(filters, count);
   }
 }

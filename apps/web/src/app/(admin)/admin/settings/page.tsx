@@ -407,15 +407,15 @@ export default function SettingsPage() {
             </div>
           )}
 
-          {/* Other tabs placeholder */}
+          {/* Other tabs */}
           {activeTab !== 'profile' && activeTab !== 'security' && (
             <div className="bg-white border-2 border-slate-100 shadow-lg rounded-2xl p-8 text-center">
               <div className="w-16 h-16 bg-slate-200 rounded-2xl flex items-center justify-center mx-auto mb-4">
                 <SettingsIcon className="h-8 w-8 text-slate-500" />
               </div>
-              <h3 className="text-xl font-bold text-slate-900 mb-2">Coming Soon</h3>
+              <h3 className="text-xl font-bold text-slate-900 mb-2">In Development</h3>
               <p className="text-slate-600">
-                This section is under development and will be available soon.
+                This settings section will be available in a future update.
               </p>
             </div>
           )}

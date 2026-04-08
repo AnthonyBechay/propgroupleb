@@ -2,6 +2,7 @@ import express, { type Request, type Response, type Router } from 'express';
 import { prisma } from '@propgroup/db';
 import { authenticateToken, requireAdmin, logAdminAction } from '../middleware/auth.js';
 import { asyncHandler } from '../utils/errors.js';
+import { logger } from '../utils/logger.js';
 import { sendSuccess, sendCreated, sendPaginated, sendNotFound } from '../utils/response.js';
 import { buildPaginationResponse } from '../utils/pagination.js';
 import { PROPERTY_LIST_INCLUDE, PROPERTY_DETAIL_INCLUDE } from '../utils/prisma-includes.js';
@@ -143,7 +144,7 @@ router.get(
     prisma.property.update({
       where: { id: req.params.id },
       data: { views: { increment: 1 } },
-    }).catch(err => console.error('Failed to increment view count:', err));
+    }).catch(err => logger.error('Failed to increment view count', err));
 
     sendSuccess(res, property);
   })
@@ -316,11 +317,11 @@ async function cleanupPropertyFiles(propertyId: string) {
         const key = extractKeyFromUrl(url);
         if (key) await deleteFile(key);
       } catch (err) {
-        console.error(`Failed to delete R2 file: ${url}`, err);
+        logger.error('Failed to delete R2 file', err, { url });
       }
     }
   } catch (err) {
-    console.error(`Failed to cleanup files for property ${propertyId}:`, err);
+    logger.error('Failed to cleanup files for property', err, { propertyId });
   }
 }
 

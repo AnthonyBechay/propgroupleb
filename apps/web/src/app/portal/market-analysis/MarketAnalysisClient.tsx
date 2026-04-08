@@ -126,10 +126,10 @@ export function MarketAnalysisClient({ marketData, comparisonMetrics }: MarketAn
             <div className="col-span-full bg-white rounded-xl shadow-sm p-12 text-center">
               <MapPin className="w-16 h-16 text-gray-400 mx-auto mb-4" />
               <h3 className="text-xl font-semibold text-gray-900 mb-2">
-                No market data available
+                Market Data Coming Soon
               </h3>
               <p className="text-gray-600 mb-6">
-                Use the seed button in admin to add sample market data
+                We're preparing detailed market analysis for Georgian real estate. Check back soon for investment insights.
               </p>
             </div>
           )}

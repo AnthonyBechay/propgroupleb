@@ -14,7 +14,6 @@
     "db:migrate": "cd ../../packages/db && prisma migrate dev",
     "db:migrate:deploy": "cd ../../packages/db && prisma migrate deploy",
     "db:migrate:resolve": "cd ../../packages/db && prisma migrate resolve",
-    "db:seed": "tsx src/seed.ts",
     "db:studio": "cd ../../packages/db && prisma studio"
   },
   "keywords": [

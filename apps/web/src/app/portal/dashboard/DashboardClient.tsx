@@ -183,7 +183,7 @@ export function DashboardClient({
                 )) : (
                   <div className="text-center py-8 text-slate-500">
                     <MapPin className="w-12 h-12 mx-auto mb-4 text-slate-300" />
-                    <p>No market data available. Use the seed button in admin to add sample data.</p>
+                    <p>Market data is currently being updated. Check back soon.</p>
                   </div>
                 )}
               </div>

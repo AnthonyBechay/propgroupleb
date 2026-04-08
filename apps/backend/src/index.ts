@@ -7,6 +7,7 @@ import cookieParser from 'cookie-parser';
 import { prisma } from '@propgroup/db';
 import passport from './config/passport.js';
 import { errorHandler } from './utils/errors.js';
+import { logger } from './utils/logger.js';
 
 // Import routes
 import authRoutes from './routes/auth.js';
@@ -37,7 +38,8 @@ app.use(
     crossOriginResourcePolicy: { policy: 'cross-origin' },
   })
 );
-// Custom request logging - skip health checks, clean format
+// Request logging — structured JSON in production, readable in dev
+const isProduction = process.env.NODE_ENV === 'production';
 app.use(
   morgan(
     (tokens, req, res) => {
@@ -45,8 +47,22 @@ app.use(
       const url = tokens.url(req, res);
       const status = tokens.status(req, res);
       const responseTime = tokens['response-time'](req, res);
-      const statusNum = Number(status);
-      const icon = statusNum >= 500 ? 'ERR' : statusNum >= 400 ? 'WARN' : 'OK';
+
+      if (isProduction) {
+        return JSON.stringify({
+          level: Number(status) >= 500 ? 'error' : Number(status) >= 400 ? 'warn' : 'info',
+          message: 'request',
+          timestamp: new Date().toISOString(),
+          method,
+          path: url,
+          status: Number(status),
+          responseTime: `${responseTime}ms`,
+          ip: req.ip,
+          userAgent: req.headers['user-agent'],
+        });
+      }
+
+      const icon = Number(status) >= 500 ? 'ERR' : Number(status) >= 400 ? 'WARN' : 'OK';
       return `[${icon}] ${method} ${url} ${status} ${responseTime}ms`;
     },
     {
@@ -131,7 +147,7 @@ app.get('/api/health', async (_req, res) => {
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error';
-    console.error('Health check failed:', error);
+    logger.error('Health check failed', error);
     res.status(503).json({
       status: 'error',
       timestamp: new Date().toISOString(),
@@ -176,7 +192,7 @@ app.use('*', (_req, res) => {
 
 // Graceful shutdown
 async function shutdown() {
-  console.log('Shutting down gracefully...');
+  logger.info('Shutting down gracefully');
   await prisma.$disconnect();
   process.exit(0);
 }
@@ -184,25 +200,31 @@ async function shutdown() {
 process.on('SIGINT', shutdown);
 process.on('SIGTERM', shutdown);
 
+// Unhandled rejection / exception logging
+process.on('unhandledRejection', (reason) => {
+  logger.error('Unhandled promise rejection', reason);
+});
+
+process.on('uncaughtException', (error) => {
+  logger.error('Uncaught exception — shutting down', error);
+  process.exit(1);
+});
+
 // Startup
 async function startServer() {
   try {
-    console.log('Testing database connection...');
     await prisma.$queryRaw`SELECT 1`;
-    console.log('Database connection successful');
+    logger.info('Database connected');
 
     app.listen(PORT, () => {
-      console.log('');
-      console.log('=================================');
-      console.log(`  PropGroup API Server`);
-      console.log(`  Port: ${PORT}`);
-      console.log(`  Env:  ${process.env.NODE_ENV || 'development'}`);
-      console.log(`  CORS: ${allowedOrigins.join(', ')}`);
-      console.log('=================================');
-      console.log('');
+      logger.info('Server started', {
+        port: PORT,
+        env: process.env.NODE_ENV || 'development',
+        cors: allowedOrigins,
+      });
     });
   } catch (error) {
-    console.error('Failed to start server:', error);
+    logger.error('Failed to start server', error);
     process.exit(1);
   }
 }

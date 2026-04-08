@@ -1,5 +1,4 @@
 import { PropertiesClient } from '@/components/properties/PropertiesClient';
-import { apiClient } from '@/lib/api/client';
 import { SearchParams } from '@/types/search';
 
 type PropertiesPageProps = {
@@ -93,7 +92,7 @@ export default async function PropertiesPage({ searchParams }: PropertiesPagePro
       });
     }
   } catch (error) {
-    console.warn('Failed to fetch properties from API:', error);
+    // Silently fall back to empty list on fetch failure
     // Use empty array as fallback
     properties = [];
   }

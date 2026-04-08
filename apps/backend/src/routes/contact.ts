@@ -2,6 +2,7 @@ import express, { type Request, type Response, type Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '@propgroup/db';
 import { asyncHandler } from '../utils/errors.js';
+import { logger } from '../utils/logger.js';
 import { authenticateToken, requireAdmin } from '../middleware/auth.js';
 import { sendSuccess, sendPaginated } from '../utils/response.js';
 import { parsePagination, buildPaginationResponse } from '../utils/pagination.js';
@@ -40,7 +41,7 @@ router.post('/', contactLimiter, asyncHandler(async (req: Request, res: Response
 
   // Send email notifications (fire and forget)
   sendContactConfirmation(data.email, data.name).catch(err =>
-    console.error('Failed to send contact confirmation:', err)
+    logger.error('Failed to send contact confirmation', err)
   );
 
   notifyAdminOfInquiry({
@@ -48,7 +49,7 @@ router.post('/', contactLimiter, asyncHandler(async (req: Request, res: Response
     email: data.email,
     phone: data.phone,
     message: data.message,
-  }).catch(err => console.error('Failed to send admin notification:', err));
+  }).catch(err => logger.error('Failed to send admin notification', err));
 
   res.status(201).json({ success: true, id: contact.id });
 }));

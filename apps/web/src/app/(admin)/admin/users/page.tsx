@@ -112,19 +112,19 @@ export default function SuperAdminUsersPage() {
         <div className="bg-white p-6 rounded-lg shadow">
           <div className="text-sm text-gray-600">Total Users</div>
           <div className="text-2xl font-bold">
-            {users.filter((u: any) => u.role === 'USER').length}
+            {users.length}
           </div>
         </div>
         <div className="bg-white p-6 rounded-lg shadow">
           <div className="text-sm text-gray-600">Admins</div>
           <div className="text-2xl font-bold text-blue-600">
-            {users.filter((u: any) => u.role === 'ADMIN').length}
+            {users.filter((u: any) => u.role === 'ADMIN' || u.role === 'SUPER_ADMIN').length}
           </div>
         </div>
         <div className="bg-white p-6 rounded-lg shadow">
-          <div className="text-sm text-gray-600">Super Admins</div>
+          <div className="text-sm text-gray-600">Agents</div>
           <div className="text-2xl font-bold text-purple-600">
-            {users.filter((u: any) => u.role === 'SUPER_ADMIN').length}
+            {users.filter((u: any) => u.role === 'AGENT').length}
           </div>
         </div>
         <div className="bg-white p-6 rounded-lg shadow">

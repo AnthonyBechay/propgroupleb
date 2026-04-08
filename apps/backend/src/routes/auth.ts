@@ -4,6 +4,7 @@ import jwt from 'jsonwebtoken';
 import { prisma } from '@propgroup/db';
 import { authenticateToken, logAdminAction } from '../middleware/auth.js';
 import { asyncHandler } from '../utils/errors.js';
+import { logger } from '../utils/logger.js';
 import { sendSuccess, sendCreated } from '../utils/response.js';
 import { USER_AUTH_SELECT } from '../utils/prisma-includes.js';
 import { registerSchema, loginSchema, updateProfileSchema, changePasswordSchema } from '../schemas/index.js';
@@ -96,7 +97,7 @@ router.post(
 
     // Send welcome email (fire and forget)
     sendWelcomeEmail(user.email, user.firstName || undefined).catch(err =>
-      console.error('Failed to send welcome email:', err)
+      logger.error('Failed to send welcome email', err)
     );
 
     sendCreated(res, user, 'User registered successfully');
