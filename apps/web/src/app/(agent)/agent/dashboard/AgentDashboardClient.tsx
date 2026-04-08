@@ -85,7 +85,7 @@ export default function AgentDashboardClient() {
     return (
       <div className="flex flex-col items-center justify-center h-96 space-y-4">
         <AlertCircle className="w-12 h-12 text-red-500" />
-        <p className="text-lg text-stone-600">{error || 'Failed to load dashboard'}</p>
+        <p className="text-lg text-slate-600">{error || 'Failed to load dashboard'}</p>
         <Button onClick={fetchDashboardStats}>Try Again</Button>
       </div>
     )
@@ -95,14 +95,14 @@ export default function AgentDashboardClient() {
   const { totalProperties, totalInquiries, totalViews, estimatedCommission, recentInquiries, topProperties } = stats
 
   return (
-    <div className="min-h-screen bg-stone-50">
+    <div className="min-h-screen bg-slate-50">
       <div className="pg-container max-w-7xl mx-auto py-6 sm:py-8 lg:py-12">
         {/* Header */}
         <div className="mb-8 sm:mb-12">
-          <h1 className="pg-text-3xl sm:pg-text-4xl lg:pg-text-5xl font-black text-stone-900">
+          <h1 className="pg-text-3xl sm:pg-text-4xl lg:pg-text-5xl font-black text-slate-900">
             Welcome back, <span className="pg-gradient-text">{user?.firstName || 'Agent'}</span>!
           </h1>
-          <p className="pg-text-lg text-stone-600 mt-2">
+          <p className="pg-text-lg text-slate-600 mt-2">
             Here's your performance overview
           </p>
         </div>
@@ -121,10 +121,10 @@ export default function AgentDashboardClient() {
               </div>
             </div>
             <div>
-              <p className="text-sm font-medium text-stone-600 mb-2">
+              <p className="text-sm font-medium text-slate-600 mb-2">
                 Total Properties
               </p>
-              <p className="pg-text-3xl sm:pg-text-4xl font-bold text-stone-900">
+              <p className="pg-text-3xl sm:pg-text-4xl font-bold text-slate-900">
                 {totalProperties}
               </p>
             </div>
@@ -142,10 +142,10 @@ export default function AgentDashboardClient() {
               </div>
             </div>
             <div>
-              <p className="text-sm font-medium text-stone-600 mb-2">
+              <p className="text-sm font-medium text-slate-600 mb-2">
                 Total Inquiries
               </p>
-              <p className="pg-text-3xl sm:pg-text-4xl font-bold text-stone-900">
+              <p className="pg-text-3xl sm:pg-text-4xl font-bold text-slate-900">
                 {totalInquiries}
               </p>
             </div>
@@ -157,15 +157,15 @@ export default function AgentDashboardClient() {
               <div className="p-3 bg-green-100 rounded-xl shadow-md">
                 <Eye className="w-6 h-6 text-green-600" />
               </div>
-              <div className="text-sm text-stone-600">
+              <div className="text-sm text-slate-600">
                 Across all properties
               </div>
             </div>
             <div>
-              <p className="text-sm font-medium text-stone-600 mb-2">
+              <p className="text-sm font-medium text-slate-600 mb-2">
                 Total Views
               </p>
-              <p className="pg-text-3xl sm:pg-text-4xl font-bold text-stone-900">
+              <p className="pg-text-3xl sm:pg-text-4xl font-bold text-slate-900">
                 {totalViews.toLocaleString()}
               </p>
             </div>
@@ -177,15 +177,15 @@ export default function AgentDashboardClient() {
               <div className="p-3 bg-yellow-100 rounded-xl shadow-md">
                 <DollarSign className="w-6 h-6 text-yellow-600" />
               </div>
-              <div className="text-sm text-stone-600">
+              <div className="text-sm text-slate-600">
                 Estimated
               </div>
             </div>
             <div>
-              <p className="text-sm font-medium text-stone-600 mb-2">
+              <p className="text-sm font-medium text-slate-600 mb-2">
                 Est. Commission
               </p>
-              <p className="pg-text-3xl sm:pg-text-4xl font-bold text-stone-900">
+              <p className="pg-text-3xl sm:pg-text-4xl font-bold text-slate-900">
                 {formatCurrency(estimatedCommission)}
               </p>
             </div>
@@ -197,23 +197,23 @@ export default function AgentDashboardClient() {
           {/* Recent Inquiries */}
           <div className="pg-card">
             <div className="pg-card-header">
-              <CardTitle className="flex items-center justify-between pg-text-lg font-bold text-stone-900">
+              <CardTitle className="flex items-center justify-between pg-text-lg font-bold text-slate-900">
                 <span>Recent Inquiries</span>
                 <Link href="/agent/inquiries">
                   <Button variant="ghost" size="sm">View All</Button>
                 </Link>
               </CardTitle>
-              <CardDescription className="text-stone-600 mt-2">
+              <CardDescription className="text-slate-600 mt-2">
                 Latest property inquiries from potential buyers
               </CardDescription>
             </div>
             <div className="pg-card-content">
               <div className="space-y-4">
                 {recentInquiries.length === 0 ? (
-                  <p className="text-center text-stone-500 py-8">No inquiries yet</p>
+                  <p className="text-center text-slate-500 py-8">No inquiries yet</p>
                 ) : (
                   recentInquiries.slice(0, 5).map((inquiry: any) => (
-                    <div key={inquiry.id} className="flex items-start space-x-4 p-3 hover:bg-stone-50 rounded-lg transition-colors">
+                    <div key={inquiry.id} className="flex items-start space-x-4 p-3 hover:bg-slate-50 rounded-lg transition-colors">
                       <div className="flex-shrink-0">
                         {inquiry.property?.images?.[0] ? (
                           <Image
@@ -224,19 +224,19 @@ export default function AgentDashboardClient() {
                             className="rounded-lg object-cover"
                           />
                         ) : (
-                          <div className="w-15 h-15 bg-stone-200 rounded-lg flex items-center justify-center">
-                            <Home className="w-6 h-6 text-stone-400" />
+                          <div className="w-15 h-15 bg-slate-200 rounded-lg flex items-center justify-center">
+                            <Home className="w-6 h-6 text-slate-400" />
                           </div>
                         )}
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-stone-900 truncate">
+                        <p className="text-sm font-medium text-slate-900 truncate">
                           {inquiry.name}
                         </p>
-                        <p className="text-sm text-stone-600 truncate">
+                        <p className="text-sm text-slate-600 truncate">
                           {inquiry.property?.title}
                         </p>
-                        <p className="text-xs text-stone-500 mt-1">
+                        <p className="text-xs text-slate-500 mt-1">
                           {formatDate(inquiry.createdAt)}
                         </p>
                       </div>
@@ -257,23 +257,23 @@ export default function AgentDashboardClient() {
           {/* Top Properties */}
           <div className="pg-card">
             <div className="pg-card-header">
-              <CardTitle className="flex items-center justify-between pg-text-lg font-bold text-stone-900">
+              <CardTitle className="flex items-center justify-between pg-text-lg font-bold text-slate-900">
                 <span>Top Performing Properties</span>
                 <Link href="/agent/properties">
                   <Button variant="ghost" size="sm">View All</Button>
                 </Link>
               </CardTitle>
-              <CardDescription className="text-stone-600 mt-2">
+              <CardDescription className="text-slate-600 mt-2">
                 Your best properties by views and inquiries
               </CardDescription>
             </div>
             <div className="pg-card-content">
               <div className="space-y-4">
                 {topProperties.length === 0 ? (
-                  <p className="text-center text-stone-500 py-8">No properties yet</p>
+                  <p className="text-center text-slate-500 py-8">No properties yet</p>
                 ) : (
                   topProperties.map((property: any) => (
-                    <div key={property.id} className="flex items-start space-x-4 p-3 hover:bg-stone-50 rounded-lg transition-colors">
+                    <div key={property.id} className="flex items-start space-x-4 p-3 hover:bg-slate-50 rounded-lg transition-colors">
                       <div className="flex-shrink-0">
                         {property.images?.[0] ? (
                           <Image
@@ -284,19 +284,19 @@ export default function AgentDashboardClient() {
                             className="rounded-lg object-cover"
                           />
                         ) : (
-                          <div className="w-15 h-15 bg-stone-200 rounded-lg flex items-center justify-center">
-                            <Home className="w-6 h-6 text-stone-400" />
+                          <div className="w-15 h-15 bg-slate-200 rounded-lg flex items-center justify-center">
+                            <Home className="w-6 h-6 text-slate-400" />
                           </div>
                         )}
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-stone-900 truncate">
+                        <p className="text-sm font-medium text-slate-900 truncate">
                           {property.title}
                         </p>
-                        <p className="text-sm font-bold text-[#1B4965]">
+                        <p className="text-sm font-bold text-[#1B3A5C]">
                           {formatCurrency(property.price)}
                         </p>
-                        <div className="flex items-center gap-4 mt-1 text-xs text-stone-500">
+                        <div className="flex items-center gap-4 mt-1 text-xs text-slate-500">
                           <span className="flex items-center">
                             <Eye className="w-3 h-3 mr-1" />
                             {property.views}
@@ -325,25 +325,25 @@ export default function AgentDashboardClient() {
         {/* Quick Actions */}
         <div className="pg-card">
           <div className="pg-card-header">
-            <CardTitle className="pg-text-lg font-bold text-stone-900">Quick Actions</CardTitle>
-            <CardDescription className="text-stone-600 mt-2">Manage your properties and client relationships</CardDescription>
+            <CardTitle className="pg-text-lg font-bold text-slate-900">Quick Actions</CardTitle>
+            <CardDescription className="text-slate-600 mt-2">Manage your properties and client relationships</CardDescription>
           </div>
           <div className="pg-card-content">
             <div className="pg-grid pg-grid-cols-1 md:pg-grid-cols-3">
               <Link href="/agent/properties">
-                <Button variant="outline" className="w-full h-20 flex flex-col items-center justify-center space-y-2 hover:bg-stone-50 transition-colors">
+                <Button variant="outline" className="w-full h-20 flex flex-col items-center justify-center space-y-2 hover:bg-slate-50 transition-colors">
                   <Building2 className="w-6 h-6" />
                   <span>Manage Properties</span>
                 </Button>
               </Link>
               <Link href="/agent/inquiries">
-                <Button variant="outline" className="w-full h-20 flex flex-col items-center justify-center space-y-2 hover:bg-stone-50 transition-colors">
+                <Button variant="outline" className="w-full h-20 flex flex-col items-center justify-center space-y-2 hover:bg-slate-50 transition-colors">
                   <Mail className="w-6 h-6" />
                   <span>View Inquiries</span>
                 </Button>
               </Link>
               <Link href="/agent/profile">
-                <Button variant="outline" className="w-full h-20 flex flex-col items-center justify-center space-y-2 hover:bg-stone-50 transition-colors">
+                <Button variant="outline" className="w-full h-20 flex flex-col items-center justify-center space-y-2 hover:bg-slate-50 transition-colors">
                   <Users className="w-6 h-6" />
                   <span>Edit Profile</span>
                 </Button>

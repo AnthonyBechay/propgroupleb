@@ -73,7 +73,7 @@ export function PropertyDescription({ description }: PropertyDescriptionProps) {
 
   return (
     <div
-      className="text-lg text-stone-600 max-w-3xl leading-relaxed prose-strong:text-stone-800"
+      className="text-lg text-slate-600 max-w-3xl leading-relaxed prose-strong:text-slate-800"
       dangerouslySetInnerHTML={{ __html: html }}
     />
   )

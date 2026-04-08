@@ -15,7 +15,7 @@ export function Footer() {
   const currentYear = new Date().getFullYear()
 
   return (
-    <footer className="relative bg-[#1B4965] text-white">
+    <footer className="relative bg-[#1B3A5C] text-white">
       {/* Main Footer */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-6">
@@ -31,24 +31,24 @@ export function Footer() {
               />
               <div>
                 <h3 className="font-bold text-base">PropGroup</h3>
-                <p className="text-xs text-stone-300">Invest Smart</p>
+                <p className="text-xs text-slate-300">Invest Smart</p>
               </div>
             </div>
-            <p className="text-xs text-stone-300 mb-3">
+            <p className="text-xs text-slate-300 mb-3">
               AI-powered real estate investment platform helping you make smarter property decisions.
             </p>
             <div className="flex gap-2">
               <a href="#" aria-label="Facebook" className="w-8 h-8 bg-white/10 rounded-lg flex items-center justify-center hover:bg-white/20 transition-colors">
-                <Facebook className="w-4 h-4 text-stone-300 hover:text-white" />
+                <Facebook className="w-4 h-4 text-slate-300 hover:text-white" />
               </a>
               <a href="#" aria-label="Twitter" className="w-8 h-8 bg-white/10 rounded-lg flex items-center justify-center hover:bg-white/20 transition-colors">
-                <Twitter className="w-4 h-4 text-stone-300 hover:text-white" />
+                <Twitter className="w-4 h-4 text-slate-300 hover:text-white" />
               </a>
               <a href="#" aria-label="LinkedIn" className="w-8 h-8 bg-white/10 rounded-lg flex items-center justify-center hover:bg-white/20 transition-colors">
-                <Linkedin className="w-4 h-4 text-stone-300 hover:text-white" />
+                <Linkedin className="w-4 h-4 text-slate-300 hover:text-white" />
               </a>
               <a href="#" aria-label="Instagram" className="w-8 h-8 bg-white/10 rounded-lg flex items-center justify-center hover:bg-white/20 transition-colors">
-                <Instagram className="w-4 h-4 text-stone-300 hover:text-white" />
+                <Instagram className="w-4 h-4 text-slate-300 hover:text-white" />
               </a>
             </div>
           </div>
@@ -58,17 +58,17 @@ export function Footer() {
             <h4 className="font-semibold text-sm mb-2">Invest</h4>
             <ul className="space-y-1.5">
               <li>
-                <Link href="/properties" className="text-stone-300 hover:text-white transition-colors text-xs">
+                <Link href="/properties" className="text-slate-300 hover:text-white transition-colors text-xs">
                   Properties
                 </Link>
               </li>
               <li>
-                <Link href="/portal/calculator" className="text-stone-300 hover:text-white transition-colors text-xs">
+                <Link href="/portal/calculator" className="text-slate-300 hover:text-white transition-colors text-xs">
                   Calculator
                 </Link>
               </li>
               <li>
-                <Link href="/portal/portfolio" className="text-stone-300 hover:text-white transition-colors text-xs">
+                <Link href="/portal/portfolio" className="text-slate-300 hover:text-white transition-colors text-xs">
                   Portfolio
                 </Link>
               </li>
@@ -80,17 +80,17 @@ export function Footer() {
             <h4 className="font-semibold text-sm mb-2">Company</h4>
             <ul className="space-y-1.5">
               <li>
-                <Link href="/about" className="text-stone-300 hover:text-white transition-colors text-xs">
+                <Link href="/about" className="text-slate-300 hover:text-white transition-colors text-xs">
                   About
                 </Link>
               </li>
               <li>
-                <Link href="/contact" className="text-stone-300 hover:text-white transition-colors text-xs">
+                <Link href="/contact" className="text-slate-300 hover:text-white transition-colors text-xs">
                   Contact
                 </Link>
               </li>
               <li>
-                <Link href="/ai-search" className="text-stone-300 hover:text-white transition-colors text-xs">
+                <Link href="/ai-search" className="text-slate-300 hover:text-white transition-colors text-xs">
                   AI Search
                 </Link>
               </li>
@@ -101,13 +101,13 @@ export function Footer() {
           <div>
             <h4 className="font-semibold text-sm mb-2">Contact</h4>
             <ul className="space-y-1.5">
-              <li className="flex items-center gap-2 text-stone-300 text-xs">
+              <li className="flex items-center gap-2 text-slate-300 text-xs">
                 <Mail className="w-3 h-3 flex-shrink-0" />
                 <a href="mailto:invest@propgroup.com" className="hover:text-white transition-colors">
                   invest@propgroup.com
                 </a>
               </li>
-              <li className="flex items-center gap-2 text-stone-300 text-xs">
+              <li className="flex items-center gap-2 text-slate-300 text-xs">
                 <Phone className="w-3 h-3 flex-shrink-0" />
                 <a href="tel:+97142345678" className="hover:text-white transition-colors">
                   +971 4 234 5678
@@ -120,14 +120,14 @@ export function Footer() {
         {/* Bottom Bar */}
         <div className="border-t border-white/20 pt-4">
           <div className="flex flex-col sm:flex-row justify-between items-center gap-3">
-            <p className="text-stone-300 text-xs text-center sm:text-left">
+            <p className="text-slate-300 text-xs text-center sm:text-left">
               &copy; {currentYear} PropGroup. All rights reserved.
             </p>
             <div className="flex gap-4 text-xs">
-              <Link href="/privacy" className="text-stone-300 hover:text-white transition-colors">
+              <Link href="/privacy" className="text-slate-300 hover:text-white transition-colors">
                 Privacy
               </Link>
-              <Link href="/terms" className="text-stone-300 hover:text-white transition-colors">
+              <Link href="/terms" className="text-slate-300 hover:text-white transition-colors">
                 Terms
               </Link>
             </div>

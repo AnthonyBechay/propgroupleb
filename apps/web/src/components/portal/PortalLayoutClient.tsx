@@ -57,10 +57,10 @@ export function PortalLayoutClient({ children }: { children: React.ReactNode }) 
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-stone-50">
+      <div className="min-h-screen flex items-center justify-center bg-slate-50">
         <div className="text-center">
-          <Loader2 className="h-8 w-8 animate-spin text-[#1B4965] mx-auto mb-4" />
-          <p className="text-stone-600">Loading your portal...</p>
+          <Loader2 className="h-8 w-8 animate-spin text-[#1B3A5C] mx-auto mb-4" />
+          <p className="text-slate-600">Loading your portal...</p>
         </div>
       </div>
     )
@@ -68,17 +68,17 @@ export function PortalLayoutClient({ children }: { children: React.ReactNode }) 
 
   if (!user || !user.isActive || user.bannedAt) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-stone-50">
+      <div className="min-h-screen flex items-center justify-center bg-slate-50">
         <div className="text-center">
-          <Loader2 className="h-8 w-8 animate-spin text-[#1B4965] mx-auto mb-4" />
-          <p className="text-stone-600">Redirecting...</p>
+          <Loader2 className="h-8 w-8 animate-spin text-[#1B3A5C] mx-auto mb-4" />
+          <p className="text-slate-600">Redirecting...</p>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-stone-50 flex">
+    <div className="min-h-screen bg-slate-50 flex">
       {/* Mobile sidebar overlay */}
       {sidebarOpen && (
         <div
@@ -88,7 +88,7 @@ export function PortalLayoutClient({ children }: { children: React.ReactNode }) 
       )}
 
       {/* Sidebar */}
-      <aside className={`fixed lg:sticky top-0 left-0 z-50 lg:z-auto h-screen w-64 bg-[#1B4965] flex flex-col transition-transform duration-300 ${
+      <aside className={`fixed lg:sticky top-0 left-0 z-50 lg:z-auto h-screen w-64 bg-[#1B3A5C] flex flex-col transition-transform duration-300 ${
         sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
       }`}>
         {/* Logo */}
@@ -169,16 +169,16 @@ export function PortalLayoutClient({ children }: { children: React.ReactNode }) 
       {/* Main content area */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* Top bar (mobile) */}
-        <header className="lg:hidden sticky top-0 z-30 bg-white border-b border-stone-200 px-4 py-3 flex items-center justify-between">
+        <header className="lg:hidden sticky top-0 z-30 bg-white border-b border-slate-200 px-4 py-3 flex items-center justify-between">
           <button
             onClick={() => setSidebarOpen(true)}
-            className="p-2 rounded-lg hover:bg-stone-100 transition-colors"
+            className="p-2 rounded-lg hover:bg-slate-100 transition-colors"
           >
-            <Menu className="w-5 h-5 text-stone-700" />
+            <Menu className="w-5 h-5 text-slate-700" />
           </button>
           <Link href="/" className="flex items-center gap-2">
             <Image src="/logo.png" alt="PropGroup" width={28} height={28} />
-            <span className="font-bold text-stone-900">PropGroup</span>
+            <span className="font-bold text-slate-900">PropGroup</span>
           </Link>
           <div className="w-9" /> {/* Spacer for centering */}
         </header>

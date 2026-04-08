@@ -13,7 +13,7 @@
 - Focus: Georgia real estate investment platform
 
 ## Key Conventions
-- Color palette: `#1B4965` (primary teal), `#C97B4B` (accent terracotta), stone neutrals
+- Color palette: `#1B3A5C` (primary navy), `#C49A2E` (accent gold), slate neutrals
 - CSS variables use bare HSL triples in `:root`, wrapped with `hsl()` in `@theme inline` block
 - Use `pg-` prefixed utility classes from `design-system.css` where available
 - Portal has its own sidebar layout (separate from main site navbar)

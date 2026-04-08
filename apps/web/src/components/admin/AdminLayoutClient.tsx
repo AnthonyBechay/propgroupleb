@@ -30,10 +30,10 @@ export function AdminLayoutClient({ children }: { children: React.ReactNode }) {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-stone-50">
+      <div className="min-h-screen flex items-center justify-center bg-slate-50">
         <div className="text-center">
-          <Loader2 className="h-8 w-8 animate-spin text-[#1B4965] mx-auto mb-4" />
-          <p className="text-stone-500">Loading...</p>
+          <Loader2 className="h-8 w-8 animate-spin text-[#1B3A5C] mx-auto mb-4" />
+          <p className="text-slate-500">Loading...</p>
         </div>
       </div>
     )
@@ -41,17 +41,17 @@ export function AdminLayoutClient({ children }: { children: React.ReactNode }) {
 
   if (!user || !user.isActive || user.bannedAt || (user.role !== 'ADMIN' && user.role !== 'SUPER_ADMIN')) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-stone-50">
+      <div className="min-h-screen flex items-center justify-center bg-slate-50">
         <div className="text-center">
-          <Loader2 className="h-8 w-8 animate-spin text-[#1B4965] mx-auto mb-4" />
-          <p className="text-stone-500">Redirecting...</p>
+          <Loader2 className="h-8 w-8 animate-spin text-[#1B3A5C] mx-auto mb-4" />
+          <p className="text-slate-500">Redirecting...</p>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-stone-50">
+    <div className="min-h-screen bg-slate-50">
       <Sidebar />
       <div className="lg:pl-64">
         <AdminHeader />

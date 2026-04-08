@@ -145,7 +145,7 @@ export function InviteAdminModal({ children, currentUserId }: InviteAdminModalPr
                           <Shield className="h-4 w-4 text-blue-600" />
                           <div>
                             <div className="font-medium">Admin</div>
-                            <div className="text-xs text-stone-500">Can manage properties and view users</div>
+                            <div className="text-xs text-slate-500">Can manage properties and view users</div>
                           </div>
                         </div>
                       </SelectItem>
@@ -154,7 +154,7 @@ export function InviteAdminModal({ children, currentUserId }: InviteAdminModalPr
                           <Shield className="h-4 w-4 text-purple-600" />
                           <div>
                             <div className="font-medium">Super Admin</div>
-                            <div className="text-xs text-stone-500">Full access including user management</div>
+                            <div className="text-xs text-slate-500">Full access including user management</div>
                           </div>
                         </div>
                       </SelectItem>

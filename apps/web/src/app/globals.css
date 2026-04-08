@@ -46,48 +46,48 @@
 
 :root {
   --radius: 0.75rem;
-  --background: 40 20% 99%;
-  --foreground: 24 10% 10%;
+  --background: 210 20% 98%;
+  --foreground: 222 47% 11%;
   --card: 0 0% 100%;
-  --card-foreground: 24 10% 10%;
+  --card-foreground: 222 47% 11%;
   --popover: 0 0% 100%;
-  --popover-foreground: 24 10% 10%;
-  --primary: 200 57% 25%;
+  --popover-foreground: 222 47% 11%;
+  --primary: 213 54% 23%;
   --primary-foreground: 0 0% 100%;
-  --secondary: 30 6% 96%;
-  --secondary-foreground: 24 10% 10%;
-  --muted: 30 6% 96%;
-  --muted-foreground: 25 5% 45%;
-  --accent: 28 53% 54%;
+  --secondary: 210 20% 96%;
+  --secondary-foreground: 222 47% 11%;
+  --muted: 210 20% 96%;
+  --muted-foreground: 215 16% 47%;
+  --accent: 43 66% 47%;
   --accent-foreground: 0 0% 100%;
   --destructive: 0 72% 51%;
   --destructive-foreground: 0 0% 100%;
-  --border: 30 6% 90%;
-  --input: 30 6% 90%;
-  --ring: 200 57% 25%;
+  --border: 214 20% 90%;
+  --input: 214 20% 90%;
+  --ring: 213 54% 23%;
   --success: 160 84% 39%;
   --success-foreground: 0 0% 100%;
   --warning: 38 92% 50%;
-  --warning-foreground: 24 10% 10%;
-  --info: 200 57% 25%;
+  --warning-foreground: 222 47% 11%;
+  --info: 213 54% 23%;
   --info-foreground: 0 0% 100%;
 
   /* Chart colors */
-  --chart-1: 200 57% 25%;
+  --chart-1: 213 54% 23%;
   --chart-2: 160 60% 39%;
-  --chart-3: 28 53% 54%;
-  --chart-4: 200 40% 50%;
+  --chart-3: 43 66% 47%;
+  --chart-4: 213 40% 45%;
   --chart-5: 160 40% 55%;
 
   /* Sidebar */
-  --sidebar: 200 57% 25%;
+  --sidebar: 213 54% 23%;
   --sidebar-foreground: 0 0% 100%;
-  --sidebar-primary: 28 53% 54%;
+  --sidebar-primary: 43 66% 47%;
   --sidebar-primary-foreground: 0 0% 100%;
-  --sidebar-accent: 200 57% 30%;
+  --sidebar-accent: 213 54% 28%;
   --sidebar-accent-foreground: 0 0% 100%;
-  --sidebar-border: 200 30% 35%;
-  --sidebar-ring: 28 53% 54%;
+  --sidebar-border: 213 30% 32%;
+  --sidebar-ring: 43 66% 47%;
 }
 
 @layer base {
@@ -199,7 +199,7 @@
   /* Skeleton loading */
   .skeleton {
     animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite, skeleton 1.5s ease-in-out infinite;
-    background: linear-gradient(to right, #E7E5E4, #D6D3D1, #E7E5E4);
+    background: linear-gradient(to right, #E2E8F0, #CBD5E1, #E2E8F0);
     background-size: 200% 100%;
   }
 
@@ -241,6 +241,6 @@
 
 /* Hero pattern */
 .hero-pattern {
-  background-color: #FAFAF9;
-  background-image: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23A8A29E' fill-opacity='0.06'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+  background-color: #F8FAFC;
+  background-image: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%2394A3B8' fill-opacity='0.06'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
 }

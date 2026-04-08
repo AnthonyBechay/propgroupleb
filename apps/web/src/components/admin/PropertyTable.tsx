@@ -188,7 +188,7 @@ export function PropertyTable({ properties }: PropertyTableProps) {
           <div className="relative bg-white rounded-2xl shadow-2xl max-w-md w-full mx-4 p-6">
             <button
               onClick={() => !bulkDeleting && setBulkDeleteOpen(false)}
-              className="absolute top-4 right-4 text-stone-400 hover:text-stone-600"
+              className="absolute top-4 right-4 text-slate-400 hover:text-slate-600"
             >
               <X className="w-5 h-5" />
             </button>
@@ -197,21 +197,21 @@ export function PropertyTable({ properties }: PropertyTableProps) {
                 <AlertTriangle className="w-6 h-6 text-red-600" />
               </div>
               <div>
-                <h3 className="text-lg font-bold text-stone-900">Delete Properties</h3>
-                <p className="text-sm text-stone-500">This action cannot be undone</p>
+                <h3 className="text-lg font-bold text-slate-900">Delete Properties</h3>
+                <p className="text-sm text-slate-500">This action cannot be undone</p>
               </div>
             </div>
-            <p className="text-stone-700 mb-2">
+            <p className="text-slate-700 mb-2">
               Are you sure you want to delete <span className="font-bold text-red-600">{selectedIds.size}</span> {selectedIds.size === 1 ? 'property' : 'properties'}?
             </p>
-            <p className="text-sm text-stone-500 mb-6">
+            <p className="text-sm text-slate-500 mb-6">
               All associated documents, inquiries, favorites, and related data will be permanently removed.
             </p>
             <div className="flex gap-3 justify-end">
               <button
                 onClick={() => setBulkDeleteOpen(false)}
                 disabled={bulkDeleting}
-                className="px-4 py-2 text-sm font-medium text-stone-700 bg-stone-100 rounded-lg hover:bg-stone-200 transition-colors disabled:opacity-50"
+                className="px-4 py-2 text-sm font-medium text-slate-700 bg-slate-100 rounded-lg hover:bg-slate-200 transition-colors disabled:opacity-50"
               >
                 Cancel
               </button>
@@ -246,7 +246,7 @@ export function PropertyTable({ properties }: PropertyTableProps) {
           <div className="flex items-center gap-2">
             <button
               onClick={() => setSelectedIds(new Set())}
-              className="text-sm text-stone-600 hover:text-stone-800 px-3 py-1.5 rounded-lg hover:bg-white transition-colors"
+              className="text-sm text-slate-600 hover:text-slate-800 px-3 py-1.5 rounded-lg hover:bg-white transition-colors"
             >
               Clear Selection
             </button>
@@ -266,9 +266,9 @@ export function PropertyTable({ properties }: PropertyTableProps) {
           <thead className="bg-gray-50 border-b">
             <tr>
               <th className="px-4 py-3 w-10">
-                <button onClick={toggleSelectAll} className="text-stone-400 hover:text-stone-700">
+                <button onClick={toggleSelectAll} className="text-slate-400 hover:text-slate-700">
                   {allSelected ? (
-                    <CheckSquare className="w-4.5 h-4.5 text-[#1B4965]" />
+                    <CheckSquare className="w-4.5 h-4.5 text-[#1B3A5C]" />
                   ) : (
                     <Square className="w-4.5 h-4.5" />
                   )}
@@ -287,9 +287,9 @@ export function PropertyTable({ properties }: PropertyTableProps) {
             {properties.map((property) => (
               <tr key={property.id} className={`hover:bg-gray-50 ${selectedIds.has(property.id) ? 'bg-blue-50/50' : ''}`}>
                 <td className="px-4 py-3">
-                  <button onClick={() => toggleSelect(property.id)} className="text-stone-400 hover:text-stone-700">
+                  <button onClick={() => toggleSelect(property.id)} className="text-slate-400 hover:text-slate-700">
                     {selectedIds.has(property.id) ? (
-                      <CheckSquare className="w-4.5 h-4.5 text-[#1B4965]" />
+                      <CheckSquare className="w-4.5 h-4.5 text-[#1B3A5C]" />
                     ) : (
                       <Square className="w-4.5 h-4.5" />
                     )}
@@ -362,7 +362,7 @@ export function PropertyTable({ properties }: PropertyTableProps) {
                       className={`p-1.5 rounded-lg transition-colors ${
                         copiedId === property.id
                           ? 'text-emerald-600 bg-emerald-50'
-                          : 'text-gray-400 hover:text-[#C97B4B] hover:bg-orange-50'
+                          : 'text-gray-400 hover:text-[#C49A2E] hover:bg-orange-50'
                       }`}
                       title={copiedId === property.id ? 'Link copied!' : 'Share public link'}
                     >

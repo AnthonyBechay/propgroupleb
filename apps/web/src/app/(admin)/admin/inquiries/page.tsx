@@ -29,12 +29,12 @@ import { normalizeApiUrl } from '@/lib/utils/api-url'
 const API_BASE_URL = normalizeApiUrl(process.env.NEXT_PUBLIC_API_URL)
 
 const STATUSES = [
-  { value: 'ALL', label: 'All', icon: MessageSquare, color: 'text-stone-600', bg: 'bg-stone-100' },
+  { value: 'ALL', label: 'All', icon: MessageSquare, color: 'text-slate-600', bg: 'bg-slate-100' },
   { value: 'NEW', label: 'New', icon: Clock, color: 'text-blue-600', bg: 'bg-blue-100' },
   { value: 'IN_PROGRESS', label: 'In Progress', icon: Loader2, color: 'text-amber-600', bg: 'bg-amber-100' },
   { value: 'REPLIED', label: 'Replied', icon: CheckCircle2, color: 'text-emerald-600', bg: 'bg-emerald-100' },
   { value: 'CANCELLED', label: 'Cancelled', icon: XCircle, color: 'text-red-600', bg: 'bg-red-100' },
-  { value: 'CLOSED', label: 'Closed', icon: Archive, color: 'text-stone-500', bg: 'bg-stone-200' },
+  { value: 'CLOSED', label: 'Closed', icon: Archive, color: 'text-slate-500', bg: 'bg-slate-200' },
 ] as const
 
 interface Inquiry {
@@ -236,7 +236,7 @@ export default function AdminInquiriesPage() {
   }
 
   if (!user || (user.role !== 'ADMIN' && user.role !== 'SUPER_ADMIN')) {
-    return <div className="p-8 text-center text-stone-500">Access denied</div>
+    return <div className="p-8 text-center text-slate-500">Access denied</div>
   }
 
   return (
@@ -244,13 +244,13 @@ export default function AdminInquiriesPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-stone-900 flex items-center gap-2">
-            <div className="w-10 h-10 bg-[#C97B4B] rounded-xl flex items-center justify-center shadow-md">
+          <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
+            <div className="w-10 h-10 bg-[#C49A2E] rounded-xl flex items-center justify-center shadow-md">
               <MessageSquare className="h-5 w-5 text-white" />
             </div>
             Inquiries
           </h1>
-          <p className="text-stone-600 mt-1">
+          <p className="text-slate-600 mt-1">
             {totalCount} total {totalCount === 1 ? 'inquiry' : 'inquiries'} from potential investors
           </p>
         </div>
@@ -276,7 +276,7 @@ export default function AdminInquiriesPage() {
           </button>
           <button
             onClick={() => setSelectedIds(new Set())}
-            className="text-sm text-stone-500 hover:text-stone-700"
+            className="text-sm text-slate-500 hover:text-slate-700"
           >
             Clear
           </button>
@@ -286,7 +286,7 @@ export default function AdminInquiriesPage() {
       {/* Status Tabs + Search */}
       <div className="flex flex-col sm:flex-row gap-4">
         {/* Status filter tabs */}
-        <div className="flex gap-1 bg-stone-100 p-1 rounded-xl overflow-x-auto">
+        <div className="flex gap-1 bg-slate-100 p-1 rounded-xl overflow-x-auto">
           {STATUSES.map(s => {
             const Icon = s.icon
             const isActive = statusFilter === s.value
@@ -296,8 +296,8 @@ export default function AdminInquiriesPage() {
                 onClick={() => { setStatusFilter(s.value); setPage(1) }}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium whitespace-nowrap transition-all ${
                   isActive
-                    ? 'bg-white shadow-sm text-stone-900'
-                    : 'text-stone-500 hover:text-stone-700'
+                    ? 'bg-white shadow-sm text-slate-900'
+                    : 'text-slate-500 hover:text-slate-700'
                 }`}
               >
                 <Icon className={`w-3.5 h-3.5 ${isActive ? s.color : ''}`} />
@@ -309,7 +309,7 @@ export default function AdminInquiriesPage() {
 
         {/* Search */}
         <div className="relative flex-1 max-w-sm">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
           <input
             type="text"
             value={searchQuery}
@@ -322,14 +322,14 @@ export default function AdminInquiriesPage() {
 
       {loading ? (
         <div className="text-center py-12">
-          <Loader2 className="w-8 h-8 animate-spin text-[#1B4965] mx-auto mb-2" />
-          <p className="text-stone-500">Loading inquiries...</p>
+          <Loader2 className="w-8 h-8 animate-spin text-[#1B3A5C] mx-auto mb-2" />
+          <p className="text-slate-500">Loading inquiries...</p>
         </div>
       ) : filtered.length === 0 ? (
         <div className="text-center py-12 bg-white rounded-xl border">
-          <MessageSquare className="w-12 h-12 text-stone-300 mx-auto mb-4" />
-          <h3 className="text-lg font-medium text-stone-900 mb-1">No inquiries found</h3>
-          <p className="text-stone-500">
+          <MessageSquare className="w-12 h-12 text-slate-300 mx-auto mb-4" />
+          <h3 className="text-lg font-medium text-slate-900 mb-1">No inquiries found</h3>
+          <p className="text-slate-500">
             {inquiries.length === 0
               ? 'Inquiries from potential investors will appear here.'
               : 'Try adjusting your search or filter.'}
@@ -339,14 +339,14 @@ export default function AdminInquiriesPage() {
         <>
           {/* Select all */}
           <div className="flex items-center gap-2 px-1">
-            <button onClick={toggleSelectAll} className="text-stone-400 hover:text-stone-600 transition-colors">
+            <button onClick={toggleSelectAll} className="text-slate-400 hover:text-slate-600 transition-colors">
               {selectedIds.size === filtered.length && filtered.length > 0 ? (
-                <CheckSquare className="w-5 h-5 text-[#1B4965]" />
+                <CheckSquare className="w-5 h-5 text-[#1B3A5C]" />
               ) : (
                 <Square className="w-5 h-5" />
               )}
             </button>
-            <span className="text-xs text-stone-500">Select all</span>
+            <span className="text-xs text-slate-500">Select all</span>
           </div>
 
           {/* Inquiry Cards */}
@@ -364,31 +364,31 @@ export default function AdminInquiriesPage() {
                     {/* Checkbox */}
                     <button
                       onClick={(e) => { e.stopPropagation(); toggleSelect(inq.id) }}
-                      className="text-stone-400 hover:text-stone-600 flex-shrink-0"
+                      className="text-slate-400 hover:text-slate-600 flex-shrink-0"
                     >
                       {selectedIds.has(inq.id) ? (
-                        <CheckSquare className="w-5 h-5 text-[#1B4965]" />
+                        <CheckSquare className="w-5 h-5 text-[#1B3A5C]" />
                       ) : (
                         <Square className="w-5 h-5" />
                       )}
                     </button>
 
                     {/* Avatar */}
-                    <div className="w-10 h-10 bg-[#1B4965] rounded-full flex items-center justify-center text-white text-sm font-bold flex-shrink-0">
+                    <div className="w-10 h-10 bg-[#1B3A5C] rounded-full flex items-center justify-center text-white text-sm font-bold flex-shrink-0">
                       {inq.name.charAt(0).toUpperCase()}
                     </div>
 
                     {/* Main info */}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
-                        <p className="font-semibold text-stone-900">{inq.name}</p>
+                        <p className="font-semibold text-slate-900">{inq.name}</p>
                         {inq.user && (
                           <span className="text-xs px-1.5 py-0.5 bg-emerald-100 text-emerald-700 rounded font-medium">
                             Registered
                           </span>
                         )}
                       </div>
-                      <p className="text-sm text-stone-500 truncate">{inq.email}</p>
+                      <p className="text-sm text-slate-500 truncate">{inq.email}</p>
                     </div>
 
                     {/* Status badge */}
@@ -399,11 +399,11 @@ export default function AdminInquiriesPage() {
 
                     {/* Property */}
                     <div className="hidden md:block text-right flex-shrink-0 max-w-[180px]">
-                      <p className={`text-sm font-medium truncate ${inq.property ? 'text-[#1B4965]' : 'text-stone-400 italic'}`}>
+                      <p className={`text-sm font-medium truncate ${inq.property ? 'text-[#1B3A5C]' : 'text-slate-400 italic'}`}>
                         {getPropertyName(inq)}
                       </p>
                       {inq.property ? (
-                        <p className="text-xs text-stone-400 flex items-center justify-end gap-1">
+                        <p className="text-xs text-slate-400 flex items-center justify-end gap-1">
                           <MapPin className="w-3 h-3" /> {inq.property.country}
                         </p>
                       ) : (
@@ -413,11 +413,11 @@ export default function AdminInquiriesPage() {
 
                     {/* Time */}
                     <div className="hidden lg:block text-right flex-shrink-0">
-                      <p className="text-xs text-stone-400">{timeAgo(inq.createdAt)}</p>
+                      <p className="text-xs text-slate-400">{timeAgo(inq.createdAt)}</p>
                     </div>
 
                     {/* Expand toggle */}
-                    <div className="text-stone-400 flex-shrink-0">
+                    <div className="text-slate-400 flex-shrink-0">
                       {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                     </div>
                   </div>
@@ -428,38 +428,38 @@ export default function AdminInquiriesPage() {
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
                         {/* Contact Info */}
                         <div className="space-y-2">
-                          <h4 className="text-xs font-bold text-stone-500 uppercase tracking-wider">Contact Details</h4>
-                          <div className="flex items-center gap-2 text-sm text-stone-700">
-                            <Mail className="w-4 h-4 text-stone-400" />
-                            <a href={`mailto:${inq.email}`} className="text-[#1B4965] hover:underline">{inq.email}</a>
+                          <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider">Contact Details</h4>
+                          <div className="flex items-center gap-2 text-sm text-slate-700">
+                            <Mail className="w-4 h-4 text-slate-400" />
+                            <a href={`mailto:${inq.email}`} className="text-[#1B3A5C] hover:underline">{inq.email}</a>
                           </div>
                           {inq.phone && (
-                            <div className="flex items-center gap-2 text-sm text-stone-700">
-                              <Phone className="w-4 h-4 text-stone-400" />
-                              <a href={`tel:${inq.phone}`} className="text-[#1B4965] hover:underline">{inq.phone}</a>
+                            <div className="flex items-center gap-2 text-sm text-slate-700">
+                              <Phone className="w-4 h-4 text-slate-400" />
+                              <a href={`tel:${inq.phone}`} className="text-[#1B3A5C] hover:underline">{inq.phone}</a>
                             </div>
                           )}
                           {inq.user && (
-                            <div className="flex items-center gap-2 text-sm text-stone-700">
-                              <User className="w-4 h-4 text-stone-400" />
+                            <div className="flex items-center gap-2 text-sm text-slate-700">
+                              <User className="w-4 h-4 text-slate-400" />
                               <span>
                                 {inq.user.firstName} {inq.user.lastName}
-                                <span className="text-stone-400 ml-1">({inq.user.email})</span>
+                                <span className="text-slate-400 ml-1">({inq.user.email})</span>
                               </span>
                             </div>
                           )}
-                          <div className="flex items-center gap-2 text-sm text-stone-500">
-                            <Calendar className="w-4 h-4 text-stone-400" />
+                          <div className="flex items-center gap-2 text-sm text-slate-500">
+                            <Calendar className="w-4 h-4 text-slate-400" />
                             {new Date(inq.createdAt).toLocaleString()}
                           </div>
                         </div>
 
                         {/* Property Info */}
                         <div className="space-y-2">
-                          <h4 className="text-xs font-bold text-stone-500 uppercase tracking-wider">Property</h4>
-                          <div className="flex items-center gap-2 text-sm text-stone-700">
-                            <Building2 className="w-4 h-4 text-stone-400" />
-                            <span className={`font-medium ${!inq.property ? 'text-stone-400 italic' : ''}`}>
+                          <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider">Property</h4>
+                          <div className="flex items-center gap-2 text-sm text-slate-700">
+                            <Building2 className="w-4 h-4 text-slate-400" />
+                            <span className={`font-medium ${!inq.property ? 'text-slate-400 italic' : ''}`}>
                               {getPropertyName(inq)}
                             </span>
                             {!inq.property && (
@@ -468,12 +468,12 @@ export default function AdminInquiriesPage() {
                           </div>
                           {inq.property && (
                             <>
-                              <div className="flex items-center gap-2 text-sm text-stone-500">
-                                <MapPin className="w-4 h-4 text-stone-400" />
+                              <div className="flex items-center gap-2 text-sm text-slate-500">
+                                <MapPin className="w-4 h-4 text-slate-400" />
                                 {inq.property.country}
                               </div>
                               {inq.property.price && (
-                                <p className="text-sm text-stone-500">
+                                <p className="text-sm text-slate-500">
                                   Price: {inq.property.currency || '$'}{inq.property.price.toLocaleString()}
                                 </p>
                               )}
@@ -485,8 +485,8 @@ export default function AdminInquiriesPage() {
                       {/* Message */}
                       {inq.message && (
                         <div className="mt-4">
-                          <h4 className="text-xs font-bold text-stone-500 uppercase tracking-wider mb-2">Message</h4>
-                          <div className="bg-stone-50 rounded-lg p-3 text-sm text-stone-700 whitespace-pre-wrap">
+                          <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Message</h4>
+                          <div className="bg-slate-50 rounded-lg p-3 text-sm text-slate-700 whitespace-pre-wrap">
                             {inq.message}
                           </div>
                         </div>
@@ -494,7 +494,7 @@ export default function AdminInquiriesPage() {
 
                       {/* Status Changer */}
                       <div className="mt-4 pt-3 border-t">
-                        <h4 className="text-xs font-bold text-stone-500 uppercase tracking-wider mb-2">Update Status</h4>
+                        <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Update Status</h4>
                         <div className="flex flex-wrap gap-2">
                           {STATUSES.filter(s => s.value !== 'ALL').map(s => {
                             const Icon = s.icon
@@ -507,7 +507,7 @@ export default function AdminInquiriesPage() {
                                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all border ${
                                   isActive
                                     ? `${s.bg} ${s.color} border-current`
-                                    : 'bg-white text-stone-500 border-stone-200 hover:border-stone-300 hover:text-stone-700'
+                                    : 'bg-white text-slate-500 border-slate-200 hover:border-slate-300 hover:text-slate-700'
                                 } disabled:opacity-60`}
                               >
                                 <Icon className="w-3.5 h-3.5" />
@@ -517,7 +517,7 @@ export default function AdminInquiriesPage() {
                           })}
                         </div>
                         {inq.repliedAt && (
-                          <p className="text-xs text-stone-400 mt-2">
+                          <p className="text-xs text-slate-400 mt-2">
                             Replied {new Date(inq.repliedAt).toLocaleString()}
                             {inq.repliedBy && ` by ${inq.repliedBy}`}
                           </p>
@@ -527,13 +527,13 @@ export default function AdminInquiriesPage() {
                       {/* Admin Notes */}
                       <div className="mt-4 pt-3 border-t">
                         <div className="flex items-center justify-between mb-2">
-                          <h4 className="text-xs font-bold text-stone-500 uppercase tracking-wider flex items-center gap-1">
+                          <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
                             <StickyNote className="w-3.5 h-3.5" /> Admin Notes
                           </h4>
                           {editingNotesId !== inq.id && (
                             <button
                               onClick={() => { setEditingNotesId(inq.id); setNotesText(inq.adminNotes || '') }}
-                              className="text-xs text-[#1B4965] hover:underline"
+                              className="text-xs text-[#1B3A5C] hover:underline"
                             >
                               {inq.adminNotes ? 'Edit' : 'Add note'}
                             </button>
@@ -542,7 +542,7 @@ export default function AdminInquiriesPage() {
                         {editingNotesId === inq.id ? (
                           <div className="space-y-2">
                             <textarea
-                              className="w-full border rounded-lg p-2.5 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-[#1B4965]/20"
+                              className="w-full border rounded-lg p-2.5 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-[#1B3A5C]/20"
                               rows={3}
                               value={notesText}
                               onChange={(e) => setNotesText(e.target.value)}
@@ -552,24 +552,24 @@ export default function AdminInquiriesPage() {
                               <button
                                 onClick={() => handleSaveNotes(inq.id)}
                                 disabled={updatingId === inq.id}
-                                className="px-3 py-1.5 text-xs font-medium text-white bg-[#1B4965] rounded-lg hover:bg-[#2B6985] disabled:opacity-50"
+                                className="px-3 py-1.5 text-xs font-medium text-white bg-[#1B3A5C] rounded-lg hover:bg-[#24507D] disabled:opacity-50"
                               >
                                 {updatingId === inq.id ? 'Saving...' : 'Save'}
                               </button>
                               <button
                                 onClick={() => setEditingNotesId(null)}
-                                className="px-3 py-1.5 text-xs font-medium text-stone-600 bg-stone-100 rounded-lg hover:bg-stone-200"
+                                className="px-3 py-1.5 text-xs font-medium text-slate-600 bg-slate-100 rounded-lg hover:bg-slate-200"
                               >
                                 Cancel
                               </button>
                             </div>
                           </div>
                         ) : inq.adminNotes ? (
-                          <div className="bg-amber-50 border border-amber-200 rounded-lg p-2.5 text-sm text-stone-700 whitespace-pre-wrap">
+                          <div className="bg-amber-50 border border-amber-200 rounded-lg p-2.5 text-sm text-slate-700 whitespace-pre-wrap">
                             {inq.adminNotes}
                           </div>
                         ) : (
-                          <p className="text-xs text-stone-400 italic">No notes yet</p>
+                          <p className="text-xs text-slate-400 italic">No notes yet</p>
                         )}
                       </div>
 
@@ -583,7 +583,7 @@ export default function AdminInquiriesPage() {
                               handleStatusChange(inq.id, 'REPLIED')
                             }
                           }}
-                          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white bg-[#1B4965] rounded-lg hover:bg-[#2B6985] transition-colors"
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white bg-[#1B3A5C] rounded-lg hover:bg-[#24507D] transition-colors"
                         >
                           <Mail className="w-3.5 h-3.5" />
                           Reply via Email
@@ -593,7 +593,7 @@ export default function AdminInquiriesPage() {
                             href={`/property/${inq.property.id}`}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-stone-700 bg-stone-100 rounded-lg hover:bg-stone-200 transition-colors"
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-slate-700 bg-slate-100 rounded-lg hover:bg-slate-200 transition-colors"
                           >
                             <ExternalLink className="w-3.5 h-3.5" />
                             View Property
@@ -625,17 +625,17 @@ export default function AdminInquiriesPage() {
               <button
                 onClick={() => setPage(p => Math.max(1, p - 1))}
                 disabled={page === 1}
-                className="px-4 py-2 border rounded-lg text-sm font-medium disabled:opacity-50 hover:bg-stone-50 transition-colors"
+                className="px-4 py-2 border rounded-lg text-sm font-medium disabled:opacity-50 hover:bg-slate-50 transition-colors"
               >
                 Previous
               </button>
-              <span className="text-sm text-stone-600 px-3">
+              <span className="text-sm text-slate-600 px-3">
                 Page {page} of {totalPages}
               </span>
               <button
                 onClick={() => setPage(p => Math.min(totalPages, p + 1))}
                 disabled={page === totalPages}
-                className="px-4 py-2 border rounded-lg text-sm font-medium disabled:opacity-50 hover:bg-stone-50 transition-colors"
+                className="px-4 py-2 border rounded-lg text-sm font-medium disabled:opacity-50 hover:bg-slate-50 transition-colors"
               >
                 Next
               </button>

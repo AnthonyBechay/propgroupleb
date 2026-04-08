@@ -5,30 +5,30 @@ import Link from 'next/link'
 
 export function HeroSectionNew() {
   return (
-    <section className="relative min-h-[85vh] flex items-center justify-center overflow-hidden bg-gradient-to-br from-stone-50 via-white to-[#E8F1F5] w-full">
+    <section className="relative min-h-[85vh] flex items-center justify-center overflow-hidden bg-gradient-to-br from-slate-50 via-white to-[#E0EDF7] w-full">
       <div className="relative z-10 container mx-auto px-4 sm:px-6 lg:px-8 py-16 w-full max-w-7xl">
         <div className="max-w-5xl mx-auto">
 
           {/* Main Headline */}
           <div className="text-center space-y-4 sm:space-y-6 mb-10 sm:mb-12">
             <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-black leading-tight">
-              <span className="block text-stone-900 mb-2">
+              <span className="block text-slate-900 mb-2">
                 Smart Real Estate
               </span>
-              <span className="block bg-gradient-to-r from-[#1B4965] to-[#C97B4B] bg-clip-text text-transparent">
+              <span className="block bg-gradient-to-r from-[#1B3A5C] to-[#C49A2E] bg-clip-text text-transparent">
                 Investments
               </span>
             </h1>
 
-            <p className="text-lg sm:text-xl md:text-2xl text-stone-600 max-w-2xl mx-auto">
+            <p className="text-lg sm:text-xl md:text-2xl text-slate-600 max-w-2xl mx-auto">
               Your gateway to Georgia real estate investment
             </p>
           </div>
 
           {/* AI Search Section */}
           <div className="max-w-3xl mx-auto mb-10">
-            <div className="bg-white border border-stone-200 rounded-2xl p-5 sm:p-6 shadow-md">
-              <div className="flex items-center gap-2 mb-3 text-sm text-[#1B4965]">
+            <div className="bg-white border border-slate-200 rounded-2xl p-5 sm:p-6 shadow-md">
+              <div className="flex items-center gap-2 mb-3 text-sm text-[#1B3A5C]">
                 <Sparkles className="w-4 h-4" />
                 <span className="font-medium">AI-Powered Search</span>
               </div>
@@ -45,7 +45,7 @@ export function HeroSectionNew() {
             <Link href="/properties">
               <Button
                 size="lg"
-                className="w-full sm:w-auto h-12 px-8 text-base font-semibold bg-[#C97B4B] hover:bg-[#B86A3A] text-white rounded-xl shadow-lg transition-all"
+                className="w-full sm:w-auto h-12 px-8 text-base font-semibold bg-[#C49A2E] hover:bg-[#A98327] text-white rounded-xl shadow-lg transition-all"
               >
                 <span className="flex items-center gap-2">
                   Browse Properties
@@ -58,7 +58,7 @@ export function HeroSectionNew() {
               <Button
                 size="lg"
                 variant="outline"
-                className="w-full sm:w-auto h-12 px-8 text-base font-semibold border-2 border-[#1B4965] text-[#1B4965] hover:bg-[#E8F1F5] rounded-xl transition-all"
+                className="w-full sm:w-auto h-12 px-8 text-base font-semibold border-2 border-[#1B3A5C] text-[#1B3A5C] hover:bg-[#E0EDF7] rounded-xl transition-all"
               >
                 Start Investing
               </Button>

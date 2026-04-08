@@ -60,7 +60,7 @@ function getTypeColor(type: string) {
     CONTRACT: 'bg-red-100 text-red-700',
     LEGAL_DOCUMENT: 'bg-amber-100 text-amber-700',
     CERTIFICATE: 'bg-purple-100 text-purple-700',
-    OTHER: 'bg-stone-100 text-stone-700',
+    OTHER: 'bg-slate-100 text-slate-700',
   }
   return colors[type] || colors.OTHER
 }
@@ -296,19 +296,19 @@ export default function DocumentsPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-stone-900 flex items-center gap-2">
-            <div className="w-10 h-10 bg-[#1B4965] rounded-xl flex items-center justify-center shadow-md">
+          <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
+            <div className="w-10 h-10 bg-[#1B3A5C] rounded-xl flex items-center justify-center shadow-md">
               <FileText className="h-5 w-5 text-white" />
             </div>
             Document Management
           </h1>
-          <p className="mt-2 text-sm text-stone-600">
+          <p className="mt-2 text-sm text-slate-600">
             Upload and manage documents linked to property listings.
           </p>
         </div>
         <button
           onClick={() => setUploadModalOpen(true)}
-          className="inline-flex items-center gap-2 px-4 py-2.5 bg-[#1B4965] text-white rounded-xl font-medium hover:bg-[#2B6985] transition-colors shadow-md"
+          className="inline-flex items-center gap-2 px-4 py-2.5 bg-[#1B3A5C] text-white rounded-xl font-medium hover:bg-[#24507D] transition-colors shadow-md"
         >
           <Upload className="w-4 h-4" />
           Upload Document
@@ -318,20 +318,20 @@ export default function DocumentsPage() {
       {/* Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         <div className="bg-white border rounded-xl p-4">
-          <p className="text-sm text-stone-500">Total Documents</p>
-          <p className="text-2xl font-bold text-stone-900">{documents.length}</p>
+          <p className="text-sm text-slate-500">Total Documents</p>
+          <p className="text-2xl font-bold text-slate-900">{documents.length}</p>
         </div>
         <div className="bg-white border rounded-xl p-4">
-          <p className="text-sm text-stone-500">Properties with Docs</p>
-          <p className="text-2xl font-bold text-stone-900">{Object.keys(docsByProperty).length}</p>
+          <p className="text-sm text-slate-500">Properties with Docs</p>
+          <p className="text-2xl font-bold text-slate-900">{Object.keys(docsByProperty).length}</p>
         </div>
         <div className="bg-white border rounded-xl p-4">
-          <p className="text-sm text-stone-500">Public Documents</p>
-          <p className="text-2xl font-bold text-stone-900">{documents.filter(d => d.isPublic).length}</p>
+          <p className="text-sm text-slate-500">Public Documents</p>
+          <p className="text-2xl font-bold text-slate-900">{documents.filter(d => d.isPublic).length}</p>
         </div>
         <div className="bg-white border rounded-xl p-4">
-          <p className="text-sm text-stone-500">Total Size</p>
-          <p className="text-2xl font-bold text-stone-900">
+          <p className="text-sm text-slate-500">Total Size</p>
+          <p className="text-2xl font-bold text-slate-900">
             {formatFileSize(documents.reduce((sum, d) => sum + (d.fileSize || 0), 0))}
           </p>
         </div>
@@ -340,7 +340,7 @@ export default function DocumentsPage() {
       {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-3">
         <div className="relative flex-1 max-w-sm">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
           <input
             type="text"
             value={searchQuery}
@@ -374,16 +374,16 @@ export default function DocumentsPage() {
       {/* Document Table */}
       {loading ? (
         <div className="text-center py-12">
-          <Loader2 className="w-8 h-8 animate-spin text-[#1B4965] mx-auto mb-2" />
-          <p className="text-stone-500">Loading documents...</p>
+          <Loader2 className="w-8 h-8 animate-spin text-[#1B3A5C] mx-auto mb-2" />
+          <p className="text-slate-500">Loading documents...</p>
         </div>
       ) : filtered.length === 0 ? (
         <div className="bg-white border rounded-xl p-12 text-center">
-          <FileText className="w-12 h-12 text-stone-300 mx-auto mb-4" />
-          <h3 className="text-lg font-medium text-stone-900 mb-2">
+          <FileText className="w-12 h-12 text-slate-300 mx-auto mb-4" />
+          <h3 className="text-lg font-medium text-slate-900 mb-2">
             {documents.length === 0 ? 'No documents yet' : 'No matching documents'}
           </h3>
-          <p className="text-stone-500 mb-4">
+          <p className="text-slate-500 mb-4">
             {documents.length === 0
               ? 'Upload your first document to link it to a property listing.'
               : 'Try adjusting your search or filters.'}
@@ -391,7 +391,7 @@ export default function DocumentsPage() {
           {documents.length === 0 && (
             <button
               onClick={() => setUploadModalOpen(true)}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-[#1B4965] text-white rounded-lg font-medium hover:bg-[#2B6985] transition-colors"
+              className="inline-flex items-center gap-2 px-4 py-2 bg-[#1B3A5C] text-white rounded-lg font-medium hover:bg-[#24507D] transition-colors"
             >
               <Upload className="w-4 h-4" />
               Upload Document
@@ -401,35 +401,35 @@ export default function DocumentsPage() {
       ) : (
         <div className="bg-white rounded-xl border overflow-hidden">
           <table className="w-full text-sm">
-            <thead className="bg-stone-50 border-b">
+            <thead className="bg-slate-50 border-b">
               <tr>
-                <th className="text-left px-4 py-3 font-medium text-stone-600">Document</th>
-                <th className="text-left px-4 py-3 font-medium text-stone-600">Property</th>
-                <th className="text-left px-4 py-3 font-medium text-stone-600">Type</th>
-                <th className="text-left px-4 py-3 font-medium text-stone-600">Size</th>
-                <th className="text-left px-4 py-3 font-medium text-stone-600">Date</th>
-                <th className="text-right px-4 py-3 font-medium text-stone-600">Actions</th>
+                <th className="text-left px-4 py-3 font-medium text-slate-600">Document</th>
+                <th className="text-left px-4 py-3 font-medium text-slate-600">Property</th>
+                <th className="text-left px-4 py-3 font-medium text-slate-600">Type</th>
+                <th className="text-left px-4 py-3 font-medium text-slate-600">Size</th>
+                <th className="text-left px-4 py-3 font-medium text-slate-600">Date</th>
+                <th className="text-right px-4 py-3 font-medium text-slate-600">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y">
               {filtered.map(doc => (
-                <tr key={doc.id} className="hover:bg-stone-50">
+                <tr key={doc.id} className="hover:bg-slate-50">
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 bg-stone-100 rounded-lg flex items-center justify-center text-stone-500">
+                      <div className="w-8 h-8 bg-slate-100 rounded-lg flex items-center justify-center text-slate-500">
                         {getFileIcon(doc.mimeType)}
                       </div>
                       <div>
-                        <p className="font-medium text-stone-900">{doc.title}</p>
+                        <p className="font-medium text-slate-900">{doc.title}</p>
                         {doc.description && (
-                          <p className="text-xs text-stone-500 truncate max-w-[200px]">{doc.description}</p>
+                          <p className="text-xs text-slate-500 truncate max-w-[200px]">{doc.description}</p>
                         )}
                       </div>
                     </div>
                   </td>
                   <td className="px-4 py-3">
-                    <div className="flex items-center gap-1.5 text-stone-700">
-                      <Building2 className="w-3.5 h-3.5 text-stone-400" />
+                    <div className="flex items-center gap-1.5 text-slate-700">
+                      <Building2 className="w-3.5 h-3.5 text-slate-400" />
                       <span className="max-w-[150px] truncate">{doc.property.title}</span>
                     </div>
                   </td>
@@ -438,17 +438,17 @@ export default function DocumentsPage() {
                       {doc.type.replace(/_/g, ' ')}
                     </span>
                   </td>
-                  <td className="px-4 py-3 text-stone-500">
+                  <td className="px-4 py-3 text-slate-500">
                     {formatFileSize(doc.fileSize)}
                   </td>
-                  <td className="px-4 py-3 text-stone-500 whitespace-nowrap">
+                  <td className="px-4 py-3 text-slate-500 whitespace-nowrap">
                     {new Date(doc.createdAt).toLocaleDateString()}
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex items-center justify-end gap-1">
                       <button
                         onClick={() => startEditing(doc)}
-                        className="p-1.5 rounded-lg text-stone-400 hover:text-[#C97B4B] hover:bg-orange-50 transition-colors"
+                        className="p-1.5 rounded-lg text-slate-400 hover:text-[#C49A2E] hover:bg-orange-50 transition-colors"
                         title="Edit"
                       >
                         <Pencil className="w-4 h-4" />
@@ -457,7 +457,7 @@ export default function DocumentsPage() {
                         href={doc.fileUrl}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="p-1.5 rounded-lg text-stone-400 hover:text-[#1B4965] hover:bg-[#E8F1F5] transition-colors"
+                        className="p-1.5 rounded-lg text-slate-400 hover:text-[#1B3A5C] hover:bg-[#E0EDF7] transition-colors"
                         title="View"
                       >
                         <ExternalLink className="w-4 h-4" />
@@ -465,14 +465,14 @@ export default function DocumentsPage() {
                       <a
                         href={doc.fileUrl}
                         download={`${doc.title}${doc.mimeType ? '.' + doc.mimeType.split('/').pop()?.replace('vnd.openxmlformats-officedocument.wordprocessingml.document', 'docx').replace('vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'xlsx').replace('vnd.ms-excel', 'xls').replace('msword', 'doc').replace('jpeg', 'jpg') : ''}`}
-                        className="p-1.5 rounded-lg text-stone-400 hover:text-emerald-600 hover:bg-emerald-50 transition-colors"
+                        className="p-1.5 rounded-lg text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 transition-colors"
                         title="Download"
                       >
                         <Download className="w-4 h-4" />
                       </a>
                       <button
                         onClick={() => handleDelete(doc)}
-                        className="p-1.5 rounded-lg text-stone-400 hover:text-red-600 hover:bg-red-50 transition-colors"
+                        className="p-1.5 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors"
                         title="Delete"
                       >
                         <Trash2 className="w-4 h-4" />
@@ -493,19 +493,19 @@ export default function DocumentsPage() {
           <div className="relative bg-white rounded-2xl shadow-2xl max-w-lg w-full mx-4 p-6">
             <button
               onClick={() => !saving && cancelEditing()}
-              className="absolute top-4 right-4 text-stone-400 hover:text-stone-600"
+              className="absolute top-4 right-4 text-slate-400 hover:text-slate-600"
             >
               <X className="w-5 h-5" />
             </button>
 
-            <h3 className="text-lg font-bold text-stone-900 mb-6 flex items-center gap-2">
-              <Pencil className="w-5 h-5 text-[#C97B4B]" />
+            <h3 className="text-lg font-bold text-slate-900 mb-6 flex items-center gap-2">
+              <Pencil className="w-5 h-5 text-[#C49A2E]" />
               Edit Document
             </h3>
 
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-stone-700 mb-1">
+                <label className="block text-sm font-medium text-slate-700 mb-1">
                   Title <span className="text-red-500">*</span>
                 </label>
                 <input
@@ -517,7 +517,7 @@ export default function DocumentsPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-stone-700 mb-1">Description</label>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Description</label>
                 <textarea
                   value={editDescription}
                   onChange={(e) => setEditDescription(e.target.value)}
@@ -527,7 +527,7 @@ export default function DocumentsPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-stone-700 mb-1">Document Type</label>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Document Type</label>
                 <select
                   value={editType}
                   onChange={(e) => setEditType(e.target.value)}
@@ -544,9 +544,9 @@ export default function DocumentsPage() {
                   type="checkbox"
                   checked={editIsPublic}
                   onChange={(e) => setEditIsPublic(e.target.checked)}
-                  className="rounded border-stone-300"
+                  className="rounded border-slate-300"
                 />
-                <span className="text-sm text-stone-700">Make publicly visible to users</span>
+                <span className="text-sm text-slate-700">Make publicly visible to users</span>
               </label>
             </div>
 
@@ -554,14 +554,14 @@ export default function DocumentsPage() {
               <button
                 onClick={cancelEditing}
                 disabled={saving}
-                className="px-4 py-2 text-sm font-medium text-stone-700 bg-stone-100 rounded-lg hover:bg-stone-200 transition-colors"
+                className="px-4 py-2 text-sm font-medium text-slate-700 bg-slate-100 rounded-lg hover:bg-slate-200 transition-colors"
               >
                 Cancel
               </button>
               <button
                 onClick={handleSaveEdit}
                 disabled={saving || !editTitle.trim()}
-                className="px-4 py-2 text-sm font-medium text-white bg-[#1B4965] rounded-lg hover:bg-[#2B6985] transition-colors disabled:opacity-50 flex items-center gap-2"
+                className="px-4 py-2 text-sm font-medium text-white bg-[#1B3A5C] rounded-lg hover:bg-[#24507D] transition-colors disabled:opacity-50 flex items-center gap-2"
               >
                 {saving ? (
                   <>
@@ -587,20 +587,20 @@ export default function DocumentsPage() {
           <div className="relative bg-white rounded-2xl shadow-2xl max-w-lg w-full mx-4 p-6 max-h-[90vh] overflow-y-auto">
             <button
               onClick={() => { if (!uploading) { setUploadModalOpen(false); resetUploadForm() } }}
-              className="absolute top-4 right-4 text-stone-400 hover:text-stone-600"
+              className="absolute top-4 right-4 text-slate-400 hover:text-slate-600"
             >
               <X className="w-5 h-5" />
             </button>
 
-            <h3 className="text-lg font-bold text-stone-900 mb-6 flex items-center gap-2">
-              <Upload className="w-5 h-5 text-[#1B4965]" />
+            <h3 className="text-lg font-bold text-slate-900 mb-6 flex items-center gap-2">
+              <Upload className="w-5 h-5 text-[#1B3A5C]" />
               Upload Document
             </h3>
 
             <div className="space-y-4">
               {/* Property Selection */}
               <div>
-                <label className="block text-sm font-medium text-stone-700 mb-1">
+                <label className="block text-sm font-medium text-slate-700 mb-1">
                   Link to Property <span className="text-red-500">*</span>
                 </label>
                 <select
@@ -617,7 +617,7 @@ export default function DocumentsPage() {
 
               {/* Title */}
               <div>
-                <label className="block text-sm font-medium text-stone-700 mb-1">
+                <label className="block text-sm font-medium text-slate-700 mb-1">
                   Title <span className="text-red-500">*</span>
                 </label>
                 <input
@@ -631,7 +631,7 @@ export default function DocumentsPage() {
 
               {/* Description */}
               <div>
-                <label className="block text-sm font-medium text-stone-700 mb-1">Description</label>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Description</label>
                 <textarea
                   value={uploadDescription}
                   onChange={(e) => setUploadDescription(e.target.value)}
@@ -643,7 +643,7 @@ export default function DocumentsPage() {
 
               {/* Type */}
               <div>
-                <label className="block text-sm font-medium text-stone-700 mb-1">Document Type</label>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Document Type</label>
                 <select
                   value={uploadType}
                   onChange={(e) => setUploadType(e.target.value)}
@@ -657,31 +657,31 @@ export default function DocumentsPage() {
 
               {/* File */}
               <div>
-                <label className="block text-sm font-medium text-stone-700 mb-1">
+                <label className="block text-sm font-medium text-slate-700 mb-1">
                   File <span className="text-red-500">*</span>
                 </label>
-                <div className="border-2 border-dashed rounded-xl p-4 text-center hover:border-[#1B4965] transition-colors">
+                <div className="border-2 border-dashed rounded-xl p-4 text-center hover:border-[#1B3A5C] transition-colors">
                   {uploadFile ? (
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         {getFileIcon(uploadFile.type)}
                         <div className="text-left">
-                          <p className="text-sm font-medium text-stone-900">{uploadFile.name}</p>
-                          <p className="text-xs text-stone-500">{formatFileSize(uploadFile.size)}</p>
+                          <p className="text-sm font-medium text-slate-900">{uploadFile.name}</p>
+                          <p className="text-xs text-slate-500">{formatFileSize(uploadFile.size)}</p>
                         </div>
                       </div>
                       <button
                         onClick={() => setUploadFile(null)}
-                        className="text-stone-400 hover:text-red-500"
+                        className="text-slate-400 hover:text-red-500"
                       >
                         <X className="w-4 h-4" />
                       </button>
                     </div>
                   ) : (
                     <label className="cursor-pointer">
-                      <Upload className="w-8 h-8 text-stone-300 mx-auto mb-2" />
-                      <p className="text-sm text-stone-500">Click to select a file</p>
-                      <p className="text-xs text-stone-400 mt-1">PDF, images, Word, Excel (max 25MB)</p>
+                      <Upload className="w-8 h-8 text-slate-300 mx-auto mb-2" />
+                      <p className="text-sm text-slate-500">Click to select a file</p>
+                      <p className="text-xs text-slate-400 mt-1">PDF, images, Word, Excel (max 25MB)</p>
                       <input
                         type="file"
                         className="hidden"
@@ -699,9 +699,9 @@ export default function DocumentsPage() {
                   type="checkbox"
                   checked={uploadIsPublic}
                   onChange={(e) => setUploadIsPublic(e.target.checked)}
-                  className="rounded border-stone-300"
+                  className="rounded border-slate-300"
                 />
-                <span className="text-sm text-stone-700">Make publicly visible to users</span>
+                <span className="text-sm text-slate-700">Make publicly visible to users</span>
               </label>
             </div>
 
@@ -709,14 +709,14 @@ export default function DocumentsPage() {
               <button
                 onClick={() => { setUploadModalOpen(false); resetUploadForm() }}
                 disabled={uploading}
-                className="px-4 py-2 text-sm font-medium text-stone-700 bg-stone-100 rounded-lg hover:bg-stone-200 transition-colors"
+                className="px-4 py-2 text-sm font-medium text-slate-700 bg-slate-100 rounded-lg hover:bg-slate-200 transition-colors"
               >
                 Cancel
               </button>
               <button
                 onClick={handleUpload}
                 disabled={uploading || !uploadFile || !uploadPropertyId || !uploadTitle}
-                className="px-4 py-2 text-sm font-medium text-white bg-[#1B4965] rounded-lg hover:bg-[#2B6985] transition-colors disabled:opacity-50 flex items-center gap-2"
+                className="px-4 py-2 text-sm font-medium text-white bg-[#1B3A5C] rounded-lg hover:bg-[#24507D] transition-colors disabled:opacity-50 flex items-center gap-2"
               >
                 {uploading ? (
                   <>

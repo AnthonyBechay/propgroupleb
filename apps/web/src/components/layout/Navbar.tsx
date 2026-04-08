@@ -56,7 +56,7 @@ export function Navbar() {
       isScrolled
         ? 'bg-white/95 backdrop-blur-lg shadow-lg'
         : 'bg-white shadow-sm'
-    } border-b border-stone-200`}>
+    } border-b border-slate-200`}>
       <div className="pg-container max-w-7xl mx-auto w-full">
         <div className="flex justify-between items-center h-16 w-full">
           {/* Logo */}
@@ -70,10 +70,10 @@ export function Navbar() {
               priority
             />
             <div>
-              <span className="font-bold text-xl text-stone-900 block leading-tight">
+              <span className="font-bold text-xl text-slate-900 block leading-tight">
                 PropGroup
               </span>
-              <span className="text-xs text-stone-500">Georgia Real Estate</span>
+              <span className="text-xs text-slate-500">Georgia Real Estate</span>
             </div>
           </Link>
 
@@ -86,7 +86,7 @@ export function Navbar() {
             <NavLink href="/ai-search" icon={<Sparkles className="w-4 h-4" />} isActive={isActive('/ai-search')}>
               <span className="flex items-center gap-1.5">
                 AI Search
-                <span className="inline-flex items-center px-2 py-0.5 text-xs font-semibold bg-[#C97B4B] text-white rounded-full">
+                <span className="inline-flex items-center px-2 py-0.5 text-xs font-semibold bg-[#C49A2E] text-white rounded-full">
                   NEW
                 </span>
               </span>
@@ -104,8 +104,8 @@ export function Navbar() {
           <div className="hidden lg:flex items-center space-x-2 flex-shrink-0">
             {loading ? (
               <div className="flex items-center space-x-2" data-testid="loading-skeleton">
-                <div className="w-8 h-8 rounded-full bg-stone-200 animate-pulse" />
-                <div className="w-16 h-4 rounded bg-stone-200 animate-pulse" />
+                <div className="w-8 h-8 rounded-full bg-slate-200 animate-pulse" />
+                <div className="w-16 h-4 rounded bg-slate-200 animate-pulse" />
               </div>
             ) : user ? (
               <div className="flex items-center space-x-2 flex-shrink-0">
@@ -114,7 +114,7 @@ export function Navbar() {
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="relative text-stone-600 hover:text-stone-900"
+                    className="relative text-slate-600 hover:text-slate-900"
                   >
                     <Bell className="w-5 h-5" />
                   </Button>
@@ -127,26 +127,26 @@ export function Navbar() {
                     onBlur={() => setTimeout(() => setIsProfileDropdownOpen(false), 200)}
                     aria-expanded={isProfileDropdownOpen}
                     aria-haspopup="true"
-                    className="flex items-center gap-2 px-3 py-1.5 bg-stone-50 rounded-full hover:shadow-md transition-all"
+                    className="flex items-center gap-2 px-3 py-1.5 bg-slate-50 rounded-full hover:shadow-md transition-all"
                   >
-                    <div className="w-8 h-8 rounded-full bg-[#1B4965] flex items-center justify-center text-white text-sm font-bold">
+                    <div className="w-8 h-8 rounded-full bg-[#1B3A5C] flex items-center justify-center text-white text-sm font-bold">
                       {user.email?.charAt(0).toUpperCase()}
                     </div>
-                    <span className="text-sm text-stone-700 font-medium">
+                    <span className="text-sm text-slate-700 font-medium">
                       {user.email?.split('@')[0]}
                     </span>
-                    <ChevronDown className={`w-3 h-3 text-stone-500 transition-transform ${
+                    <ChevronDown className={`w-3 h-3 text-slate-500 transition-transform ${
                       isProfileDropdownOpen ? 'rotate-180' : ''
                     }`} />
                   </button>
 
                   {isProfileDropdownOpen && (
-                    <div role="menu" className="absolute top-full right-0 mt-2 w-56 bg-white rounded-2xl shadow-2xl border border-stone-100 py-2 animate-in fade-in slide-in-from-top-2">
-                      <div className="px-4 py-3 border-b border-stone-100">
-                        <p className="text-sm font-medium text-stone-900">
+                    <div role="menu" className="absolute top-full right-0 mt-2 w-56 bg-white rounded-2xl shadow-2xl border border-slate-100 py-2 animate-in fade-in slide-in-from-top-2">
+                      <div className="px-4 py-3 border-b border-slate-100">
+                        <p className="text-sm font-medium text-slate-900">
                           {user.email}
                         </p>
-                        <p className="text-xs text-stone-500 mt-1">
+                        <p className="text-xs text-slate-500 mt-1">
                           My Account
                         </p>
                       </div>
@@ -155,13 +155,13 @@ export function Navbar() {
                           key={link.href}
                           href={link.href}
                           role="menuitem"
-                          className="flex items-center gap-3 px-4 py-2.5 text-stone-700 hover:bg-stone-50 transition-colors"
+                          className="flex items-center gap-3 px-4 py-2.5 text-slate-700 hover:bg-slate-50 transition-colors"
                         >
                           {link.icon}
                           <span className="font-medium">{link.label}</span>
                         </Link>
                       ))}
-                      <div className="border-t border-stone-100 mt-2 pt-2">
+                      <div className="border-t border-slate-100 mt-2 pt-2">
                         <button
                           onClick={signOut}
                           role="menuitem"
@@ -178,7 +178,7 @@ export function Navbar() {
                 {/* Portal Button */}
                 {!pathname.startsWith('/portal') && !pathname.startsWith('/admin') && (
                   <Link href="/portal/dashboard">
-                    <Button size="sm" variant="ghost" className="text-stone-600 hover:text-[#1B4965] hover:bg-[#E8F1F5]">
+                    <Button size="sm" variant="ghost" className="text-slate-600 hover:text-[#1B3A5C] hover:bg-[#E0EDF7]">
                       <LayoutDashboard className="w-4 h-4 mr-1.5" />
                       Portal
                     </Button>
@@ -188,7 +188,7 @@ export function Navbar() {
                 {/* Admin Button for Admin/Super Admin users */}
                 {(user.role === 'ADMIN' || user.role === 'SUPER_ADMIN') && !pathname.startsWith('/admin') && (
                   <Link href="/admin">
-                    <Button size="sm" variant="outline" className="border-[#1B4965] text-[#1B4965] hover:bg-[#E8F1F5]">
+                    <Button size="sm" variant="outline" className="border-[#1B3A5C] text-[#1B3A5C] hover:bg-[#E0EDF7]">
                       <Shield className="w-4 h-4 mr-2" />
                       Admin Panel
                     </Button>
@@ -204,7 +204,7 @@ export function Navbar() {
                   </Button>
                 </AuthModal>
                 <AuthModal defaultMode="signup">
-                  <Button size="sm" className="bg-[#C97B4B] hover:bg-[#B86A3A] text-white shadow-md hover:shadow-lg transition-all">
+                  <Button size="sm" className="bg-[#C49A2E] hover:bg-[#A98327] text-white shadow-md hover:shadow-lg transition-all">
                     <Sparkles className="w-4 h-4 mr-2" />
                     Get Started
                   </Button>
@@ -230,7 +230,7 @@ export function Navbar() {
         <div className={`lg:hidden transition-all duration-300 ease-in-out ${
           isMenuOpen ? 'max-h-screen opacity-100' : 'max-h-0 opacity-0 overflow-hidden'
         }`}>
-          <div className="py-4 space-y-1 border-t border-stone-200">
+          <div className="py-4 space-y-1 border-t border-slate-200">
             <MobileNavLink
               href="/properties"
               icon={<Building2 className="w-4 h-4" />}
@@ -258,30 +258,30 @@ export function Navbar() {
             </MobileNavLink>
 
             {/* Mobile Auth Section */}
-            <div className="pt-4 px-4 border-t border-stone-200">
+            <div className="pt-4 px-4 border-t border-slate-200">
               {loading ? (
                 <div className="flex items-center gap-3 px-3 py-2">
-                  <div className="w-8 h-8 rounded-full bg-stone-200 animate-pulse" />
-                  <div className="w-24 h-4 rounded bg-stone-200 animate-pulse" />
+                  <div className="w-8 h-8 rounded-full bg-slate-200 animate-pulse" />
+                  <div className="w-24 h-4 rounded bg-slate-200 animate-pulse" />
                 </div>
               ) : user ? (
                 <div className="space-y-3">
-                  <div className="flex items-center gap-3 px-3 py-2 bg-stone-50 rounded-lg">
-                    <div className="w-8 h-8 rounded-full bg-[#1B4965] flex items-center justify-center text-white text-sm font-bold">
+                  <div className="flex items-center gap-3 px-3 py-2 bg-slate-50 rounded-lg">
+                    <div className="w-8 h-8 rounded-full bg-[#1B3A5C] flex items-center justify-center text-white text-sm font-bold">
                       {user.email?.charAt(0).toUpperCase()}
                     </div>
                     <div>
-                      <p className="text-sm font-medium text-stone-900">
+                      <p className="text-sm font-medium text-slate-900">
                         {user.email?.split('@')[0]}
                       </p>
-                      <p className="text-xs text-stone-500">
+                      <p className="text-xs text-slate-500">
                         {user.email}
                       </p>
                     </div>
                   </div>
                   {!pathname.startsWith('/portal') && !pathname.startsWith('/admin') && (
                     <Link href="/portal/dashboard" onClick={() => setIsMenuOpen(false)}>
-                      <Button variant="outline" size="sm" className="w-full border-[#1B4965] text-[#1B4965]">
+                      <Button variant="outline" size="sm" className="w-full border-[#1B3A5C] text-[#1B3A5C]">
                         <LayoutDashboard className="w-4 h-4 mr-2" />
                         My Portal
                       </Button>
@@ -299,7 +299,7 @@ export function Navbar() {
                 </div>
               ) : (
                 <AuthModal>
-                  <Button size="sm" className="w-full bg-[#C97B4B] hover:bg-[#B86A3A] text-white">
+                  <Button size="sm" className="w-full bg-[#C49A2E] hover:bg-[#A98327] text-white">
                     <Sparkles className="w-4 h-4 mr-2" />
                     Sign In / Get Started
                   </Button>
@@ -320,8 +320,8 @@ function NavLink({ href, icon, children, isActive }: any) {
       href={href}
       className={`px-4 py-2 rounded-lg font-medium transition-all flex items-center gap-2 whitespace-nowrap flex-shrink-0 ${
         isActive
-          ? 'bg-[#E8F1F5] text-[#1B4965]'
-          : 'text-stone-600 hover:text-stone-900 hover:bg-stone-50'
+          ? 'bg-[#E0EDF7] text-[#1B3A5C]'
+          : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
       }`}
     >
       {icon}
@@ -338,8 +338,8 @@ function MobileNavLink({ href, icon, children, isActive, onClick }: any) {
       onClick={onClick}
       className={`flex items-center gap-3 px-4 py-3 text-base font-medium transition-colors ${
         isActive
-          ? 'bg-[#E8F1F5] text-[#1B4965] border-l-4 border-[#1B4965]'
-          : 'text-stone-600 hover:bg-stone-50 hover:text-stone-900 border-l-4 border-transparent'
+          ? 'bg-[#E0EDF7] text-[#1B3A5C] border-l-4 border-[#1B3A5C]'
+          : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 border-l-4 border-transparent'
       }`}
     >
       {icon}

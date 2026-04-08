@@ -106,10 +106,10 @@ export default function SettingsPage() {
   }
 
   const navItems = [
-    { id: 'profile' as TabType, label: 'Profile', icon: User, color: 'bg-[#1B4965]' },
+    { id: 'profile' as TabType, label: 'Profile', icon: User, color: 'bg-[#1B3A5C]' },
     { id: 'security' as TabType, label: 'Security', icon: Lock, color: 'bg-emerald-600' },
-    { id: 'notifications' as TabType, label: 'Notifications', icon: Bell, color: 'bg-[#C97B4B]' },
-    { id: 'email' as TabType, label: 'Email Templates', icon: Mail, color: 'bg-stone-600' },
+    { id: 'notifications' as TabType, label: 'Notifications', icon: Bell, color: 'bg-[#C49A2E]' },
+    { id: 'email' as TabType, label: 'Email Templates', icon: Mail, color: 'bg-slate-600' },
     ...(isSuperAdmin ? [
       { id: 'database' as TabType, label: 'Database', icon: Database, color: 'bg-amber-500' },
       { id: 'api' as TabType, label: 'API Keys', icon: Key, color: 'bg-rose-500' },
@@ -122,13 +122,13 @@ export default function SettingsPage() {
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-3xl font-black text-stone-900 flex items-center gap-3">
-          <div className="w-10 h-10 bg-[#1B4965] rounded-xl flex items-center justify-center shadow-md">
+        <h1 className="text-3xl font-black text-slate-900 flex items-center gap-3">
+          <div className="w-10 h-10 bg-[#1B3A5C] rounded-xl flex items-center justify-center shadow-md">
             <SettingsIcon className="h-6 w-6 text-white" />
           </div>
           Settings
         </h1>
-        <p className="mt-2 text-stone-600">
+        <p className="mt-2 text-slate-600">
           Manage your platform settings and preferences.
         </p>
       </div>
@@ -144,11 +144,11 @@ export default function SettingsPage() {
                 className={`group flex items-center px-4 py-3 text-sm font-bold rounded-xl w-full transition-all ${
                   activeTab === item.id
                     ? `${item.color} text-white shadow-md`
-                    : 'text-stone-700 hover:bg-stone-50'
+                    : 'text-slate-700 hover:bg-slate-50'
                 }`}
               >
                 <item.icon className={`flex-shrink-0 mr-3 h-5 w-5 ${
-                  activeTab === item.id ? 'text-white' : 'text-stone-400 group-hover:text-stone-600'
+                  activeTab === item.id ? 'text-white' : 'text-slate-400 group-hover:text-slate-600'
                 }`} />
                 <span className="truncate">{item.label}</span>
               </button>
@@ -178,13 +178,13 @@ export default function SettingsPage() {
           {activeTab === 'profile' && (
             <div className="bg-white border-2 border-slate-100 shadow-lg rounded-2xl overflow-hidden">
               <div className="px-6 py-5 border-b-2 border-slate-100 bg-gradient-to-r from-slate-50 to-white">
-                <h2 className="text-lg font-bold text-stone-900 flex items-center gap-2">
-                  <div className="w-8 h-8 bg-[#1B4965] rounded-lg flex items-center justify-center">
+                <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                  <div className="w-8 h-8 bg-[#1B3A5C] rounded-lg flex items-center justify-center">
                     <User className="h-5 w-5 text-white" />
                   </div>
                   Profile Settings
                 </h2>
-                <p className="mt-1 text-sm text-stone-600">
+                <p className="mt-1 text-sm text-slate-600">
                   Update your personal information and account details.
                 </p>
               </div>
@@ -192,31 +192,31 @@ export default function SettingsPage() {
               <form onSubmit={handleProfileSubmit} className="p-6 space-y-6">
                 <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
                   <div>
-                    <Label htmlFor="firstName" className="font-bold text-stone-900">First Name</Label>
+                    <Label htmlFor="firstName" className="font-bold text-slate-900">First Name</Label>
                     <Input
                       type="text"
                       id="firstName"
                       value={firstName}
                       onChange={(e) => setFirstName(e.target.value)}
-                      className="mt-2 border-2 border-slate-200 rounded-xl focus:border-[#1B4965] focus:ring-[#1B4965]"
+                      className="mt-2 border-2 border-slate-200 rounded-xl focus:border-[#1B3A5C] focus:ring-[#1B3A5C]"
                       placeholder="Enter first name"
                     />
                   </div>
 
                   <div>
-                    <Label htmlFor="lastName" className="font-bold text-stone-900">Last Name</Label>
+                    <Label htmlFor="lastName" className="font-bold text-slate-900">Last Name</Label>
                     <Input
                       type="text"
                       id="lastName"
                       value={lastName}
                       onChange={(e) => setLastName(e.target.value)}
-                      className="mt-2 border-2 border-slate-200 rounded-xl focus:border-[#1B4965] focus:ring-[#1B4965]"
+                      className="mt-2 border-2 border-slate-200 rounded-xl focus:border-[#1B3A5C] focus:ring-[#1B3A5C]"
                       placeholder="Enter last name"
                     />
                   </div>
 
                   <div className="sm:col-span-2">
-                    <Label htmlFor="email" className="font-bold text-stone-900">Email Address</Label>
+                    <Label htmlFor="email" className="font-bold text-slate-900">Email Address</Label>
                     <Input
                       type="email"
                       id="email"
@@ -224,32 +224,32 @@ export default function SettingsPage() {
                       className="mt-2 border-2 border-slate-200 rounded-xl bg-slate-50"
                       disabled
                     />
-                    <p className="mt-2 text-sm text-stone-500 flex items-center gap-2">
+                    <p className="mt-2 text-sm text-slate-500 flex items-center gap-2">
                       <AlertCircle className="h-4 w-4" />
                       Email cannot be changed. Contact support if needed.
                     </p>
                   </div>
 
                   <div>
-                    <Label htmlFor="phone" className="font-bold text-stone-900">Phone Number</Label>
+                    <Label htmlFor="phone" className="font-bold text-slate-900">Phone Number</Label>
                     <Input
                       type="tel"
                       id="phone"
                       value={phone}
                       onChange={(e) => setPhone(e.target.value)}
-                      className="mt-2 border-2 border-slate-200 rounded-xl focus:border-[#1B4965] focus:ring-[#1B4965]"
+                      className="mt-2 border-2 border-slate-200 rounded-xl focus:border-[#1B3A5C] focus:ring-[#1B3A5C]"
                       placeholder="+1 (555) 000-0000"
                     />
                   </div>
 
                   <div>
-                    <Label htmlFor="country" className="font-bold text-stone-900">Country</Label>
+                    <Label htmlFor="country" className="font-bold text-slate-900">Country</Label>
                     <Input
                       type="text"
                       id="country"
                       value={country}
                       onChange={(e) => setCountry(e.target.value)}
-                      className="mt-2 border-2 border-slate-200 rounded-xl focus:border-[#1B4965] focus:ring-[#1B4965]"
+                      className="mt-2 border-2 border-slate-200 rounded-xl focus:border-[#1B3A5C] focus:ring-[#1B3A5C]"
                       placeholder="United States"
                     />
                   </div>
@@ -259,12 +259,12 @@ export default function SettingsPage() {
                     <div className="mt-2 flex items-center gap-3 p-4 bg-slate-50 rounded-xl border-2 border-slate-100">
                       <span className={`inline-flex items-center px-4 py-2 rounded-xl text-sm font-bold shadow-md
                         ${user?.role === 'SUPER_ADMIN'
-                          ? 'bg-[#C97B4B] text-white'
-                          : 'bg-[#1B4965] text-white'}`}>
+                          ? 'bg-[#C49A2E] text-white'
+                          : 'bg-[#1B3A5C] text-white'}`}>
                         <Shield className="h-4 w-4 mr-2" />
                         {user?.role?.replace('_', ' ') || 'USER'}
                       </span>
-                      <span className="text-sm text-stone-600">
+                      <span className="text-sm text-slate-600">
                         Your role determines your access level across the platform.
                       </span>
                     </div>
@@ -279,14 +279,14 @@ export default function SettingsPage() {
                           type="checkbox"
                           checked={emailNotifications}
                           onChange={(e) => setEmailNotifications(e.target.checked)}
-                          className="focus:ring-[#1B4965] h-5 w-5 text-[#1B4965] border-slate-300 rounded"
+                          className="focus:ring-[#1B3A5C] h-5 w-5 text-[#1B3A5C] border-slate-300 rounded"
                         />
                       </div>
                       <div className="ml-3 text-sm">
-                        <label htmlFor="notifications" className="font-bold text-stone-900">
+                        <label htmlFor="notifications" className="font-bold text-slate-900">
                           Email Notifications
                         </label>
-                        <p className="text-stone-600 mt-1">
+                        <p className="text-slate-600 mt-1">
                           Get notified about new inquiries, user registrations, and system updates.
                         </p>
                       </div>
@@ -311,7 +311,7 @@ export default function SettingsPage() {
                   <Button
                     type="submit"
                     disabled={loading}
-                    className="bg-[#1B4965] hover:bg-[#163d55] text-white rounded-xl font-bold shadow-md"
+                    className="bg-[#1B3A5C] hover:bg-[#152D4A] text-white rounded-xl font-bold shadow-md"
                   >
                     <Save className="h-4 w-4 mr-2" />
                     {loading ? 'Saving...' : 'Save Changes'}
@@ -325,13 +325,13 @@ export default function SettingsPage() {
           {activeTab === 'security' && (
             <div className="bg-white border-2 border-slate-100 shadow-lg rounded-2xl overflow-hidden">
               <div className="px-6 py-5 border-b-2 border-slate-100 bg-gradient-to-r from-slate-50 to-white">
-                <h2 className="text-lg font-bold text-stone-900 flex items-center gap-2">
+                <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
                   <div className="w-8 h-8 bg-emerald-600 rounded-lg flex items-center justify-center">
                     <Lock className="h-5 w-5 text-white" />
                   </div>
                   Security Settings
                 </h2>
-                <p className="mt-1 text-sm text-stone-600">
+                <p className="mt-1 text-sm text-slate-600">
                   Update your password and security preferences.
                 </p>
               </div>
@@ -339,7 +339,7 @@ export default function SettingsPage() {
               <form onSubmit={handlePasswordSubmit} className="p-6 space-y-6">
                 <div className="space-y-6">
                   <div>
-                    <Label htmlFor="currentPassword" className="font-bold text-stone-900">Current Password</Label>
+                    <Label htmlFor="currentPassword" className="font-bold text-slate-900">Current Password</Label>
                     <Input
                       type="password"
                       id="currentPassword"
@@ -352,7 +352,7 @@ export default function SettingsPage() {
                   </div>
 
                   <div>
-                    <Label htmlFor="newPassword" className="font-bold text-stone-900">New Password</Label>
+                    <Label htmlFor="newPassword" className="font-bold text-slate-900">New Password</Label>
                     <Input
                       type="password"
                       id="newPassword"
@@ -362,13 +362,13 @@ export default function SettingsPage() {
                       placeholder="Enter new password"
                       required
                     />
-                    <p className="mt-2 text-sm text-stone-500">
+                    <p className="mt-2 text-sm text-slate-500">
                       Password must be at least 8 characters long.
                     </p>
                   </div>
 
                   <div>
-                    <Label htmlFor="confirmPassword" className="font-bold text-stone-900">Confirm New Password</Label>
+                    <Label htmlFor="confirmPassword" className="font-bold text-slate-900">Confirm New Password</Label>
                     <Input
                       type="password"
                       id="confirmPassword"
@@ -410,11 +410,11 @@ export default function SettingsPage() {
           {/* Other tabs placeholder */}
           {activeTab !== 'profile' && activeTab !== 'security' && (
             <div className="bg-white border-2 border-slate-100 shadow-lg rounded-2xl p-8 text-center">
-              <div className="w-16 h-16 bg-stone-200 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                <SettingsIcon className="h-8 w-8 text-stone-500" />
+              <div className="w-16 h-16 bg-slate-200 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                <SettingsIcon className="h-8 w-8 text-slate-500" />
               </div>
-              <h3 className="text-xl font-bold text-stone-900 mb-2">Coming Soon</h3>
-              <p className="text-stone-600">
+              <h3 className="text-xl font-bold text-slate-900 mb-2">Coming Soon</h3>
+              <p className="text-slate-600">
                 This section is under development and will be available soon.
               </p>
             </div>

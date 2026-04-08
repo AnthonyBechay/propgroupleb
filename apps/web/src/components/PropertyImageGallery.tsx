@@ -17,8 +17,8 @@ export function PropertyImageGallery({ images: rawImages, title }: PropertyImage
 
   if (!images || images.length === 0) {
     return (
-      <div className="bg-white rounded-xl border border-stone-200 overflow-hidden">
-        <div className="aspect-[16/10] bg-stone-100 flex flex-col items-center justify-center text-stone-400">
+      <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+        <div className="aspect-[16/10] bg-slate-100 flex flex-col items-center justify-center text-slate-400">
           <ImageIcon className="w-12 h-12 mb-2" />
           <span className="text-sm">No images available</span>
         </div>
@@ -33,9 +33,9 @@ export function PropertyImageGallery({ images: rawImages, title }: PropertyImage
   }
 
   return (
-    <div className="bg-white rounded-xl border border-stone-200 overflow-hidden">
+    <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
       {/* Main Image */}
-      <div className="relative aspect-[16/10] bg-stone-100 group">
+      <div className="relative aspect-[16/10] bg-slate-100 group">
         <Image
           src={images[activeIndex]}
           alt={`${title} - Image ${activeIndex + 1}`}
@@ -53,14 +53,14 @@ export function PropertyImageGallery({ images: rawImages, title }: PropertyImage
               className="absolute left-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white/80 hover:bg-white flex items-center justify-center shadow-md opacity-0 group-hover:opacity-100 transition-opacity"
               aria-label="Previous image"
             >
-              <ChevronLeft className="w-5 h-5 text-stone-700" />
+              <ChevronLeft className="w-5 h-5 text-slate-700" />
             </button>
             <button
               onClick={() => goTo(activeIndex + 1)}
               className="absolute right-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white/80 hover:bg-white flex items-center justify-center shadow-md opacity-0 group-hover:opacity-100 transition-opacity"
               aria-label="Next image"
             >
-              <ChevronRight className="w-5 h-5 text-stone-700" />
+              <ChevronRight className="w-5 h-5 text-slate-700" />
             </button>
           </>
         )}
@@ -75,7 +75,7 @@ export function PropertyImageGallery({ images: rawImages, title }: PropertyImage
 
       {/* Thumbnail Strip */}
       {images.length > 1 && (
-        <div className="p-3 border-t border-stone-100">
+        <div className="p-3 border-t border-slate-100">
           <div className="flex gap-2 overflow-x-auto">
             {images.map((img, i) => (
               <button
@@ -83,7 +83,7 @@ export function PropertyImageGallery({ images: rawImages, title }: PropertyImage
                 onClick={() => setActiveIndex(i)}
                 className={`relative flex-shrink-0 w-20 h-14 rounded-lg overflow-hidden transition-all ${
                   i === activeIndex
-                    ? 'ring-2 ring-[#1B4965] opacity-100'
+                    ? 'ring-2 ring-[#1B3A5C] opacity-100'
                     : 'opacity-60 hover:opacity-100'
                 }`}
               >

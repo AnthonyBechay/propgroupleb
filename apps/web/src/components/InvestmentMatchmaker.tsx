@@ -57,18 +57,18 @@ export function InvestmentMatchmaker() {
   }
 
   return (
-    <div className="bg-white rounded-2xl p-8 md:p-12 shadow-lg border border-stone-200">
+    <div className="bg-white rounded-2xl p-8 md:p-12 shadow-lg border border-slate-200">
       <div className="max-w-4xl mx-auto">
         {/* Header */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center gap-2 px-4 py-2 bg-stone-200 text-[#1B4965] rounded-full text-sm font-semibold mb-4">
+          <div className="inline-flex items-center gap-2 px-4 py-2 bg-slate-200 text-[#1B3A5C] rounded-full text-sm font-semibold mb-4">
             <Sparkles className="w-4 h-4" />
             AI-POWERED MATCHMAKER
           </div>
-          <h2 className="text-3xl md:text-4xl font-bold text-stone-900 mb-2">
+          <h2 className="text-3xl md:text-4xl font-bold text-slate-900 mb-2">
             Find Your Perfect Investment
           </h2>
-          <p className="text-lg text-stone-600">
+          <p className="text-lg text-slate-600">
             Answer a few questions and we'll match you with ideal properties
           </p>
         </div>
@@ -76,16 +76,16 @@ export function InvestmentMatchmaker() {
         {/* Progress bar */}
         <div className="mb-8">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-sm font-medium text-stone-600">
+            <span className="text-sm font-medium text-slate-600">
               Step {step} of 3
             </span>
-            <span className="text-sm font-medium text-stone-600">
+            <span className="text-sm font-medium text-slate-600">
               {Math.round((step / 3) * 100)}% Complete
             </span>
           </div>
-          <div className="h-2 bg-stone-200 rounded-full overflow-hidden">
+          <div className="h-2 bg-slate-200 rounded-full overflow-hidden">
             <div
-              className="h-full bg-[#1B4965] transition-all duration-500 ease-out"
+              className="h-full bg-[#1B3A5C] transition-all duration-500 ease-out"
               style={{ width: `${(step / 3) * 100}%` }}
             />
           </div>
@@ -96,7 +96,7 @@ export function InvestmentMatchmaker() {
           {step === 1 && (
             <div className="space-y-6 animate-fade-in">
               <div>
-                <Label className="text-lg font-semibold text-stone-900 mb-4 flex items-center gap-2">
+                <Label className="text-lg font-semibold text-slate-900 mb-4 flex items-center gap-2">
                   <Target className="w-5 h-5 text-blue-600" />
                   What's your investment goal?
                 </Label>
@@ -105,15 +105,15 @@ export function InvestmentMatchmaker() {
                     onClick={() => updateFormData('goal', 'HIGH_ROI')}
                     className={`p-6 rounded-xl border-2 transition-all ${
                       formData.goal === 'HIGH_ROI'
-                        ? 'border-[#1B4965] bg-blue-50'
-                        : 'border-stone-200 hover:border-stone-300'
+                        ? 'border-[#1B3A5C] bg-blue-50'
+                        : 'border-slate-200 hover:border-slate-300'
                     }`}
                   >
                     <TrendingUp className="w-8 h-8 text-green-500 mb-3" />
-                    <h3 className="font-semibold text-stone-900 mb-1">
+                    <h3 className="font-semibold text-slate-900 mb-1">
                       Maximum Returns
                     </h3>
-                    <p className="text-sm text-stone-600">
+                    <p className="text-sm text-slate-600">
                       Focus on properties with highest ROI potential (15%+)
                     </p>
                   </button>
@@ -122,15 +122,15 @@ export function InvestmentMatchmaker() {
                     onClick={() => updateFormData('goal', 'GOLDEN_VISA')}
                     className={`p-6 rounded-xl border-2 transition-all ${
                       formData.goal === 'GOLDEN_VISA'
-                        ? 'border-[#1B4965] bg-blue-50'
-                        : 'border-stone-200 hover:border-stone-300'
+                        ? 'border-[#1B3A5C] bg-blue-50'
+                        : 'border-slate-200 hover:border-slate-300'
                     }`}
                   >
                     <BadgeCheck className="w-8 h-8 text-yellow-500 mb-3" />
-                    <h3 className="font-semibold text-stone-900 mb-1">
+                    <h3 className="font-semibold text-slate-900 mb-1">
                       Residency Benefits
                     </h3>
-                    <p className="text-sm text-stone-600">
+                    <p className="text-sm text-slate-600">
                       Properties eligible for Golden Visa programs
                     </p>
                   </button>
@@ -139,15 +139,15 @@ export function InvestmentMatchmaker() {
                     onClick={() => updateFormData('goal', 'PASSIVE_INCOME')}
                     className={`p-6 rounded-xl border-2 transition-all ${
                       formData.goal === 'PASSIVE_INCOME'
-                        ? 'border-[#1B4965] bg-blue-50'
-                        : 'border-stone-200 hover:border-stone-300'
+                        ? 'border-[#1B3A5C] bg-blue-50'
+                        : 'border-slate-200 hover:border-slate-300'
                     }`}
                   >
                     <DollarSign className="w-8 h-8 text-blue-500 mb-3" />
-                    <h3 className="font-semibold text-stone-900 mb-1">
+                    <h3 className="font-semibold text-slate-900 mb-1">
                       Rental Income
                     </h3>
-                    <p className="text-sm text-stone-600">
+                    <p className="text-sm text-slate-600">
                       Steady monthly income from rental properties
                     </p>
                   </button>
@@ -156,15 +156,15 @@ export function InvestmentMatchmaker() {
                     onClick={() => updateFormData('goal', 'DIVERSIFICATION')}
                     className={`p-6 rounded-xl border-2 transition-all ${
                       formData.goal === 'DIVERSIFICATION'
-                        ? 'border-[#1B4965] bg-blue-50'
-                        : 'border-stone-200 hover:border-stone-300'
+                        ? 'border-[#1B3A5C] bg-blue-50'
+                        : 'border-slate-200 hover:border-slate-300'
                     }`}
                   >
                     <Globe className="w-8 h-8 text-purple-500 mb-3" />
-                    <h3 className="font-semibold text-stone-900 mb-1">
+                    <h3 className="font-semibold text-slate-900 mb-1">
                       Portfolio Diversification
                     </h3>
-                    <p className="text-sm text-stone-600">
+                    <p className="text-sm text-slate-600">
                       Spread investments across multiple markets
                     </p>
                   </button>
@@ -176,13 +176,13 @@ export function InvestmentMatchmaker() {
           {step === 2 && (
             <div className="space-y-6 animate-fade-in">
               <div>
-                <Label className="text-lg font-semibold text-stone-900 mb-4 flex items-center gap-2">
+                <Label className="text-lg font-semibold text-slate-900 mb-4 flex items-center gap-2">
                   <Calculator className="w-5 h-5 text-blue-600" />
                   What's your investment budget?
                 </Label>
                 <div className="space-y-4">
                   <div className="relative">
-                    <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 text-stone-500 w-5 h-5" />
+                    <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-500 w-5 h-5" />
                     <Input
                       type="number"
                       placeholder="Enter amount"
@@ -208,7 +208,7 @@ export function InvestmentMatchmaker() {
               </div>
 
               <div>
-                <Label className="text-lg font-semibold text-stone-900 mb-4 flex items-center gap-2">
+                <Label className="text-lg font-semibold text-slate-900 mb-4 flex items-center gap-2">
                   <Globe className="w-5 h-5 text-blue-600" />
                   Preferred location?
                 </Label>
@@ -233,7 +233,7 @@ export function InvestmentMatchmaker() {
           {step === 3 && (
             <div className="space-y-6 animate-fade-in">
               <div>
-                <Label className="text-lg font-semibold text-stone-900 mb-4">
+                <Label className="text-lg font-semibold text-slate-900 mb-4">
                   When do you plan to invest?
                 </Label>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -241,14 +241,14 @@ export function InvestmentMatchmaker() {
                     onClick={() => updateFormData('timeline', 'IMMEDIATE')}
                     className={`p-4 rounded-xl border-2 transition-all ${
                       formData.timeline === 'IMMEDIATE'
-                        ? 'border-[#1B4965] bg-blue-50'
-                        : 'border-stone-200 hover:border-stone-300'
+                        ? 'border-[#1B3A5C] bg-blue-50'
+                        : 'border-slate-200 hover:border-slate-300'
                     }`}
                   >
-                    <h3 className="font-semibold text-stone-900 mb-1">
+                    <h3 className="font-semibold text-slate-900 mb-1">
                       Ready to invest now
                     </h3>
-                    <p className="text-sm text-stone-600">
+                    <p className="text-sm text-slate-600">
                       I have funds ready and want to invest immediately
                     </p>
                   </button>
@@ -257,14 +257,14 @@ export function InvestmentMatchmaker() {
                     onClick={() => updateFormData('timeline', '3_MONTHS')}
                     className={`p-4 rounded-xl border-2 transition-all ${
                       formData.timeline === '3_MONTHS'
-                        ? 'border-[#1B4965] bg-blue-50'
-                        : 'border-stone-200 hover:border-stone-300'
+                        ? 'border-[#1B3A5C] bg-blue-50'
+                        : 'border-slate-200 hover:border-slate-300'
                     }`}
                   >
-                    <h3 className="font-semibold text-stone-900 mb-1">
+                    <h3 className="font-semibold text-slate-900 mb-1">
                       Within 3 months
                     </h3>
-                    <p className="text-sm text-stone-600">
+                    <p className="text-sm text-slate-600">
                       Planning to invest in the next quarter
                     </p>
                   </button>
@@ -273,14 +273,14 @@ export function InvestmentMatchmaker() {
                     onClick={() => updateFormData('timeline', '6_MONTHS')}
                     className={`p-4 rounded-xl border-2 transition-all ${
                       formData.timeline === '6_MONTHS'
-                        ? 'border-[#1B4965] bg-blue-50'
-                        : 'border-stone-200 hover:border-stone-300'
+                        ? 'border-[#1B3A5C] bg-blue-50'
+                        : 'border-slate-200 hover:border-slate-300'
                     }`}
                   >
-                    <h3 className="font-semibold text-stone-900 mb-1">
+                    <h3 className="font-semibold text-slate-900 mb-1">
                       Within 6 months
                     </h3>
-                    <p className="text-sm text-stone-600">
+                    <p className="text-sm text-slate-600">
                       Exploring options for the next 6 months
                     </p>
                   </button>
@@ -289,14 +289,14 @@ export function InvestmentMatchmaker() {
                     onClick={() => updateFormData('timeline', 'RESEARCH')}
                     className={`p-4 rounded-xl border-2 transition-all ${
                       formData.timeline === 'RESEARCH'
-                        ? 'border-[#1B4965] bg-blue-50'
-                        : 'border-stone-200 hover:border-stone-300'
+                        ? 'border-[#1B3A5C] bg-blue-50'
+                        : 'border-slate-200 hover:border-slate-300'
                     }`}
                   >
-                    <h3 className="font-semibold text-stone-900 mb-1">
+                    <h3 className="font-semibold text-slate-900 mb-1">
                       Just researching
                     </h3>
-                    <p className="text-sm text-stone-600">
+                    <p className="text-sm text-slate-600">
                       Learning about investment opportunities
                     </p>
                   </button>
@@ -307,7 +307,7 @@ export function InvestmentMatchmaker() {
         </div>
 
         {/* Navigation buttons */}
-        <div className="flex items-center justify-between mt-8 pt-8 border-t border-stone-200">
+        <div className="flex items-center justify-between mt-8 pt-8 border-t border-slate-200">
           <Button
             variant="ghost"
             onClick={handleBack}
@@ -324,7 +324,7 @@ export function InvestmentMatchmaker() {
               (step === 2 && (!formData.budget || !formData.country)) ||
               (step === 3 && !formData.timeline)
             }
-            className="bg-[#1B4965] hover:bg-[#164256] min-w-[150px]"
+            className="bg-[#1B3A5C] hover:bg-[#152D4A] min-w-[150px]"
           >
             {step === 3 ? (
               <>

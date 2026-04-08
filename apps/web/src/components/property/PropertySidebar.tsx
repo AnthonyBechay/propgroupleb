@@ -236,13 +236,13 @@ export function PropertySidebar({
     <>
       <div className="space-y-6">
         {/* Price Card */}
-        <div className="bg-white rounded-xl border border-stone-200 p-6 sticky top-24">
+        <div className="bg-white rounded-xl border border-slate-200 p-6 sticky top-24">
           <div className="text-center mb-6">
-            <div className="text-3xl font-bold text-stone-900 mb-1">
+            <div className="text-3xl font-bold text-slate-900 mb-1">
               {currency} {price?.toLocaleString()}
             </div>
             {area > 0 && (
-              <div className="text-sm text-stone-500">
+              <div className="text-sm text-slate-500">
                 {currency} {Math.round(price / area).toLocaleString()} / m²
               </div>
             )}
@@ -256,14 +256,14 @@ export function PropertySidebar({
 
           <div className="space-y-3">
             <Button
-              className="w-full bg-[#1B4965] hover:bg-[#2B6985] text-white"
+              className="w-full bg-[#1B3A5C] hover:bg-[#24507D] text-white"
               onClick={() => setShowInquiryDialog(true)}
             >
               Request Information
             </Button>
             <Button
               variant="outline"
-              className="w-full border-[#1B4965] text-[#1B4965] hover:bg-[#E8F1F5]"
+              className="w-full border-[#1B3A5C] text-[#1B3A5C] hover:bg-[#E0EDF7]"
               onClick={() => {
                 if (!user) {
                   router.push('/auth/login?next=/property/' + propertyId)
@@ -280,7 +280,7 @@ export function PropertySidebar({
               className={`w-full ${
                 isFavorited
                   ? 'border-red-300 text-red-600 bg-red-50 hover:bg-red-100'
-                  : 'border-stone-300 text-stone-700 hover:bg-stone-50'
+                  : 'border-slate-300 text-slate-700 hover:bg-slate-50'
               }`}
               onClick={handleFavoriteToggle}
               disabled={isLoadingFavorite}
@@ -302,14 +302,14 @@ export function PropertySidebar({
       <Dialog open={showInquiryDialog} onOpenChange={setShowInquiryDialog}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle className="text-stone-900">Request Information</DialogTitle>
-            <DialogDescription className="text-stone-500">
+            <DialogTitle className="text-slate-900">Request Information</DialogTitle>
+            <DialogDescription className="text-slate-500">
               Ask about {title}. We will respond within 24 hours.
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleInquirySubmit} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="inquiry-name" className="text-stone-700">
+              <Label htmlFor="inquiry-name" className="text-slate-700">
                 Name <span className="text-red-500">*</span>
               </Label>
               <Input
@@ -321,7 +321,7 @@ export function PropertySidebar({
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="inquiry-email" className="text-stone-700">
+              <Label htmlFor="inquiry-email" className="text-slate-700">
                 Email <span className="text-red-500">*</span>
               </Label>
               <Input
@@ -334,7 +334,7 @@ export function PropertySidebar({
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="inquiry-phone" className="text-stone-700">
+              <Label htmlFor="inquiry-phone" className="text-slate-700">
                 Phone
               </Label>
               <Input
@@ -346,7 +346,7 @@ export function PropertySidebar({
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="inquiry-message" className="text-stone-700">
+              <Label htmlFor="inquiry-message" className="text-slate-700">
                 Message
               </Label>
               <Textarea
@@ -359,7 +359,7 @@ export function PropertySidebar({
             </div>
             <Button
               type="submit"
-              className="w-full bg-[#1B4965] hover:bg-[#2B6985] text-white"
+              className="w-full bg-[#1B3A5C] hover:bg-[#24507D] text-white"
               disabled={isSubmittingInquiry}
             >
               {isSubmittingInquiry ? (
@@ -379,14 +379,14 @@ export function PropertySidebar({
       <Dialog open={showViewingDialog} onOpenChange={setShowViewingDialog}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle className="text-stone-900">Schedule a Viewing</DialogTitle>
-            <DialogDescription className="text-stone-500">
+            <DialogTitle className="text-slate-900">Schedule a Viewing</DialogTitle>
+            <DialogDescription className="text-slate-500">
               Request a viewing for {title}. We will confirm your appointment.
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleViewingSubmit} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="viewing-date" className="text-stone-700">
+              <Label htmlFor="viewing-date" className="text-slate-700">
                 Preferred Date <span className="text-red-500">*</span>
               </Label>
               <Input
@@ -399,7 +399,7 @@ export function PropertySidebar({
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="viewing-message" className="text-stone-700">
+              <Label htmlFor="viewing-message" className="text-slate-700">
                 Additional Notes
               </Label>
               <Textarea
@@ -412,7 +412,7 @@ export function PropertySidebar({
             </div>
             <Button
               type="submit"
-              className="w-full bg-[#1B4965] hover:bg-[#2B6985] text-white"
+              className="w-full bg-[#1B3A5C] hover:bg-[#24507D] text-white"
               disabled={isSubmittingViewing}
             >
               {isSubmittingViewing ? (

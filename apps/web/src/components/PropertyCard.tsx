@@ -204,7 +204,7 @@ export function PropertyCard({
 
   const statusConfig = {
     OFF_PLAN: {
-      bg: 'bg-[#1B4965]',
+      bg: 'bg-[#1B3A5C]',
       text: 'text-white',
       label: 'Off Plan',
       icon: Sparkles
@@ -216,12 +216,12 @@ export function PropertyCard({
       icon: Award
     },
     RESALE: {
-      bg: 'bg-stone-600',
+      bg: 'bg-slate-600',
       text: 'text-white',
       label: 'Resale',
       icon: Shield
     },
-  }[status] || { bg: 'bg-stone-500', text: 'text-white', label: status, icon: Home }
+  }[status] || { bg: 'bg-slate-500', text: 'text-white', label: status, icon: Home }
 
   const defaultImage = '/placeholder-property.jpg'
   const mainImage = images && images.length > 0 ? normalizeFileUrl(images[currentImageIndex]) : defaultImage
@@ -246,14 +246,14 @@ export function PropertyCard({
 
   return (
     <>
-      <div className={`group relative bg-white rounded-2xl border border-stone-200 overflow-hidden shadow-sm hover:shadow-lg transition-all duration-500 transform hover:-translate-y-2 ${className} ${featured ? 'ring-2 ring-[#C97B4B] ring-offset-2' : ''}`}>
+      <div className={`group relative bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm hover:shadow-lg transition-all duration-500 transform hover:-translate-y-2 ${className} ${featured ? 'ring-2 ring-[#C49A2E] ring-offset-2' : ''}`}>
         {/* Image Container */}
-        <div className="relative aspect-[4/3] overflow-hidden bg-stone-100">
+        <div className="relative aspect-[4/3] overflow-hidden bg-slate-100">
           <Link href={`/property/${id}`}>
             <div className="relative w-full h-full">
               {(mainImage === defaultImage || imageError) ? (
                 <div className="w-full h-full flex items-center justify-center">
-                  <Home className="w-16 h-16 text-stone-400" />
+                  <Home className="w-16 h-16 text-slate-400" />
                 </div>
               ) : (
                 <>
@@ -283,7 +283,7 @@ export function PropertyCard({
           {/* Top-left badges */}
           <div className="absolute top-4 left-4 flex flex-wrap gap-2 max-w-[calc(100%-70px)]">
             {featured && (
-              <span className="px-3 py-1.5 rounded-full text-xs font-bold bg-[#C97B4B] text-white shadow-lg backdrop-blur-sm flex items-center gap-1">
+              <span className="px-3 py-1.5 rounded-full text-xs font-bold bg-[#C49A2E] text-white shadow-lg backdrop-blur-sm flex items-center gap-1">
                 <Sparkles className="w-3 h-3" />
                 Featured
               </span>
@@ -295,7 +295,7 @@ export function PropertyCard({
             </span>
 
             {isGoldenVisaEligible && (
-              <span className="px-3 py-1.5 rounded-full text-xs font-bold bg-[#C97B4B]/90 text-white shadow-lg backdrop-blur-sm flex items-center gap-1">
+              <span className="px-3 py-1.5 rounded-full text-xs font-bold bg-[#C49A2E]/90 text-white shadow-lg backdrop-blur-sm flex items-center gap-1">
                 <BadgeCheck className="w-3 h-3" />
                 Golden Visa
               </span>
@@ -318,7 +318,7 @@ export function PropertyCard({
           >
             <Heart
               className={`w-5 h-5 transition-all ${
-                isFavorited ? 'fill-red-500 text-red-500' : 'text-stone-600 group-hover/fav:text-red-500'
+                isFavorited ? 'fill-red-500 text-red-500' : 'text-slate-600 group-hover/fav:text-red-500'
               } ${isLoadingFavorite ? 'animate-pulse' : ''}`}
             />
           </button>
@@ -329,43 +329,43 @@ export function PropertyCard({
           {/* Title and Location */}
           <div>
             <Link href={`/property/${id}`}>
-              <h3 className="text-xl font-bold text-stone-900 hover:text-[#1B4965] transition-colors line-clamp-1 mb-1">
+              <h3 className="text-xl font-bold text-slate-900 hover:text-[#1B3A5C] transition-colors line-clamp-1 mb-1">
                 {title}
               </h3>
             </Link>
-            <div className="flex items-center text-stone-500 text-sm">
-              <MapPin className="w-4 h-4 mr-1.5 text-stone-400" />
+            <div className="flex items-center text-slate-500 text-sm">
+              <MapPin className="w-4 h-4 mr-1.5 text-slate-400" />
               {country.charAt(0).toUpperCase() + country.slice(1).toLowerCase()}
             </div>
           </div>
 
           {/* Description */}
-          <p className="text-stone-600 text-sm line-clamp-2 leading-relaxed">
+          <p className="text-slate-600 text-sm line-clamp-2 leading-relaxed">
             {description}
           </p>
 
           {/* Features */}
-          <div className="flex items-center gap-4 text-stone-600 text-sm">
-            <div className="flex items-center gap-1.5 px-3 py-1.5 bg-stone-50 rounded-lg">
-              <Bed className="w-4 h-4 text-[#1B4965]" />
+          <div className="flex items-center gap-4 text-slate-600 text-sm">
+            <div className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 rounded-lg">
+              <Bed className="w-4 h-4 text-[#1B3A5C]" />
               <span className="font-medium">{bedrooms}</span>
             </div>
-            <div className="flex items-center gap-1.5 px-3 py-1.5 bg-stone-50 rounded-lg">
-              <Bath className="w-4 h-4 text-[#1B4965]" />
+            <div className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 rounded-lg">
+              <Bath className="w-4 h-4 text-[#1B3A5C]" />
               <span className="font-medium">{bathrooms}</span>
             </div>
-            <div className="flex items-center gap-1.5 px-3 py-1.5 bg-stone-50 rounded-lg">
-              <Square className="w-4 h-4 text-[#1B4965]" />
+            <div className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 rounded-lg">
+              <Square className="w-4 h-4 text-[#1B3A5C]" />
               <span className="font-medium">{area} m²</span>
             </div>
           </div>
 
           {/* Price and Actions */}
-          <div className="pt-4 border-t border-stone-200">
+          <div className="pt-4 border-t border-slate-200">
             <div className="flex items-end justify-between mb-4">
               <div>
                 <div className="flex items-center gap-2">
-                  <div className="text-3xl font-bold text-stone-900">
+                  <div className="text-3xl font-bold text-slate-900">
                     {formatPrice(price)}
                   </div>
                   {investmentData && bestMetric > 0 && bestMetricLabel && (
@@ -374,7 +374,7 @@ export function PropertyCard({
                     </span>
                   )}
                 </div>
-                <div className="text-xs text-stone-500 mt-0.5">
+                <div className="text-xs text-slate-500 mt-0.5">
                   {area > 0 ? `${formatPrice(Math.round(price / area))}/m²` : ''}
                 </div>
               </div>
@@ -384,7 +384,7 @@ export function PropertyCard({
               <Link href={`/property/${id}`} className="flex-1">
                 <Button
                   variant="outline"
-                  className="w-full group/btn hover:bg-stone-50"
+                  className="w-full group/btn hover:bg-slate-50"
                 >
                   View Details
                   <ArrowRight className="w-4 h-4 ml-2 group-hover/btn:translate-x-1 transition-transform" />
@@ -395,7 +395,7 @@ export function PropertyCard({
                   e.stopPropagation()
                   setShowInquiryModal(true)
                 }}
-                className="flex-1 bg-[#1B4965] hover:bg-[#2B6985] text-white shadow-md"
+                className="flex-1 bg-[#1B3A5C] hover:bg-[#24507D] text-white shadow-md"
               >
                 <DollarSign className="w-4 h-4 mr-2" />
                 Inquire Now
@@ -489,7 +489,7 @@ export function PropertyCard({
               <Button
                 type="submit"
                 disabled={isSubmittingInquiry}
-                className="flex-1 bg-[#1B4965] hover:bg-[#2B6985] text-white"
+                className="flex-1 bg-[#1B3A5C] hover:bg-[#24507D] text-white"
               >
                 {isSubmittingInquiry ? (
                   <span className="flex items-center gap-2">

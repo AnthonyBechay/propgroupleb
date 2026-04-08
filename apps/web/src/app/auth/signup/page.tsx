@@ -97,26 +97,26 @@ function SignupForm() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-stone-100">
-        <Loader2 className="h-8 w-8 animate-spin text-[#1B4965]" />
+      <div className="min-h-screen flex items-center justify-center bg-slate-100">
+        <Loader2 className="h-8 w-8 animate-spin text-[#1B3A5C]" />
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-stone-100 py-12 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen flex items-center justify-center bg-slate-100 py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full space-y-6">
-        <div className="bg-white shadow-lg rounded-2xl px-8 py-10 border border-stone-200">
+        <div className="bg-white shadow-lg rounded-2xl px-8 py-10 border border-slate-200">
           <div className="text-center">
             <div className="flex justify-center">
               <Image src="/logo.png" alt="PropGroup" width={56} height={56} />
             </div>
 
-            <h1 className="mt-4 text-3xl font-bold text-stone-900">
+            <h1 className="mt-4 text-3xl font-bold text-slate-900">
               Create Account
             </h1>
 
-            <p className="mt-2 text-sm text-stone-500">
+            <p className="mt-2 text-sm text-slate-500">
               Start your investment journey today
             </p>
           </div>
@@ -133,7 +133,7 @@ function SignupForm() {
             <Button
               type="button"
               variant="outline"
-              className="w-full border-stone-200 hover:border-stone-300 hover:bg-stone-50 rounded-xl font-semibold py-6"
+              className="w-full border-slate-200 hover:border-slate-300 hover:bg-slate-50 rounded-xl font-semibold py-6"
               onClick={handleGoogleSignup}
               disabled={isGoogleLoading}
             >
@@ -144,7 +144,7 @@ function SignupForm() {
                 </>
               ) : (
                 <>
-                  <span className="h-5 w-5 mr-3 font-bold text-[#1B4965] text-lg flex items-center justify-center">G</span>
+                  <span className="h-5 w-5 mr-3 font-bold text-[#1B3A5C] text-lg flex items-center justify-center">G</span>
                   Continue with Google
                 </>
               )}
@@ -154,10 +154,10 @@ function SignupForm() {
           <div className="mt-6">
             <div className="relative">
               <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-stone-200"></div>
+                <div className="w-full border-t border-slate-200"></div>
               </div>
               <div className="relative flex justify-center text-sm">
-                <span className="px-4 bg-white text-stone-400 font-medium">Or continue with email</span>
+                <span className="px-4 bg-white text-slate-400 font-medium">Or continue with email</span>
               </div>
             </div>
           </div>
@@ -165,17 +165,17 @@ function SignupForm() {
           <form onSubmit={form.handleSubmit(handleSignup)} className="mt-6 space-y-5">
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <Label htmlFor="firstName" className="font-semibold text-stone-800">First Name</Label>
+                <Label htmlFor="firstName" className="font-semibold text-slate-800">First Name</Label>
                 <div className="mt-2 relative">
                   <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <UserIcon className="h-4 w-4 text-stone-400" />
+                    <UserIcon className="h-4 w-4 text-slate-400" />
                   </div>
                   <Input
                     id="firstName"
                     type="text"
                     {...form.register('firstName')}
                     placeholder="John"
-                    className="pl-10 border-stone-200 rounded-xl focus:border-[#1B4965] focus:ring-[#1B4965]"
+                    className="pl-10 border-slate-200 rounded-xl focus:border-[#1B3A5C] focus:ring-[#1B3A5C]"
                     autoComplete="given-name"
                   />
                 </div>
@@ -187,17 +187,17 @@ function SignupForm() {
               </div>
 
               <div>
-                <Label htmlFor="lastName" className="font-semibold text-stone-800">Last Name</Label>
+                <Label htmlFor="lastName" className="font-semibold text-slate-800">Last Name</Label>
                 <div className="mt-2 relative">
                   <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <UserIcon className="h-4 w-4 text-stone-400" />
+                    <UserIcon className="h-4 w-4 text-slate-400" />
                   </div>
                   <Input
                     id="lastName"
                     type="text"
                     {...form.register('lastName')}
                     placeholder="Doe"
-                    className="pl-10 border-stone-200 rounded-xl focus:border-[#1B4965] focus:ring-[#1B4965]"
+                    className="pl-10 border-slate-200 rounded-xl focus:border-[#1B3A5C] focus:ring-[#1B3A5C]"
                     autoComplete="family-name"
                   />
                 </div>
@@ -210,17 +210,17 @@ function SignupForm() {
             </div>
 
             <div>
-              <Label htmlFor="email" className="font-semibold text-stone-800">Email Address</Label>
+              <Label htmlFor="email" className="font-semibold text-slate-800">Email Address</Label>
               <div className="mt-2 relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Mail className="h-4 w-4 text-stone-400" />
+                  <Mail className="h-4 w-4 text-slate-400" />
                 </div>
                 <Input
                   id="email"
                   type="email"
                   {...form.register('email')}
                   placeholder="john@example.com"
-                  className="pl-10 border-stone-200 rounded-xl focus:border-[#1B4965] focus:ring-[#1B4965]"
+                  className="pl-10 border-slate-200 rounded-xl focus:border-[#1B3A5C] focus:ring-[#1B3A5C]"
                   autoComplete="email"
                 />
               </div>
@@ -232,17 +232,17 @@ function SignupForm() {
             </div>
 
             <div>
-              <Label htmlFor="password" className="font-semibold text-stone-800">Password</Label>
+              <Label htmlFor="password" className="font-semibold text-slate-800">Password</Label>
               <div className="mt-2 relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Lock className="h-4 w-4 text-stone-400" />
+                  <Lock className="h-4 w-4 text-slate-400" />
                 </div>
                 <Input
                   id="password"
                   type="password"
                   {...form.register('password')}
                   placeholder="Minimum 8 characters"
-                  className="pl-10 border-stone-200 rounded-xl focus:border-[#1B4965] focus:ring-[#1B4965]"
+                  className="pl-10 border-slate-200 rounded-xl focus:border-[#1B3A5C] focus:ring-[#1B3A5C]"
                   autoComplete="new-password"
                 />
               </div>
@@ -254,17 +254,17 @@ function SignupForm() {
             </div>
 
             <div>
-              <Label htmlFor="confirmPassword" className="font-semibold text-stone-800">Confirm Password</Label>
+              <Label htmlFor="confirmPassword" className="font-semibold text-slate-800">Confirm Password</Label>
               <div className="mt-2 relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Lock className="h-4 w-4 text-stone-400" />
+                  <Lock className="h-4 w-4 text-slate-400" />
                 </div>
                 <Input
                   id="confirmPassword"
                   type="password"
                   {...form.register('confirmPassword')}
                   placeholder="Re-enter password"
-                  className="pl-10 border-stone-200 rounded-xl focus:border-[#1B4965] focus:ring-[#1B4965]"
+                  className="pl-10 border-slate-200 rounded-xl focus:border-[#1B3A5C] focus:ring-[#1B3A5C]"
                   autoComplete="new-password"
                 />
               </div>
@@ -279,7 +279,7 @@ function SignupForm() {
               <Button
                 type="submit"
                 disabled={isLoading}
-                className="w-full bg-[#1B4965] hover:bg-[#2B6985] text-white rounded-xl font-semibold py-6"
+                className="w-full bg-[#1B3A5C] hover:bg-[#24507D] text-white rounded-xl font-semibold py-6"
               >
                 {isLoading ? (
                   <>
@@ -291,13 +291,13 @@ function SignupForm() {
                 )}
               </Button>
 
-              <p className="text-xs text-center text-stone-500 mt-3">
+              <p className="text-xs text-center text-slate-500 mt-3">
                 By signing up, you agree to our{' '}
-                <Link href="/terms" className="text-[#1B4965] hover:underline font-medium">
+                <Link href="/terms" className="text-[#1B3A5C] hover:underline font-medium">
                   Terms of Service
                 </Link>
                 {' '}and{' '}
-                <Link href="/privacy" className="text-[#1B4965] hover:underline font-medium">
+                <Link href="/privacy" className="text-[#1B3A5C] hover:underline font-medium">
                   Privacy Policy
                 </Link>
               </p>
@@ -307,16 +307,16 @@ function SignupForm() {
           <div className="mt-6 text-center">
             <Link
               href="/auth/login"
-              className="text-sm text-stone-600 hover:text-stone-900 font-medium"
+              className="text-sm text-slate-600 hover:text-slate-900 font-medium"
             >
               Already have an account?{' '}
-              <span className="text-[#C97B4B] hover:text-[#B86A3A] font-semibold">Sign in</span>
+              <span className="text-[#C49A2E] hover:text-[#A98327] font-semibold">Sign in</span>
             </Link>
           </div>
         </div>
 
         <div className="text-center">
-          <Link href="/" className="text-sm text-stone-500 hover:text-stone-700 font-medium">
+          <Link href="/" className="text-sm text-slate-500 hover:text-slate-700 font-medium">
             &larr; Back to Homepage
           </Link>
         </div>
@@ -328,8 +328,8 @@ function SignupForm() {
 export default function SignupPage() {
   return (
     <Suspense fallback={
-      <div className="min-h-screen flex items-center justify-center bg-stone-100">
-        <Loader2 className="h-8 w-8 animate-spin text-[#1B4965]" />
+      <div className="min-h-screen flex items-center justify-center bg-slate-100">
+        <Loader2 className="h-8 w-8 animate-spin text-[#1B3A5C]" />
       </div>
     }>
       <SignupForm />

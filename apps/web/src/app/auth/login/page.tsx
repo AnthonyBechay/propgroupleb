@@ -102,24 +102,24 @@ function LoginForm() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-stone-100 py-12 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen flex items-center justify-center bg-slate-100 py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full space-y-6">
-        <div className="bg-white shadow-lg rounded-2xl px-8 py-10 border border-stone-200">
+        <div className="bg-white shadow-lg rounded-2xl px-8 py-10 border border-slate-200">
           <div className="text-center">
             <div className="flex justify-center">
               <Image src="/logo.png" alt="PropGroup" width={56} height={56} />
             </div>
 
-            <h1 className="mt-4 text-3xl font-bold text-stone-900">
+            <h1 className="mt-4 text-3xl font-bold text-slate-900">
               Welcome Back
             </h1>
 
-            <p className="mt-2 text-sm text-stone-500">
+            <p className="mt-2 text-sm text-slate-500">
               Sign in to access your account
             </p>
 
             {next.startsWith('/admin') && (
-              <div className="mt-4 inline-flex items-center px-4 py-2 rounded-lg text-xs font-semibold bg-[#1B4965] text-white">
+              <div className="mt-4 inline-flex items-center px-4 py-2 rounded-lg text-xs font-semibold bg-[#1B3A5C] text-white">
                 <Shield className="h-4 w-4 mr-2" />
                 Admin Login Required
               </div>
@@ -138,7 +138,7 @@ function LoginForm() {
             <Button
               type="button"
               variant="outline"
-              className="w-full border-stone-200 hover:border-stone-300 hover:bg-stone-50 rounded-xl font-semibold py-6"
+              className="w-full border-slate-200 hover:border-slate-300 hover:bg-slate-50 rounded-xl font-semibold py-6"
               onClick={handleGoogleLogin}
               disabled={isGoogleLoading}
             >
@@ -149,7 +149,7 @@ function LoginForm() {
                 </>
               ) : (
                 <>
-                  <span className="h-5 w-5 mr-3 font-bold text-[#1B4965] text-lg flex items-center justify-center">G</span>
+                  <span className="h-5 w-5 mr-3 font-bold text-[#1B3A5C] text-lg flex items-center justify-center">G</span>
                   Continue with Google
                 </>
               )}
@@ -159,27 +159,27 @@ function LoginForm() {
           <div className="mt-6">
             <div className="relative">
               <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-stone-200"></div>
+                <div className="w-full border-t border-slate-200"></div>
               </div>
               <div className="relative flex justify-center text-sm">
-                <span className="px-4 bg-white text-stone-400 font-medium">Or continue with email</span>
+                <span className="px-4 bg-white text-slate-400 font-medium">Or continue with email</span>
               </div>
             </div>
           </div>
 
           <form onSubmit={form.handleSubmit(handleLogin)} className="mt-6 space-y-5">
             <div>
-              <Label htmlFor="email" className="font-semibold text-stone-800">Email Address</Label>
+              <Label htmlFor="email" className="font-semibold text-slate-800">Email Address</Label>
               <div className="mt-2 relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Mail className="h-4 w-4 text-stone-400" />
+                  <Mail className="h-4 w-4 text-slate-400" />
                 </div>
                 <Input
                   id="email"
                   type="email"
                   {...form.register('email')}
                   placeholder="admin@example.com"
-                  className="pl-10 border-stone-200 rounded-xl focus:border-[#1B4965] focus:ring-[#1B4965]"
+                  className="pl-10 border-slate-200 rounded-xl focus:border-[#1B3A5C] focus:ring-[#1B3A5C]"
                   autoComplete="email"
                   disabled={isLoading || isGoogleLoading}
                   readOnly={false}
@@ -193,17 +193,17 @@ function LoginForm() {
             </div>
 
             <div>
-              <Label htmlFor="password" className="font-semibold text-stone-800">Password</Label>
+              <Label htmlFor="password" className="font-semibold text-slate-800">Password</Label>
               <div className="mt-2 relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Lock className="h-4 w-4 text-stone-400" />
+                  <Lock className="h-4 w-4 text-slate-400" />
                 </div>
                 <Input
                   id="password"
                   type="password"
                   {...form.register('password')}
                   placeholder="Enter your password"
-                  className="pl-10 border-stone-200 rounded-xl focus:border-[#1B4965] focus:ring-[#1B4965]"
+                  className="pl-10 border-slate-200 rounded-xl focus:border-[#1B3A5C] focus:ring-[#1B3A5C]"
                   autoComplete="current-password"
                   disabled={isLoading || isGoogleLoading}
                   readOnly={false}
@@ -222,16 +222,16 @@ function LoginForm() {
                   id="remember-me"
                   name="remember-me"
                   type="checkbox"
-                  className="h-4 w-4 text-[#1B4965] focus:ring-[#1B4965] border-stone-300 rounded"
+                  className="h-4 w-4 text-[#1B3A5C] focus:ring-[#1B3A5C] border-slate-300 rounded"
                 />
-                <label htmlFor="remember-me" className="ml-2 block text-sm text-stone-600">
+                <label htmlFor="remember-me" className="ml-2 block text-sm text-slate-600">
                   Remember me
                 </label>
               </div>
 
               <div className="text-sm">
                 <span
-                  className="font-medium text-stone-400 cursor-default"
+                  className="font-medium text-slate-400 cursor-default"
                   title="Password reset coming soon"
                 >
                   Forgot password?
@@ -242,7 +242,7 @@ function LoginForm() {
             <Button
               type="submit"
               disabled={isLoading}
-              className="w-full bg-[#1B4965] hover:bg-[#2B6985] text-white rounded-xl font-semibold py-6"
+              className="w-full bg-[#1B3A5C] hover:bg-[#24507D] text-white rounded-xl font-semibold py-6"
             >
               {isLoading ? (
                 <>
@@ -258,16 +258,16 @@ function LoginForm() {
           <div className="mt-6 text-center">
             <Link
               href="/auth/signup"
-              className="text-sm text-stone-600 hover:text-stone-900 font-medium"
+              className="text-sm text-slate-600 hover:text-slate-900 font-medium"
             >
               Don&apos;t have an account?{' '}
-              <span className="text-[#C97B4B] hover:text-[#B86A3A] font-semibold">Sign up</span>
+              <span className="text-[#C49A2E] hover:text-[#A98327] font-semibold">Sign up</span>
             </Link>
           </div>
         </div>
 
         <div className="text-center">
-          <Link href="/" className="text-sm text-stone-500 hover:text-stone-700 font-medium">
+          <Link href="/" className="text-sm text-slate-500 hover:text-slate-700 font-medium">
             &larr; Back to Homepage
           </Link>
         </div>
@@ -279,8 +279,8 @@ function LoginForm() {
 export default function LoginPage() {
   return (
     <Suspense fallback={
-      <div className="min-h-screen flex items-center justify-center bg-stone-100">
-        <Loader2 className="h-8 w-8 animate-spin text-[#1B4965]" />
+      <div className="min-h-screen flex items-center justify-center bg-slate-100">
+        <Loader2 className="h-8 w-8 animate-spin text-[#1B3A5C]" />
       </div>
     }>
       <LoginForm />

@@ -39,7 +39,7 @@ export function Sidebar() {
 
   return (
     <div className="hidden lg:fixed lg:inset-y-0 lg:z-50 lg:flex lg:w-64 lg:flex-col">
-      <div className="flex grow flex-col gap-y-5 overflow-y-auto bg-[#1B4965] px-6 pb-4 border-r border-[#153B52]">
+      <div className="flex grow flex-col gap-y-5 overflow-y-auto bg-[#1B3A5C] px-6 pb-4 border-r border-[#153B52]">
         <div className="flex h-16 shrink-0 items-center">
           <div className="flex items-center space-x-3">
             <Image
@@ -54,7 +54,7 @@ export function Sidebar() {
                 Admin Panel
               </span>
               {user?.role === 'SUPER_ADMIN' && (
-                <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-semibold bg-[#C97B4B] text-white mt-0.5">
+                <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-semibold bg-[#C49A2E] text-white mt-0.5">
                   Super Admin
                 </span>
               )}
@@ -74,7 +74,7 @@ export function Sidebar() {
                         href={item.href}
                         className={`group flex gap-x-3 rounded-lg p-3 text-sm font-semibold leading-6 transition-all ${
                           isActive
-                            ? 'bg-[#C97B4B] text-white'
+                            ? 'bg-[#C49A2E] text-white'
                             : 'text-white/70 hover:text-white hover:bg-white/10'
                         }`}
                       >

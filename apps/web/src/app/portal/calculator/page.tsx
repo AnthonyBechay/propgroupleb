@@ -168,23 +168,23 @@ export default function CalculatorPage() {
   }
 
   return (
-    <div className="min-h-screen bg-stone-50">
+    <div className="min-h-screen bg-slate-50">
       <div className="max-w-7xl mx-auto p-4 md:p-8">
         {/* Header */}
         <div className="mb-8">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between">
             <div>
-              <h1 className="text-3xl md:text-4xl font-bold text-stone-900 mb-2">
+              <h1 className="text-3xl md:text-4xl font-bold text-slate-900 mb-2">
                 Investment Calculator
               </h1>
-              <p className="text-stone-600">
+              <p className="text-slate-600">
                 Calculate ROI, cash flow, and investment metrics for any property
               </p>
             </div>
             <div className="flex gap-2 mt-4 md:mt-0">
               <button 
                 onClick={resetCalculator}
-                className="px-4 py-2 bg-white border border-stone-200 rounded-lg hover:bg-stone-50 transition-colors flex items-center gap-2"
+                className="px-4 py-2 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors flex items-center gap-2"
               >
                 <RefreshCw className="w-4 h-4" />
                 Reset
@@ -198,8 +198,8 @@ export default function CalculatorPage() {
           <div className="lg:col-span-2 space-y-6">
             {/* Property Details */}
             <div className="bg-white rounded-2xl shadow-sm p-6">
-              <h2 className="text-xl font-semibold text-stone-900 mb-6 flex items-center gap-2">
-                <Home className="w-5 h-5 text-[#1B4965]" />
+              <h2 className="text-xl font-semibold text-slate-900 mb-6 flex items-center gap-2">
+                <Home className="w-5 h-5 text-[#1B3A5C]" />
                 Property Details
               </h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -243,7 +243,7 @@ export default function CalculatorPage() {
 
             {/* Loan Details */}
             <div className="bg-white rounded-2xl shadow-sm p-6">
-              <h2 className="text-xl font-semibold text-stone-900 mb-6 flex items-center gap-2">
+              <h2 className="text-xl font-semibold text-slate-900 mb-6 flex items-center gap-2">
                 <DollarSign className="w-5 h-5 text-green-600" />
                 Loan Details
               </h2>
@@ -272,9 +272,9 @@ export default function CalculatorPage() {
                   min={1}
                   max={30}
                 />
-                <div className="p-4 bg-[#E8F1F5] rounded-lg">
-                  <p className="text-sm text-[#1B4965] mb-1">Monthly Payment</p>
-                  <p className="text-2xl font-bold text-stone-900">
+                <div className="p-4 bg-[#E0EDF7] rounded-lg">
+                  <p className="text-sm text-[#1B3A5C] mb-1">Monthly Payment</p>
+                  <p className="text-2xl font-bold text-slate-900">
                     ${monthlyPayment.toFixed(2)}
                   </p>
                 </div>
@@ -283,8 +283,8 @@ export default function CalculatorPage() {
 
             {/* Rental Income & Expenses */}
             <div className="bg-white rounded-2xl shadow-sm p-6">
-              <h2 className="text-xl font-semibold text-stone-900 mb-6 flex items-center gap-2">
-                <Calendar className="w-5 h-5 text-[#C97B4B]" />
+              <h2 className="text-xl font-semibold text-slate-900 mb-6 flex items-center gap-2">
+                <Calendar className="w-5 h-5 text-[#C49A2E]" />
                 Income & Expenses
               </h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -348,7 +348,7 @@ export default function CalculatorPage() {
           {/* Results Section */}
           <div className="space-y-6">
             {/* Key Metrics */}
-            <div className="bg-[#1B4965] rounded-2xl shadow-lg p-6 text-white">
+            <div className="bg-[#1B3A5C] rounded-2xl shadow-lg p-6 text-white">
               <h2 className="text-xl font-semibold mb-6 flex items-center gap-2">
                 <TrendingUp className="w-5 h-5" />
                 Investment Metrics
@@ -384,18 +384,18 @@ export default function CalculatorPage() {
 
             {/* Financial Summary */}
             <div className="bg-white rounded-2xl shadow-sm p-6">
-              <h3 className="text-lg font-semibold text-stone-900 mb-4 flex items-center gap-2">
-                <PieChart className="w-5 h-5 text-[#C97B4B]" />
+              <h3 className="text-lg font-semibold text-slate-900 mb-4 flex items-center gap-2">
+                <PieChart className="w-5 h-5 text-[#C49A2E]" />
                 Financial Summary
               </h3>
               <div className="mb-4">
-                <label className="block text-sm font-medium text-stone-700 mb-2">
+                <label className="block text-sm font-medium text-slate-700 mb-2">
                   Projection Period
                 </label>
                 <select
                   value={projectionYears}
                   onChange={(e) => setProjectionYears(parseInt(e.target.value))}
-                  className="w-full px-3 py-2 border border-stone-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1B4965] text-sm"
+                  className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1B3A5C] text-sm"
                 >
                   {[3, 5, 7, 10, 15, 20].map(y => (
                     <option key={y} value={y}>{y} years</option>
@@ -431,14 +431,14 @@ export default function CalculatorPage() {
             {/* Compound Growth Projection */}
             {compoundProjection.length > 0 && (
               <div className="bg-white rounded-2xl shadow-sm p-6">
-                <h3 className="text-lg font-semibold text-stone-900 mb-4 flex items-center gap-2">
-                  <TrendingUp className="w-5 h-5 text-[#1B4965]" />
+                <h3 className="text-lg font-semibold text-slate-900 mb-4 flex items-center gap-2">
+                  <TrendingUp className="w-5 h-5 text-[#1B3A5C]" />
                   Compound Growth
                 </h3>
                 <div className="overflow-x-auto -mx-2">
                   <table className="w-full text-xs">
                     <thead>
-                      <tr className="border-b text-stone-500">
+                      <tr className="border-b text-slate-500">
                         <th className="text-left py-2 px-2">Year</th>
                         <th className="text-right py-2 px-2">Value</th>
                         <th className="text-right py-2 px-2">Equity</th>
@@ -453,8 +453,8 @@ export default function CalculatorPage() {
                           return i % 3 === 0 || i === compoundProjection.length - 1
                         })
                         .map(p => (
-                        <tr key={p.year} className="border-b border-stone-100">
-                          <td className="py-1.5 px-2 text-stone-600">Yr {p.year}</td>
+                        <tr key={p.year} className="border-b border-slate-100">
+                          <td className="py-1.5 px-2 text-slate-600">Yr {p.year}</td>
                           <td className="py-1.5 px-2 text-right font-medium">${(p.propertyValue / 1000).toFixed(0)}k</td>
                           <td className="py-1.5 px-2 text-right font-medium">${(p.equity / 1000).toFixed(0)}k</td>
                           <td className={`py-1.5 px-2 text-right font-bold ${p.annualizedReturn > 0 ? 'text-emerald-600' : 'text-red-500'}`}>
@@ -465,7 +465,7 @@ export default function CalculatorPage() {
                     </tbody>
                   </table>
                 </div>
-                <p className="text-xs text-stone-400 mt-3">
+                <p className="text-xs text-slate-400 mt-3">
                   Projections use compound appreciation. Rent growth estimated at 60% of property appreciation rate.
                 </p>
               </div>
@@ -473,14 +473,14 @@ export default function CalculatorPage() {
 
             {/* Investment Grade */}
             <div className="bg-white rounded-2xl shadow-sm p-6">
-              <h3 className="text-lg font-semibold text-stone-900 mb-4 flex items-center gap-2">
+              <h3 className="text-lg font-semibold text-slate-900 mb-4 flex items-center gap-2">
                 <BarChart3 className="w-5 h-5 text-green-600" />
                 Investment Grade
               </h3>
               <div className="text-center">
                 <div className={`text-5xl font-bold mb-2 ${
                   totalROI > 15 ? 'text-green-600' :
-                  totalROI > 10 ? 'text-[#1B4965]' :
+                  totalROI > 10 ? 'text-[#1B3A5C]' :
                   totalROI > 5 ? 'text-yellow-600' : 'text-red-600'
                 }`}>
                   {totalROI > 15 ? 'A+' :
@@ -489,16 +489,16 @@ export default function CalculatorPage() {
                    totalROI > 8 ? 'B' :
                    totalROI > 5 ? 'C' : 'D'}
                 </div>
-                <p className="text-stone-600">
+                <p className="text-slate-600">
                   {totalROI > 15 ? 'Excellent Investment' :
                    totalROI > 10 ? 'Good Investment' :
                    totalROI > 5 ? 'Fair Investment' : 'Poor Investment'}
                 </p>
               </div>
-              <div className="mt-4 p-3 bg-[#E8F1F5] rounded-lg">
+              <div className="mt-4 p-3 bg-[#E0EDF7] rounded-lg">
                 <div className="flex items-start gap-2">
-                  <Info className="w-4 h-4 text-[#1B4965] mt-0.5" />
-                  <p className="text-xs text-[#1B4965]">
+                  <Info className="w-4 h-4 text-[#1B3A5C] mt-0.5" />
+                  <p className="text-xs text-[#1B3A5C]">
                     This grade is based on total ROI including rental income and property appreciation.
                   </p>
                 </div>
@@ -526,13 +526,13 @@ function InputField({
 }: any) {
   return (
     <div>
-      <label className="block text-sm font-medium text-stone-700 mb-2">
-        {label} {percentage && <span className="text-[#1B4965]">({percentage}%)</span>}
-        {monthly && <span className="text-stone-500 text-xs ml-1">/month</span>}
+      <label className="block text-sm font-medium text-slate-700 mb-2">
+        {label} {percentage && <span className="text-[#1B3A5C]">({percentage}%)</span>}
+        {monthly && <span className="text-slate-500 text-xs ml-1">/month</span>}
       </label>
       <div className="relative">
         {type === 'currency' && (
-          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-500">$</span>
+          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500">$</span>
         )}
         <input
           type="number"
@@ -542,14 +542,14 @@ function InputField({
           max={max}
           step={step}
           disabled={disabled}
-          className={`w-full px-3 py-2 border border-stone-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1B4965] ${
+          className={`w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1B3A5C] ${
             type === 'currency' ? 'pl-8' : ''
           } ${type === 'percentage' ? 'pr-8' : ''} ${
-            disabled ? 'bg-stone-100 cursor-not-allowed' : ''
+            disabled ? 'bg-slate-100 cursor-not-allowed' : ''
           }`}
         />
         {type === 'percentage' && (
-          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-stone-500">%</span>
+          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500">%</span>
         )}
       </div>
     </div>
@@ -574,8 +574,8 @@ function MetricDisplay({ label, value, isPositive }: any) {
 function SummaryRow({ label, value, highlight = false }: any) {
   return (
     <div className={`flex justify-between items-center ${highlight ? 'font-semibold' : ''}`}>
-      <span className="text-sm text-stone-600">{label}</span>
-      <span className={`text-sm ${highlight ? 'text-[#1B4965] text-base' : 'text-stone-900'}`}>
+      <span className="text-sm text-slate-600">{label}</span>
+      <span className={`text-sm ${highlight ? 'text-[#1B3A5C] text-base' : 'text-slate-900'}`}>
         {value}
       </span>
     </div>

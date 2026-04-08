@@ -14,12 +14,12 @@ export function AIAssistantFab() {
       {!isOpen && (
         <Button
           onClick={() => setIsOpen(true)}
-          className="fixed bottom-6 right-6 w-16 h-16 rounded-full shadow-2xl bg-[#1B4965] hover:bg-[#2B6985] z-50 group"
+          className="fixed bottom-6 right-6 w-16 h-16 rounded-full shadow-2xl bg-[#1B3A5C] hover:bg-[#24507D] z-50 group"
           size="lg"
         >
           <div className="relative">
             <Bot className="w-7 h-7 text-white" />
-            <Sparkles className="w-3 h-3 text-[#C97B4B] absolute -top-1 -right-1 animate-pulse" />
+            <Sparkles className="w-3 h-3 text-[#C49A2E] absolute -top-1 -right-1 animate-pulse" />
           </div>
           <span className="sr-only">Open AI Assistant</span>
         </Button>

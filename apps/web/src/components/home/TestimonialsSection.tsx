@@ -52,13 +52,13 @@ export function TestimonialsSection() {
   }
 
   return (
-    <section className="py-16 sm:py-20 bg-stone-50 relative overflow-hidden">
+    <section className="py-16 sm:py-20 bg-slate-50 relative overflow-hidden">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
         <div className="text-center mb-10 sm:mb-12">
-          <h2 className="text-3xl sm:text-4xl lg:text-5xl font-black text-stone-900 mb-3">
-            Investor <span className="text-[#1B4965]">Success</span>
+          <h2 className="text-3xl sm:text-4xl lg:text-5xl font-black text-slate-900 mb-3">
+            Investor <span className="text-[#1B3A5C]">Success</span>
           </h2>
-          <p className="text-lg text-stone-600">
+          <p className="text-lg text-slate-600">
             Real results from real investors
           </p>
         </div>
@@ -66,25 +66,25 @@ export function TestimonialsSection() {
         <div className="max-w-4xl mx-auto">
           <div className="relative">
             {/* Quote icon */}
-            <Quote className="absolute -top-4 -left-4 w-16 h-16 text-[#1B4965]/15" />
+            <Quote className="absolute -top-4 -left-4 w-16 h-16 text-[#1B3A5C]/15" />
 
             {/* Testimonial card */}
-            <div className="bg-white border border-stone-200 shadow-lg rounded-2xl p-8 md:p-12">
+            <div className="bg-white border border-slate-200 shadow-lg rounded-2xl p-8 md:p-12">
               <div className="grid md:grid-cols-3 gap-8 items-center">
                 {/* Author info */}
                 <div className="md:col-span-1 text-center md:text-left">
                   <div className="relative w-32 h-32 mx-auto md:mx-0 mb-4">
-                    <div className="w-32 h-32 rounded-full bg-[#1B4965] flex items-center justify-center text-white text-3xl font-bold">
+                    <div className="w-32 h-32 rounded-full bg-[#1B3A5C] flex items-center justify-center text-white text-3xl font-bold">
                       {testimonials[currentIndex].name.split(' ').map(n => n[0]).join('')}
                     </div>
                   </div>
-                  <h3 className="text-xl font-bold text-stone-900">
+                  <h3 className="text-xl font-bold text-slate-900">
                     {testimonials[currentIndex].name}
                   </h3>
-                  <p className="text-sm text-stone-600">
+                  <p className="text-sm text-slate-600">
                     {testimonials[currentIndex].role}
                   </p>
-                  <p className="text-sm text-stone-500">
+                  <p className="text-sm text-slate-500">
                     {testimonials[currentIndex].location}
                   </p>
 
@@ -96,7 +96,7 @@ export function TestimonialsSection() {
                         className={`w-5 h-5 ${
                           i < testimonials[currentIndex].rating
                             ? 'text-yellow-500 fill-yellow-500'
-                            : 'text-stone-300'
+                            : 'text-slate-300'
                         }`}
                       />
                     ))}
@@ -105,21 +105,21 @@ export function TestimonialsSection() {
 
                 {/* Testimonial content */}
                 <div className="md:col-span-2 space-y-4">
-                  <p className="text-lg text-stone-700 leading-relaxed italic">
+                  <p className="text-lg text-slate-700 leading-relaxed italic">
                     "{testimonials[currentIndex].text}"
                   </p>
 
                   {/* Investment stats */}
-                  <div className="flex flex-wrap gap-4 pt-4 border-t border-stone-200">
+                  <div className="flex flex-wrap gap-4 pt-4 border-t border-slate-200">
                     <div className="flex items-center gap-2">
                       <div className="w-2 h-2 bg-green-500 rounded-full" />
-                      <span className="text-sm font-semibold text-stone-900">
+                      <span className="text-sm font-semibold text-slate-900">
                         {testimonials[currentIndex].investment}
                       </span>
                     </div>
                     <div className="flex items-center gap-2">
-                      <div className="w-2 h-2 bg-[#1B4965] rounded-full" />
-                      <span className="text-sm font-semibold text-stone-900">
+                      <div className="w-2 h-2 bg-[#1B3A5C] rounded-full" />
+                      <span className="text-sm font-semibold text-slate-900">
                         {testimonials[currentIndex].returns}
                       </span>
                     </div>
@@ -135,7 +135,7 @@ export function TestimonialsSection() {
                 className="p-3 rounded-full bg-white shadow-lg hover:shadow-xl transform hover:scale-110 transition-all"
                 aria-label="Previous testimonial"
               >
-                <ChevronLeft className="w-5 h-5 text-stone-600" />
+                <ChevronLeft className="w-5 h-5 text-slate-600" />
               </button>
 
               {/* Dots indicator */}
@@ -146,8 +146,8 @@ export function TestimonialsSection() {
                     onClick={() => setCurrentIndex(index)}
                     className={`h-2 transition-all duration-300 rounded-full ${
                       index === currentIndex
-                        ? 'w-8 bg-[#1B4965]'
-                        : 'w-2 bg-stone-300 hover:bg-stone-400'
+                        ? 'w-8 bg-[#1B3A5C]'
+                        : 'w-2 bg-slate-300 hover:bg-slate-400'
                     }`}
                     aria-label={`Go to testimonial ${index + 1}`}
                   />
@@ -159,7 +159,7 @@ export function TestimonialsSection() {
                 className="p-3 rounded-full bg-white shadow-lg hover:shadow-xl transform hover:scale-110 transition-all"
                 aria-label="Next testimonial"
               >
-                <ChevronRight className="w-5 h-5 text-stone-600" />
+                <ChevronRight className="w-5 h-5 text-slate-600" />
               </button>
             </div>
           </div>

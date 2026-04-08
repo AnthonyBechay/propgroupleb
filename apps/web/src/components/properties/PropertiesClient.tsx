@@ -136,16 +136,16 @@ export function PropertiesClient({
   return (
     <div className="min-h-screen bg-white">
       {/* Compact Hero Section */}
-      <section className="relative py-6 sm:py-8 bg-[#1B4965] text-white overflow-hidden">
+      <section className="relative py-6 sm:py-8 bg-[#1B3A5C] text-white overflow-hidden">
         <div className="pg-container max-w-7xl mx-auto relative z-10">
           <div className="max-w-4xl mx-auto text-center">
             <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-white/15 backdrop-blur-sm border border-white/25 rounded-full text-xs font-semibold mb-3">
-              <Sparkles className="w-3.5 h-3.5 text-[#C97B4B]" />
+              <Sparkles className="w-3.5 h-3.5 text-[#C49A2E]" />
               <span className="text-white/80">CURATED PROPERTIES</span>
             </div>
             <h1 className="text-2xl sm:text-3xl md:text-4xl font-black mb-2">
               <span className="text-white">Premium Investment </span>
-              <span className="text-[#C97B4B]">Properties</span>
+              <span className="text-[#C49A2E]">Properties</span>
             </h1>
             <p className="text-sm sm:text-base text-white/70 mb-4 max-w-2xl mx-auto">
               Hand-picked opportunities with verified returns
@@ -161,7 +161,7 @@ export function PropertiesClient({
       <div className="pg-container max-w-7xl mx-auto py-6 sm:py-8">
         {/* AI Search Banner - More Compact */}
         {!showAISearch && (
-          <div className="mb-6 p-4 bg-[#1B4965] rounded-xl text-white shadow-lg">
+          <div className="mb-6 p-4 bg-[#1B3A5C] rounded-xl text-white shadow-lg">
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
               <div className="flex items-start gap-3">
                 <div className="w-10 h-10 bg-white/15 rounded-lg flex items-center justify-center flex-shrink-0">
@@ -170,7 +170,7 @@ export function PropertiesClient({
                 <div>
                   <div className="flex items-center gap-2 mb-0.5">
                     <h3 className="text-sm font-bold text-white">AI-Powered Search</h3>
-                    <span className="inline-flex items-center px-1.5 py-0.5 text-xs font-semibold bg-[#C97B4B] text-white rounded-full">
+                    <span className="inline-flex items-center px-1.5 py-0.5 text-xs font-semibold bg-[#C49A2E] text-white rounded-full">
                       NEW
                     </span>
                   </div>
@@ -181,7 +181,7 @@ export function PropertiesClient({
               </div>
               <Button
                 onClick={() => setShowAISearch(true)}
-                className="bg-[#C97B4B] hover:bg-[#B86A3A] text-white rounded-lg shadow-md transition-all flex-shrink-0"
+                className="bg-[#C49A2E] hover:bg-[#A98327] text-white rounded-lg shadow-md transition-all flex-shrink-0"
                 size="sm"
               >
                 <Sparkles className="w-3.5 h-3.5 mr-1.5" />
@@ -194,10 +194,10 @@ export function PropertiesClient({
         {/* AI Search Interface - Compact */}
         {showAISearch && (
           <div className="mb-6 animate-in fade-in slide-in-from-top-2">
-            <div className="bg-stone-50 border border-stone-200 rounded-xl p-4 shadow-sm">
+            <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 shadow-sm">
               <div className="flex items-center justify-between mb-3">
-                <h3 className="text-base font-bold text-stone-900 flex items-center gap-2">
-                  <div className="w-7 h-7 bg-[#1B4965] rounded-lg flex items-center justify-center">
+                <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                  <div className="w-7 h-7 bg-[#1B3A5C] rounded-lg flex items-center justify-center">
                     <Bot className="w-4 h-4 text-white" />
                   </div>
                   AI Property Search
@@ -206,7 +206,7 @@ export function PropertiesClient({
                   variant="ghost"
                   size="sm"
                   onClick={() => setShowAISearch(false)}
-                  className="text-stone-500 hover:text-stone-900 hover:bg-stone-100"
+                  className="text-slate-500 hover:text-slate-900 hover:bg-slate-100"
                 >
                   <X className="w-4 h-4" />
                 </Button>
@@ -223,7 +223,7 @@ export function PropertiesClient({
             {!showAISearch && (
               <Button
                 onClick={() => setShowAISearch(true)}
-                className="bg-[#1B4965] hover:bg-[#2B6985] text-white border-0 shadow-md"
+                className="bg-[#1B3A5C] hover:bg-[#24507D] text-white border-0 shadow-md"
               >
                 <Bot className="w-4 h-4 mr-2" />
                 AI Search
@@ -236,29 +236,29 @@ export function PropertiesClient({
               variant="outline"
               className={`relative border-2 shadow-sm ${
                 showFilters
-                  ? 'bg-[#1B4965] text-white border-[#1B4965] hover:bg-[#2B6985]'
-                  : 'border-stone-300 text-stone-700 hover:bg-stone-50'
+                  ? 'bg-[#1B3A5C] text-white border-[#1B3A5C] hover:bg-[#24507D]'
+                  : 'border-slate-300 text-slate-700 hover:bg-slate-50'
               }`}
             >
               <Filter className="w-4 h-4 mr-2" />
               Filters
               {activeFiltersCount > 0 && (
-                <span className="absolute -top-2 -right-2 w-5 h-5 bg-[#C97B4B] text-white text-xs rounded-full flex items-center justify-center font-bold shadow-md">
+                <span className="absolute -top-2 -right-2 w-5 h-5 bg-[#C49A2E] text-white text-xs rounded-full flex items-center justify-center font-bold shadow-md">
                   {activeFiltersCount}
                 </span>
               )}
             </Button>
 
             {/* View mode toggle */}
-            <div className="flex items-center bg-white rounded-lg shadow-sm border-2 border-stone-200">
+            <div className="flex items-center bg-white rounded-lg shadow-sm border-2 border-slate-200">
               <Button
                 variant={viewMode === 'grid' ? 'default' : 'ghost'}
                 size="sm"
                 onClick={() => setViewMode('grid')}
                 className={`rounded-r-none ${
                   viewMode === 'grid'
-                    ? 'bg-[#1B4965] text-white hover:bg-[#2B6985]'
-                    : 'text-stone-600 hover:text-stone-900 hover:bg-stone-50'
+                    ? 'bg-[#1B3A5C] text-white hover:bg-[#24507D]'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
                 }`}
               >
                 <Grid3x3 className="w-4 h-4" />
@@ -269,8 +269,8 @@ export function PropertiesClient({
                 onClick={() => setViewMode('map')}
                 className={`rounded-l-none ${
                   viewMode === 'map'
-                    ? 'bg-[#1B4965] text-white hover:bg-[#2B6985]'
-                    : 'text-stone-600 hover:text-stone-900 hover:bg-stone-50'
+                    ? 'bg-[#1B3A5C] text-white hover:bg-[#24507D]'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
                 }`}
               >
                 <Map className="w-4 h-4" />
@@ -311,29 +311,29 @@ export function PropertiesClient({
 
         {/* Results summary */}
         {(searchParams.q || searchParams.goal || searchParams.budget) && (
-          <div className="mb-4 p-4 bg-[#E8F1F5] border border-[#1B4965]/20 rounded-xl shadow-sm">
+          <div className="mb-4 p-4 bg-[#E0EDF7] border border-[#1B3A5C]/20 rounded-xl shadow-sm">
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
               <div className="flex items-center gap-3">
-                <div className="w-8 h-8 bg-[#1B4965] rounded-lg flex items-center justify-center shrink-0">
+                <div className="w-8 h-8 bg-[#1B3A5C] rounded-lg flex items-center justify-center shrink-0">
                   {searchParams.q ? <Bot className="w-4 h-4 text-white" /> : <Search className="w-4 h-4 text-white" />}
                 </div>
                 <div>
-                  <span className="text-sm font-bold text-stone-900 flex items-center gap-2">
+                  <span className="text-sm font-bold text-slate-900 flex items-center gap-2">
                     {searchParams.q ? 'AI Search Results' : 'Search Results'}
                     {searchParams.q && (
-                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-semibold bg-[#C97B4B]/10 text-[#C97B4B] rounded-full">
+                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-semibold bg-[#C49A2E]/10 text-[#C49A2E] rounded-full">
                         <Sparkles className="w-2.5 h-2.5" />
                         AI
                       </span>
                     )}
                   </span>
                   {searchParams.q && (
-                    <p className="text-xs text-stone-600 mt-0.5">&quot;{searchParams.q}&quot;</p>
+                    <p className="text-xs text-slate-600 mt-0.5">&quot;{searchParams.q}&quot;</p>
                   )}
                 </div>
               </div>
-              <span className="text-xs font-medium text-stone-700 bg-white px-3 py-1.5 rounded-md">
-                <span className="font-bold text-[#1B4965]">{filteredProperties.length}</span> found
+              <span className="text-xs font-medium text-slate-700 bg-white px-3 py-1.5 rounded-md">
+                <span className="font-bold text-[#1B3A5C]">{filteredProperties.length}</span> found
                 {searchParams.goal && ` for ${searchParams.goal.replace('_', ' ').toLowerCase()}`}
                 {searchParams.budget && ` under $${parseInt(searchParams.budget).toLocaleString()}`}
               </span>
@@ -378,20 +378,20 @@ export function PropertiesClient({
               ))}
             </div>
           ) : (
-            <div className="text-center py-12 bg-stone-50 border border-stone-200 rounded-2xl shadow-sm">
+            <div className="text-center py-12 bg-slate-50 border border-slate-200 rounded-2xl shadow-sm">
               <div className="max-w-md mx-auto">
-                <div className="w-16 h-16 bg-stone-200 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <Search className="w-8 h-8 text-stone-500" />
+                <div className="w-16 h-16 bg-slate-200 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <Search className="w-8 h-8 text-slate-500" />
                 </div>
-                <h3 className="text-2xl font-black text-stone-900 mb-2">
+                <h3 className="text-2xl font-black text-slate-900 mb-2">
                   No properties found
                 </h3>
-                <p className="text-sm text-stone-600 mb-6">
+                <p className="text-sm text-slate-600 mb-6">
                   Try adjusting your filters or search criteria
                 </p>
                 <Button
                   onClick={clearFilters}
-                  className="bg-[#1B4965] hover:bg-[#2B6985] text-white rounded-lg shadow-md px-6"
+                  className="bg-[#1B3A5C] hover:bg-[#24507D] text-white rounded-lg shadow-md px-6"
                 >
                   <Sparkles className="w-4 h-4 mr-2" />
                   View All Properties
@@ -408,7 +408,7 @@ export function PropertiesClient({
           <div className="text-center mt-8">
             <Button
               variant="outline"
-              className="min-w-[180px] border-2 border-[#1B4965] text-[#1B4965] hover:bg-[#1B4965] hover:text-white font-semibold rounded-lg shadow-sm transition-all"
+              className="min-w-[180px] border-2 border-[#1B3A5C] text-[#1B3A5C] hover:bg-[#1B3A5C] hover:text-white font-semibold rounded-lg shadow-sm transition-all"
             >
               Load More Properties
             </Button>

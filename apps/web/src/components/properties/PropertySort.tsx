@@ -26,13 +26,13 @@ const sortOptions = [
 export function PropertySort({ value, onChange }: PropertySortProps) {
   return (
     <div className="flex items-center gap-2">
-      <span className="text-sm text-stone-600 hidden sm:inline">
+      <span className="text-sm text-slate-600 hidden sm:inline">
         Sort by:
       </span>
       <Select value={value} onValueChange={onChange}>
         <SelectTrigger className="w-[200px] bg-white">
           <div className="flex items-center gap-2">
-            <ArrowUpDown className="w-4 h-4 text-stone-500" />
+            <ArrowUpDown className="w-4 h-4 text-slate-500" />
             <SelectValue />
           </div>
         </SelectTrigger>

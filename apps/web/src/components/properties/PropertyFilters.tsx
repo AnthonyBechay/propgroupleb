@@ -85,9 +85,9 @@ export function PropertyFilters({ filters, onChange, onClose }: PropertyFiltersP
   }
 
   return (
-    <div className="bg-white border border-stone-200 rounded-2xl p-6 shadow-sm">
+    <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
       <div className="flex items-center justify-between mb-6">
-        <h3 className="text-xl font-bold text-stone-900">
+        <h3 className="text-xl font-bold text-slate-900">
           Filter Properties
         </h3>
         <Button
@@ -104,7 +104,7 @@ export function PropertyFilters({ filters, onChange, onClose }: PropertyFiltersP
         {/* Location */}
         <div className="space-y-2">
           <Label className="flex items-center gap-2">
-            <MapPin className="w-4 h-4 text-stone-500" />
+            <MapPin className="w-4 h-4 text-slate-500" />
             Location
           </Label>
           <Select
@@ -130,7 +130,7 @@ export function PropertyFilters({ filters, onChange, onClose }: PropertyFiltersP
         {/* Property Type */}
         <div className="space-y-2">
           <Label className="flex items-center gap-2">
-            <Home className="w-4 h-4 text-stone-500" />
+            <Home className="w-4 h-4 text-slate-500" />
             Property Type
           </Label>
           <Select
@@ -156,7 +156,7 @@ export function PropertyFilters({ filters, onChange, onClose }: PropertyFiltersP
         {/* Status */}
         <div className="space-y-2">
           <Label className="flex items-center gap-2">
-            <BadgeCheck className="w-4 h-4 text-stone-500" />
+            <BadgeCheck className="w-4 h-4 text-slate-500" />
             Status
           </Label>
           <Select
@@ -179,7 +179,7 @@ export function PropertyFilters({ filters, onChange, onClose }: PropertyFiltersP
         {/* Bedrooms */}
         <div className="space-y-2">
           <Label className="flex items-center gap-2">
-            <Bed className="w-4 h-4 text-stone-500" />
+            <Bed className="w-4 h-4 text-slate-500" />
             Bedrooms
           </Label>
           <Select
@@ -202,15 +202,15 @@ export function PropertyFilters({ filters, onChange, onClose }: PropertyFiltersP
         {/* Price Range - Full width */}
         <div className="space-y-2 lg:col-span-2">
           <Label className="flex items-center gap-2">
-            <DollarSign className="w-4 h-4 text-stone-500" />
+            <DollarSign className="w-4 h-4 text-slate-500" />
             Price Range
           </Label>
-          <div className="px-4 py-3 bg-stone-50 rounded-lg">
+          <div className="px-4 py-3 bg-slate-50 rounded-lg">
             <div className="flex items-center justify-between mb-4">
-              <span className="text-sm font-medium text-stone-700">
+              <span className="text-sm font-medium text-slate-700">
                 ${priceRange[0]}k
               </span>
-              <span className="text-sm font-medium text-stone-700">
+              <span className="text-sm font-medium text-slate-700">
                 ${priceRange[1]}k{priceRange[1] >= 5000 ? '+' : ''}
               </span>
             </div>
@@ -228,7 +228,7 @@ export function PropertyFilters({ filters, onChange, onClose }: PropertyFiltersP
         {/* Area Range */}
         <div className="space-y-2">
           <Label className="flex items-center gap-2">
-            <Square className="w-4 h-4 text-stone-500" />
+            <Square className="w-4 h-4 text-slate-500" />
             Area (m²)
           </Label>
           <div className="flex gap-2">
@@ -250,7 +250,7 @@ export function PropertyFilters({ filters, onChange, onClose }: PropertyFiltersP
         {/* Golden Visa */}
         <div className="space-y-2">
           <Label className="flex items-center gap-2">
-            <BadgeCheck className="w-4 h-4 text-[#C97B4B]" />
+            <BadgeCheck className="w-4 h-4 text-[#C49A2E]" />
             Special Features
           </Label>
           <div className="space-y-2">
@@ -259,9 +259,9 @@ export function PropertyFilters({ filters, onChange, onClose }: PropertyFiltersP
                 type="checkbox"
                 checked={localFilters.isGoldenVisaEligible === 'true'}
                 onChange={(e) => handleFilterChange('isGoldenVisaEligible', e.target.checked ? 'true' : '')}
-                className="rounded border-stone-300 text-[#1B4965] focus:ring-[#1B4965]"
+                className="rounded border-slate-300 text-[#1B3A5C] focus:ring-[#1B3A5C]"
               />
-              <span className="text-sm text-stone-700">
+              <span className="text-sm text-slate-700">
                 Golden Visa Eligible
               </span>
             </label>
@@ -270,9 +270,9 @@ export function PropertyFilters({ filters, onChange, onClose }: PropertyFiltersP
                 type="checkbox"
                 checked={localFilters.highRoi === 'true'}
                 onChange={(e) => handleFilterChange('highRoi', e.target.checked ? 'true' : '')}
-                className="rounded border-stone-300 text-[#1B4965] focus:ring-[#1B4965]"
+                className="rounded border-slate-300 text-[#1B3A5C] focus:ring-[#1B3A5C]"
               />
-              <span className="text-sm text-stone-700">
+              <span className="text-sm text-slate-700">
                 High ROI (15%+)
               </span>
             </label>
@@ -281,11 +281,11 @@ export function PropertyFilters({ filters, onChange, onClose }: PropertyFiltersP
       </div>
 
       {/* Action Buttons */}
-      <div className="flex items-center justify-between mt-8 pt-6 border-t border-stone-200">
+      <div className="flex items-center justify-between mt-8 pt-6 border-t border-slate-200">
         <Button
           variant="ghost"
           onClick={resetFilters}
-          className="text-stone-600"
+          className="text-slate-600"
         >
           Reset Filters
         </Button>
@@ -298,7 +298,7 @@ export function PropertyFilters({ filters, onChange, onClose }: PropertyFiltersP
           </Button>
           <Button
             onClick={applyFilters}
-            className="bg-[#1B4965] hover:bg-[#2B6985] text-white"
+            className="bg-[#1B3A5C] hover:bg-[#24507D] text-white"
           >
             Apply Filters
           </Button>

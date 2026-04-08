@@ -143,7 +143,9 @@
       "Read(//usr/local/**)",
       "Bash(export PATH=\"/opt/homebrew/bin:/opt/homebrew/Cellar/node/25.2.1/bin:$HOME/Library/pnpm:$PATH\")",
       "Bash(pnpm --filter @propgroup/backend run build)",
-      "WebFetch(domain:propgrp.com)"
+      "WebFetch(domain:propgrp.com)",
+      "Bash(xargs ls:*)",
+      "Bash(xargs sed:*)"
     ],
     "deny": [],
     "ask": []

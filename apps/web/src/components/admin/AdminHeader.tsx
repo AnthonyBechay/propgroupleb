@@ -27,7 +27,7 @@ export function AdminHeader() {
 
   return (
     <>
-      <div className="sticky top-0 z-40 flex h-16 shrink-0 items-center gap-x-4 border-b border-stone-200 bg-white px-4 shadow-sm sm:gap-x-6 sm:px-6 lg:px-8">
+      <div className="sticky top-0 z-40 flex h-16 shrink-0 items-center gap-x-4 border-b border-slate-200 bg-white px-4 shadow-sm sm:gap-x-6 sm:px-6 lg:px-8">
         {/* Mobile menu button */}
         <Button
           variant="ghost"
@@ -43,23 +43,23 @@ export function AdminHeader() {
             <Button
               variant="ghost"
               size="sm"
-              className="relative hover:bg-stone-100 rounded-lg"
+              className="relative hover:bg-slate-100 rounded-lg"
             >
-              <Bell className="h-5 w-5 text-stone-600" />
-              <span className="absolute top-1 right-1 w-2 h-2 bg-[#C97B4B] rounded-full"></span>
+              <Bell className="h-5 w-5 text-slate-600" />
+              <span className="absolute top-1 right-1 w-2 h-2 bg-[#C49A2E] rounded-full"></span>
               <span className="sr-only">View notifications</span>
             </Button>
 
-            <div className="hidden lg:block lg:h-6 lg:w-px lg:bg-stone-200" aria-hidden="true" />
+            <div className="hidden lg:block lg:h-6 lg:w-px lg:bg-slate-200" aria-hidden="true" />
 
             <div className="flex items-center gap-x-3 lg:gap-x-4">
               <div className="hidden lg:block lg:max-w-xs lg:truncate lg:leading-6">
-                <p className="text-sm font-semibold text-stone-900">
+                <p className="text-sm font-semibold text-slate-900">
                   {user?.email}
                 </p>
-                <p className="text-xs text-stone-500 font-medium">Administrator</p>
+                <p className="text-xs text-slate-500 font-medium">Administrator</p>
               </div>
-              <div className="h-10 w-10 rounded-full bg-[#1B4965] flex items-center justify-center">
+              <div className="h-10 w-10 rounded-full bg-[#1B3A5C] flex items-center justify-center">
                 <span className="text-sm font-semibold text-white">
                   {user?.email?.charAt(0).toUpperCase()}
                 </span>
@@ -73,12 +73,12 @@ export function AdminHeader() {
       {mobileMenuOpen && (
         <div className="lg:hidden fixed inset-0 z-50 bg-black/50" onClick={() => setMobileMenuOpen(false)}>
           <div
-            className="fixed inset-y-0 left-0 w-72 bg-[#1B4965] shadow-xl overflow-y-auto"
+            className="fixed inset-y-0 left-0 w-72 bg-[#1B3A5C] shadow-xl overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex h-16 shrink-0 items-center px-6 border-b border-[#153B52]">
               <div className="flex items-center space-x-3">
-                <div className="w-10 h-10 bg-[#C97B4B] rounded-xl flex items-center justify-center">
+                <div className="w-10 h-10 bg-[#C49A2E] rounded-xl flex items-center justify-center">
                   <Shield className="text-white font-bold w-6 h-6" />
                 </div>
                 <div>
@@ -86,7 +86,7 @@ export function AdminHeader() {
                     Admin Panel
                   </span>
                   {user?.role === 'SUPER_ADMIN' && (
-                    <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-semibold bg-[#C97B4B] text-white mt-0.5">
+                    <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-semibold bg-[#C49A2E] text-white mt-0.5">
                       Super Admin
                     </span>
                   )}
@@ -105,7 +105,7 @@ export function AdminHeader() {
                     onClick={() => setMobileMenuOpen(false)}
                     className={`group flex gap-x-3 rounded-lg p-3 text-sm font-semibold leading-6 transition-all ${
                       isActive
-                        ? 'bg-[#C97B4B] text-white'
+                        ? 'bg-[#C49A2E] text-white'
                         : 'text-white/70 hover:text-white hover:bg-white/10'
                     }`}
                   >

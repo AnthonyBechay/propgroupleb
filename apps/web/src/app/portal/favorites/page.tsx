@@ -64,10 +64,10 @@ export default function FavoritesPage() {
 
   if (loading) {
     return (
-      <div className="min-h-[60vh] flex items-center justify-center bg-stone-50">
+      <div className="min-h-[60vh] flex items-center justify-center bg-slate-50">
         <div className="text-center">
-          <Loader2 className="w-10 h-10 animate-spin text-[#1B4965] mx-auto mb-4" />
-          <p className="text-stone-500 text-sm">Loading your favorites...</p>
+          <Loader2 className="w-10 h-10 animate-spin text-[#1B3A5C] mx-auto mb-4" />
+          <p className="text-slate-500 text-sm">Loading your favorites...</p>
         </div>
       </div>
     )
@@ -75,29 +75,29 @@ export default function FavoritesPage() {
 
   if (error) {
     return (
-      <div className="min-h-[60vh] flex items-center justify-center bg-stone-50">
+      <div className="min-h-[60vh] flex items-center justify-center bg-slate-50">
         <div className="text-center max-w-md">
           <div className="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-4">
             <Heart className="w-8 h-8 text-red-400" />
           </div>
-          <h2 className="text-xl font-semibold text-stone-900 mb-2">
+          <h2 className="text-xl font-semibold text-slate-900 mb-2">
             Something went wrong
           </h2>
-          <p className="text-stone-500 mb-6">{error}</p>
+          <p className="text-slate-500 mb-6">{error}</p>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="bg-stone-50 min-h-screen">
+    <div className="bg-slate-50 min-h-screen">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
         {/* Header */}
         <div className="mb-10">
-          <h1 className="text-3xl font-bold text-stone-900">
+          <h1 className="text-3xl font-bold text-slate-900">
             Saved Properties
           </h1>
-          <p className="mt-2 text-stone-500">
+          <p className="mt-2 text-slate-500">
             {properties.length > 0
               ? `You have ${properties.length} saved ${properties.length === 1 ? 'property' : 'properties'}`
               : 'Properties you favorite will appear here'}
@@ -130,19 +130,19 @@ export default function FavoritesPage() {
         ) : (
           /* Empty State */
           <div className="flex flex-col items-center justify-center py-24 text-center">
-            <div className="w-20 h-20 bg-stone-100 rounded-full flex items-center justify-center mb-6">
-              <Heart className="w-10 h-10 text-stone-300" />
+            <div className="w-20 h-20 bg-slate-100 rounded-full flex items-center justify-center mb-6">
+              <Heart className="w-10 h-10 text-slate-300" />
             </div>
-            <h2 className="text-2xl font-semibold text-stone-800 mb-3">
+            <h2 className="text-2xl font-semibold text-slate-800 mb-3">
               No saved properties yet
             </h2>
-            <p className="text-stone-500 max-w-md mb-8 leading-relaxed">
+            <p className="text-slate-500 max-w-md mb-8 leading-relaxed">
               When you find a property you love, click the heart icon to save it
               here for easy access later.
             </p>
             <Link
               href="/properties"
-              className="inline-flex items-center gap-2 px-6 py-3 bg-[#1B4965] text-white font-medium rounded-xl hover:bg-[#2B6985] transition-colors shadow-md"
+              className="inline-flex items-center gap-2 px-6 py-3 bg-[#1B3A5C] text-white font-medium rounded-xl hover:bg-[#24507D] transition-colors shadow-md"
             >
               <Search className="w-4 h-4" />
               Browse Properties

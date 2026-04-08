@@ -138,12 +138,12 @@ export default function SettingsPage() {
 
   if (!user) {
     return (
-      <div className="min-h-screen bg-stone-50 flex items-center justify-center">
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
         <div className="text-center">
-          <h2 className="text-xl font-semibold text-stone-900 mb-2">
+          <h2 className="text-xl font-semibold text-slate-900 mb-2">
             Authentication Required
           </h2>
-          <p className="text-stone-600">
+          <p className="text-slate-600">
             Please sign in to access your settings.
           </p>
         </div>
@@ -152,13 +152,13 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-stone-50">
+    <div className="min-h-screen bg-slate-50">
       <div className="pg-container max-w-7xl mx-auto py-6 sm:py-8 lg:py-12">
         <div className="mb-8 sm:mb-12">
-          <h1 className="pg-text-3xl sm:pg-text-4xl lg:pg-text-5xl font-black text-stone-900 mb-3">
+          <h1 className="pg-text-3xl sm:pg-text-4xl lg:pg-text-5xl font-black text-slate-900 mb-3">
             <span className="pg-gradient-text">Settings</span>
           </h1>
-          <p className="pg-text-lg text-stone-600">
+          <p className="pg-text-lg text-slate-600">
             Manage your account settings and preferences.
           </p>
         </div>
@@ -167,13 +167,13 @@ export default function SettingsPage() {
           {/* Profile Information */}
           <div className="pg-card">
             <div className="pg-card-header">
-              <CardTitle className="flex items-center pg-text-lg font-bold text-stone-900">
-                <div className="w-8 h-8 bg-[#1B4965] rounded-lg flex items-center justify-center mr-3 shadow-md">
+              <CardTitle className="flex items-center pg-text-lg font-bold text-slate-900">
+                <div className="w-8 h-8 bg-[#1B3A5C] rounded-lg flex items-center justify-center mr-3 shadow-md">
                   <User className="h-5 w-5 text-white" />
                 </div>
                 Profile Information
               </CardTitle>
-              <CardDescription className="text-stone-600 mt-2">
+              <CardDescription className="text-slate-600 mt-2">
                 Update your personal information and contact details.
               </CardDescription>
             </div>
@@ -214,9 +214,9 @@ export default function SettingsPage() {
                     id="email"
                     value={user.email}
                     disabled
-                    className="bg-stone-50"
+                    className="bg-slate-50"
                   />
-                  <p className="text-sm text-stone-500 mt-1">
+                  <p className="text-sm text-slate-500 mt-1">
                     Email cannot be changed. Contact support if needed.
                   </p>
                 </div>
@@ -260,7 +260,7 @@ export default function SettingsPage() {
                   <Button
                     type="submit"
                     disabled={isUpdatingProfile}
-                    className="flex items-center bg-[#1B4965] hover:bg-[#164256] text-white rounded-xl shadow-lg transition-all"
+                    className="flex items-center bg-[#1B3A5C] hover:bg-[#152D4A] text-white rounded-xl shadow-lg transition-all"
                   >
                     {isUpdatingProfile ? (
                       <>
@@ -287,13 +287,13 @@ export default function SettingsPage() {
           {/* Password Change */}
           <div className="pg-card">
             <div className="pg-card-header">
-              <CardTitle className="flex items-center pg-text-lg font-bold text-stone-900">
+              <CardTitle className="flex items-center pg-text-lg font-bold text-slate-900">
                 <div className="w-8 h-8 bg-red-600 rounded-lg flex items-center justify-center mr-3 shadow-md">
                   <Lock className="h-5 w-5 text-white" />
                 </div>
                 Change Password
               </CardTitle>
-              <CardDescription className="text-stone-600 mt-2">
+              <CardDescription className="text-slate-600 mt-2">
                 Update your password to keep your account secure.
               </CardDescription>
             </div>

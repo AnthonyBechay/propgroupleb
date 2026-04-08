@@ -152,47 +152,47 @@ export default async function AnalyticsPage() {
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-3xl font-black text-stone-900 flex items-center gap-3">
-          <div className="w-10 h-10 bg-[#1B4965] rounded-xl flex items-center justify-center shadow-md">
+        <h1 className="text-3xl font-black text-slate-900 flex items-center gap-3">
+          <div className="w-10 h-10 bg-[#1B3A5C] rounded-xl flex items-center justify-center shadow-md">
             <BarChart3 className="h-6 w-6 text-white" />
           </div>
           Analytics Dashboard
         </h1>
-        <p className="mt-2 text-stone-600">
+        <p className="mt-2 text-slate-600">
           Real-time platform performance and engagement metrics.
         </p>
       </div>
 
       {/* Key Metrics */}
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
-        <MetricCard icon={Building2} label="Properties" value={totalProperties} color="bg-[#1B4965]" />
+        <MetricCard icon={Building2} label="Properties" value={totalProperties} color="bg-[#1B3A5C]" />
         <MetricCard icon={Users} label="Users" value={totalUsers} color="bg-emerald-600" />
-        <MetricCard icon={MessageSquare} label="Inquiries" value={totalInquiries} color="bg-[#C97B4B]" />
+        <MetricCard icon={MessageSquare} label="Inquiries" value={totalInquiries} color="bg-[#C49A2E]" />
         <MetricCard icon={Heart} label="Favorites" value={totalFavorites} color="bg-pink-600" />
-        <MetricCard icon={Eye} label="Total Views" value={totalViews} color="bg-stone-600" />
-        <MetricCard icon={DollarSign} label="Portfolio Value" value={`$${(totalPortfolioValue / 1_000_000).toFixed(1)}M`} color="bg-[#1B4965]" />
+        <MetricCard icon={Eye} label="Total Views" value={totalViews} color="bg-slate-600" />
+        <MetricCard icon={DollarSign} label="Portfolio Value" value={`$${(totalPortfolioValue / 1_000_000).toFixed(1)}M`} color="bg-[#1B3A5C]" />
       </div>
 
       {/* Price Overview */}
       <div className="bg-white border-2 border-slate-100 shadow-lg rounded-2xl p-6">
-        <h3 className="text-lg font-bold text-stone-900 mb-4 flex items-center gap-2">
-          <div className="w-8 h-8 bg-[#C97B4B] rounded-lg flex items-center justify-center">
+        <h3 className="text-lg font-bold text-slate-900 mb-4 flex items-center gap-2">
+          <div className="w-8 h-8 bg-[#C49A2E] rounded-lg flex items-center justify-center">
             <DollarSign className="h-5 w-5 text-white" />
           </div>
           Price Overview
         </h3>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <div className="bg-stone-50 rounded-xl p-4 text-center">
-            <p className="text-sm text-stone-500 mb-1">Lowest Price</p>
-            <p className="text-2xl font-bold text-stone-900">${priceRange.min.toLocaleString()}</p>
+          <div className="bg-slate-50 rounded-xl p-4 text-center">
+            <p className="text-sm text-slate-500 mb-1">Lowest Price</p>
+            <p className="text-2xl font-bold text-slate-900">${priceRange.min.toLocaleString()}</p>
           </div>
-          <div className="bg-stone-50 rounded-xl p-4 text-center">
-            <p className="text-sm text-stone-500 mb-1">Average Price</p>
-            <p className="text-2xl font-bold text-[#1B4965]">${priceRange.avg.toLocaleString()}</p>
+          <div className="bg-slate-50 rounded-xl p-4 text-center">
+            <p className="text-sm text-slate-500 mb-1">Average Price</p>
+            <p className="text-2xl font-bold text-[#1B3A5C]">${priceRange.avg.toLocaleString()}</p>
           </div>
-          <div className="bg-stone-50 rounded-xl p-4 text-center">
-            <p className="text-sm text-stone-500 mb-1">Highest Price</p>
-            <p className="text-2xl font-bold text-stone-900">${priceRange.max.toLocaleString()}</p>
+          <div className="bg-slate-50 rounded-xl p-4 text-center">
+            <p className="text-sm text-slate-500 mb-1">Highest Price</p>
+            <p className="text-2xl font-bold text-slate-900">${priceRange.max.toLocaleString()}</p>
           </div>
         </div>
       </div>
@@ -201,8 +201,8 @@ export default async function AnalyticsPage() {
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         {/* Monthly Inquiries Chart */}
         <div className="bg-white border-2 border-slate-100 shadow-lg rounded-2xl p-6">
-          <h3 className="text-lg font-bold text-stone-900 mb-6 flex items-center gap-2">
-            <div className="w-8 h-8 bg-[#C97B4B] rounded-lg flex items-center justify-center">
+          <h3 className="text-lg font-bold text-slate-900 mb-6 flex items-center gap-2">
+            <div className="w-8 h-8 bg-[#C49A2E] rounded-lg flex items-center justify-center">
               <Activity className="h-5 w-5 text-white" />
             </div>
             Monthly Inquiries
@@ -210,10 +210,10 @@ export default async function AnalyticsPage() {
           <div className="space-y-3">
             {monthlyInquiryCounts.map((m) => (
               <div key={m.month} className="flex items-center gap-3">
-                <span className="text-xs text-stone-500 w-20 text-right">{m.month}</span>
+                <span className="text-xs text-slate-500 w-20 text-right">{m.month}</span>
                 <div className="flex-1 bg-slate-100 rounded-full h-6 relative overflow-hidden">
                   <div
-                    className="bg-[#C97B4B] h-6 rounded-full flex items-center justify-end pr-2 transition-all"
+                    className="bg-[#C49A2E] h-6 rounded-full flex items-center justify-end pr-2 transition-all"
                     style={{ width: `${Math.max((m.count / maxInquiryCount) * 100, m.count > 0 ? 10 : 0)}%` }}
                   >
                     {m.count > 0 && (
@@ -221,7 +221,7 @@ export default async function AnalyticsPage() {
                     )}
                   </div>
                 </div>
-                {m.count === 0 && <span className="text-xs text-stone-400">0</span>}
+                {m.count === 0 && <span className="text-xs text-slate-400">0</span>}
               </div>
             ))}
           </div>
@@ -229,7 +229,7 @@ export default async function AnalyticsPage() {
 
         {/* User Growth Chart */}
         <div className="bg-white border-2 border-slate-100 shadow-lg rounded-2xl p-6">
-          <h3 className="text-lg font-bold text-stone-900 mb-6 flex items-center gap-2">
+          <h3 className="text-lg font-bold text-slate-900 mb-6 flex items-center gap-2">
             <div className="w-8 h-8 bg-emerald-600 rounded-lg flex items-center justify-center">
               <Users className="h-5 w-5 text-white" />
             </div>
@@ -238,7 +238,7 @@ export default async function AnalyticsPage() {
           <div className="space-y-3">
             {userGrowthData.map((m) => (
               <div key={m.month} className="flex items-center gap-3">
-                <span className="text-xs text-stone-500 w-20 text-right">{m.month}</span>
+                <span className="text-xs text-slate-500 w-20 text-right">{m.month}</span>
                 <div className="flex-1 bg-slate-100 rounded-full h-6 relative overflow-hidden">
                   <div
                     className="bg-emerald-600 h-6 rounded-full flex items-center justify-end pr-2 transition-all"
@@ -249,7 +249,7 @@ export default async function AnalyticsPage() {
                     )}
                   </div>
                 </div>
-                {m.count === 0 && <span className="text-xs text-stone-400">0</span>}
+                {m.count === 0 && <span className="text-xs text-slate-400">0</span>}
               </div>
             ))}
           </div>
@@ -260,8 +260,8 @@ export default async function AnalyticsPage() {
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         {/* Properties by Country */}
         <div className="bg-white border-2 border-slate-100 shadow-lg rounded-2xl p-6">
-          <h3 className="text-lg font-bold text-stone-900 mb-6 flex items-center gap-2">
-            <div className="w-8 h-8 bg-[#1B4965] rounded-lg flex items-center justify-center">
+          <h3 className="text-lg font-bold text-slate-900 mb-6 flex items-center gap-2">
+            <div className="w-8 h-8 bg-[#1B3A5C] rounded-lg flex items-center justify-center">
               <MapPin className="h-5 w-5 text-white" />
             </div>
             By Country
@@ -270,23 +270,23 @@ export default async function AnalyticsPage() {
             {propertiesByCountry.map((item) => (
               <div key={item.country} className="flex items-center justify-between p-3 bg-slate-50 rounded-xl">
                 <div>
-                  <span className="text-sm font-bold text-stone-900">{item.country}</span>
-                  <p className="text-xs text-stone-500">Avg: ${Math.round(item._avg?.price || 0).toLocaleString()}</p>
+                  <span className="text-sm font-bold text-slate-900">{item.country}</span>
+                  <p className="text-xs text-slate-500">Avg: ${Math.round(item._avg?.price || 0).toLocaleString()}</p>
                 </div>
-                <span className="text-sm font-bold text-[#1B4965] bg-white px-3 py-1 rounded-lg shadow-sm">
+                <span className="text-sm font-bold text-[#1B3A5C] bg-white px-3 py-1 rounded-lg shadow-sm">
                   {item._count}
                 </span>
               </div>
             ))}
             {propertiesByCountry.length === 0 && (
-              <p className="text-sm text-stone-400 text-center py-4">No data yet</p>
+              <p className="text-sm text-slate-400 text-center py-4">No data yet</p>
             )}
           </div>
         </div>
 
         {/* Properties by Status */}
         <div className="bg-white border-2 border-slate-100 shadow-lg rounded-2xl p-6">
-          <h3 className="text-lg font-bold text-stone-900 mb-6 flex items-center gap-2">
+          <h3 className="text-lg font-bold text-slate-900 mb-6 flex items-center gap-2">
             <div className="w-8 h-8 bg-emerald-600 rounded-lg flex items-center justify-center">
               <BarChart3 className="h-5 w-5 text-white" />
             </div>
@@ -297,7 +297,7 @@ export default async function AnalyticsPage() {
               const statusColors: Record<string, string> = {
                 OFF_PLAN: 'bg-amber-500',
                 NEW_BUILD: 'bg-emerald-600',
-                RESALE: 'bg-[#C97B4B]',
+                RESALE: 'bg-[#C49A2E]',
               }
               const statusLabels: Record<string, string> = {
                 OFF_PLAN: 'Off Plan',
@@ -307,31 +307,31 @@ export default async function AnalyticsPage() {
               return (
                 <div key={item.status} className="flex items-center justify-between p-3 bg-slate-50 rounded-xl">
                   <div className="flex items-center gap-2">
-                    <div className={`w-3 h-3 rounded-full ${statusColors[item.status] || 'bg-stone-400'}`} />
-                    <span className="text-sm font-bold text-stone-900">{statusLabels[item.status] || item.status}</span>
+                    <div className={`w-3 h-3 rounded-full ${statusColors[item.status] || 'bg-slate-400'}`} />
+                    <span className="text-sm font-bold text-slate-900">{statusLabels[item.status] || item.status}</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <div className="w-20 bg-slate-200 rounded-full h-2">
                       <div
-                        className={`${statusColors[item.status] || 'bg-stone-400'} h-2 rounded-full`}
+                        className={`${statusColors[item.status] || 'bg-slate-400'} h-2 rounded-full`}
                         style={{ width: `${totalProperties > 0 ? (item._count / totalProperties) * 100 : 0}%` }}
                       />
                     </div>
-                    <span className="text-sm font-bold text-stone-900 w-8 text-right">{item._count}</span>
+                    <span className="text-sm font-bold text-slate-900 w-8 text-right">{item._count}</span>
                   </div>
                 </div>
               )
             })}
             {propertiesByStatus.length === 0 && (
-              <p className="text-sm text-stone-400 text-center py-4">No data yet</p>
+              <p className="text-sm text-slate-400 text-center py-4">No data yet</p>
             )}
           </div>
         </div>
 
         {/* Properties by Type */}
         <div className="bg-white border-2 border-slate-100 shadow-lg rounded-2xl p-6">
-          <h3 className="text-lg font-bold text-stone-900 mb-6 flex items-center gap-2">
-            <div className="w-8 h-8 bg-stone-600 rounded-lg flex items-center justify-center">
+          <h3 className="text-lg font-bold text-slate-900 mb-6 flex items-center gap-2">
+            <div className="w-8 h-8 bg-slate-600 rounded-lg flex items-center justify-center">
               <PieChart className="h-5 w-5 text-white" />
             </div>
             By Type
@@ -339,16 +339,16 @@ export default async function AnalyticsPage() {
           <div className="space-y-3">
             {propertiesByType.map((item) => (
               <div key={item.propertyType} className="flex items-center justify-between p-3 bg-slate-50 rounded-xl">
-                <span className="text-sm font-bold text-stone-900">
+                <span className="text-sm font-bold text-slate-900">
                   {item.propertyType.replace(/_/g, ' ')}
                 </span>
-                <span className="text-sm font-bold text-stone-600 bg-white px-3 py-1 rounded-lg shadow-sm">
+                <span className="text-sm font-bold text-slate-600 bg-white px-3 py-1 rounded-lg shadow-sm">
                   {item._count}
                 </span>
               </div>
             ))}
             {propertiesByType.length === 0 && (
-              <p className="text-sm text-stone-400 text-center py-4">No data yet</p>
+              <p className="text-sm text-slate-400 text-center py-4">No data yet</p>
             )}
           </div>
         </div>
@@ -356,8 +356,8 @@ export default async function AnalyticsPage() {
 
       {/* Top Properties Table */}
       <div className="bg-white border-2 border-slate-100 shadow-lg rounded-2xl p-6">
-        <h3 className="text-lg font-bold text-stone-900 mb-6 flex items-center gap-2">
-          <div className="w-8 h-8 bg-[#1B4965] rounded-lg flex items-center justify-center">
+        <h3 className="text-lg font-bold text-slate-900 mb-6 flex items-center gap-2">
+          <div className="w-8 h-8 bg-[#1B3A5C] rounded-lg flex items-center justify-center">
             <TrendingUp className="h-5 w-5 text-white" />
           </div>
           Top Performing Properties
@@ -367,13 +367,13 @@ export default async function AnalyticsPage() {
             <table className="min-w-full divide-y-2 divide-slate-100">
               <thead className="bg-slate-50">
                 <tr>
-                  <th className="px-4 py-3 text-left text-xs font-bold text-stone-700 uppercase tracking-wider">Property</th>
-                  <th className="px-4 py-3 text-left text-xs font-bold text-stone-700 uppercase tracking-wider">Price</th>
-                  <th className="px-4 py-3 text-center text-xs font-bold text-stone-700 uppercase tracking-wider">Favorites</th>
-                  <th className="px-4 py-3 text-center text-xs font-bold text-stone-700 uppercase tracking-wider">Inquiries</th>
-                  <th className="px-4 py-3 text-center text-xs font-bold text-stone-700 uppercase tracking-wider">Views</th>
-                  <th className="px-4 py-3 text-center text-xs font-bold text-stone-700 uppercase tracking-wider">Yield</th>
-                  <th className="px-4 py-3 text-left text-xs font-bold text-stone-700 uppercase tracking-wider">Status</th>
+                  <th className="px-4 py-3 text-left text-xs font-bold text-slate-700 uppercase tracking-wider">Property</th>
+                  <th className="px-4 py-3 text-left text-xs font-bold text-slate-700 uppercase tracking-wider">Price</th>
+                  <th className="px-4 py-3 text-center text-xs font-bold text-slate-700 uppercase tracking-wider">Favorites</th>
+                  <th className="px-4 py-3 text-center text-xs font-bold text-slate-700 uppercase tracking-wider">Inquiries</th>
+                  <th className="px-4 py-3 text-center text-xs font-bold text-slate-700 uppercase tracking-wider">Views</th>
+                  <th className="px-4 py-3 text-center text-xs font-bold text-slate-700 uppercase tracking-wider">Yield</th>
+                  <th className="px-4 py-3 text-left text-xs font-bold text-slate-700 uppercase tracking-wider">Status</th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-slate-100">
@@ -381,14 +381,14 @@ export default async function AnalyticsPage() {
                   <tr key={property.id} className="hover:bg-slate-50 transition-colors">
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
-                        <span className="text-xs font-bold text-stone-400 w-5">#{i + 1}</span>
+                        <span className="text-xs font-bold text-slate-400 w-5">#{i + 1}</span>
                         <div>
-                          <p className="text-sm font-bold text-stone-900 max-w-[200px] truncate">{property.title}</p>
-                          <p className="text-xs text-stone-500">{property.country}</p>
+                          <p className="text-sm font-bold text-slate-900 max-w-[200px] truncate">{property.title}</p>
+                          <p className="text-xs text-slate-500">{property.country}</p>
                         </div>
                       </div>
                     </td>
-                    <td className="px-4 py-3 text-sm font-semibold text-stone-900">
+                    <td className="px-4 py-3 text-sm font-semibold text-slate-900">
                       ${property.price?.toLocaleString()}
                     </td>
                     <td className="px-4 py-3 text-center">
@@ -401,7 +401,7 @@ export default async function AnalyticsPage() {
                         <MessageSquare className="w-3 h-3" /> {property._count.propertyInquiries}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-center text-sm text-stone-600">
+                    <td className="px-4 py-3 text-center text-sm text-slate-600">
                       {property.views || 0}
                     </td>
                     <td className="px-4 py-3 text-center text-sm font-semibold text-emerald-600">
@@ -423,7 +423,7 @@ export default async function AnalyticsPage() {
             </table>
           </div>
         ) : (
-          <p className="text-sm text-stone-400 text-center py-8">No properties yet. Add some to see analytics.</p>
+          <p className="text-sm text-slate-400 text-center py-8">No properties yet. Add some to see analytics.</p>
         )}
       </div>
 
@@ -431,8 +431,8 @@ export default async function AnalyticsPage() {
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         {/* Recent Inquiries */}
         <div className="bg-white border-2 border-slate-100 shadow-lg rounded-2xl p-6">
-          <h3 className="text-lg font-bold text-stone-900 mb-4 flex items-center gap-2">
-            <div className="w-8 h-8 bg-[#C97B4B] rounded-lg flex items-center justify-center">
+          <h3 className="text-lg font-bold text-slate-900 mb-4 flex items-center gap-2">
+            <div className="w-8 h-8 bg-[#C49A2E] rounded-lg flex items-center justify-center">
               <MessageSquare className="h-5 w-5 text-white" />
             </div>
             Recent Inquiries
@@ -440,28 +440,28 @@ export default async function AnalyticsPage() {
           <div className="space-y-3">
             {recentInquiries.map((inq: any) => (
               <div key={inq.id} className="flex items-start gap-3 p-3 bg-slate-50 rounded-xl">
-                <div className="w-8 h-8 bg-[#C97B4B] rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
+                <div className="w-8 h-8 bg-[#C49A2E] rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
                   {inq.name.charAt(0).toUpperCase()}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-stone-900">{inq.name}</p>
-                  <p className="text-xs text-stone-500 truncate">{inq.email}</p>
-                  <p className="text-xs text-[#1B4965] mt-1">Re: {inq.property?.title || inq.propertyTitle || 'Deleted Property'}</p>
+                  <p className="text-sm font-medium text-slate-900">{inq.name}</p>
+                  <p className="text-xs text-slate-500 truncate">{inq.email}</p>
+                  <p className="text-xs text-[#1B3A5C] mt-1">Re: {inq.property?.title || inq.propertyTitle || 'Deleted Property'}</p>
                 </div>
-                <span className="text-xs text-stone-400 flex-shrink-0">
+                <span className="text-xs text-slate-400 flex-shrink-0">
                   {new Date(inq.createdAt).toLocaleDateString()}
                 </span>
               </div>
             ))}
             {recentInquiries.length === 0 && (
-              <p className="text-sm text-stone-400 text-center py-4">No inquiries yet</p>
+              <p className="text-sm text-slate-400 text-center py-4">No inquiries yet</p>
             )}
           </div>
         </div>
 
         {/* Recent Users */}
         <div className="bg-white border-2 border-slate-100 shadow-lg rounded-2xl p-6">
-          <h3 className="text-lg font-bold text-stone-900 mb-4 flex items-center gap-2">
+          <h3 className="text-lg font-bold text-slate-900 mb-4 flex items-center gap-2">
             <div className="w-8 h-8 bg-emerald-600 rounded-lg flex items-center justify-center">
               <Users className="h-5 w-5 text-white" />
             </div>
@@ -474,27 +474,27 @@ export default async function AnalyticsPage() {
                   {u.email.charAt(0).toUpperCase()}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-stone-900">
+                  <p className="text-sm font-medium text-slate-900">
                     {u.firstName && u.lastName ? `${u.firstName} ${u.lastName}` : u.email.split('@')[0]}
                   </p>
-                  <p className="text-xs text-stone-500">{u.email}</p>
+                  <p className="text-xs text-slate-500">{u.email}</p>
                 </div>
                 <div className="text-right flex-shrink-0">
                   <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                    u.role === 'ADMIN' ? 'bg-[#1B4965] text-white' :
-                    u.role === 'SUPER_ADMIN' ? 'bg-[#C97B4B] text-white' :
-                    'bg-stone-100 text-stone-600'
+                    u.role === 'ADMIN' ? 'bg-[#1B3A5C] text-white' :
+                    u.role === 'SUPER_ADMIN' ? 'bg-[#C49A2E] text-white' :
+                    'bg-slate-100 text-slate-600'
                   }`}>
                     {u.role}
                   </span>
-                  <p className="text-xs text-stone-400 mt-1">
+                  <p className="text-xs text-slate-400 mt-1">
                     {new Date(u.createdAt).toLocaleDateString()}
                   </p>
                 </div>
               </div>
             ))}
             {recentUsers.length === 0 && (
-              <p className="text-sm text-stone-400 text-center py-4">No users yet</p>
+              <p className="text-sm text-slate-400 text-center py-4">No users yet</p>
             )}
           </div>
         </div>
@@ -509,8 +509,8 @@ function MetricCard({ icon: Icon, label, value, color }: { icon: any; label: str
       <div className={`w-10 h-10 ${color} rounded-xl flex items-center justify-center shadow-md mb-3`}>
         <Icon className="h-5 w-5 text-white" />
       </div>
-      <dt className="text-xs font-medium text-stone-500 mb-1">{label}</dt>
-      <dd className="text-2xl font-black text-stone-900">{typeof value === 'number' ? value.toLocaleString() : value}</dd>
+      <dt className="text-xs font-medium text-slate-500 mb-1">{label}</dt>
+      <dd className="text-2xl font-black text-slate-900">{typeof value === 'number' ? value.toLocaleString() : value}</dd>
     </div>
   )
 }

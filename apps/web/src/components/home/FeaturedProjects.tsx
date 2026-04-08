@@ -17,14 +17,14 @@ export async function FeaturedProjects() {
   }
 
   return (
-    <section className="py-16 sm:py-20 bg-stone-50">
+    <section className="py-16 sm:py-20 bg-slate-50">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
         {/* Section Header */}
         <div className="text-center max-w-2xl mx-auto mb-12">
-          <h2 className="text-3xl sm:text-4xl lg:text-5xl font-black text-stone-900 mb-4">
-            Featured <span className="text-[#1B4965]">Projects</span>
+          <h2 className="text-3xl sm:text-4xl lg:text-5xl font-black text-slate-900 mb-4">
+            Featured <span className="text-[#1B3A5C]">Projects</span>
           </h2>
-          <p className="text-lg text-stone-600">
+          <p className="text-lg text-slate-600">
             Hand-picked investment opportunities in Georgia
           </p>
         </div>
@@ -60,7 +60,7 @@ export async function FeaturedProjects() {
           <Link href="/properties">
             <Button
               size="lg"
-              className="h-12 px-8 text-base font-semibold bg-[#1B4965] hover:bg-[#2B6985] text-white rounded-xl shadow-lg transition-all"
+              className="h-12 px-8 text-base font-semibold bg-[#1B3A5C] hover:bg-[#24507D] text-white rounded-xl shadow-lg transition-all"
             >
               <span className="flex items-center gap-2">
                 View All Properties

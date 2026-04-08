@@ -59,20 +59,20 @@ function CallbackHandler() {
   }, [searchParams, router, refreshUser])
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-stone-100">
-      <div className="relative z-10 bg-white shadow-2xl rounded-2xl px-12 py-16 border border-stone-200 max-w-md w-full mx-4">
+    <div className="min-h-screen flex items-center justify-center bg-slate-100">
+      <div className="relative z-10 bg-white shadow-2xl rounded-2xl px-12 py-16 border border-slate-200 max-w-md w-full mx-4">
         <div className="text-center">
           {status === 'loading' && (
             <>
               <div className="flex justify-center mb-6">
-                <div className="w-16 h-16 bg-[#1B4965] rounded-full flex items-center justify-center shadow-lg">
+                <div className="w-16 h-16 bg-[#1B3A5C] rounded-full flex items-center justify-center shadow-lg">
                   <Loader2 className="h-8 w-8 text-white animate-spin" />
                 </div>
               </div>
-              <h2 className="text-2xl font-bold text-stone-900 mb-2">
+              <h2 className="text-2xl font-bold text-slate-900 mb-2">
                 Completing Sign In
               </h2>
-              <p className="text-stone-600">
+              <p className="text-slate-600">
                 Please wait while we authenticate your account...
               </p>
             </>
@@ -85,13 +85,13 @@ function CallbackHandler() {
                   <CheckCircle className="h-8 w-8 text-white" />
                 </div>
               </div>
-              <h2 className="text-2xl font-bold text-stone-900 mb-2">
+              <h2 className="text-2xl font-bold text-slate-900 mb-2">
                 Authentication Successful!
               </h2>
-              <p className="text-stone-600">
+              <p className="text-slate-600">
                 {message}
               </p>
-              <p className="text-sm text-stone-500 mt-4">
+              <p className="text-sm text-slate-500 mt-4">
                 Redirecting you now...
               </p>
             </>
@@ -104,13 +104,13 @@ function CallbackHandler() {
                   <XCircle className="h-8 w-8 text-white" />
                 </div>
               </div>
-              <h2 className="text-2xl font-bold text-stone-900 mb-2">
+              <h2 className="text-2xl font-bold text-slate-900 mb-2">
                 Authentication Failed
               </h2>
-              <p className="text-stone-600 mb-4">
+              <p className="text-slate-600 mb-4">
                 {message}
               </p>
-              <p className="text-sm text-stone-500">
+              <p className="text-sm text-slate-500">
                 Redirecting to login page...
               </p>
             </>
@@ -124,8 +124,8 @@ function CallbackHandler() {
 export default function CallbackPage() {
   return (
     <Suspense fallback={
-      <div className="min-h-screen flex items-center justify-center bg-stone-100">
-        <Loader2 className="h-8 w-8 animate-spin text-[#1B4965]" />
+      <div className="min-h-screen flex items-center justify-center bg-slate-100">
+        <Loader2 className="h-8 w-8 animate-spin text-[#1B3A5C]" />
       </div>
     }>
       <CallbackHandler />
