@@ -1,23 +1,26 @@
 import { Resend } from 'resend';
 
-const resend = new Resend(process.env.RESEND_API_KEY);
-
 const FROM_EMAIL = process.env.FROM_EMAIL || 'PropGroup <noreply@propgroup.com>';
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'invest@propgroup.com';
 
-function isConfigured(): boolean {
-  return !!process.env.RESEND_API_KEY;
+let resend: Resend | null = null;
+
+function getClient(): Resend | null {
+  if (!process.env.RESEND_API_KEY) return null;
+  if (!resend) resend = new Resend(process.env.RESEND_API_KEY);
+  return resend;
 }
 
 // ── Welcome Email ──────────────────────────────────────────────────────────
 
 export async function sendWelcomeEmail(to: string, firstName?: string) {
-  if (!isConfigured()) return;
+  const client = getClient();
+  if (!client) return;
 
   const name = firstName || 'Investor';
 
   try {
-    await resend.emails.send({
+    await client.emails.send({
       from: FROM_EMAIL,
       to,
       subject: `Welcome to PropGroup, ${name}!`,
@@ -60,12 +63,13 @@ export async function sendWelcomeEmail(to: string, firstName?: string) {
 // ── Password Reset Email ───────────────────────────────────────────────────
 
 export async function sendPasswordResetEmail(to: string, resetToken: string) {
-  if (!isConfigured()) return;
+  const client = getClient();
+  if (!client) return;
 
   const resetUrl = `${process.env.FRONTEND_URL || 'https://propgroup.com'}/auth/reset-password?token=${resetToken}`;
 
   try {
-    await resend.emails.send({
+    await client.emails.send({
       from: FROM_EMAIL,
       to,
       subject: 'Reset your password — PropGroup',
@@ -106,10 +110,11 @@ export async function sendInquiryConfirmation(
   to: string,
   data: { name: string; propertyTitle?: string }
 ) {
-  if (!isConfigured()) return;
+  const client = getClient();
+  if (!client) return;
 
   try {
-    await resend.emails.send({
+    await client.emails.send({
       from: FROM_EMAIL,
       to,
       subject: 'We received your inquiry — PropGroup',
@@ -148,10 +153,11 @@ export async function notifyAdminOfInquiry(data: {
   message?: string;
   propertyTitle?: string;
 }) {
-  if (!isConfigured()) return;
+  const client = getClient();
+  if (!client) return;
 
   try {
-    await resend.emails.send({
+    await client.emails.send({
       from: FROM_EMAIL,
       to: ADMIN_EMAIL,
       subject: `New inquiry${data.propertyTitle ? `: ${data.propertyTitle}` : ''} — ${data.name}`,
@@ -186,10 +192,11 @@ export async function notifyAdminOfInquiry(data: {
 // ── Contact Form Confirmation ──────────────────────────────────────────────
 
 export async function sendContactConfirmation(to: string, name: string) {
-  if (!isConfigured()) return;
+  const client = getClient();
+  if (!client) return;
 
   try {
-    await resend.emails.send({
+    await client.emails.send({
       from: FROM_EMAIL,
       to,
       subject: 'We received your message — PropGroup',
