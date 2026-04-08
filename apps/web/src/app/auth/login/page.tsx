@@ -230,12 +230,12 @@ function LoginForm() {
               </div>
 
               <div className="text-sm">
-                <span
-                  className="font-medium text-slate-400 cursor-default"
-                  title="Password reset coming soon"
+                <a
+                  href="/auth/forgot-password"
+                  className="font-medium text-[#1B3A5C] hover:underline"
                 >
                   Forgot password?
-                </span>
+                </a>
               </div>
             </div>
 

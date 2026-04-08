@@ -102,7 +102,7 @@ export async function getPropertyById(id: string) {
     prisma.property.update({
       where: { id },
       data: { views: { increment: 1 } },
-    }).catch(() => {});
+    }).catch(err => console.error('Failed to increment view count:', err));
   }
 
   return property;

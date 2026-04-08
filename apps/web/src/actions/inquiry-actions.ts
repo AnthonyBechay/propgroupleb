@@ -21,15 +21,7 @@ export async function submitInquiry(data: z.infer<typeof inquirySchema>) {
     const response = await apiClient.createInquiry(validatedData) as ApiResponse<Inquiry>
 
     if (response.success && response.data) {
-      // Log the inquiry for now (you could store this in a separate table for admin review)
-      console.log('New property inquiry:', {
-        property: response.data.property?.title || 'N/A',
-        name: response.data.name,
-        email: response.data.email,
-        date: response.data.createdAt
-      })
-
-      return { 
+      return {
         success: true, 
         inquiry: response.data,
         message: 'Your inquiry has been submitted successfully! We will get back to you soon.'

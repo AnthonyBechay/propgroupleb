@@ -138,6 +138,14 @@ enum TransactionStatus {
   CANCELLED
 }
 
+enum InquiryStatus {
+  NEW
+  IN_PROGRESS
+  REPLIED
+  CANCELLED
+  CLOSED
+}
+
 enum NotificationType {
   PROPERTY_UPDATE
   PRICE_DROP
@@ -181,6 +189,10 @@ model User {
   emailVerifiedAt DateTime?
   lastLoginAt     DateTime?
 
+  // Password reset
+  resetToken       String?   @unique
+  resetTokenExpiry DateTime?
+
   // Ban management
   bannedAt     DateTime?
   bannedBy     String?
@@ -220,7 +232,8 @@ model User {
   propertyOffers       PropertyOffer[]
   propertyTours        PropertyTour[]
   notifications        Notification[]
-  transactions         Transaction[]
+  buyerTransactions    Transaction[]         @relation("BuyerTransactions")
+  sellerTransactions   Transaction[]         @relation("SellerTransactions")
   messages             Message[]             @relation("UserMessages")
   sentMessages         Message[]             @relation("SentMessages")
   referredUsers        User[]                @relation("UserReferrals")
@@ -327,7 +340,7 @@ model Property {
   views           Int       @default(0)
 
   // Public sharing
-  shareToken      String?   @unique
+  shareToken String? @unique
 
   // Availability
   availableFrom DateTime?
@@ -361,6 +374,7 @@ model Property {
   offers             PropertyOffer[]
   tours              PropertyTour[]
   transactions       Transaction[]
+  priceHistory       PropertyPriceHistory[]
 
   @@index([country])
   @@index([propertyType])
@@ -438,7 +452,7 @@ model FavoriteProperty {
 }
 
 model PropertyInquiry {
-  id            String   @id @default(cuid())
+  id            String        @id @default(cuid())
   userId        String?
   propertyId    String?
   propertyTitle String?
@@ -446,12 +460,12 @@ model PropertyInquiry {
   email         String
   phone         String?
   message       String?
-  status        String   @default("NEW")    // NEW, IN_PROGRESS, REPLIED, CANCELLED, CLOSED
+  status        InquiryStatus @default(NEW)
   adminNotes    String?
   repliedAt     DateTime?
   repliedBy     String?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @default(now()) @updatedAt
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @default(now()) @updatedAt
 
   user     User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
   property Property? @relation(fields: [propertyId], references: [id], onDelete: SetNull)
@@ -507,11 +521,12 @@ model AdminAuditLog {
   userAgent  String?
   createdAt  DateTime @default(now())
 
-  admin User @relation("AdminAuditLogs", fields: [adminId], references: [id])
+  admin User @relation("AdminAuditLogs", fields: [adminId], references: [id], onDelete: Cascade)
 
   @@index([adminId])
   @@index([createdAt])
   @@index([action])
+  @@index([targetType])
   @@map("admin_audit_logs")
 }
 
@@ -647,6 +662,8 @@ model PropertyPriceHistory {
   changedAt  DateTime @default(now())
   changedBy  String?
   reason     String?
+
+  property Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
 
   @@index([propertyId])
   @@index([changedAt])
@@ -830,10 +847,12 @@ model Transaction {
   updatedAt DateTime @updatedAt
 
   property Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
-  buyer    User     @relation(fields: [buyerId], references: [id], onDelete: Cascade)
+  buyer    User     @relation("BuyerTransactions", fields: [buyerId], references: [id], onDelete: Cascade)
+  seller   User?    @relation("SellerTransactions", fields: [sellerId], references: [id], onDelete: SetNull)
 
   @@index([propertyId])
   @@index([buyerId])
+  @@index([sellerId])
   @@index([status])
   @@index([expectedClosingDate])
   @@map("transactions")
@@ -903,6 +922,7 @@ model Message {
   @@index([recipientId])
   @@index([threadId])
   @@index([propertyId])
+  @@index([parentMessageId])
   @@index([createdAt])
   @@map("messages")
 }
@@ -936,8 +956,8 @@ model SiteContent {
   key     String @unique
   section String
 
-  title   String?
-  content String?
+  title    String?
+  content  String?
   metadata Json?
 
   sortOrder Int     @default(0)

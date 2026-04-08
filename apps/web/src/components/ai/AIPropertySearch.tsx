@@ -19,6 +19,7 @@ import {
   ChevronDown,
   ChevronUp,
 } from 'lucide-react'
+import { normalizeApiUrl } from '@/lib/utils/api-url'
 
 interface Message {
   id: string
@@ -149,7 +150,7 @@ export function AIPropertySearch({
     setQuery('')
 
     try {
-      const { normalizeApiUrl } = await import('@/lib/utils/api-url')
+
       const apiUrl = normalizeApiUrl(process.env.NEXT_PUBLIC_API_URL)
 
       const isFollowUp = messages.length > 0

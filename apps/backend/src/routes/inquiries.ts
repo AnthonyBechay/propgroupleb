@@ -7,6 +7,7 @@ import { sendSuccess, sendCreated, sendPaginated, sendNotFound } from '../utils/
 import { parsePagination, buildPaginationResponse } from '../utils/pagination.js';
 import { PROPERTY_WITH_STATS_INCLUDE } from '../utils/prisma-includes.js';
 import { inquirySchema } from '../schemas/index.js';
+import { sendInquiryConfirmation, notifyAdminOfInquiry } from '../services/email.service.js';
 import type { AuthenticatedRequest, MaybeAuthRequest } from '../types/index.js';
 
 const router: Router = express.Router();
@@ -39,6 +40,20 @@ router.post(
         user: { select: { id: true, email: true, firstName: true, lastName: true } },
       },
     });
+
+    // Send email notifications (fire and forget)
+    sendInquiryConfirmation(validatedData.email, {
+      name: validatedData.name,
+      propertyTitle: property.title,
+    }).catch(err => console.error('Failed to send inquiry confirmation:', err));
+
+    notifyAdminOfInquiry({
+      name: validatedData.name,
+      email: validatedData.email,
+      phone: validatedData.phone,
+      message: validatedData.message,
+      propertyTitle: property.title,
+    }).catch(err => console.error('Failed to send admin notification:', err));
 
     sendCreated(res, inquiry, 'Inquiry submitted successfully');
   })

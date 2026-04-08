@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { Property } from '@/lib/types/api'
-import { EditPropertyModal } from './EditPropertyModal'
+import { EditPropertyModal } from './PropertyFormModal'
 import {
   Edit,
   Trash2,

@@ -1,5 +1,5 @@
 import { PropertyTable } from '@/components/admin/PropertyTable'
-import { CreatePropertyModal } from '@/components/admin/CreatePropertyModal'
+import { CreatePropertyModal } from '@/components/admin/PropertyFormModal'
 import { Button } from '@/components/ui/button'
 import { Plus, Building2 } from 'lucide-react'
 import { Property } from '@/lib/types/api'
@@ -11,8 +11,6 @@ export default async function AdminPropertiesPage() {
   let locationGuides: any[] = []
 
   try {
-    console.log('[Admin Properties] Fetching properties from API...')
-
     // Fetch from API instead of direct database access
     const { normalizeApiUrl } = await import('@/lib/utils/api-url')
     const apiUrl = normalizeApiUrl(process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001')
@@ -30,7 +28,6 @@ export default async function AdminPropertiesPage() {
       const propertiesData = await propertiesResponse.json()
       if (propertiesData.success && propertiesData.data) {
         properties = propertiesData.data
-        console.log(`[Admin Properties] Found ${properties.length} properties`)
       }
     } else {
       console.error('[Admin Properties] Failed to fetch properties:', propertiesResponse.status)
@@ -41,7 +38,6 @@ export default async function AdminPropertiesPage() {
     developers = []
     locationGuides = []
 
-    console.log(`[Admin Properties] Found ${developers.length} developers and ${locationGuides.length} location guides`)
   } catch (error) {
     console.error('[Admin Properties] Error fetching properties data:', error)
     console.error('[Admin Properties] Error details:', {

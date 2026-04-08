@@ -143,7 +143,7 @@ router.get(
     prisma.property.update({
       where: { id: req.params.id },
       data: { views: { increment: 1 } },
-    }).catch(() => {});
+    }).catch(err => console.error('Failed to increment view count:', err));
 
     sendSuccess(res, property);
   })

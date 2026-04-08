@@ -1,7 +1,6 @@
 'use client'
 
-import { MapPin, Navigation } from 'lucide-react'
-import { Button } from '@/components/ui/button'
+import { MapPin } from 'lucide-react'
 
 interface MapViewProps {
   properties: any[]
@@ -9,49 +8,17 @@ interface MapViewProps {
 
 export function MapView({ properties }: MapViewProps) {
   return (
-    <div className="relative h-[600px] bg-slate-50 rounded-2xl overflow-hidden">
-      {/* Map placeholder */}
-      <div className="absolute inset-0 flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-24 h-24 bg-[#E0EDF7] rounded-full flex items-center justify-center mx-auto mb-4">
-            <MapPin className="w-12 h-12 text-[#1B3A5C]" />
-          </div>
-          <h3 className="text-2xl font-bold text-slate-900 mb-2">
-            Interactive Map View
-          </h3>
-          <p className="text-slate-600 mb-6 max-w-md">
-            Explore properties on an interactive map with filters and real-time updates
-          </p>
-          <div className="flex gap-4 justify-center">
-            <Button variant="outline">
-              <Navigation className="w-4 h-4 mr-2" />
-              Use My Location
-            </Button>
-            <Button className="bg-[#1B3A5C] hover:bg-[#24507D] text-white">
-              Enable Map View
-            </Button>
-          </div>
+    <div className="relative h-[400px] bg-slate-50 rounded-2xl overflow-hidden flex items-center justify-center">
+      <div className="text-center px-6">
+        <div className="w-16 h-16 bg-[#E0EDF7] rounded-full flex items-center justify-center mx-auto mb-4">
+          <MapPin className="w-8 h-8 text-[#1B3A5C]" />
         </div>
-      </div>
-
-      {/* Property markers preview */}
-      <div className="absolute top-4 left-4 bg-white rounded-lg shadow-lg p-4 max-w-sm">
-        <h4 className="font-semibold text-slate-900 mb-2">
-          {properties.length} Properties Available
-        </h4>
-        <p className="text-sm text-slate-600">
-          Click on markers to view property details
+        <h3 className="text-xl font-bold text-slate-900 mb-2">
+          Map View Coming Soon
+        </h3>
+        <p className="text-sm text-slate-600 max-w-md">
+          We&apos;re building an interactive map so you can explore {properties.length} properties by location.
         </p>
-      </div>
-
-      {/* Map controls */}
-      <div className="absolute top-4 right-4 flex flex-col gap-2">
-        <Button size="sm" variant="outline" className="bg-white">
-          <span className="text-lg">+</span>
-        </Button>
-        <Button size="sm" variant="outline" className="bg-white">
-          <span className="text-lg">-</span>
-        </Button>
       </div>
     </div>
   )

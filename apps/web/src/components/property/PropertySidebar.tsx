@@ -17,6 +17,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { toast } from '@/components/ui/use-toast'
 import { submitInquiry } from '@/actions/inquiry-actions'
 import { Heart, TrendingUp, Calendar, Loader2 } from 'lucide-react'
+import { InquiryForm } from '@/components/shared/InquiryForm'
 import { normalizeApiUrl } from '@/lib/utils/api-url'
 
 interface PropertySidebarProps {
@@ -46,13 +47,6 @@ export function PropertySidebar({
   const [isFavorited, setIsFavorited] = useState(false)
   const [isLoadingFavorite, setIsLoadingFavorite] = useState(false)
 
-  // Inquiry form state
-  const [inquiryName, setInquiryName] = useState('')
-  const [inquiryEmail, setInquiryEmail] = useState('')
-  const [inquiryPhone, setInquiryPhone] = useState('')
-  const [inquiryMessage, setInquiryMessage] = useState('')
-  const [isSubmittingInquiry, setIsSubmittingInquiry] = useState(false)
-
   // Viewing form state
   const [viewingDate, setViewingDate] = useState('')
   const [viewingMessage, setViewingMessage] = useState('')
@@ -80,16 +74,6 @@ export function PropertySidebar({
 
     checkFavorite()
   }, [user, propertyId, apiBaseUrl])
-
-  // Pre-fill email when user is available
-  useEffect(() => {
-    if (user?.email) {
-      setInquiryEmail(user.email)
-    }
-    if (user?.firstName) {
-      setInquiryName(`${user.firstName}${user.lastName ? ' ' + user.lastName : ''}`)
-    }
-  }, [user])
 
   const handleFavoriteToggle = async () => {
     if (!user) {
@@ -129,54 +113,6 @@ export function PropertySidebar({
       })
     } finally {
       setIsLoadingFavorite(false)
-    }
-  }
-
-  const handleInquirySubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-
-    if (!inquiryName.trim() || !inquiryEmail.trim()) {
-      toast({
-        title: 'Error',
-        description: 'Name and email are required',
-        variant: 'destructive',
-      })
-      return
-    }
-
-    setIsSubmittingInquiry(true)
-    try {
-      const result = await submitInquiry({
-        propertyId,
-        name: inquiryName,
-        email: inquiryEmail,
-        phone: inquiryPhone || undefined,
-        message: inquiryMessage || undefined,
-      })
-
-      if (result.success) {
-        toast({
-          title: 'Inquiry sent!',
-          description: result.message || 'We will get back to you soon.',
-        })
-        setInquiryMessage('')
-        setInquiryPhone('')
-        setShowInquiryDialog(false)
-      } else {
-        toast({
-          title: 'Error',
-          description: result.error || 'Failed to send inquiry',
-          variant: 'destructive',
-        })
-      }
-    } catch {
-      toast({
-        title: 'Error',
-        description: 'An unexpected error occurred',
-        variant: 'destructive',
-      })
-    } finally {
-      setIsSubmittingInquiry(false)
     }
   }
 
@@ -307,71 +243,13 @@ export function PropertySidebar({
               Ask about {title}. We will respond within 24 hours.
             </DialogDescription>
           </DialogHeader>
-          <form onSubmit={handleInquirySubmit} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="inquiry-name" className="text-slate-700">
-                Name <span className="text-red-500">*</span>
-              </Label>
-              <Input
-                id="inquiry-name"
-                value={inquiryName}
-                onChange={(e) => setInquiryName(e.target.value)}
-                placeholder="Your full name"
-                required
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="inquiry-email" className="text-slate-700">
-                Email <span className="text-red-500">*</span>
-              </Label>
-              <Input
-                id="inquiry-email"
-                type="email"
-                value={inquiryEmail}
-                onChange={(e) => setInquiryEmail(e.target.value)}
-                placeholder="your@email.com"
-                required
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="inquiry-phone" className="text-slate-700">
-                Phone
-              </Label>
-              <Input
-                id="inquiry-phone"
-                type="tel"
-                value={inquiryPhone}
-                onChange={(e) => setInquiryPhone(e.target.value)}
-                placeholder="+1 (555) 000-0000"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="inquiry-message" className="text-slate-700">
-                Message
-              </Label>
-              <Textarea
-                id="inquiry-message"
-                value={inquiryMessage}
-                onChange={(e) => setInquiryMessage(e.target.value)}
-                placeholder="I'm interested in this property..."
-                rows={3}
-              />
-            </div>
-            <Button
-              type="submit"
-              className="w-full bg-[#1B3A5C] hover:bg-[#24507D] text-white"
-              disabled={isSubmittingInquiry}
-            >
-              {isSubmittingInquiry ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Sending...
-                </>
-              ) : (
-                'Send Inquiry'
-              )}
-            </Button>
-          </form>
+          <InquiryForm
+            propertyId={propertyId}
+            defaultName={user ? `${user.firstName || ''} ${user.lastName || ''}`.trim() : ''}
+            defaultEmail={user?.email || ''}
+            messagePlaceholder="I'm interested in this property..."
+            onSuccess={() => setShowInquiryDialog(false)}
+          />
         </DialogContent>
       </Dialog>
 

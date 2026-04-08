@@ -7,6 +7,8 @@ import { asyncHandler } from '../utils/errors.js';
 import { sendSuccess, sendCreated } from '../utils/response.js';
 import { USER_AUTH_SELECT } from '../utils/prisma-includes.js';
 import { registerSchema, loginSchema, updateProfileSchema, changePasswordSchema } from '../schemas/index.js';
+import crypto from 'node:crypto';
+import { sendWelcomeEmail, sendPasswordResetEmail } from '../services/email.service.js';
 import passport from '../config/passport.js';
 import type { AuthenticatedRequest } from '../types/index.js';
 
@@ -91,6 +93,12 @@ router.post(
 
     const token = createToken(user.id);
     setTokenCookie(res, token);
+
+    // Send welcome email (fire and forget)
+    sendWelcomeEmail(user.email, user.firstName || undefined).catch(err =>
+      console.error('Failed to send welcome email:', err)
+    );
+
     sendCreated(res, user, 'User registered successfully');
   })
 );
@@ -245,6 +253,80 @@ router.put(
     });
 
     sendSuccess(res, null, 'Password changed successfully');
+  })
+);
+
+// Forgot password
+router.post(
+  '/forgot-password',
+  asyncHandler(async (req: Request, res: Response) => {
+    const { email } = req.body;
+    if (!email) {
+      res.status(400).json({ error: 'Email is required' });
+      return;
+    }
+
+    const user = await prisma.user.findUnique({ where: { email: email.toLowerCase().trim() } });
+
+    // Always respond success to prevent email enumeration
+    if (!user || !user.password) {
+      sendSuccess(res, null, 'If an account exists with this email, a reset link has been sent.');
+      return;
+    }
+
+    const resetToken = crypto.randomBytes(32).toString('hex');
+    const resetTokenExpiry = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { resetToken, resetTokenExpiry },
+    });
+
+    await sendPasswordResetEmail(user.email, resetToken);
+
+    sendSuccess(res, null, 'If an account exists with this email, a reset link has been sent.');
+  })
+);
+
+// Reset password
+router.post(
+  '/reset-password',
+  asyncHandler(async (req: Request, res: Response) => {
+    const { token, password } = req.body;
+    if (!token || !password) {
+      res.status(400).json({ error: 'Token and password are required' });
+      return;
+    }
+
+    if (password.length < 8 || !/[A-Z]/.test(password) || !/[0-9]/.test(password)) {
+      res.status(400).json({ error: 'Password must be at least 8 characters with 1 uppercase letter and 1 number' });
+      return;
+    }
+
+    const user = await prisma.user.findFirst({
+      where: {
+        resetToken: token,
+        resetTokenExpiry: { gt: new Date() },
+      },
+    });
+
+    if (!user) {
+      res.status(400).json({ error: 'Invalid or expired reset token' });
+      return;
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 12);
+
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        password: hashedPassword,
+        resetToken: null,
+        resetTokenExpiry: null,
+      },
+    });
+
+    sendSuccess(res, null, 'Password reset successfully. You can now log in.');
   })
 );
 

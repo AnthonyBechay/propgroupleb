@@ -25,7 +25,6 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
     const token = cookieStore.get('token')?.value
 
     if (!token) {
-      console.log('[rbac] No token found in cookies')
       return null
     }
 
@@ -51,7 +50,6 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
     const data = JSON.parse(text)
 
     if (data.success && data.user) {
-      console.log(`[rbac] Successfully authenticated user: ${data.user.email} (${data.user.role})`)
       return {
         id: data.user.id,
         email: data.user.email,

@@ -2,7 +2,6 @@ import { PrismaClient } from '@prisma/client'
 import {
   Country,
   PropertyStatus,
-  InvestmentGoal,
   Role,
   PropertyType,
   FurnishingStatus,
@@ -64,47 +63,7 @@ async function main() {
     },
   })
 
-  const testUser = await prisma.user.upsert({
-    where: { email: 'user@propgroup.com' },
-    update: {},
-    create: {
-      email: 'user@propgroup.com',
-      password: hashedUserPassword,
-      firstName: 'Test',
-      lastName: 'User',
-      role: Role.USER,
-      provider: 'local',
-      isActive: true,
-      emailVerifiedAt: new Date(),
-      investmentGoals: [InvestmentGoal.HIGH_ROI, InvestmentGoal.CAPITAL_GROWTH],
-      membershipTier: MembershipTier.FREE,
-      country: 'United States',
-      phone: '+1 555 0123',
-    },
-  })
-
-  const eliteUser = await prisma.user.upsert({
-    where: { email: 'elite@propgroup.com' },
-    update: {},
-    create: {
-      email: 'elite@propgroup.com',
-      password: hashedUserPassword,
-      firstName: 'Elite',
-      lastName: 'Member',
-      role: Role.USER,
-      provider: 'local',
-      isActive: true,
-      emailVerifiedAt: new Date(),
-      investmentGoals: [InvestmentGoal.GOLDEN_VISA, InvestmentGoal.CAPITAL_GROWTH],
-      membershipTier: MembershipTier.ELITE,
-      membershipStartDate: new Date(),
-      membershipEndDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
-      country: 'United Kingdom',
-      phone: '+44 20 7123 4567',
-    },
-  })
-
-  console.log('✅ Created 4 users (Super Admin, Agent, Test User, Elite Member)')
+  console.log('✅ Created 2 users (Super Admin, Agent)')
 
   // ============================================
   // 2. CREATE DEVELOPERS (Georgia-focused)
@@ -1897,101 +1856,7 @@ An affordable coastal entry point with strong upside.`,
   console.log(`✅ Created ${amenityData.length} amenities`)
 
   // ============================================
-  // 7. USER INTERACTIONS
-  // ============================================
-  console.log('\n💝 Creating user interactions...')
-  await prisma.favoriteProperty.createMany({
-    data: [
-      { userId: testUser.id, propertyId: createdProperties[0].id },  // Lamborghini Tower
-      { userId: testUser.id, propertyId: createdProperties[2].id },  // Rotana Pontus
-      { userId: testUser.id, propertyId: createdProperties[12].id }, // Redco Gudauri
-      { userId: eliteUser.id, propertyId: createdProperties[0].id }, // Lamborghini Tower
-      { userId: eliteUser.id, propertyId: createdProperties[5].id }, // Royal Tulip Oval
-      { userId: eliteUser.id, propertyId: createdProperties[10].id }, // Novotel Living
-    ],
-    skipDuplicates: true,
-  })
-
-  await prisma.propertyInquiry.createMany({
-    data: [
-      {
-        userId: testUser.id,
-        propertyId: createdProperties[0].id,
-        name: 'Test User',
-        email: 'user@propgroup.com',
-        phone: '+1 555 0123',
-        message: 'I am interested in the Tonino Lamborghini Tower. Could you provide more details about the payment plan and available units?',
-      },
-      {
-        userId: eliteUser.id,
-        propertyId: createdProperties[2].id,
-        name: 'Elite Member',
-        email: 'elite@propgroup.com',
-        phone: '+44 20 7123 4567',
-        message: 'I would like to discuss the Rotana Pontus Gonio project and the 12.5% ROI in detail. Can we arrange a call?',
-      },
-      {
-        userId: testUser.id,
-        propertyId: createdProperties[4].id,
-        name: 'Test User',
-        email: 'user@propgroup.com',
-        phone: '+1 555 0123',
-        message: 'The OKTO Art House looks very affordable. What are the exact installment terms and when is delivery expected?',
-      },
-    ],
-  })
-
-  console.log('✅ Created favorites and inquiries')
-
-  // ============================================
-  // 8. NOTIFICATIONS
-  // ============================================
-  console.log('\n🔔 Creating notifications...')
-  await prisma.notification.createMany({
-    data: [
-      {
-        userId: testUser.id,
-        type: 'PROPERTY_UPDATE',
-        title: 'New Listing: Tonino Lamborghini Tower',
-        message: 'A luxury branded residence just listed on Batumi Island — starting from $165,000',
-        link: `/properties/${createdProperties[0].id}`,
-        actionLabel: 'View Property',
-        actionUrl: `/properties/${createdProperties[0].id}`,
-        relatedEntityType: 'property',
-        relatedEntityId: createdProperties[0].id,
-        priority: 'high',
-      },
-      {
-        userId: testUser.id,
-        type: 'NEW_MATCHING_PROPERTY',
-        title: 'High ROI Match: Rotana Pontus Gonio',
-        message: '12.5% projected ROI — a 5-star beachfront resort in Gonio matching your investment goals',
-        link: `/properties/${createdProperties[2].id}`,
-        actionLabel: 'View Property',
-        actionUrl: `/properties/${createdProperties[2].id}`,
-        relatedEntityType: 'property',
-        relatedEntityId: createdProperties[2].id,
-        priority: 'normal',
-      },
-      {
-        userId: eliteUser.id,
-        type: 'NEW_MATCHING_PROPERTY',
-        title: 'Budget-Friendly: OKTO Art House from $45K',
-        message: 'New affordable option with 0% installments — great for first-time investors',
-        link: `/properties/${createdProperties[4].id}`,
-        actionLabel: 'View Property',
-        actionUrl: `/properties/${createdProperties[4].id}`,
-        relatedEntityType: 'property',
-        relatedEntityId: createdProperties[4].id,
-        priority: 'normal',
-      },
-    ],
-  })
-
-  console.log('✅ Created notifications')
-
-  // ============================================
-  // 9. SITE CONTENT (CMS)
+  // 7. SITE CONTENT (CMS)
   // ============================================
   console.log('\n📄 Seeding site content...')
 
@@ -2036,40 +1901,20 @@ An affordable coastal entry point with strong upside.`,
   // SUMMARY
   // ============================================
   console.log('\n' + '='.repeat(50))
-  console.log('🎉 Database seed completed successfully!')
+  console.log('Database seed completed successfully!')
   console.log('='.repeat(50))
-  console.log('\n📊 Summary:')
-  console.log('   • 4 Users (Super Admin, Agent, Test User, Elite Member)')
-  console.log(`   • ${developers.length} Developers (real Georgia-based companies)`)
-  console.log(`   • ${locationGuides.length} Location Guides`)
-  console.log(`   • ${createdProperties.length} Properties from propgrp.com (real listings)`)
-  console.log(`   • ${tags.length} Tags with property assignments`)
-  console.log(`   • ${amenityData.length} Amenities`)
-  console.log('   • Favorites, Inquiries, Notifications')
-  console.log('\n📍 Cities Covered:')
-  console.log('   • Batumi (10 properties)')
-  console.log('   • Tbilisi (1 property)')
-  console.log('   • Gudauri (1 property)')
-  console.log('   • Gonio, Kvariati, Chakvi, Makhinjauri, Kobuleti')
-  console.log('\n👤 Login Credentials:')
-  console.log('   ┌─────────────────────────────────────────┐')
-  console.log('   │ Super Admin:                            │')
-  console.log('   │ Email: admin@propgroup.com              │')
-  console.log('   │ Password: Admin123!                     │')
-  console.log('   ├─────────────────────────────────────────┤')
-  console.log('   │ Agent:                                  │')
-  console.log('   │ Email: agent@propgroup.com              │')
-  console.log('   │ Password: User123!                      │')
-  console.log('   ├─────────────────────────────────────────┤')
-  console.log('   │ Test User:                              │')
-  console.log('   │ Email: user@propgroup.com               │')
-  console.log('   │ Password: User123!                      │')
-  console.log('   ├─────────────────────────────────────────┤')
-  console.log('   │ Elite Member:                           │')
-  console.log('   │ Email: elite@propgroup.com              │')
-  console.log('   │ Password: User123!                      │')
-  console.log('   └─────────────────────────────────────────┘')
-  console.log('\n⚠️  IMPORTANT: Change all passwords after first login!')
+  console.log('\nSummary:')
+  console.log('   2 Users (Super Admin, Agent)')
+  console.log(`   ${developers.length} Developers`)
+  console.log(`   ${locationGuides.length + 1} Location Guides`)
+  console.log(`   ${createdProperties.length} Properties with investment data`)
+  console.log(`   ${tags.length} Tags with property assignments`)
+  console.log(`   ${amenityData.length} Amenities`)
+  console.log(`   ${siteContentData.length} Site content entries`)
+  console.log('\nLogin Credentials:')
+  console.log('   Super Admin: admin@propgroup.com / Admin123!')
+  console.log('   Agent: agent@propgroup.com / User123!')
+  console.log('\nIMPORTANT: Change all passwords after first login!')
   console.log('')
 }
 

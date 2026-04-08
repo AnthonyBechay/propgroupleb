@@ -78,18 +78,10 @@ export default async function PropertiesPage({ searchParams }: PropertiesPagePro
     
     if (response.ok) {
       const data = await response.json();
-      console.log('Properties API response:', { success: data.success, dataLength: data.data?.length, pagination: data.pagination });
-      
       if (data.success && data.data) {
-        // Backend returns { success: true, data: [properties array], pagination: {...} }
         if (Array.isArray(data.data)) {
           properties = data.data;
-          console.log(`[Properties Page] Loaded ${properties.length} properties from ${apiUrl}/api/properties`);
-        } else {
-          console.warn('[Properties Page] Properties data is not an array:', data.data);
         }
-      } else {
-        console.warn('[Properties Page] API returned unsuccessful response:', data);
       }
     } else {
       const errorText = await response.text();

@@ -22,7 +22,6 @@ import {
   Award,
   Camera
 } from 'lucide-react'
-import { submitInquiry } from '@/actions/inquiry-actions'
 import { useAuth } from '@/contexts/AuthContext'
 import { normalizeApiUrl, normalizeFileUrl } from '@/lib/utils/api-url'
 import { AuthModal } from '@/components/auth/AuthModal'
@@ -34,11 +33,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Textarea } from '@/components/ui/textarea'
-import { useForm } from 'react-hook-form'
 import { toast } from '@/components/ui/use-toast'
+import { InquiryForm } from '@/components/shared/InquiryForm'
 
 interface PropertyCardProps {
   id: string
@@ -86,23 +82,8 @@ export function PropertyCard({
   const [isLoadingFavorite, setIsLoadingFavorite] = useState(false)
   const [showAuthModal, setShowAuthModal] = useState(false)
   const [showInquiryModal, setShowInquiryModal] = useState(false)
-  const [isSubmittingInquiry, setIsSubmittingInquiry] = useState(false)
   const [imageError, setImageError] = useState(false)
   const [currentImageIndex, setCurrentImageIndex] = useState(0)
-
-  const {
-    register,
-    handleSubmit,
-    reset,
-    formState: { errors },
-  } = useForm({
-    defaultValues: {
-      name: '',
-      email: user?.email || '',
-      phone: '',
-      message: '',
-    },
-  })
 
   const apiUrl = normalizeApiUrl(process.env.NEXT_PUBLIC_API_URL)
 
@@ -157,39 +138,6 @@ export function PropertyCard({
       })
     } finally {
       setIsLoadingFavorite(false)
-    }
-  }
-
-  const onInquirySubmit = async (data: any) => {
-    setIsSubmittingInquiry(true)
-    try {
-      const result = await submitInquiry({
-        propertyId: id,
-        ...data,
-      })
-
-      if (result.success) {
-        toast({
-          title: 'Inquiry sent!',
-          description: result.message,
-        })
-        reset()
-        setShowInquiryModal(false)
-      } else {
-        toast({
-          title: 'Error',
-          description: result.error || 'Failed to send inquiry',
-          variant: 'destructive',
-        })
-      }
-    } catch (error) {
-      toast({
-        title: 'Error',
-        description: 'An unexpected error occurred',
-        variant: 'destructive',
-      })
-    } finally {
-      setIsSubmittingInquiry(false)
     }
   }
 
@@ -418,90 +366,18 @@ export function PropertyCard({
           <DialogHeader>
             <DialogTitle className="text-2xl font-bold">Property Inquiry</DialogTitle>
             <DialogDescription className="text-base">
-              Interested in "{title}"? Fill out the form below and our team will contact you within 24 hours.
+              Interested in &quot;{title}&quot;? Fill out the form below and our team will contact you within 24 hours.
             </DialogDescription>
           </DialogHeader>
-          <form onSubmit={handleSubmit(onInquirySubmit)} className="space-y-4 mt-4">
-            <div className="space-y-2">
-              <Label htmlFor="name">Full Name *</Label>
-              <Input
-                id="name"
-                {...register('name', { required: 'Name is required' })}
-                placeholder="John Doe"
-                className="h-11"
-              />
-              {errors.name && (
-                <p className="text-sm text-red-600">{errors.name.message}</p>
-              )}
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="email">Email Address *</Label>
-              <Input
-                id="email"
-                type="email"
-                {...register('email', {
-                  required: 'Email is required',
-                  pattern: {
-                    value: /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i,
-                    message: 'Invalid email address',
-                  },
-                })}
-                placeholder="john@example.com"
-                className="h-11"
-              />
-              {errors.email && (
-                <p className="text-sm text-red-600">{errors.email.message}</p>
-              )}
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="phone">Phone Number</Label>
-              <Input
-                id="phone"
-                type="tel"
-                {...register('phone')}
-                placeholder="+1 (555) 000-0000"
-                className="h-11"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="message">Message (Optional)</Label>
-              <Textarea
-                id="message"
-                {...register('message')}
-                placeholder="Tell us about your investment goals or any specific questions..."
-                rows={4}
-                className="resize-none"
-              />
-            </div>
-
-            <div className="flex gap-3 pt-4">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setShowInquiryModal(false)}
-                className="flex-1"
-              >
-                Cancel
-              </Button>
-              <Button
-                type="submit"
-                disabled={isSubmittingInquiry}
-                className="flex-1 bg-[#1B3A5C] hover:bg-[#24507D] text-white"
-              >
-                {isSubmittingInquiry ? (
-                  <span className="flex items-center gap-2">
-                    <span className="animate-spin h-4 w-4 border-2 border-white/30 border-t-white rounded-full" />
-                    Sending...
-                  </span>
-                ) : (
-                  'Send Inquiry'
-                )}
-              </Button>
-            </div>
-          </form>
+          <div className="mt-4">
+            <InquiryForm
+              propertyId={id}
+              defaultEmail={user?.email || ''}
+              showCancel
+              onSuccess={() => setShowInquiryModal(false)}
+              onCancel={() => setShowInquiryModal(false)}
+            />
+          </div>
         </DialogContent>
       </Dialog>
     </>

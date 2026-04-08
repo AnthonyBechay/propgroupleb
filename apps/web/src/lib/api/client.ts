@@ -20,10 +20,6 @@ class ApiClient {
     const normalizedEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
     const url = `${this.baseURL}${normalizedEndpoint}`;
     
-    if (process.env.NODE_ENV === 'development') {
-      console.log('[API Client] Request:', url, 'baseURL:', this.baseURL, 'endpoint:', normalizedEndpoint);
-    }
-
     const config: RequestInit = {
       credentials: 'include', // Include cookies for authentication
       headers: {

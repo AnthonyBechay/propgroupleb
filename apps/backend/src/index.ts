@@ -67,8 +67,11 @@ const allowedOrigins = (process.env.ALLOWED_ORIGINS || FRONTEND_URL)
 app.use(
   cors({
     origin: (origin, callback) => {
-      // Allow requests with no origin (mobile apps, curl, server-to-server)
+      // Reject origin-less requests in production (prevents CORS bypass)
       if (!origin) {
+        if (process.env.NODE_ENV === 'production') {
+          return callback(null, false);
+        }
         return callback(null, true);
       }
 

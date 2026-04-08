@@ -150,7 +150,7 @@ export function AIAssistantFab() {
           <button
             onClick={() => openWhatsApp()}
             className="w-12 h-12 rounded-full shadow-lg bg-[#25D366] hover:bg-[#20BD5A] flex items-center justify-center transition-all hover:scale-105"
-            title="Chat on WhatsApp"
+            aria-label="Chat on WhatsApp"
           >
             <WhatsAppIcon className="w-6 h-6 text-white" />
           </button>
@@ -159,6 +159,7 @@ export function AIAssistantFab() {
           <button
             onClick={handleOpen}
             className="w-16 h-16 rounded-full shadow-2xl bg-[#1B3A5C] hover:bg-[#24507D] flex items-center justify-center transition-all hover:scale-105 group"
+            aria-label="Open AI assistant"
           >
             <div className="relative">
               <Bot className="w-7 h-7 text-white" />
@@ -197,7 +198,7 @@ export function AIAssistantFab() {
                     <button
                       onClick={handleNewSearch}
                       className="p-1.5 text-white/60 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
-                      title="New search"
+                      aria-label="New search"
                     >
                       <RotateCcw className="w-4 h-4" />
                     </button>
@@ -205,6 +206,7 @@ export function AIAssistantFab() {
                   <button
                     onClick={() => setIsOpen(false)}
                     className="p-1.5 text-white/60 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
+                    aria-label="Close assistant"
                   >
                     <X className="w-4 h-4" />
                   </button>

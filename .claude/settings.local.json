@@ -145,7 +145,12 @@
       "Bash(pnpm --filter @propgroup/backend run build)",
       "WebFetch(domain:propgrp.com)",
       "Bash(xargs ls:*)",
-      "Bash(xargs sed:*)"
+      "Bash(xargs sed:*)",
+      "Bash(ls -la /Users/anthonybechay/development/propgroup/apps/backend/src/.env* /Users/anthonybechay/development/propgroup/apps/web/.env*)",
+      "Bash(ls -la /Users/anthonybechay/development/propgroup/apps/backend/.env.*)",
+      "Bash(git -C /Users/anthonybechay/development/propgroup log --oneline -20)",
+      "Bash(npm ls:*)",
+      "Bash(npm list:*)"
     ],
     "deny": [],
     "ask": []

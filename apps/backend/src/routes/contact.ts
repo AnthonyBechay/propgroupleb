@@ -6,6 +6,7 @@ import { authenticateToken, requireAdmin } from '../middleware/auth.js';
 import { sendSuccess, sendPaginated } from '../utils/response.js';
 import { parsePagination, buildPaginationResponse } from '../utils/pagination.js';
 import rateLimit from 'express-rate-limit';
+import { sendContactConfirmation, notifyAdminOfInquiry } from '../services/email.service.js';
 
 const router: Router = express.Router();
 
@@ -36,6 +37,18 @@ router.post('/', contactLimiter, asyncHandler(async (req: Request, res: Response
       message: data.message,
     },
   });
+
+  // Send email notifications (fire and forget)
+  sendContactConfirmation(data.email, data.name).catch(err =>
+    console.error('Failed to send contact confirmation:', err)
+  );
+
+  notifyAdminOfInquiry({
+    name: data.name,
+    email: data.email,
+    phone: data.phone,
+    message: data.message,
+  }).catch(err => console.error('Failed to send admin notification:', err));
 
   res.status(201).json({ success: true, id: contact.id });
 }));
