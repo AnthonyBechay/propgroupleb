@@ -1881,7 +1881,7 @@ An affordable coastal entry point with strong upside.`,
     { key: 'cta_button_link', section: 'cta', title: 'CTA Button Link', content: '/get-started', sortOrder: 4 },
 
     { key: 'contact_email', section: 'contact', title: 'Contact Email', content: 'info@propgroup.com', sortOrder: 1 },
-    { key: 'contact_phone', section: 'contact', title: 'Contact Phone', content: '+995 32 123 456', sortOrder: 2 },
+    { key: 'contact_phone', section: 'contact', title: 'Contact Phone', content: '+961 71 934 001', sortOrder: 2 },
     { key: 'contact_address', section: 'contact', title: 'Contact Address', content: 'Tbilisi, Georgia', sortOrder: 3 },
 
     { key: 'footer_tagline', section: 'footer', title: 'Footer Tagline', content: 'Premium Georgian Real Estate Investment Platform', sortOrder: 1 },

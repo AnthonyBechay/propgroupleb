@@ -130,7 +130,7 @@ export function InquiryForm({
           id="inquiry-phone"
           type="tel"
           {...register('phone')}
-          placeholder="+1 (555) 000-0000"
+          placeholder="+961 71 000 000"
           className="h-11"
         />
       </div>

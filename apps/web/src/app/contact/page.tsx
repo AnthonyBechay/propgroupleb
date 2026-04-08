@@ -242,7 +242,7 @@ export default function ContactPage() {
                     <Phone className="h-5 w-5 text-[#1B3A5C] mt-1" />
                     <div>
                       <div className="font-medium text-slate-900">Phone</div>
-                      <div className="text-sm text-slate-600">+1 (555) 123-4567</div>
+                      <div className="text-sm text-slate-600">+961 71 934 001</div>
                     </div>
                   </div>
                   <div className="flex items-start space-x-3">

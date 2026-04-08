@@ -238,7 +238,7 @@ export default function SettingsPage() {
                       value={phone}
                       onChange={(e) => setPhone(e.target.value)}
                       className="mt-2 border-2 border-slate-200 rounded-xl focus:border-[#1B3A5C] focus:ring-[#1B3A5C]"
-                      placeholder="+1 (555) 000-0000"
+                      placeholder="+961 71 000 000"
                     />
                   </div>
 
