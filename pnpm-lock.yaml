@@ -284,15 +284,9 @@ importers:
       '@prisma/client':
         specifier: ^5.0.0
         version: 5.22.0(prisma@5.22.0)
-      bcryptjs:
-        specifier: ^2.4.3
-        version: 2.4.3
       prisma:
         specifier: ^5.0.0
         version: 5.22.0
-      tsx:
-        specifier: ^4.0.0
-        version: 4.20.6
     devDependencies:
       '@types/node':
         specifier: ^20.0.0
