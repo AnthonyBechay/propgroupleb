@@ -154,7 +154,8 @@
       "Bash(ls /Users/anthonybechay/development/propgroup/apps/backend/src/routes/*.ts)",
       "Bash(ls -lt /Users/anthonybechay/development/propgroup/packages/db/*.js /Users/anthonybechay/development/propgroup/packages/db/*.sql)",
       "Bash(ls /Users/anthonybechay/development/propgroup/packages/db/prisma*)",
-      "Bash(ls /Users/anthonybechay/development/propgroup/packages/db/*.sql)"
+      "Bash(ls /Users/anthonybechay/development/propgroup/packages/db/*.sql)",
+      "Bash(git fetch:*)"
     ],
     "deny": [],
     "ask": []
