@@ -182,33 +182,101 @@ router.get(
   })
 );
 
-// Update document metadata (admin only)
+// Update document metadata + optional file replacement (admin only)
 router.put(
   '/:id',
   authenticateToken,
   requireAdmin,
+  (req: Request, res: Response, next: NextFunction) => {
+    // Accept multipart (with file) or JSON (metadata only)
+    const contentType = req.headers['content-type'] || '';
+    if (contentType.startsWith('multipart/form-data')) {
+      documentUpload.single('file')(req, res, (err) => {
+        if (err) {
+          const status = (err as any).code === 'LIMIT_FILE_SIZE' ? 413 : 400;
+          res.status(status).json({ error: 'Upload error', message: err.message });
+          return;
+        }
+        next();
+      });
+    } else {
+      next();
+    }
+  },
   asyncHandler(async (req: Request, res: Response) => {
     const authReq = req as AuthenticatedRequest;
     const { title, description, type, isPublic } = req.body;
+    const newFile = req.file;
 
-    const document = await prisma.propertyDocument.findUnique({
+    const existing = await prisma.propertyDocument.findUnique({
       where: { id: req.params.id },
-      select: { id: true, title: true },
+      include: {
+        property: { select: { id: true, title: true, slug: true, country: true } },
+      },
     });
 
-    if (!document) {
+    if (!existing) {
       sendNotFound(res, 'Document');
       return;
     }
 
+    // Normalize isPublic (may come as string from multipart)
+    const normalizedIsPublic =
+      typeof isPublic === 'string' ? isPublic === 'true' : isPublic;
+
+    const validTypes = ['FLOOR_PLAN', 'BROCHURE', 'CONTRACT', 'LEGAL_DOCUMENT', 'CERTIFICATE', 'OTHER'];
+    const normalizedType =
+      type !== undefined && validTypes.includes(type) ? type : undefined;
+
+    const updateData: Record<string, unknown> = {};
+    if (title !== undefined) updateData.title = title;
+    if (description !== undefined) updateData.description = description || null;
+    if (normalizedType !== undefined) updateData.type = normalizedType;
+    if (normalizedIsPublic !== undefined) updateData.isPublic = normalizedIsPublic;
+
+    // Handle optional file replacement
+    if (newFile) {
+      try {
+        const uploaded = await uploadFile(
+          newFile.buffer,
+          newFile.originalname,
+          newFile.mimetype,
+          'documents',
+          {
+            propertySlug: existing.property.slug || existing.property.title,
+            documentType: (normalizedType || existing.type) as string,
+            customName: (title || existing.title) as string,
+          }
+        );
+
+        // Delete the old file from storage (best-effort)
+        try {
+          const oldKey = extractKeyFromUrl(existing.fileUrl);
+          if (oldKey) await deleteFile(oldKey);
+        } catch (delErr) {
+          logger.error('Failed to delete old document file', delErr);
+        }
+
+        updateData.fileUrl = uploaded.url;
+        updateData.fileSize = newFile.size;
+        updateData.mimeType = newFile.mimetype;
+      } catch (uploadErr: any) {
+        logger.error('R2 upload failed for document replacement', uploadErr, {
+          fileName: newFile.originalname,
+          mimeType: newFile.mimetype,
+          documentId: req.params.id,
+        });
+        res.status(500).json({
+          error: 'Upload failed',
+          message: `Failed to replace file: ${uploadErr?.message || 'Unknown error'}`,
+        });
+        return;
+      }
+    }
+
     const updated = await prisma.propertyDocument.update({
       where: { id: req.params.id },
-      data: {
-        ...(title !== undefined && { title }),
-        ...(description !== undefined && { description }),
-        ...(type !== undefined && { type }),
-        ...(isPublic !== undefined && { isPublic }),
-      },
+      data: updateData,
       include: {
         property: { select: { id: true, title: true, country: true } },
       },
@@ -217,6 +285,7 @@ router.put(
     await logAdminAction('UPDATE_DOCUMENT', 'document', req.params.id, {
       title: updated.title,
       propertyId: updated.property.id,
+      fileReplaced: !!newFile,
     }, authReq);
 
     sendSuccess(res, updated, 'Document updated successfully');

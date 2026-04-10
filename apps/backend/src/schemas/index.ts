@@ -84,6 +84,7 @@ export const propertySchema = z.object({
   zipCode: z.string().nullish(),
   latitude: z.number().nullish(),
   longitude: z.number().nullish(),
+  locationUrl: z.string().nullish(),
 
   status: z.enum(['OFF_PLAN', 'NEW_BUILD', 'RESALE']),
   availabilityStatus: z.enum(['AVAILABLE', 'RESERVED', 'SOLD', 'OFF_MARKET']).nullish(),

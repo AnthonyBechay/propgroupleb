@@ -103,6 +103,7 @@ export default function DocumentsPage() {
   const [editDescription, setEditDescription] = useState('')
   const [editType, setEditType] = useState('')
   const [editIsPublic, setEditIsPublic] = useState(false)
+  const [editReplaceFile, setEditReplaceFile] = useState<File | null>(null)
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
@@ -215,10 +216,12 @@ export default function DocumentsPage() {
     setEditDescription(doc.description || '')
     setEditType(doc.type)
     setEditIsPublic(doc.isPublic)
+    setEditReplaceFile(null)
   }
 
   function cancelEditing() {
     setEditingDoc(null)
+    setEditReplaceFile(null)
   }
 
   async function handleSaveEdit() {
@@ -227,26 +230,50 @@ export default function DocumentsPage() {
     try {
       const { normalizeApiUrl } = await import('@/lib/utils/api-url')
       const apiUrl = normalizeApiUrl(process.env.NEXT_PUBLIC_API_URL || '')
-      const response = await fetch(`${apiUrl}/api/documents/${editingDoc.id}`, {
-        method: 'PUT',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          title: editTitle,
-          description: editDescription || null,
-          type: editType,
-          isPublic: editIsPublic,
-        }),
-      })
+
+      // Use multipart if a file replacement is provided, otherwise JSON
+      let response: Response
+      if (editReplaceFile) {
+        const fd = new FormData()
+        fd.append('file', editReplaceFile)
+        fd.append('title', editTitle)
+        fd.append('description', editDescription)
+        fd.append('type', editType)
+        fd.append('isPublic', String(editIsPublic))
+        response = await fetch(`${apiUrl}/api/documents/${editingDoc.id}`, {
+          method: 'PUT',
+          credentials: 'include',
+          body: fd,
+        })
+      } else {
+        response = await fetch(`${apiUrl}/api/documents/${editingDoc.id}`, {
+          method: 'PUT',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            title: editTitle,
+            description: editDescription || null,
+            type: editType,
+            isPublic: editIsPublic,
+          }),
+        })
+      }
+
       if (response.ok) {
-        setDocuments(prev =>
-          prev.map(d =>
-            d.id === editingDoc.id
-              ? { ...d, title: editTitle, description: editDescription || null, type: editType, isPublic: editIsPublic }
-              : d
+        // Refetch to get updated fileUrl/size if replaced
+        if (editReplaceFile) {
+          await fetchDocuments()
+        } else {
+          setDocuments(prev =>
+            prev.map(d =>
+              d.id === editingDoc.id
+                ? { ...d, title: editTitle, description: editDescription || null, type: editType, isPublic: editIsPublic }
+                : d
+            )
           )
-        )
+        }
         setEditingDoc(null)
+        setEditReplaceFile(null)
       } else {
         const err = await response.json().catch(() => ({}))
         alert(`Failed to update: ${err.message || err.error || 'Unknown error'}`)
@@ -490,7 +517,7 @@ export default function DocumentsPage() {
       {editingDoc && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
           <div className="fixed inset-0 bg-black/50" onClick={() => !saving && cancelEditing()} />
-          <div className="relative bg-white rounded-2xl shadow-2xl max-w-lg w-full mx-4 p-6">
+          <div className="relative bg-white rounded-2xl shadow-2xl max-w-lg w-full mx-4 p-6 max-h-[90vh] overflow-y-auto">
             <button
               onClick={() => !saving && cancelEditing()}
               className="absolute top-4 right-4 text-slate-400 hover:text-slate-600"
@@ -499,11 +526,23 @@ export default function DocumentsPage() {
             </button>
 
             <h3 className="text-lg font-bold text-slate-900 mb-6 flex items-center gap-2">
-              <Pencil className="w-5 h-5 text-[#C49A2E]" />
+              <Pencil className="w-5 h-5 text-[#D97706]" />
               Edit Document
             </h3>
 
             <div className="space-y-4">
+              {/* Property (read-only display) */}
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Property</label>
+                <div className="flex items-center gap-2 px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm">
+                  <Building2 className="w-4 h-4 text-slate-400 flex-shrink-0" />
+                  <span className="text-slate-700 truncate">
+                    {editingDoc.property.title} ({editingDoc.property.country})
+                  </span>
+                </div>
+              </div>
+
+              {/* Title */}
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">
                   Title <span className="text-red-500">*</span>
@@ -516,6 +555,7 @@ export default function DocumentsPage() {
                 />
               </div>
 
+              {/* Description */}
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Description</label>
                 <textarea
@@ -526,6 +566,7 @@ export default function DocumentsPage() {
                 />
               </div>
 
+              {/* Type */}
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Document Type</label>
                 <select
@@ -539,6 +580,71 @@ export default function DocumentsPage() {
                 </select>
               </div>
 
+              {/* Current file + replacement */}
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">File</label>
+                {!editReplaceFile ? (
+                  <div className="border border-slate-200 rounded-lg p-3 bg-slate-50">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2 min-w-0">
+                        {getFileIcon(editingDoc.mimeType)}
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium text-slate-900 truncate">
+                            Current file
+                          </p>
+                          <p className="text-xs text-slate-500">
+                            {formatFileSize(editingDoc.fileSize)}
+                            {editingDoc.mimeType && ` · ${editingDoc.mimeType.split('/').pop()?.toUpperCase()}`}
+                          </p>
+                        </div>
+                      </div>
+                      <a
+                        href={editingDoc.fileUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs text-[#1B3A5C] hover:underline flex-shrink-0"
+                      >
+                        View
+                      </a>
+                    </div>
+                    <label className="mt-2 block cursor-pointer">
+                      <span className="text-xs text-slate-500 hover:text-[#1B3A5C] transition-colors flex items-center gap-1">
+                        <Upload className="w-3 h-3" /> Replace with a new file
+                      </span>
+                      <input
+                        type="file"
+                        className="hidden"
+                        accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx,.xls,.xlsx"
+                        onChange={(e) => setEditReplaceFile(e.target.files?.[0] || null)}
+                      />
+                    </label>
+                  </div>
+                ) : (
+                  <div className="border-2 border-dashed border-[#1B3A5C] rounded-lg p-3 bg-[#E0EDF7]/40">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2 min-w-0">
+                        {getFileIcon(editReplaceFile.type)}
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium text-slate-900 truncate">
+                            {editReplaceFile.name}
+                          </p>
+                          <p className="text-xs text-slate-500">
+                            New file · {formatFileSize(editReplaceFile.size)}
+                          </p>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => setEditReplaceFile(null)}
+                        className="text-slate-400 hover:text-red-500 flex-shrink-0"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Public toggle */}
               <label className="flex items-center gap-2 cursor-pointer">
                 <input
                   type="checkbox"

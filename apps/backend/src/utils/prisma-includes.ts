@@ -45,6 +45,20 @@ export const PROPERTY_DETAIL_INCLUDE = {
       tag: true,
     },
   },
+  documents: {
+    where: { isPublic: true },
+    select: {
+      id: true,
+      title: true,
+      description: true,
+      fileUrl: true,
+      fileSize: true,
+      mimeType: true,
+      type: true,
+      createdAt: true,
+    },
+    orderBy: { createdAt: 'desc' },
+  },
   _count: {
     select: {
       favoriteProperties: true,

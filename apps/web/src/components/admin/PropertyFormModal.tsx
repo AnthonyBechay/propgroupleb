@@ -63,6 +63,7 @@ const INITIAL_FORM = {
   district: '',
   address: '',
   location: '',
+  locationUrl: '',
   nearbyFacilities: '',
   builtYear: '' as string | number,
   floors: '' as string | number,
@@ -109,7 +110,7 @@ function buildPayload(form: typeof INITIAL_FORM, imageUrls: string[], videoUrl: 
     city: form.city || null,
     district: form.district || null,
     address: form.address || null,
-    location: form.location || null,
+    locationUrl: form.locationUrl || null,
     nearbyFacilities: form.nearbyFacilities || null,
     builtYear: form.builtYear ? Number(form.builtYear) : null,
     floors: form.floors ? Number(form.floors) : null,
@@ -184,6 +185,7 @@ export function PropertyFormModal(props: PropertyFormModalProps) {
         district: p.district || '',
         address: p.address || '',
         location: p.location || '',
+        locationUrl: p.locationUrl || '',
         nearbyFacilities: p.nearbyFacilities || '',
         builtYear: p.builtYear || '',
         floors: p.floors || '',
@@ -353,9 +355,15 @@ export function PropertyFormModal(props: PropertyFormModalProps) {
                 <label className={labelClass}>District</label>
                 <input className={inputClass} value={form.district} onChange={(e) => updateField('district', e.target.value)} placeholder="District" />
               </div>
-              <div>
-                <label className={labelClass}>Location</label>
-                <input className={inputClass} value={form.location} onChange={(e) => updateField('location', e.target.value)} placeholder="e.g., City Center, Beach Front" />
+              <div className="md:col-span-2">
+                <label className={labelClass}>Google Maps URL</label>
+                <input
+                  className={inputClass}
+                  value={form.locationUrl}
+                  onChange={(e) => updateField('locationUrl', e.target.value)}
+                  placeholder="https://www.google.com/maps/place/..."
+                />
+                <p className="mt-1 text-xs text-gray-500">Paste a Google Maps link — it will appear as an interactive map on the property page.</p>
               </div>
               <div className="flex items-center gap-3">
                 <input type="checkbox" id={`${isEdit ? 'edit' : 'create'}GoldenVisa`} checked={form.isGoldenVisaEligible} onChange={(e) => updateField('isGoldenVisaEligible', e.target.checked)} className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500" />

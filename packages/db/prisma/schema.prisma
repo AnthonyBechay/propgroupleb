@@ -301,13 +301,14 @@ model Property {
   parkingSpaces Int?         @default(0)
 
   // Location
-  country   Country
-  city      String?
-  district  String?
-  address   String?
-  zipCode   String?
-  latitude  Float?
-  longitude Float?
+  country     Country
+  city        String?
+  district    String?
+  address     String?
+  zipCode     String?
+  latitude    Float?
+  longitude   Float?
+  locationUrl String?  // Google Maps / OpenStreetMap URL for interactive map embedding
 
   // Status
   status             PropertyStatus
