@@ -21,7 +21,7 @@ export function HeroSectionNew() {
           {/* Main Headline */}
           <div className="text-center space-y-4 sm:space-y-6 mb-10 sm:mb-12">
             <div className="inline-flex items-center gap-2 px-4 py-2 bg-white/10 backdrop-blur-sm border border-white/20 rounded-full">
-              <Sparkles className="w-4 h-4 text-[#C49A2E]" />
+              <Sparkles className="w-4 h-4 text-white/90" />
               <span className="text-sm font-semibold text-white/90">Georgia Real Estate Investment</span>
             </div>
 
@@ -29,7 +29,7 @@ export function HeroSectionNew() {
               <span className="block text-white mb-2">
                 Invest Smart in
               </span>
-              <span className="block text-[#C49A2E]">
+              <span className="block text-slate-300">
                 Georgian Real Estate
               </span>
             </h1>
@@ -59,7 +59,7 @@ export function HeroSectionNew() {
             <Link href="/properties">
               <Button
                 size="lg"
-                className="w-full sm:w-auto h-12 px-8 text-base font-semibold bg-[#C49A2E] hover:bg-[#A98327] text-white rounded-xl shadow-lg transition-all"
+                className="w-full sm:w-auto h-12 px-8 text-base font-semibold bg-white hover:bg-slate-100 text-[#1B3A5C] rounded-xl shadow-lg transition-all"
               >
                 <span className="flex items-center gap-2">
                   Browse Properties
@@ -71,8 +71,7 @@ export function HeroSectionNew() {
             <Link href="/get-started">
               <Button
                 size="lg"
-                variant="outline"
-                className="w-full sm:w-auto h-12 px-8 text-base font-semibold border-2 border-white/30 text-white hover:bg-white/10 rounded-xl transition-all"
+                className="w-full sm:w-auto h-12 px-8 text-base font-semibold bg-slate-200/90 hover:bg-slate-100 text-[#0F2137] border-2 border-white/40 rounded-xl shadow-lg transition-all"
               >
                 Start Investing
               </Button>

@@ -1,7 +1,7 @@
 import { notFound } from 'next/navigation'
 import { normalizeApiUrl, normalizeFileUrl } from '@/lib/utils/api-url'
-import { toGoogleMapsEmbedUrl } from '@/lib/utils/map-embed'
-import { RoiCalculator } from '@/components/RoiCalculator'
+import { resolveGoogleMapsEmbedUrl } from '@/lib/utils/map-embed'
+import { CollapsibleRoiCalculator } from '@/components/property/CollapsibleRoiCalculator'
 import { PropertyImageGallery } from '@/components/PropertyImageGallery'
 import { PropertyDescription } from '@/components/property/PropertyDescription'
 import { PropertySidebar } from '@/components/property/PropertySidebar'
@@ -81,7 +81,7 @@ export default async function PropertyPage({ params }: PropertyPageProps) {
   }
 
   const showInvestmentSection = hasInvestmentData(property.investmentData)
-  const mapEmbedUrl = toGoogleMapsEmbedUrl(property.locationUrl)
+  const mapEmbedUrl = await resolveGoogleMapsEmbedUrl(property.locationUrl)
   const publicDocuments: any[] = Array.isArray(property.documents) ? property.documents : []
 
   const locationBits = [property.district, property.city, property.country?.charAt(0) + property.country?.slice(1).toLowerCase()]
@@ -388,8 +388,8 @@ export default async function PropertyPage({ params }: PropertyPageProps) {
               </div>
             )}
 
-            {/* ROI Calculator */}
-            <RoiCalculator
+            {/* ROI Calculator (collapsible) */}
+            <CollapsibleRoiCalculator
               propertyPrice={property.price}
               estimatedRent={estimatedRent}
             />
