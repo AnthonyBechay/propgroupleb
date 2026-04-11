@@ -33,10 +33,18 @@ export default async function AdminPropertiesPage() {
       console.error('[Admin Properties] Failed to fetch properties:', propertiesResponse.status)
     }
 
-    // Fetch developers and location guides (we'll need to create these API endpoints or use mock data)
-    // For now, using empty arrays - you can add API endpoints for these later
+    // Fetch developers and location guides
     developers = []
-    locationGuides = []
+
+    const guidesResponse = await fetch(`${apiUrl}/api/location-guides`, {
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json' },
+      cache: 'no-store',
+    })
+    if (guidesResponse.ok) {
+      const guidesData = await guidesResponse.json()
+      locationGuides = guidesData.data || guidesData || []
+    }
 
   } catch (error) {
     console.error('[Admin Properties] Error fetching properties data:', error)

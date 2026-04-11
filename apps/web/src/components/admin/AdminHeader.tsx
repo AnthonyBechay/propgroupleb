@@ -1,7 +1,7 @@
 'use client'
 
 import { useAuth } from '@/contexts/AuthContext'
-import { Bell, Menu, X, Home, Building2, Users, Shield, FileText, Settings, BarChart3, LogOut, Bot, MessageSquare, Inbox, PenTool } from 'lucide-react'
+import { Bell, Menu, X, Home, Building2, Users, Shield, FileText, Settings, BarChart3, LogOut, Bot, MessageSquare, Inbox, PenTool, MapPin } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useState } from 'react'
 import Link from 'next/link'
@@ -15,6 +15,7 @@ export function AdminHeader() {
   const navigation = [
     { name: 'Dashboard', href: '/admin', icon: Home },
     { name: 'Properties', href: '/admin/properties', icon: Building2 },
+    { name: 'Location Guides', href: '/admin/location-guides', icon: MapPin },
     { name: 'User Management', href: '/admin/users', icon: Users },
     { name: 'Inquiries', href: '/admin/inquiries', icon: MessageSquare },
     { name: 'Contact Messages', href: '/admin/contacts', icon: Inbox },

@@ -24,6 +24,7 @@ import contactRoutes from './routes/contact.js';
 import uploadRoutes from './routes/upload.js';
 import documentRoutes from './routes/documents.js';
 import fileRoutes from './routes/files.js';
+import locationGuideRoutes from './routes/location-guides.js';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -178,6 +179,7 @@ app.use('/api/contact', contactRoutes);
 app.use('/api/upload', uploadRoutes);
 app.use('/api/documents', documentRoutes);
 app.use('/api/files', fileRoutes);
+app.use('/api/location-guides', locationGuideRoutes);
 
 // Global error handler
 app.use(errorHandler);

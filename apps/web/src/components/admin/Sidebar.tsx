@@ -17,6 +17,7 @@ import {
   PenTool,
   ArrowLeft,
   Inbox,
+  MapPin,
 } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 
@@ -27,6 +28,7 @@ export function Sidebar() {
   const navigation = [
     { name: 'Dashboard', href: '/admin', icon: Home },
     { name: 'Properties', href: '/admin/properties', icon: Building2 },
+    { name: 'Location Guides', href: '/admin/location-guides', icon: MapPin },
     { name: 'User Management', href: '/admin/users', icon: Users },
     { name: 'Inquiries', href: '/admin/inquiries', icon: MessageSquare },
     { name: 'Contact Messages', href: '/admin/contacts', icon: Inbox },

@@ -155,7 +155,14 @@
       "Bash(ls -lt /Users/anthonybechay/development/propgroup/packages/db/*.js /Users/anthonybechay/development/propgroup/packages/db/*.sql)",
       "Bash(ls /Users/anthonybechay/development/propgroup/packages/db/prisma*)",
       "Bash(ls /Users/anthonybechay/development/propgroup/packages/db/*.sql)",
-      "Bash(git fetch:*)"
+      "Bash(git fetch:*)",
+      "Bash(ls /Users/anthonybechay/development/propgroup/apps/web/src/middleware* /Users/anthonybechay/development/propgroup/apps/web/middleware*)",
+      "Bash(git -C /Users/anthonybechay/development/propgroup log --oneline -15)",
+      "Bash(git -C /Users/anthonybechay/development/propgroup status --short)",
+      "Bash(git -C /Users/anthonybechay/development/propgroup show --stat 481c7b0)",
+      "Bash(git -C /Users/anthonybechay/development/propgroup diff --stat HEAD)",
+      "Bash(curl -sI -m 8 https://bechays.com/)",
+      "Bash(curl -sI -m 8 https://www.bechays.com/)"
     ],
     "deny": [],
     "ask": []

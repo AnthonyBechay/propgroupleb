@@ -76,13 +76,17 @@ export async function resolveGoogleMapsEmbedUrl(
   const direct = extractLatLng(trimmed)
   if (direct) return buildEmbedFromLatLng(direct.lat, direct.lng)
 
-  // Short link → follow redirects to get the full URL, then extract
+  // Short link → follow redirects to get the full URL, then extract.
+  // Hard timeout so a slow/hanging resolver can never block the page.
   const isShortLink = /(?:maps\.app\.goo\.gl|goo\.gl\/maps)/i.test(trimmed)
   if (isShortLink) {
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 2500)
     try {
       const res = await fetch(trimmed, {
         method: 'GET',
         redirect: 'follow',
+        signal: controller.signal,
         // Pretend to be a browser so Google returns the full place page
         headers: {
           'User-Agent':
@@ -99,7 +103,9 @@ export async function resolveGoogleMapsEmbedUrl(
       const fromBody = extractLatLng(text)
       if (fromBody) return buildEmbedFromLatLng(fromBody.lat, fromBody.lng)
     } catch {
-      // ignore — fall through to null
+      // ignore — fall through to null (timeout, network error, etc.)
+    } finally {
+      clearTimeout(timeoutId)
     }
   }
 
