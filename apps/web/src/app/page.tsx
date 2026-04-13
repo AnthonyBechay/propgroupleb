@@ -4,7 +4,9 @@ import { FeaturedProjects } from '@/components/home/FeaturedProjects'
 import { WhyPropGroup } from '@/components/home/WhyPropGroup'
 import { CTASectionSimple } from '@/components/home/CTASectionSimple'
 
-export const dynamic = 'force-dynamic'
+// Revalidate every 60s instead of force-dynamic to avoid hitting the DB on
+// every single homepage visit.  New/edited properties appear within a minute.
+export const revalidate = 60
 
 export default async function Home() {
   return (
