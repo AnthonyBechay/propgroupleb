@@ -1,4 +1,4 @@
-FROM node:22-alpine
+FROM node:20-alpine
 
 RUN apk add --no-cache bash libc6-compat openssl
 
@@ -35,4 +35,4 @@ RUN pnpm --filter web run build
 
 EXPOSE 3000
 
-CMD ["node", "apps/web/server.js"]
+CMD ["pnpm", "--filter", "web", "start"]

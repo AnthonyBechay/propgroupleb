@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "next dev --turbopack",
     "build": "next build --turbopack",
-    "start": "next start",
+    "start": "next start --keepAliveTimeout 120000",
     "lint": "eslint . --ext .ts,.tsx,.js,.jsx",
     "type-check": "tsc --noEmit",
     "test": "vitest",
