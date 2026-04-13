@@ -6,21 +6,20 @@
 // Safari handles this gracefully; Chrome does not.
 
 const { createServer } = require('http')
-const { parse } = require('url')
+const path = require('path')
 const next = require('next')
 
 const port = parseInt(process.env.PORT || '3000', 10)
-const app = next({ dev: false })
+const dir = path.join(__dirname)
+const app = next({ dev: false, dir })
 const handle = app.getRequestHandler()
 
 app.prepare().then(() => {
   const server = createServer((req, res) => {
-    const parsedUrl = parse(req.url, true)
-    handle(req, res, parsedUrl)
+    handle(req, res)
   })
 
   // Keep-alive timeout MUST be longer than Cloudflare's (100s).
-  // Set to 120s to be safe.
   server.keepAliveTimeout = 120_000
 
   // Headers timeout must be greater than keepAliveTimeout.
