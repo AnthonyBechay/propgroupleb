@@ -162,7 +162,13 @@
       "Bash(git -C /Users/anthonybechay/development/propgroup show --stat 481c7b0)",
       "Bash(git -C /Users/anthonybechay/development/propgroup diff --stat HEAD)",
       "Bash(curl -sI -m 8 https://bechays.com/)",
-      "Bash(curl -sI -m 8 https://www.bechays.com/)"
+      "Bash(curl -sI -m 8 https://www.bechays.com/)",
+      "Bash(curl -sI -m 10 https://bechays.com/)",
+      "Bash(curl -sI -m 10 https://www.bechays.com/)",
+      "Bash(curl -sI -m 10 --http2 https://bechays.com/)",
+      "Bash(curl -svI https://bechays.com/)",
+      "Bash(curl -svI https://www.bechays.com/)",
+      "Bash(curl -svI --resolve bechays.com:443:37.27.181.201 https://bechays.com/)"
     ],
     "deny": [],
     "ask": []

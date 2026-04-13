@@ -84,11 +84,9 @@ const allowedOrigins = (process.env.ALLOWED_ORIGINS || FRONTEND_URL)
 app.use(
   cors({
     origin: (origin, callback) => {
-      // Reject origin-less requests in production (prevents CORS bypass)
+      // Allow origin-less requests (server-to-server, health checks,
+      // Cloudflare probes, curl, etc.)
       if (!origin) {
-        if (process.env.NODE_ENV === 'production') {
-          return callback(null, false);
-        }
         return callback(null, true);
       }
 
@@ -218,13 +216,18 @@ async function startServer() {
     await prisma.$queryRaw`SELECT 1`;
     logger.info('Database connected');
 
-    app.listen(PORT, () => {
+    const server = app.listen(PORT, () => {
       logger.info('Server started', {
         port: PORT,
         env: process.env.NODE_ENV || 'development',
         cors: allowedOrigins,
       });
     });
+
+    // Keep-alive must exceed Cloudflare's timeout (100s) to prevent
+    // intermittent 520 / ERR_CONNECTION_TIMED_OUT errors.
+    server.keepAliveTimeout = 120_000;
+    server.headersTimeout = 125_000;
   } catch (error) {
     logger.error('Failed to start server', error);
     process.exit(1);

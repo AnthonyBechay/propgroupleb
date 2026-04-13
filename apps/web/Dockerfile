@@ -35,4 +35,4 @@ RUN pnpm --filter web run build
 
 EXPOSE 3000
 
-CMD ["pnpm", "--filter", "web", "start"]
+CMD ["node", "apps/web/server.js"]
