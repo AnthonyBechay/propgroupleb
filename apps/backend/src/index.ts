@@ -37,6 +37,10 @@ app.set('trust proxy', 1);
 app.use(
   helmet({
     crossOriginResourcePolicy: { policy: 'cross-origin' },
+    // Cloudflare handles HSTS at the edge. Helmet v7 enables HSTS by default,
+    // which combined with Cloudflare's alt-svc header causes Chrome to lock
+    // into QUIC aggressively and fail intermittently.
+    strictTransportSecurity: false,
   })
 );
 // Request logging — structured JSON in production, readable in dev
