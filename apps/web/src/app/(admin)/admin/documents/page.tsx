@@ -23,6 +23,8 @@ import { apiClient } from '@/lib/api/client'
 interface PropertyDocument {
   id: string
   propertyId: string
+  unitId?: string | null
+  unitOptionId?: string | null
   title: string
   description: string | null
   type: string
@@ -36,12 +38,26 @@ interface PropertyDocument {
     title: string
     country: string
   }
+  unit?: { id: string; name: string } | null
+  unitOption?: { id: string; name: string } | null
 }
 
 interface PropertyOption {
   id: string
   title: string
   country: string
+}
+
+interface UnitOption {
+  id: string
+  name: string
+}
+
+interface UnitWithOptions {
+  id: string
+  name: string
+  bedrooms: number
+  options: UnitOption[]
 }
 
 const DOCUMENT_TYPES = [
@@ -95,6 +111,10 @@ export default function DocumentsPage() {
   const [uploadDescription, setUploadDescription] = useState('')
   const [uploadType, setUploadType] = useState('OTHER')
   const [uploadPropertyId, setUploadPropertyId] = useState('')
+  const [uploadUnitId, setUploadUnitId] = useState('')
+  const [uploadUnitOptionId, setUploadUnitOptionId] = useState('')
+  const [uploadUnits, setUploadUnits] = useState<UnitWithOptions[]>([])
+  const [loadingUnits, setLoadingUnits] = useState(false)
   const [uploadIsPublic, setUploadIsPublic] = useState(false)
 
   // Edit state
@@ -110,6 +130,37 @@ export default function DocumentsPage() {
     fetchDocuments()
     fetchProperties()
   }, [])
+
+  // Fetch units when property changes
+  useEffect(() => {
+    if (!uploadPropertyId) {
+      setUploadUnits([])
+      setUploadUnitId('')
+      setUploadUnitOptionId('')
+      return
+    }
+    setLoadingUnits(true)
+    const load = async () => {
+      try {
+        const { normalizeApiUrl } = await import('@/lib/utils/api-url')
+        const apiUrl = normalizeApiUrl(process.env.NEXT_PUBLIC_API_URL || '')
+        const res = await fetch(`${apiUrl}/api/properties/${uploadPropertyId}/units`, {
+          credentials: 'include',
+        })
+        if (res.ok) {
+          const data = await res.json()
+          setUploadUnits(data.data || [])
+        }
+      } catch {}
+      setLoadingUnits(false)
+    }
+    load()
+  }, [uploadPropertyId])
+
+  // Reset option when unit changes
+  useEffect(() => {
+    setUploadUnitOptionId('')
+  }, [uploadUnitId])
 
   async function fetchDocuments() {
     try {
@@ -166,6 +217,8 @@ export default function DocumentsPage() {
       formData.append('description', uploadDescription)
       formData.append('type', uploadType)
       formData.append('isPublic', String(uploadIsPublic))
+      if (uploadUnitId) formData.append('unitId', uploadUnitId)
+      if (uploadUnitOptionId) formData.append('unitOptionId', uploadUnitOptionId)
 
       const response = await fetch(`${apiUrl}/api/documents`, {
         method: 'POST',
@@ -292,6 +345,9 @@ export default function DocumentsPage() {
     setUploadDescription('')
     setUploadType('OTHER')
     setUploadPropertyId('')
+    setUploadUnitId('')
+    setUploadUnitOptionId('')
+    setUploadUnits([])
     setUploadIsPublic(false)
   }
 
@@ -457,8 +513,14 @@ export default function DocumentsPage() {
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-1.5 text-slate-700">
                       <Building2 className="w-3.5 h-3.5 text-slate-400" />
-                      <span className="max-w-[150px] truncate">{doc.property.title}</span>
+                      <span className="max-w-[140px] truncate">{doc.property.title}</span>
                     </div>
+                    {doc.unit && (
+                      <p className="text-xs text-slate-400 mt-0.5 pl-5 truncate max-w-[140px]">
+                        {doc.unit.name}
+                        {doc.unitOption ? ` › ${doc.unitOption.name}` : ''}
+                      </p>
+                    )}
                   </td>
                   <td className="px-4 py-3">
                     <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${getTypeColor(doc.type)}`}>
@@ -720,6 +782,64 @@ export default function DocumentsPage() {
                   ))}
                 </select>
               </div>
+
+              {/* Unit Selection (appears after property is chosen) */}
+              {uploadPropertyId && (
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">
+                    Link to Unit <span className="text-xs text-slate-400 font-normal">(optional — leave blank for project-level doc)</span>
+                  </label>
+                  {loadingUnits ? (
+                    <div className="flex items-center gap-2 text-sm text-slate-500 py-2">
+                      <Loader2 className="w-4 h-4 animate-spin" />Loading units...
+                    </div>
+                  ) : (
+                    <select
+                      value={uploadUnitId}
+                      onChange={(e) => setUploadUnitId(e.target.value)}
+                      className="w-full px-3 py-2 border rounded-lg text-sm bg-white"
+                    >
+                      <option value="">Project-level (no specific unit)</option>
+                      {uploadUnits.map(u => (
+                        <option key={u.id} value={u.id}>{u.name}</option>
+                      ))}
+                    </select>
+                  )}
+                </div>
+              )}
+
+              {/* Finish Option Selection (appears after unit is chosen) */}
+              {uploadUnitId && (
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">
+                    Link to Finish Option <span className="text-xs text-slate-400 font-normal">(optional)</span>
+                  </label>
+                  <select
+                    value={uploadUnitOptionId}
+                    onChange={(e) => setUploadUnitOptionId(e.target.value)}
+                    className="w-full px-3 py-2 border rounded-lg text-sm bg-white"
+                  >
+                    <option value="">Unit-level (no specific finish)</option>
+                    {(uploadUnits.find(u => u.id === uploadUnitId)?.options || []).map(opt => (
+                      <option key={opt.id} value={opt.id}>{opt.name}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {/* Scope indicator */}
+              {uploadPropertyId && (
+                <div className="flex items-center gap-2 px-3 py-2 bg-[#E0EDF7]/60 rounded-lg text-xs text-[#1B3A5C]">
+                  <Building2 className="w-3.5 h-3.5 flex-shrink-0" />
+                  <span>
+                    Scope: {uploadUnitOptionId
+                      ? `Finish option — visible when that finish is selected`
+                      : uploadUnitId
+                        ? `Unit — visible when that unit is expanded`
+                        : `Project — visible on all views of this property`}
+                  </span>
+                </div>
+              )}
 
               {/* Title */}
               <div>

@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import {
   GitCompare, ArrowLeft, Trash2, Bed, Bath, Maximize, MapPin,
-  CreditCard, TrendingUp, Check, Minus,
+  CreditCard, TrendingUp, Check, Minus, Download,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import type { ComparatorItem, PaymentPlanDetails } from '@/lib/types/api'
@@ -54,6 +54,10 @@ function Row({ label, values, highlight, isCurrency, currency }: RowProps) {
   )
 }
 
+function handlePrintCompare() {
+  window.print()
+}
+
 export default function ComparePage() {
   const { items, remove, clear } = useComparator()
   const router = useRouter()
@@ -77,11 +81,29 @@ export default function ComparePage() {
 
   return (
     <div className="min-h-screen bg-slate-50">
+      {/* Print-only styles injected inline */}
+      <style>{`
+        @media print {
+          * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+          body { background: white !important; }
+          nav, footer, .comparator-bar { display: none !important; }
+          .print\\:hidden { display: none !important; }
+          .print-header { display: block !important; }
+          @page { margin: 1.5cm; size: A4 landscape; }
+        }
+      `}</style>
+      {/* Print-only header */}
+      <div className="hidden print-header" style={{ display: 'none' }}>
+        <div style={{ borderBottom: '2px solid #1B3A5C', paddingBottom: '12px', marginBottom: '16px' }}>
+          <h1 style={{ fontSize: '20px', fontWeight: 'bold', color: '#1B3A5C', margin: 0 }}>PropGroup — Property Comparison</h1>
+          <p style={{ fontSize: '12px', color: '#64748b', margin: '4px 0 0' }}>Generated on {new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
+        </div>
+      </div>
       <div className="max-w-7xl mx-auto px-4 py-8">
 
         {/* Header */}
         <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 print:hidden">
             <Button variant="ghost" size="sm" onClick={() => router.back()} className="text-slate-500">
               <ArrowLeft className="w-4 h-4 mr-1" />Back
             </Button>
@@ -93,9 +115,19 @@ export default function ComparePage() {
               <p className="text-sm text-slate-500">{items.length} option{items.length !== 1 ? 's' : ''} selected</p>
             </div>
           </div>
-          <Button variant="outline" size="sm" onClick={clear} className="text-slate-500 hover:text-red-600">
-            <Trash2 className="w-4 h-4 mr-1.5" />Clear All
-          </Button>
+          <div className="flex items-center gap-2 print:hidden">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handlePrintCompare}
+              className="text-slate-500 hover:text-[#1B3A5C]"
+            >
+              <Download className="w-4 h-4 mr-1.5" />Export PDF
+            </Button>
+            <Button variant="outline" size="sm" onClick={clear} className="text-slate-500 hover:text-red-600">
+              <Trash2 className="w-4 h-4 mr-1.5" />Clear All
+            </Button>
+          </div>
         </div>
 
         {/* Table */}
@@ -133,7 +165,7 @@ export default function ComparePage() {
                             size="sm"
                             variant="ghost"
                             onClick={() => remove(item.unitId, item.optionId)}
-                            className="text-slate-400 hover:text-red-500 h-6 px-1 mt-1"
+                            className="text-slate-400 hover:text-red-500 h-6 px-1 mt-1 print:hidden"
                           >
                             <Trash2 className="w-3 h-3" />
                           </Button>
@@ -250,7 +282,7 @@ export default function ComparePage() {
         </div>
 
         {/* CTA */}
-        <div className="mt-6 text-center">
+        <div className="mt-6 text-center print:hidden">
           <Button onClick={() => router.push('/properties')} variant="outline">
             <GitCompare className="w-4 h-4 mr-2" />Add More Options
           </Button>

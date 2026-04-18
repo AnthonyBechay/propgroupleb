@@ -1,10 +1,11 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import {
   Bed, Bath, Maximize, ChevronDown, ChevronUp,
   FileText, Download, CreditCard, Calculator,
   GitCompare, Check, X, Image as ImageIcon,
+  FileDown, MapPin,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useComparator } from '@/contexts/ComparatorContext'
@@ -158,6 +159,170 @@ function OptionRoiPanel({
   )
 }
 
+// ── Option Sheet PDF Print ─────────────────────────────────────────────────────
+
+interface OptionSheetProps {
+  propertyTitle: string
+  propertyCountry: string
+  propertyCity?: string | null
+  propertyStatus: string
+  unit: Unit
+  option: UnitOption
+  totalPrice: number
+  currency: string
+  rentalYield?: number | null
+  logoUrl?: string
+  onClose: () => void
+}
+
+function OptionSheetPrint({
+  propertyTitle, propertyCountry, propertyCity, propertyStatus,
+  unit, option, totalPrice, currency, rentalYield, logoUrl, onClose,
+}: OptionSheetProps) {
+  const hasPrinted = useRef(false)
+  const fmt = (v: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency, maximumFractionDigits: 0 }).format(v)
+  const monthly = calcMonthlyPayment(totalPrice, option.paymentPlanDetails)
+  const milestones = (option.paymentPlanDetails as PaymentPlanDetails | null)?.milestones || []
+  const summary = (option.paymentPlanDetails as PaymentPlanDetails | null)?.summary
+  const installmentMonths = (option.paymentPlanDetails as PaymentPlanDetails | null)?.installmentMonths
+
+  useEffect(() => {
+    if (hasPrinted.current) return
+    hasPrinted.current = true
+    // Short delay to allow DOM rendering
+    const t = setTimeout(() => {
+      window.print()
+      onClose()
+    }, 300)
+    return () => clearTimeout(t)
+  }, [onClose])
+
+  return (
+    <>
+      <style>{`
+        @media print {
+          * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+          body > * { display: none !important; }
+          #option-sheet-print { display: block !important; position: static !important; }
+          @page { margin: 1.5cm; size: A4 portrait; }
+        }
+        #option-sheet-print { display: none; }
+      `}</style>
+      <div id="option-sheet-print" style={{ fontFamily: 'system-ui, sans-serif', color: '#1e293b', maxWidth: '700px', margin: '0 auto' }}>
+        {/* Header */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '3px solid #1B3A5C', paddingBottom: '16px', marginBottom: '24px' }}>
+          <div>
+            {logoUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={logoUrl} alt="Logo" style={{ height: '48px', objectFit: 'contain', marginBottom: '8px' }} />
+            ) : (
+              <div style={{ fontWeight: '800', fontSize: '20px', color: '#1B3A5C', marginBottom: '4px' }}>PropGroup</div>
+            )}
+            <div style={{ fontSize: '11px', color: '#64748b' }}>Investment Property Sheet</div>
+          </div>
+          <div style={{ textAlign: 'right' }}>
+            <div style={{ fontSize: '11px', color: '#64748b' }}>Generated</div>
+            <div style={{ fontSize: '12px', fontWeight: '600', color: '#1B3A5C' }}>{new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</div>
+          </div>
+        </div>
+
+        {/* Project + Unit title */}
+        <div style={{ marginBottom: '20px' }}>
+          <h1 style={{ fontSize: '22px', fontWeight: '800', color: '#1B3A5C', margin: '0 0 4px' }}>{propertyTitle}</h1>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: '13px', color: '#64748b' }}>
+            <span>{[propertyCity, propertyCountry].filter(Boolean).join(', ')}</span>
+            <span style={{ background: '#f1f5f9', padding: '2px 8px', borderRadius: '12px', fontSize: '11px', fontWeight: '600' }}>
+              {propertyStatus.replace(/_/g, ' ')}
+            </span>
+          </div>
+        </div>
+
+        {/* Unit + Option headline */}
+        <div style={{ background: '#1B3A5C', color: 'white', padding: '16px 20px', borderRadius: '8px', marginBottom: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div>
+            <div style={{ fontSize: '15px', fontWeight: '700' }}>{unit.name}</div>
+            <div style={{ fontSize: '13px', opacity: 0.85, marginTop: '2px' }}>{option.name} finish</div>
+          </div>
+          <div style={{ textAlign: 'right' }}>
+            <div style={{ fontSize: '26px', fontWeight: '800', color: '#C49A2E' }}>{fmt(totalPrice)}</div>
+            <div style={{ fontSize: '12px', opacity: 0.75 }}>{fmt(option.pricePerSqm)} / m²</div>
+          </div>
+        </div>
+
+        {/* Specs row */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px', marginBottom: '20px' }}>
+          {[
+            { label: 'Bedrooms', value: unit.bedrooms },
+            { label: 'Bathrooms', value: unit.bathrooms },
+            { label: 'Area', value: `${unit.area} m²` },
+            { label: 'Floor', value: unit.floor != null ? `Floor ${unit.floor}` : '—' },
+          ].map(({ label, value }) => (
+            <div key={label} style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '12px', textAlign: 'center' }}>
+              <div style={{ fontSize: '11px', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>{label}</div>
+              <div style={{ fontSize: '16px', fontWeight: '700', color: '#1B3A5C' }}>{value}</div>
+            </div>
+          ))}
+        </div>
+
+        {/* Payment Plan */}
+        {(option.initialPayment || monthly || milestones.length > 0) && (
+          <div style={{ marginBottom: '20px' }}>
+            <h3 style={{ fontSize: '13px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.08em', color: '#64748b', margin: '0 0 12px' }}>Payment Plan</h3>
+            {summary && <p style={{ fontSize: '13px', color: '#475569', marginBottom: '12px' }}>{summary}</p>}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px', marginBottom: milestones.length > 0 ? '14px' : '0' }}>
+              {option.initialPayment != null && option.initialPayment > 0 && (
+                <div style={{ background: '#fffbeb', border: '1px solid #fde68a', borderRadius: '8px', padding: '12px', textAlign: 'center' }}>
+                  <div style={{ fontSize: '11px', color: '#92400e', marginBottom: '4px' }}>Initial Payment</div>
+                  <div style={{ fontSize: '16px', fontWeight: '700', color: '#D97706' }}>{fmt(option.initialPayment)}</div>
+                </div>
+              )}
+              {monthly != null && (
+                <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '8px', padding: '12px', textAlign: 'center' }}>
+                  <div style={{ fontSize: '11px', color: '#166534', marginBottom: '4px' }}>Monthly Installment</div>
+                  <div style={{ fontSize: '16px', fontWeight: '700', color: '#16a34a' }}>{fmt(monthly)}</div>
+                  {installmentMonths && <div style={{ fontSize: '11px', color: '#4ade80' }}>{installmentMonths} months</div>}
+                </div>
+              )}
+              {rentalYield != null && rentalYield > 0 && (
+                <div style={{ background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '8px', padding: '12px', textAlign: 'center' }}>
+                  <div style={{ fontSize: '11px', color: '#1e40af', marginBottom: '4px' }}>Rental Yield</div>
+                  <div style={{ fontSize: '16px', fontWeight: '700', color: '#1d4ed8' }}>{rentalYield.toFixed(1)}%</div>
+                </div>
+              )}
+            </div>
+
+            {/* Milestone breakdown */}
+            {milestones.length > 0 && (
+              <div>
+                {milestones.map((m, i) => (
+                  <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', background: i % 2 === 0 ? '#f8fafc' : 'white', borderRadius: '6px', marginBottom: '4px' }}>
+                    <span style={{ fontSize: '13px', color: '#475569' }}>{m.label}</span>
+                    <span style={{ fontSize: '13px', fontWeight: '700', color: '#1B3A5C' }}>{m.percentage}% · {fmt(totalPrice * m.percentage / 100)}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Option description */}
+        {option.description && (
+          <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '14px', marginBottom: '20px' }}>
+            <h3 style={{ fontSize: '13px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.08em', color: '#64748b', margin: '0 0 8px' }}>Finish Details</h3>
+            <p style={{ fontSize: '13px', color: '#475569', margin: 0, lineHeight: '1.6' }}>{option.description}</p>
+          </div>
+        )}
+
+        {/* Footer */}
+        <div style={{ borderTop: '1px solid #e2e8f0', paddingTop: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ fontSize: '11px', color: '#94a3b8' }}>This document is for informational purposes only and does not constitute a binding offer.</div>
+          <div style={{ fontSize: '11px', color: '#1B3A5C', fontWeight: '600' }}>PropGroup</div>
+        </div>
+      </div>
+    </>
+  )
+}
+
 // ── Main component ─────────────────────────────────────────────────────────────
 
 export function PropertyUnitsSection({
@@ -185,6 +350,30 @@ export function PropertyUnitsSection({
 
   // Which unit is expanded for image preview
   const [expandedUnit, setExpandedUnit] = useState<string | null>(null)
+
+  // Print state — when set, shows the OptionSheetPrint overlay and triggers window.print()
+  const [printSheet, setPrintSheet] = useState<{
+    unit: Unit
+    option: UnitOption
+    totalPrice: number
+  } | null>(null)
+
+  // Logo URL from branding settings
+  const [logoUrl, setLogoUrl] = useState<string | undefined>(undefined)
+  useEffect(() => {
+    const fetchLogo = async () => {
+      try {
+        const { normalizeApiUrl } = await import('@/lib/utils/api-url')
+        const apiUrl = normalizeApiUrl(process.env.NEXT_PUBLIC_API_URL || '')
+        const res = await fetch(`${apiUrl}/api/content/media/branding.logoUrl`)
+        if (res.ok) {
+          const data = await res.json()
+          setLogoUrl(data.data?.url || data.url || undefined)
+        }
+      } catch {}
+    }
+    fetchLogo()
+  }, [])
 
   const selectOption = useCallback((unitId: string, optionId: string) => {
     setSelectedOptions(prev => ({ ...prev, [unitId]: optionId }))
@@ -304,7 +493,7 @@ export function PropertyUnitsSection({
                     {unit.options.length > 0 && (
                       <div className="border-t border-slate-100">
                         {/* Option tab picker */}
-                        <div className="flex gap-1 px-4 pt-3 pb-0 overflow-x-auto">
+                        <div className="flex items-center gap-1 px-4 pt-3 pb-0 overflow-x-auto">
                           {unit.options.map(opt => (
                             <button
                               key={opt.id}
@@ -318,6 +507,22 @@ export function PropertyUnitsSection({
                               {opt.name}
                             </button>
                           ))}
+                          {/* Spacer */}
+                          <div className="flex-1" />
+                          {/* Export PDF button for selected option */}
+                          {selOpt && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                setPrintSheet({ unit, option: selOpt, totalPrice })
+                              }}
+                              className="flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium text-slate-500 bg-slate-100 hover:bg-[#E0EDF7] hover:text-[#1B3A5C] transition-colors whitespace-nowrap flex-shrink-0"
+                              title="Export as PDF"
+                            >
+                              <FileDown className="w-3.5 h-3.5" />
+                              PDF
+                            </button>
+                          )}
                         </div>
 
                         {/* Selected option details */}
@@ -473,6 +678,23 @@ export function PropertyUnitsSection({
             ))}
           </div>
         </div>
+      )}
+
+      {/* ─── Option Sheet Print Overlay ─────────────────── */}
+      {printSheet && (
+        <OptionSheetPrint
+          propertyTitle={propertyTitle}
+          propertyCountry={propertyCountry}
+          propertyCity={propertyCity}
+          propertyStatus={propertyStatus}
+          unit={printSheet.unit}
+          option={printSheet.option}
+          totalPrice={printSheet.totalPrice}
+          currency={printSheet.option.currency || currency}
+          rentalYield={rentalYield}
+          logoUrl={logoUrl}
+          onClose={() => setPrintSheet(null)}
+        />
       )}
     </div>
   )

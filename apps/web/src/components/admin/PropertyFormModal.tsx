@@ -152,8 +152,27 @@ export function PropertyFormModal(props: PropertyFormModalProps) {
   const isOpen = isEdit ? props.open : internalOpen
   const setIsOpen = isEdit ? props.onOpenChange : setInternalOpen
   const property = isEdit ? props.property : null
-  const developers = props.developers || []
-  const locationGuides = props.locationGuides || []
+
+  // Internal state for developers/location guides — populated by self-fetch when not passed as props
+  const [internalDevelopers, setInternalDevelopers] = useState<Developer[]>(props.developers || [])
+  const [internalLocationGuides, setInternalLocationGuides] = useState<LocationGuide[]>(props.locationGuides || [])
+  const developers = internalDevelopers
+  const locationGuides = internalLocationGuides
+
+  // Self-fetch location guides when modal opens (edit mode won't have them passed as props)
+  useEffect(() => {
+    if (!isOpen || internalLocationGuides.length > 0) return
+    const fetchGuides = async () => {
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/location-guides?limit=200`, { credentials: 'include' })
+        if (res.ok) {
+          const d = await res.json()
+          setInternalLocationGuides(d.data || d || [])
+        }
+      } catch {}
+    }
+    fetchGuides()
+  }, [isOpen])
 
   // Populate form when editing
   useEffect(() => {

@@ -1,7 +1,7 @@
 'use client'
 
 import { useAuth } from '@/contexts/AuthContext'
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import {
   Settings as SettingsIcon,
   User,
@@ -15,7 +15,11 @@ import {
   Save,
   Lock,
   AlertCircle,
-  CheckCircle
+  CheckCircle,
+  Upload,
+  Image as ImageIcon,
+  X,
+  Loader2,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -43,7 +47,78 @@ export default function SettingsPage() {
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
 
+  // Branding state
+  const [logoUrl, setLogoUrl] = useState('')
+  const [logoUploading, setLogoUploading] = useState(false)
+  const [logoSaving, setLogoSaving] = useState(false)
+  const logoInputRef = useRef<HTMLInputElement>(null)
+
   const isSuperAdmin = user?.role === 'SUPER_ADMIN'
+
+  // Load branding settings on mount
+  useEffect(() => {
+    const loadBranding = async () => {
+      try {
+        const { normalizeApiUrl } = await import('@/lib/utils/api-url')
+        const apiUrl = normalizeApiUrl(process.env.NEXT_PUBLIC_API_URL || '')
+        const res = await fetch(`${apiUrl}/api/content/media/branding.logoUrl`)
+        if (res.ok) {
+          const data = await res.json()
+          setLogoUrl(data.data?.url || data.url || '')
+        }
+      } catch {}
+    }
+    loadBranding()
+  }, [])
+
+  const handleLogoFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setLogoUploading(true)
+    try {
+      const { normalizeApiUrl } = await import('@/lib/utils/api-url')
+      const apiUrl = normalizeApiUrl(process.env.NEXT_PUBLIC_API_URL || '')
+      const fd = new FormData()
+      fd.append('file', file)
+      const res = await fetch(`${apiUrl}/api/upload`, { method: 'POST', credentials: 'include', body: fd })
+      if (res.ok) {
+        const data = await res.json()
+        setLogoUrl(data.url || data.data?.url || '')
+      } else {
+        setMessage({ type: 'error', text: 'Failed to upload logo image' })
+      }
+    } catch {
+      setMessage({ type: 'error', text: 'Upload error. Please try again.' })
+    } finally {
+      setLogoUploading(false)
+      if (logoInputRef.current) logoInputRef.current.value = ''
+    }
+  }
+
+  const handleSaveBranding = async () => {
+    setLogoSaving(true)
+    setMessage(null)
+    try {
+      const { normalizeApiUrl } = await import('@/lib/utils/api-url')
+      const apiUrl = normalizeApiUrl(process.env.NEXT_PUBLIC_API_URL || '')
+      const res = await fetch(`${apiUrl}/api/content/media/branding.logoUrl`, {
+        method: 'PUT',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: logoUrl || '', section: 'branding', alt: 'Company Logo' }),
+      })
+      if (res.ok) {
+        setMessage({ type: 'success', text: 'Branding settings saved!' })
+      } else {
+        const err = await res.json().catch(() => ({}))
+        setMessage({ type: 'error', text: err.message || 'Failed to save branding settings' })
+      }
+    } catch {
+      setMessage({ type: 'error', text: 'Failed to save settings. Please try again.' })
+    } finally {
+      setLogoSaving(false)
+    }
+  }
 
   const handleProfileSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -407,8 +482,125 @@ export default function SettingsPage() {
             </div>
           )}
 
+          {/* Appearance Tab */}
+          {activeTab === 'appearance' && (
+            <div className="bg-white border-2 border-slate-100 shadow-lg rounded-2xl overflow-hidden">
+              <div className="px-6 py-5 border-b-2 border-slate-100 bg-gradient-to-r from-slate-50 to-white">
+                <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                  <div className="w-8 h-8 bg-teal-600 rounded-lg flex items-center justify-center">
+                    <Palette className="h-5 w-5 text-white" />
+                  </div>
+                  Branding &amp; Appearance
+                </h2>
+                <p className="mt-1 text-sm text-slate-600">
+                  Configure your logo and brand assets used across the platform and exported documents.
+                </p>
+              </div>
+
+              <div className="p-6 space-y-6">
+                {/* Logo */}
+                <div>
+                  <Label className="font-bold text-slate-900 mb-3 block">Company Logo</Label>
+                  <p className="text-sm text-slate-500 mb-4">
+                    Displayed on exported property sheets and investor documents. Recommended: PNG with transparent background, min 200px wide.
+                  </p>
+
+                  {/* Current logo preview */}
+                  {logoUrl && (
+                    <div className="mb-4 flex items-start gap-4 p-4 bg-slate-50 rounded-xl border-2 border-slate-100">
+                      <div className="w-32 h-16 rounded-lg bg-white border border-slate-200 flex items-center justify-center overflow-hidden flex-shrink-0 p-2">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={logoUrl} alt="Company logo" className="max-w-full max-h-full object-contain" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-slate-900 truncate">Current logo</p>
+                        <p className="text-xs text-slate-500 truncate mt-0.5">{logoUrl}</p>
+                        <button
+                          onClick={() => setLogoUrl('')}
+                          className="mt-2 text-xs text-red-500 hover:text-red-700 flex items-center gap-1"
+                        >
+                          <X className="w-3 h-3" /> Remove logo
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Upload new logo */}
+                  <div className="space-y-3">
+                    <div>
+                      <p className="text-sm font-medium text-slate-700 mb-2">Upload new logo</p>
+                      <div
+                        className="border-2 border-dashed border-slate-200 rounded-xl p-6 text-center hover:border-teal-400 transition-colors cursor-pointer"
+                        onClick={() => logoInputRef.current?.click()}
+                      >
+                        {logoUploading ? (
+                          <div className="flex flex-col items-center gap-2">
+                            <Loader2 className="w-8 h-8 animate-spin text-teal-600" />
+                            <p className="text-sm text-slate-500">Uploading...</p>
+                          </div>
+                        ) : (
+                          <>
+                            <ImageIcon className="w-8 h-8 text-slate-300 mx-auto mb-2" />
+                            <p className="text-sm text-slate-500">Click to upload PNG, JPG, SVG, or WebP</p>
+                            <p className="text-xs text-slate-400 mt-1">Recommended: transparent background PNG</p>
+                          </>
+                        )}
+                        <input
+                          ref={logoInputRef}
+                          type="file"
+                          className="hidden"
+                          accept=".png,.jpg,.jpeg,.webp,.svg"
+                          onChange={handleLogoFileChange}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-3">
+                      <div className="flex-1 h-px bg-slate-200" />
+                      <span className="text-xs text-slate-400 font-medium">or enter URL directly</span>
+                      <div className="flex-1 h-px bg-slate-200" />
+                    </div>
+
+                    <div>
+                      <Label htmlFor="logoUrl" className="text-sm font-medium text-slate-700 mb-1.5 block">Logo URL</Label>
+                      <Input
+                        id="logoUrl"
+                        type="url"
+                        value={logoUrl}
+                        onChange={(e) => setLogoUrl(e.target.value)}
+                        placeholder="https://your-cdn.com/logo.png"
+                        className="border-2 border-slate-200 rounded-xl"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex justify-end gap-3 pt-4 border-t-2 border-slate-100">
+                  <Button
+                    type="button"
+                    onClick={handleSaveBranding}
+                    disabled={logoSaving}
+                    className="bg-teal-600 hover:bg-teal-700 text-white rounded-xl font-bold shadow-md"
+                  >
+                    {logoSaving ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Saving...
+                      </>
+                    ) : (
+                      <>
+                        <Save className="h-4 w-4 mr-2" />
+                        Save Branding
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Other tabs */}
-          {activeTab !== 'profile' && activeTab !== 'security' && (
+          {activeTab !== 'profile' && activeTab !== 'security' && activeTab !== 'appearance' && (
             <div className="bg-white border-2 border-slate-100 shadow-lg rounded-2xl p-8 text-center">
               <div className="w-16 h-16 bg-slate-200 rounded-2xl flex items-center justify-center mx-auto mb-4">
                 <SettingsIcon className="h-8 w-8 text-slate-500" />
