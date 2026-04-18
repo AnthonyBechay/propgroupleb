@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Plus, Trash2 } from 'lucide-react'
 
 export const PAYMENT_PLAN_TYPES = [
@@ -106,6 +106,11 @@ export function PaymentPlanBuilder({
   inputClass: string
 }) {
   const [enabled, setEnabled] = useState(!!value)
+
+  // Sync enabled with value when edited from parent (e.g., modal opens with existing plan)
+  useEffect(() => {
+    setEnabled(!!value)
+  }, [value])
 
   const handleEnable = (checked: boolean) => {
     setEnabled(checked)

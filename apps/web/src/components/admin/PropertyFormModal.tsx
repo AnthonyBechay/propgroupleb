@@ -76,8 +76,6 @@ const INITIAL_FORM = {
   expectedROI: '' as string | number,
   rentalYield: '' as string | number,
   capitalGrowth: '' as string | number,
-  minInvestment: '' as string | number,
-  maxInvestment: '' as string | number,
   paymentPlan: '',
   paymentPlanDetails: null as PaymentPlanDetails | null,
   completionDate: '',
@@ -124,9 +122,8 @@ function buildPayload(form: typeof INITIAL_FORM, imageUrls: string[], videoUrl: 
   if (hasInvestment) {
     data.expectedROI = form.expectedROI ? Number(form.expectedROI) : undefined
     data.rentalYield = form.rentalYield ? Number(form.rentalYield) : undefined
+    // Capital growth (kept for display)
     data.capitalGrowth = form.capitalGrowth ? Number(form.capitalGrowth) : undefined
-    data.minInvestment = form.minInvestment ? Number(form.minInvestment) : undefined
-    data.maxInvestment = form.maxInvestment ? Number(form.maxInvestment) : undefined
     data.paymentPlan = form.paymentPlanDetails?.summary || form.paymentPlan || undefined
     data.paymentPlanDetails = form.paymentPlanDetails || undefined
     data.downPaymentPercentage = form.paymentPlanDetails?.milestones?.[0]?.percentage
@@ -207,8 +204,6 @@ export function PropertyFormModal(props: PropertyFormModalProps) {
         expectedROI: property.investmentData?.expectedROI || '',
         rentalYield: property.investmentData?.rentalYield || '',
         capitalGrowth: property.investmentData?.capitalGrowth || '',
-        minInvestment: property.investmentData?.minInvestment || '',
-        maxInvestment: property.investmentData?.maxInvestment || '',
         paymentPlan: property.investmentData?.paymentPlan || '',
         paymentPlanDetails: (property.investmentData as any)?.paymentPlanDetails || null,
         completionDate: property.investmentData?.completionDate || '',
@@ -416,14 +411,6 @@ export function PropertyFormModal(props: PropertyFormModalProps) {
               <div>
                 <label className={labelClass}>Capital Growth (%)</label>
                 <input className={inputClass} type="number" step="0.1" value={form.capitalGrowth} onChange={(e) => updateField('capitalGrowth', e.target.value)} />
-              </div>
-              <div>
-                <label className={labelClass}>Min Investment</label>
-                <input className={inputClass} type="number" value={form.minInvestment} onChange={(e) => updateField('minInvestment', e.target.value)} />
-              </div>
-              <div>
-                <label className={labelClass}>Max Investment</label>
-                <input className={inputClass} type="number" value={form.maxInvestment} onChange={(e) => updateField('maxInvestment', e.target.value)} />
               </div>
               <div>
                 <label className={labelClass}>Completion Date</label>

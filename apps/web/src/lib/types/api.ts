@@ -53,6 +53,8 @@ export interface Unit {
   propertyId: string;
   name: string;
   unitNumber?: string | null;
+  /** Unit-level property type (overrides project-level when set) */
+  propertyType?: 'APARTMENT' | 'VILLA' | 'TOWNHOUSE' | 'PENTHOUSE' | 'STUDIO' | 'DUPLEX' | 'LAND' | 'COMMERCIAL' | 'OFFICE' | null;
   bedrooms: number;
   bathrooms: number;
   area: number;

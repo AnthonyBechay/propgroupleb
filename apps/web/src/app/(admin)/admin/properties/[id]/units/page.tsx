@@ -17,9 +17,23 @@ const AVAILABILITY_COLORS: Record<string, string> = {
 
 const FINISH_PRESETS = ['Turnkey', 'White Frame', 'Black Frame', 'Renovated', 'Semi-Finished', 'Shell & Core']
 
+const UNIT_PROPERTY_TYPES = [
+  { value: '', label: '— Inherit from project —' },
+  { value: 'APARTMENT', label: 'Apartment' },
+  { value: 'VILLA', label: 'Villa' },
+  { value: 'TOWNHOUSE', label: 'Townhouse' },
+  { value: 'PENTHOUSE', label: 'Penthouse' },
+  { value: 'STUDIO', label: 'Studio' },
+  { value: 'DUPLEX', label: 'Duplex' },
+  { value: 'LAND', label: 'Land' },
+  { value: 'COMMERCIAL', label: 'Commercial' },
+  { value: 'OFFICE', label: 'Office' },
+]
+
 type UnitFormData = {
   name: string
   unitNumber: string
+  propertyType: string
   bedrooms: number
   bathrooms: number
   area: number
@@ -39,7 +53,7 @@ type OptionFormData = {
 }
 
 const emptyUnit: UnitFormData = {
-  name: '', unitNumber: '', bedrooms: 1, bathrooms: 1, area: 0,
+  name: '', unitNumber: '', propertyType: '', bedrooms: 1, bathrooms: 1, area: 0,
   floor: '', parkingSpaces: '', notes: '', availabilityStatus: 'AVAILABLE', images: []
 }
 
@@ -101,6 +115,7 @@ export default function UnitsPage({ params }: { params: Promise<{ id: string }> 
       const payload = {
         name: unitForm.name,
         unitNumber: unitForm.unitNumber || null,
+        propertyType: unitForm.propertyType || null,
         bedrooms: Number(unitForm.bedrooms),
         bathrooms: Number(unitForm.bathrooms),
         area: Number(unitForm.area),
@@ -148,6 +163,7 @@ export default function UnitsPage({ params }: { params: Promise<{ id: string }> 
     setUnitForm({
       name: unit.name,
       unitNumber: unit.unitNumber || '',
+      propertyType: (unit as any).propertyType || '',
       bedrooms: unit.bedrooms,
       bathrooms: unit.bathrooms,
       area: unit.area,
@@ -311,6 +327,14 @@ export default function UnitsPage({ params }: { params: Promise<{ id: string }> 
                   {['AVAILABLE','RESERVED','SOLD','OFF_MARKET'].map(s => <option key={s} value={s}>{s.replace('_',' ')}</option>)}
                 </select>
               </div>
+              <div className="col-span-2">
+                <label className={labelClass} title="Override the project-level property type for this specific unit (e.g. a studio inside an apartment building)">
+                  Unit Type <span className="text-gray-400 font-normal">(optional)</span>
+                </label>
+                <select className={selectClass} value={unitForm.propertyType} onChange={e => setUnitForm(f => ({ ...f, propertyType: e.target.value }))}>
+                  {UNIT_PROPERTY_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+                </select>
+              </div>
               <div>
                 <label className={labelClass}>Bedrooms</label>
                 <input className={inputClass} type="number" min="0" value={unitForm.bedrooms} onChange={e => setUnitForm(f => ({ ...f, bedrooms: Number(e.target.value) }))} />
@@ -397,6 +421,11 @@ export default function UnitsPage({ params }: { params: Promise<{ id: string }> 
                   <div className="flex items-center gap-3 flex-wrap">
                     <h3 className="font-semibold text-gray-900">{unit.name}</h3>
                     {unit.unitNumber && <span className="text-xs bg-[#E0EDF7] text-[#1B3A5C] px-2 py-0.5 rounded font-mono">{unit.unitNumber}</span>}
+                    {unit.propertyType && (
+                      <span className="text-xs bg-amber-50 text-amber-700 px-2 py-0.5 rounded font-semibold uppercase tracking-wide" title="Unit-level property type (overrides project)">
+                        {unit.propertyType}
+                      </span>
+                    )}
                     <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${AVAILABILITY_COLORS[unit.availabilityStatus]}`}>
                       {unit.availabilityStatus.replace('_', ' ')}
                     </span>

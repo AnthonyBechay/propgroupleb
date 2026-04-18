@@ -983,6 +983,9 @@ model Unit {
 
   name          String  // e.g., "1BR - Type A", "2BR Corner Unit"
   unitNumber    String? // e.g., "A101"
+  /// Unit-level property type (overrides project-level propertyType when set).
+  /// Useful when a single project contains multiple unit types (e.g., studios + apartments + villas).
+  propertyType  PropertyType?
   bedrooms      Int     @default(1)
   bathrooms     Int     @default(1)
   area          Float   // m²

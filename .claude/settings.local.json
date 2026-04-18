@@ -301,7 +301,9 @@
       "Bash(sudo /usr/local/sbin/mtr -r -c 100 188.114.96.6)",
       "Read(//opt/homebrew/Cellar/mtr/0.96/sbin/**)",
       "Read(//opt/homebrew/Cellar/mtr/**)",
-      "Read(//opt/homebrew/**)"
+      "Read(//opt/homebrew/**)",
+      "Bash(pnpm --filter @propgroup/db exec prisma migrate dev --name add_unit_property_type --create-only)",
+      "Bash(DATABASE_URL=\"postgresql://placeholder\" pnpm exec prisma generate)"
     ],
     "deny": [],
     "ask": []

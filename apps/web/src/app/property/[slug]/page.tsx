@@ -150,6 +150,7 @@ export default async function PropertyPage({ params }: PropertyPageProps) {
               documents={publicDocuments}
               currency={property.currency || 'USD'}
               rentalYield={property.investmentData?.rentalYield}
+              capitalGrowth={property.investmentData?.capitalGrowth}
             />
 
             {/* Description */}

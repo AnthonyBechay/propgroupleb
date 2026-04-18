@@ -198,6 +198,7 @@ export const aiSearchSchema = z.object({
 export const unitSchema = z.object({
   name: z.string().min(1, 'Unit name is required'),
   unitNumber: z.string().nullish(),
+  propertyType: z.enum(['APARTMENT', 'VILLA', 'TOWNHOUSE', 'PENTHOUSE', 'STUDIO', 'DUPLEX', 'LAND', 'COMMERCIAL', 'OFFICE']).nullish(),
   bedrooms: z.number().min(0),
   bathrooms: z.number().min(0),
   area: z.number().min(1, 'Area must be positive'),

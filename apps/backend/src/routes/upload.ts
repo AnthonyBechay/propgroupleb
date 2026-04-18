@@ -48,7 +48,11 @@ router.post(
     }
 
     const propertySlug = req.body.propertySlug || req.query.propertySlug;
-    const result = await uploadFile(file.buffer, file.originalname, file.mimetype, 'properties', {
+    const folder = (req.body.folder || req.query.folder || 'properties') as string;
+    // Whitelist allowed folders
+    const allowedFolders = ['properties', 'branding', 'general', 'users'];
+    const safeFolder = allowedFolders.includes(folder) ? folder : 'properties';
+    const result = await uploadFile(file.buffer, file.originalname, file.mimetype, safeFolder, {
       propertySlug: propertySlug as string | undefined,
     });
     res.status(201).json({ url: result.url, key: result.key });

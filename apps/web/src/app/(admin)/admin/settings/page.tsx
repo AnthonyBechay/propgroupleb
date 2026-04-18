@@ -80,6 +80,7 @@ export default function SettingsPage() {
       const apiUrl = normalizeApiUrl(process.env.NEXT_PUBLIC_API_URL || '')
       const fd = new FormData()
       fd.append('file', file)
+      fd.append('folder', 'branding')
       const res = await fetch(`${apiUrl}/api/upload`, { method: 'POST', credentials: 'include', body: fd })
       if (res.ok) {
         const data = await res.json()
