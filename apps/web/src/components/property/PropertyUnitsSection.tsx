@@ -27,6 +27,10 @@ interface Props {
   currency: string
   rentalYield?: number | null
   capitalGrowth?: number | null
+  /** Project-level images (for per-option PDF export) */
+  propertyImages?: string[]
+  /** Project description (for per-option PDF export) */
+  propertyDescription?: string | null
   /** callback to update the gallery images shown in the parent */
   onUnitImagesChange?: (images: string[]) => void
 }
@@ -78,88 +82,103 @@ function OptionRoiPanel({
   paymentPlanDetails?: PaymentPlanDetails | null
   rentalYield?: number | null
 }) {
-  const [open, setOpen] = useState(false)
-
   const estimatedMonthlyRent = rentalYield ? (totalPrice * rentalYield / 100) / 12 : totalPrice * 0.005
   const monthly = calcMonthlyPayment(totalPrice, paymentPlanDetails)
   const fmt = (v: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency, maximumFractionDigits: 0 }).format(v)
 
   return (
-    <div className="border-t border-slate-100">
-      <button
-        type="button"
-        onClick={() => setOpen(o => !o)}
-        className="w-full flex items-center justify-between px-4 py-2.5 text-xs text-slate-500 hover:bg-slate-50 transition-colors"
-      >
-        <span className="flex items-center gap-1.5 font-medium">
-          <Calculator className="w-3.5 h-3.5" />
-          ROI & Payment Breakdown
-        </span>
-        {open ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
-      </button>
-
-      {open && (
-        <div className="px-4 pb-4 space-y-3 bg-slate-50 border-t border-slate-100">
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-2 pt-3">
-            <div className="bg-white rounded-lg p-2.5 border border-slate-100 text-center">
-              <p className="text-xs text-slate-500 mb-0.5">Total Price</p>
-              <p className="font-bold text-[#1B3A5C] text-sm">{fmt(totalPrice)}</p>
-            </div>
-            {initialPayment != null && initialPayment > 0 && (
-              <div className="bg-white rounded-lg p-2.5 border border-slate-100 text-center">
-                <p className="text-xs text-slate-500 mb-0.5">Initial Payment</p>
-                <p className="font-bold text-[#D97706] text-sm">{fmt(initialPayment)}</p>
-              </div>
-            )}
-            {monthly != null && (
-              <div className="bg-white rounded-lg p-2.5 border border-slate-100 text-center">
-                <p className="text-xs text-slate-500 mb-0.5">Monthly</p>
-                <p className="font-bold text-emerald-600 text-sm">{fmt(monthly)}</p>
-              </div>
-            )}
-            {rentalYield != null && rentalYield > 0 && (
-              <div className="bg-white rounded-lg p-2.5 border border-slate-100 text-center">
-                <p className="text-xs text-slate-500 mb-0.5">Est. Monthly Rent</p>
-                <p className="font-bold text-slate-700 text-sm">{fmt(estimatedMonthlyRent)}</p>
-              </div>
-            )}
-            {rentalYield != null && rentalYield > 0 && (
-              <div className="bg-white rounded-lg p-2.5 border border-slate-100 text-center">
-                <p className="text-xs text-slate-500 mb-0.5">Rental Yield</p>
-                <p className="font-bold text-emerald-600 text-sm">{rentalYield.toFixed(1)}%</p>
-              </div>
-            )}
+    <div className="px-5 py-4 space-y-3 bg-slate-50">
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+        <div className="bg-white rounded-lg p-2.5 border border-slate-100 text-center">
+          <p className="text-xs text-slate-500 mb-0.5">Total Price</p>
+          <p className="font-bold text-[#1B3A5C] text-sm">{fmt(totalPrice)}</p>
+        </div>
+        {initialPayment != null && initialPayment > 0 && (
+          <div className="bg-white rounded-lg p-2.5 border border-slate-100 text-center">
+            <p className="text-xs text-slate-500 mb-0.5">Initial Payment</p>
+            <p className="font-bold text-[#D97706] text-sm">{fmt(initialPayment)}</p>
           </div>
+        )}
+        {monthly != null && (
+          <div className="bg-white rounded-lg p-2.5 border border-slate-100 text-center">
+            <p className="text-xs text-slate-500 mb-0.5">Monthly</p>
+            <p className="font-bold text-emerald-600 text-sm">{fmt(monthly)}</p>
+          </div>
+        )}
+        {rentalYield != null && rentalYield > 0 && (
+          <div className="bg-white rounded-lg p-2.5 border border-slate-100 text-center">
+            <p className="text-xs text-slate-500 mb-0.5">Est. Monthly Rent</p>
+            <p className="font-bold text-slate-700 text-sm">{fmt(estimatedMonthlyRent)}</p>
+          </div>
+        )}
+        {rentalYield != null && rentalYield > 0 && (
+          <div className="bg-white rounded-lg p-2.5 border border-slate-100 text-center">
+            <p className="text-xs text-slate-500 mb-0.5">Rental Yield</p>
+            <p className="font-bold text-emerald-600 text-sm">{rentalYield.toFixed(1)}%</p>
+          </div>
+        )}
+      </div>
 
-          {/* Payment plan milestones */}
-          {paymentPlanDetails?.milestones && paymentPlanDetails.milestones.length > 0 && (
-            <div>
-              {paymentPlanDetails.summary && (
-                <p className="text-xs text-slate-600 mb-2 font-medium">{paymentPlanDetails.summary}</p>
-              )}
-              <div className="flex rounded-full overflow-hidden h-1.5 mb-2">
-                {paymentPlanDetails.milestones.map((m, i) => {
-                  const colors = ['bg-[#1B3A5C]', 'bg-[#D97706]', 'bg-emerald-500', 'bg-amber-400', 'bg-slate-400']
-                  return (
-                    <div key={i} className={colors[i % colors.length]} style={{ width: `${m.percentage}%` }} title={`${m.label}: ${m.percentage}%`} />
-                  )
-                })}
-              </div>
-              <div className="grid grid-cols-2 gap-1.5">
-                {paymentPlanDetails.milestones.map((m, i) => (
-                  <div key={i} className="bg-white rounded px-2 py-1 border border-slate-100 flex justify-between items-center">
-                    <span className="text-xs text-slate-500">{m.label}</span>
-                    <span className="text-xs font-semibold text-[#1B3A5C]">{m.percentage}%</span>
-                  </div>
-                ))}
-              </div>
-            </div>
+      {/* Payment plan milestones */}
+      {paymentPlanDetails?.milestones && paymentPlanDetails.milestones.length > 0 && (
+        <div>
+          {paymentPlanDetails.summary && (
+            <p className="text-xs text-slate-600 mb-2 font-medium">{paymentPlanDetails.summary}</p>
           )}
+          <div className="flex rounded-full overflow-hidden h-1.5 mb-2">
+            {paymentPlanDetails.milestones.map((m, i) => {
+              const colors = ['bg-[#1B3A5C]', 'bg-[#D97706]', 'bg-emerald-500', 'bg-amber-400', 'bg-slate-400']
+              return (
+                <div key={i} className={colors[i % colors.length]} style={{ width: `${m.percentage}%` }} title={`${m.label}: ${m.percentage}%`} />
+              )
+            })}
+          </div>
+          <div className="grid grid-cols-2 gap-1.5">
+            {paymentPlanDetails.milestones.map((m, i) => (
+              <div key={i} className="bg-white rounded px-2 py-1 border border-slate-100 flex justify-between items-center">
+                <span className="text-xs text-slate-500">{m.label}</span>
+                <span className="text-xs font-semibold text-[#1B3A5C]">{m.percentage}%</span>
+              </div>
+            ))}
+          </div>
         </div>
       )}
     </div>
   )
 }
+
+// ── Print CSS (shared by both PDF variants) ────────────────────────────────────
+
+const PRINT_CSS = `
+  @media print {
+    * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; color-adjust: exact !important; }
+    @page { size: A4 portrait; margin: 10mm; }
+    html, body { margin: 0 !important; padding: 0 !important; background: white !important; height: auto !important; overflow: visible !important; }
+    body * { visibility: hidden !important; }
+    .propgroup-print-sheet, .propgroup-print-sheet * { visibility: visible !important; }
+    .propgroup-print-sheet {
+      position: static !important;
+      inset: auto !important;
+      width: 100% !important;
+      max-width: none !important;
+      height: auto !important;
+      min-height: 0 !important;
+      overflow: visible !important;
+      background: white !important;
+      display: block !important;
+    }
+    .propgroup-print-content {
+      max-width: none !important;
+      padding: 0 !important;
+      margin: 0 !important;
+      box-shadow: none !important;
+      page-break-after: avoid !important;
+      break-after: avoid !important;
+    }
+    .print-section { break-inside: avoid; page-break-inside: avoid; }
+    .print-close-btn { display: none !important; }
+  }
+`
 
 // ── Unit Investment Proposal PDF ───────────────────────────────────────────────
 
@@ -255,10 +274,11 @@ function UnitSheetPrint({
       position: 'fixed',
       inset: 0,
       zIndex: 9999,
-      background: 'white',
+      background: 'rgba(15, 23, 42, 0.6)',
       overflowY: 'auto',
       fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
       color: '#1e293b',
+      padding: '24px',
     }}>
       {/* Close button (screen-only) */}
       <button
@@ -269,236 +289,195 @@ function UnitSheetPrint({
           background: '#1B3A5C', color: 'white', border: 'none',
           width: '40px', height: '40px', borderRadius: '50%', cursor: 'pointer',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
+          boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
         }}
         aria-label="Close"
       >
         <X className="w-5 h-5" />
       </button>
 
-      <div id="propgroup-sheet-content" style={{
-        maxWidth: '794px', // A4 portrait at 96dpi
+      <div className="propgroup-print-content" style={{
+        maxWidth: '794px',
         margin: '0 auto',
-        padding: '40px 48px',
         background: 'white',
         boxSizing: 'border-box',
+        boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)',
       }}>
 
-        {/* Cream header block */}
-        <div style={{
+        {/* Cream header block — full width, no negative margins */}
+        <div className="print-section" style={{
           background: '#FDF8EF',
-          padding: '32px 40px 28px',
-          margin: '-40px -48px 32px',
+          padding: '28px 36px 24px',
           borderBottom: '3px solid #C49A2E',
           textAlign: 'center',
+          boxSizing: 'border-box',
         }}>
           {logoUrl && (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={logoUrl} alt="Logo" style={{
-              height: '40px', objectFit: 'contain', marginBottom: '16px', display: 'block', margin: '0 auto 16px',
+              height: '36px', objectFit: 'contain', display: 'block', margin: '0 auto 12px',
             }} />
           )}
           <div style={{
-            fontSize: '11px', fontWeight: '600', letterSpacing: '0.2em',
-            color: '#C49A2E', marginBottom: '10px',
+            fontSize: '10px', fontWeight: 600, letterSpacing: '0.2em',
+            color: '#C49A2E', marginBottom: '8px',
           }}>
             INVESTMENT PROPOSAL
           </div>
           <h1 style={{
-            fontSize: '26px', fontWeight: '900', color: '#1B3A5C',
-            margin: '0 0 10px', letterSpacing: '0.02em', lineHeight: 1.2,
+            fontSize: '22px', fontWeight: 900, color: '#1B3A5C',
+            margin: '0 0 8px', letterSpacing: '0.02em', lineHeight: 1.2,
           }}>
             {propertyTitle.toUpperCase()}{unit.unitNumber ? ` – UNIT ${unit.unitNumber}` : ''}
           </h1>
           {subtitle && (
             <div style={{
-              fontSize: '13px', fontWeight: '600', color: '#C49A2E',
-              letterSpacing: '0.1em', marginBottom: '8px',
+              fontSize: '12px', fontWeight: 600, color: '#C49A2E',
+              letterSpacing: '0.1em', marginBottom: '6px',
             }}>
               {subtitle}
             </div>
           )}
-          <div style={{ fontSize: '10px', color: '#64748b', letterSpacing: '0.15em', textTransform: 'uppercase' }}>
+          <div style={{ fontSize: '9px', color: '#64748b', letterSpacing: '0.15em', textTransform: 'uppercase' }}>
             {options.length >= 2 ? 'Acquisition Options — Investment Organigram' : 'Acquisition Details'}
           </div>
-          <div style={{ fontSize: '10px', color: '#94a3b8', marginTop: '4px' }}>
+          <div style={{ fontSize: '9px', color: '#94a3b8', marginTop: '3px' }}>
             {[propertyCity, propertyCountry].filter(Boolean).join(', ')} · {propertyStatus.replace(/_/g, ' ')}
           </div>
         </div>
 
-        {/* Options columns — side by side */}
-        {options.length > 0 ? (
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: options.length === 1 ? '1fr' : options.length === 2 ? '1fr 1fr' : 'repeat(3, 1fr)',
-            gap: '20px',
-            marginBottom: '28px',
-          }}>
-            {options.map((opt, idx) => {
-              const scheme = colorSchemes[idx % colorSchemes.length]
-              const totalPrice = opt.pricePerSqm * unit.area
-              const ppd = opt.paymentPlanDetails as PaymentPlanDetails | null
-              const monthly = calcMonthlyPayment(totalPrice, ppd)
-              const upfrontPct = ppd?.milestones?.find(m => m.type === 'upfront')?.percentage
-                ?? ppd?.milestones?.[0]?.percentage
-              const installmentPct = ppd?.milestones?.find(m => m.type === 'installment')?.percentage
-                ?? (upfrontPct != null ? 100 - upfrontPct : undefined)
-              const installmentTotal = installmentPct != null ? totalPrice * installmentPct / 100 : null
-              const bullets = parseBullets(opt.description)
-              const installmentMonths = ppd?.installmentMonths
+        {/* Options grid */}
+        <div style={{ padding: '24px 28px' }}>
+          {options.length > 0 ? (
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: options.length === 1 ? '1fr' : options.length === 2 ? '1fr 1fr' : 'repeat(3, 1fr)',
+              gap: '16px',
+            }}>
+              {options.map((opt, idx) => {
+                const scheme = colorSchemes[idx % colorSchemes.length]
+                const totalPrice = opt.pricePerSqm * unit.area
+                const ppd = opt.paymentPlanDetails as PaymentPlanDetails | null
+                const monthly = calcMonthlyPayment(totalPrice, ppd)
+                const upfrontPct = ppd?.milestones?.find(m => m.type === 'upfront')?.percentage
+                  ?? ppd?.milestones?.[0]?.percentage
+                const installmentPct = ppd?.milestones?.find(m => m.type === 'installment')?.percentage
+                  ?? (upfrontPct != null ? 100 - upfrontPct : undefined)
+                const installmentTotal = installmentPct != null ? totalPrice * installmentPct / 100 : null
+                const bullets = parseBullets(opt.description)
+                const installmentMonths = ppd?.installmentMonths
 
-              return (
-                <div key={opt.id} style={{ display: 'flex', flexDirection: 'column' }}>
-                  {/* Option header card */}
-                  <div style={{
-                    background: scheme.header,
-                    color: scheme.headerText,
-                    padding: '18px 20px',
-                    borderRadius: '8px',
-                    textAlign: 'center',
-                    marginBottom: '18px',
-                  }}>
+                return (
+                  <div key={opt.id} className="print-section" style={{ display: 'flex', flexDirection: 'column' }}>
+                    {/* Option header card */}
                     <div style={{
-                      fontSize: '11px', fontWeight: '700', letterSpacing: '0.1em',
-                      opacity: 0.9, marginBottom: '6px',
+                      background: scheme.header, color: scheme.headerText,
+                      padding: '14px 16px', borderRadius: '6px',
+                      textAlign: 'center', marginBottom: '14px',
                     }}>
-                      OPTION {String.fromCharCode(65 + idx)}: {opt.name.toUpperCase()}
-                    </div>
-                    <div style={{ fontSize: '20px', fontWeight: '900', letterSpacing: '0.02em' }}>
-                      TOTAL PRICE: {fmt(totalPrice)}
-                    </div>
-                  </div>
-
-                  {/* Payment steps */}
-                  <div style={{ marginBottom: '18px' }}>
-                    {/* 1. AGREEMENT */}
-                    <div style={{ marginBottom: '12px' }}>
-                      <div style={{ fontSize: '12px', fontWeight: '800', color: '#1B3A5C', marginBottom: '2px' }}>
-                        1. AGREEMENT
+                      <div style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.1em', opacity: 0.9, marginBottom: '4px' }}>
+                        OPTION {String.fromCharCode(65 + idx)}: {opt.name.toUpperCase()}
                       </div>
-                      <div style={{ fontSize: '11px', color: '#475569' }}>Execution of Sales Agreement</div>
+                      <div style={{ fontSize: '17px', fontWeight: 900, letterSpacing: '0.02em' }}>
+                        TOTAL: {fmt(totalPrice)}
+                      </div>
                     </div>
 
-                    {/* 2. DOWN PAYMENT */}
-                    {(opt.initialPayment != null && opt.initialPayment > 0) || upfrontPct != null ? (
-                      <div style={{ marginBottom: '12px' }}>
-                        <div style={{ fontSize: '12px', fontWeight: '800', color: '#1B3A5C', marginBottom: '2px' }}>
-                          2. DOWN PAYMENT
-                        </div>
-                        <div style={{ fontSize: '11px', color: '#475569' }}>
-                          {opt.initialPayment != null && opt.initialPayment > 0
-                            ? fmt(opt.initialPayment)
-                            : fmt(totalPrice * (upfrontPct! / 100))}
-                          {upfrontPct != null && ` (${upfrontPct}%)`} Upon Signing
-                        </div>
+                    {/* Payment steps */}
+                    <div style={{ marginBottom: '14px' }}>
+                      <div style={{ marginBottom: '10px' }}>
+                        <div style={{ fontSize: '11px', fontWeight: 800, color: '#1B3A5C', marginBottom: '2px' }}>1. AGREEMENT</div>
+                        <div style={{ fontSize: '10px', color: '#475569' }}>Execution of Sales Agreement</div>
                       </div>
-                    ) : null}
 
-                    {/* 3. INSTALLMENT PLAN */}
-                    {(installmentTotal || monthly || installmentMonths) && (
-                      <div style={{ marginBottom: '12px' }}>
-                        <div style={{ fontSize: '12px', fontWeight: '800', color: '#1B3A5C', marginBottom: '2px' }}>
-                          3. INSTALLMENT PLAN
+                      {((opt.initialPayment != null && opt.initialPayment > 0) || upfrontPct != null) && (
+                        <div style={{ marginBottom: '10px' }}>
+                          <div style={{ fontSize: '11px', fontWeight: 800, color: '#1B3A5C', marginBottom: '2px' }}>2. DOWN PAYMENT</div>
+                          <div style={{ fontSize: '10px', color: '#475569' }}>
+                            {opt.initialPayment != null && opt.initialPayment > 0
+                              ? fmt(opt.initialPayment)
+                              : fmt(totalPrice * (upfrontPct! / 100))}
+                            {upfrontPct != null && ` (${upfrontPct}%)`} Upon Signing
+                          </div>
                         </div>
-                        <div style={{ fontSize: '11px', color: '#475569', lineHeight: 1.45 }}>
-                          {installmentTotal && <>{fmt(installmentTotal)} Total</>}
-                          {monthly && <> (~{fmt(monthly)} Monthly)</>}
-                          {installmentMonths && <><br />{installmentMonths} Months Interest-Free</>}
+                      )}
+
+                      {(installmentTotal || monthly || installmentMonths) && (
+                        <div style={{ marginBottom: '10px' }}>
+                          <div style={{ fontSize: '11px', fontWeight: 800, color: '#1B3A5C', marginBottom: '2px' }}>3. INSTALLMENT PLAN</div>
+                          <div style={{ fontSize: '10px', color: '#475569', lineHeight: 1.4 }}>
+                            {installmentTotal && <>{fmt(installmentTotal)} Total</>}
+                            {monthly && <> (~{fmt(monthly)} Monthly)</>}
+                            {installmentMonths && <><br />{installmentMonths} Months Interest-Free</>}
+                          </div>
+                        </div>
+                      )}
+
+                      <div>
+                        <div style={{ fontSize: '11px', fontWeight: 800, color: '#1B3A5C', marginBottom: '2px' }}>4. OWNERSHIP</div>
+                        <div style={{ fontSize: '10px', color: '#475569' }}>Full Ownership Transfer Upon Completion of Payment Plan</div>
+                      </div>
+                    </div>
+
+                    {/* Includes */}
+                    {bullets.length > 0 && (
+                      <div style={{
+                        border: `1.5px solid ${scheme.accent}`, borderRadius: '6px',
+                        padding: '10px 12px', marginBottom: '10px',
+                        background: idx === 0 ? '#F8FAFC' : '#FDFAF3',
+                      }}>
+                        <div style={{
+                          fontSize: '10px', fontWeight: 800, color: '#1B3A5C',
+                          letterSpacing: '0.1em', marginBottom: '6px',
+                          borderBottom: '1px solid #e2e8f0', paddingBottom: '4px',
+                        }}>
+                          {opt.name.toUpperCase()} INCLUDES
+                        </div>
+                        <div style={{ fontSize: '10px', color: '#475569', lineHeight: 1.5 }}>
+                          {bullets.map((b, i) => (
+                            <div key={i} style={{ marginBottom: '2px' }}>✓ {b}</div>
+                          ))}
                         </div>
                       </div>
                     )}
 
-                    {/* 4. OWNERSHIP */}
-                    <div>
-                      <div style={{ fontSize: '12px', fontWeight: '800', color: '#1B3A5C', marginBottom: '2px' }}>
-                        4. OWNERSHIP
-                      </div>
-                      <div style={{ fontSize: '11px', color: '#475569' }}>
-                        Full Ownership Transfer Upon Completion of Payment Plan
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Delivery includes */}
-                  {bullets.length > 0 && (
+                    {/* Ideal for */}
                     <div style={{
-                      border: `1.5px solid ${scheme.accent}`,
-                      borderRadius: '8px',
-                      padding: '14px 16px',
-                      marginBottom: '14px',
-                      background: idx === 0 ? '#F8FAFC' : '#FDFAF3',
+                      background: '#F1F5F9', padding: '8px 12px', borderRadius: '5px',
+                      fontSize: '10px', color: '#475569', fontStyle: 'italic',
+                      lineHeight: 1.4, marginTop: 'auto',
                     }}>
-                      <div style={{
-                        fontSize: '11px', fontWeight: '800', color: '#1B3A5C',
-                        letterSpacing: '0.1em', marginBottom: '8px',
-                        borderBottom: '1px solid #e2e8f0', paddingBottom: '6px',
-                      }}>
-                        {opt.name.toUpperCase()} INCLUDES
-                      </div>
-                      <div style={{ fontSize: '11px', color: '#475569', lineHeight: 1.6 }}>
-                        {bullets.map((b, i) => (
-                          <div key={i} style={{ marginBottom: '2px' }}>✓ {b}</div>
-                        ))}
-                      </div>
+                      <strong style={{ color: '#1B3A5C', fontStyle: 'normal' }}>IDEAL FOR:</strong>{' '}
+                      {idx === 0
+                        ? 'Investors seeking customization, flexibility or lower entry cost.'
+                        : 'Passive investors seeking immediate rental income with zero additional setup.'}
                     </div>
-                  )}
-
-                  {/* Ideal for (from notes or auto) */}
-                  <div style={{
-                    background: '#F1F5F9',
-                    padding: '10px 14px',
-                    borderRadius: '6px',
-                    fontSize: '11px',
-                    color: '#475569',
-                    fontStyle: 'italic',
-                    lineHeight: 1.45,
-                    marginTop: 'auto',
-                  }}>
-                    <strong style={{ color: '#1B3A5C', fontStyle: 'normal' }}>IDEAL FOR:</strong>{' '}
-                    {idx === 0
-                      ? 'Investors seeking customization, flexibility or lower entry cost.'
-                      : 'Passive investors seeking immediate rental income with zero additional setup.'}
                   </div>
-                </div>
-              )
-            })}
-          </div>
-        ) : (
-          <div style={{
-            padding: '40px',
-            textAlign: 'center',
-            color: '#64748b',
-            background: '#f8fafc',
-            borderRadius: '8px',
-            marginBottom: '28px',
-          }}>
-            No finish options configured for this unit.
-          </div>
-        )}
+                )
+              })}
+            </div>
+          ) : (
+            <div style={{
+              padding: '32px', textAlign: 'center', color: '#64748b',
+              background: '#f8fafc', borderRadius: '6px',
+            }}>
+              No finish options configured for this unit.
+            </div>
+          )}
+        </div>
 
-        {/* Bottom pillars band */}
-        <div style={{
-          background: '#1B3A5C',
-          color: 'white',
-          padding: '20px 24px',
-          margin: '32px -48px -40px',
+        {/* Bottom pillars band — full width, no negative margins */}
+        <div className="print-section" style={{
+          background: '#1B3A5C', color: 'white',
+          padding: '16px 24px',
         }}>
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(4, 1fr)',
-            gap: '20px',
-            maxWidth: '794px',
-            margin: '0 auto',
-          }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px' }}>
             {pillars.map((p, i) => (
               <div key={i} style={{ textAlign: 'center' }}>
-                <div style={{
-                  fontSize: '10px', fontWeight: '800', color: '#C49A2E',
-                  letterSpacing: '0.1em', marginBottom: '6px',
-                }}>
+                <div style={{ fontSize: '9px', fontWeight: 800, color: '#C49A2E', letterSpacing: '0.1em', marginBottom: '4px' }}>
                   {p.icon}
                 </div>
-                <div style={{ fontSize: '10px', color: 'white', lineHeight: 1.4 }}>
+                <div style={{ fontSize: '9px', color: 'white', lineHeight: 1.4 }}>
                   {p.text}
                 </div>
               </div>
@@ -512,18 +491,283 @@ function UnitSheetPrint({
 
   return (
     <>
-      {/* Print CSS — visibility pattern with portal ensures sheet prints clean */}
-      <style>{`
-        @media print {
-          * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; color-adjust: exact !important; }
-          body { margin: 0 !important; padding: 0 !important; background: white !important; }
-          body * { visibility: hidden !important; }
-          .propgroup-print-sheet, .propgroup-print-sheet * { visibility: visible !important; }
-          .propgroup-print-sheet { position: absolute !important; left: 0 !important; top: 0 !important; width: 100% !important; overflow: visible !important; inset: auto !important; }
-          .print-close-btn { display: none !important; }
-          @page { margin: 0; size: A4 portrait; }
-        }
-      `}</style>
+      <style>{PRINT_CSS}</style>
+      {createPortal(sheet, document.body)}
+    </>
+  )
+}
+
+// ── Per-Option Investment Proposal PDF ─────────────────────────────────────────
+
+interface OptionSheetProps {
+  propertyTitle: string
+  propertyCountry: string
+  propertyCity?: string | null
+  propertyStatus: string
+  propertyImages: string[]
+  propertyDescription?: string | null
+  unit: Unit
+  option: UnitOption
+  currency: string
+  rentalYield?: number | null
+  capitalGrowth?: number | null
+  logoUrl?: string
+  onClose: () => void
+}
+
+function OptionSheetPrint({
+  propertyTitle, propertyCountry, propertyCity, propertyStatus,
+  propertyImages, propertyDescription,
+  unit, option, currency, rentalYield, capitalGrowth, logoUrl, onClose,
+}: OptionSheetProps) {
+  const [mounted, setMounted] = useState(false)
+  const hasPrinted = useRef(false)
+
+  useEffect(() => { setMounted(true) }, [])
+
+  useEffect(() => {
+    if (!mounted || hasPrinted.current) return
+    hasPrinted.current = true
+    const t = setTimeout(() => {
+      window.print()
+      const cleanup = () => { onClose(); window.removeEventListener('focus', cleanup) }
+      window.addEventListener('focus', cleanup, { once: true })
+      setTimeout(() => onClose(), 2000)
+    }, 300)
+    return () => clearTimeout(t)
+  }, [mounted, onClose])
+
+  if (!mounted || typeof window === 'undefined') return null
+
+  const fmt = (v: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency, maximumFractionDigits: 0 }).format(v)
+  const totalPrice = option.pricePerSqm * unit.area
+  const ppd = option.paymentPlanDetails as PaymentPlanDetails | null
+  const monthly = calcMonthlyPayment(totalPrice, ppd)
+  const bullets = parseBullets(option.description)
+  const shortDesc = propertyDescription
+    ? propertyDescription.slice(0, 320) + (propertyDescription.length > 320 ? '…' : '')
+    : null
+
+  const heroImages = propertyImages.slice(0, 3)
+
+  const pillars = [
+    {
+      icon: 'CAPITAL APPRECIATION',
+      text: capitalGrowth && capitalGrowth > 0
+        ? `${capitalGrowth}% appreciation by project completion`
+        : '15-20% appreciation by project completion',
+    },
+    {
+      icon: 'HIGH RENTAL YIELD',
+      text: rentalYield && rentalYield > 0
+        ? `${rentalYield.toFixed(1)}% yield — premium location drives strong ADR`
+        : 'Premium location drives strong ADR',
+    },
+    { icon: 'HIGH LIQUIDITY', text: 'Attractive price point & premium location' },
+    { icon: 'STRATEGIC EXIT', text: 'Flexible resale or long-term rental income strategy' },
+  ]
+
+  const sheet = (
+    <div className="propgroup-print-sheet" style={{
+      position: 'fixed', inset: 0, zIndex: 9999,
+      background: 'rgba(15, 23, 42, 0.6)', overflowY: 'auto',
+      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+      color: '#1e293b', padding: '24px',
+    }}>
+      <button
+        onClick={onClose}
+        className="print-close-btn"
+        style={{
+          position: 'fixed', top: '16px', right: '16px', zIndex: 10000,
+          background: '#1B3A5C', color: 'white', border: 'none',
+          width: '40px', height: '40px', borderRadius: '50%', cursor: 'pointer',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+        }}
+        aria-label="Close"
+      >
+        <X className="w-5 h-5" />
+      </button>
+
+      <div className="propgroup-print-content" style={{
+        maxWidth: '794px', margin: '0 auto', background: 'white',
+        boxSizing: 'border-box', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)',
+      }}>
+
+        {/* Cream header */}
+        <div className="print-section" style={{
+          background: '#FDF8EF', padding: '24px 32px 20px',
+          borderBottom: '3px solid #C49A2E', textAlign: 'center',
+        }}>
+          {logoUrl && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={logoUrl} alt="Logo" style={{
+              height: '34px', objectFit: 'contain', display: 'block', margin: '0 auto 10px',
+            }} />
+          )}
+          <div style={{ fontSize: '10px', fontWeight: 600, letterSpacing: '0.2em', color: '#C49A2E', marginBottom: '6px' }}>
+            INVESTMENT PROPOSAL · {option.name.toUpperCase()}
+          </div>
+          <h1 style={{ fontSize: '22px', fontWeight: 900, color: '#1B3A5C', margin: '0 0 6px', letterSpacing: '0.02em' }}>
+            {propertyTitle.toUpperCase()}
+          </h1>
+          <div style={{ fontSize: '11px', color: '#64748b', letterSpacing: '0.1em', textTransform: 'uppercase' }}>
+            {[propertyCity, propertyCountry].filter(Boolean).join(', ')} · {propertyStatus.replace(/_/g, ' ')}
+          </div>
+        </div>
+
+        <div style={{ padding: '20px 28px' }}>
+
+          {/* Project images */}
+          {heroImages.length > 0 && (
+            <div className="print-section" style={{
+              display: 'grid',
+              gridTemplateColumns: heroImages.length === 1 ? '1fr' : heroImages.length === 2 ? '1fr 1fr' : 'repeat(3, 1fr)',
+              gap: '8px', marginBottom: '16px',
+            }}>
+              {heroImages.map((img, i) => (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img key={i} src={img} alt="" style={{
+                  width: '100%', height: '120px', objectFit: 'cover',
+                  borderRadius: '6px', display: 'block',
+                }} />
+              ))}
+            </div>
+          )}
+
+          {/* Project description */}
+          {shortDesc && (
+            <div className="print-section" style={{
+              fontSize: '11px', color: '#475569', lineHeight: 1.55,
+              marginBottom: '18px', paddingBottom: '14px',
+              borderBottom: '1px solid #e2e8f0',
+            }}>
+              <div style={{
+                fontSize: '10px', fontWeight: 800, color: '#1B3A5C',
+                letterSpacing: '0.15em', marginBottom: '6px',
+              }}>
+                ABOUT THE PROJECT
+              </div>
+              {shortDesc}
+            </div>
+          )}
+
+          {/* Selected option — hero card */}
+          <div className="print-section" style={{
+            background: 'linear-gradient(135deg, #FDF8EF 0%, #FFFFFF 100%)',
+            border: '2px solid #C49A2E', borderRadius: '10px',
+            padding: '20px 24px', marginBottom: '18px',
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '20px', marginBottom: '14px' }}>
+              <div>
+                <div style={{ fontSize: '10px', fontWeight: 800, color: '#C49A2E', letterSpacing: '0.15em', marginBottom: '4px' }}>
+                  SELECTED FINISH OPTION
+                </div>
+                <div style={{ fontSize: '20px', fontWeight: 900, color: '#1B3A5C', lineHeight: 1.15 }}>
+                  {option.name}
+                </div>
+                <div style={{ fontSize: '11px', color: '#64748b', marginTop: '4px' }}>
+                  {unit.name}{unit.unitNumber ? ` · #${unit.unitNumber}` : ''} · {unit.bedrooms}bd / {unit.bathrooms}ba · {unit.area} m²{unit.floor != null ? ` · Floor ${unit.floor}` : ''}
+                </div>
+              </div>
+              <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                <div style={{ fontSize: '9px', color: '#64748b', letterSpacing: '0.1em', textTransform: 'uppercase' }}>Total Price</div>
+                <div style={{ fontSize: '26px', fontWeight: 900, color: '#1B3A5C', lineHeight: 1 }}>{fmt(totalPrice)}</div>
+                <div style={{ fontSize: '10px', color: '#64748b', marginTop: '2px' }}>{fmt(option.pricePerSqm)}/m²</div>
+              </div>
+            </div>
+
+            {/* Includes bullets */}
+            {bullets.length > 0 && (
+              <div style={{ fontSize: '11px', color: '#475569', lineHeight: 1.6, paddingTop: '10px', borderTop: '1px solid #C49A2E44' }}>
+                <div style={{ fontSize: '10px', fontWeight: 800, color: '#1B3A5C', letterSpacing: '0.1em', marginBottom: '6px' }}>
+                  INCLUDES
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: bullets.length > 4 ? '1fr 1fr' : '1fr', gap: '2px 16px' }}>
+                  {bullets.map((b, i) => (
+                    <div key={i}>✓ {b}</div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Payment plan */}
+          {ppd?.milestones && ppd.milestones.length > 0 && (
+            <div className="print-section" style={{
+              border: '1px solid #e2e8f0', borderRadius: '8px',
+              padding: '14px 18px', marginBottom: '18px',
+            }}>
+              <div style={{ fontSize: '10px', fontWeight: 800, color: '#1B3A5C', letterSpacing: '0.15em', marginBottom: '8px' }}>
+                PAYMENT PLAN {ppd.summary && <span style={{ color: '#64748b', fontWeight: 500, letterSpacing: 0 }}>— {ppd.summary}</span>}
+              </div>
+
+              {/* Milestone bar */}
+              <div style={{ display: 'flex', borderRadius: '999px', overflow: 'hidden', height: '6px', marginBottom: '10px', background: '#f1f5f9' }}>
+                {ppd.milestones.map((m, i) => {
+                  const colors = ['#1B3A5C', '#C49A2E', '#10b981', '#f59e0b', '#64748b']
+                  return (
+                    <div key={i} style={{ background: colors[i % colors.length], width: `${m.percentage}%` }} />
+                  )
+                })}
+              </div>
+
+              {/* Milestone rows */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 14px' }}>
+                {ppd.milestones.map((m, i) => (
+                  <div key={i} style={{
+                    display: 'flex', justifyContent: 'space-between',
+                    fontSize: '10px', padding: '4px 10px',
+                    background: '#f8fafc', borderRadius: '4px',
+                  }}>
+                    <span style={{ color: '#475569' }}>{m.label}</span>
+                    <span style={{ color: '#1B3A5C', fontWeight: 700 }}>
+                      {m.percentage}% · {fmt(totalPrice * m.percentage / 100)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+
+              {monthly && (
+                <div style={{
+                  marginTop: '10px', padding: '8px 12px',
+                  background: '#F1F5F9', borderRadius: '5px',
+                  fontSize: '10px', color: '#475569', display: 'flex', justifyContent: 'space-between',
+                }}>
+                  <span>Estimated monthly installment</span>
+                  <span style={{ color: '#10b981', fontWeight: 700 }}>{fmt(monthly)}</span>
+                </div>
+              )}
+            </div>
+          )}
+
+        </div>
+
+        {/* Bottom pillars */}
+        <div className="print-section" style={{
+          background: '#1B3A5C', color: 'white', padding: '16px 24px',
+        }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px' }}>
+            {pillars.map((p, i) => (
+              <div key={i} style={{ textAlign: 'center' }}>
+                <div style={{ fontSize: '9px', fontWeight: 800, color: '#C49A2E', letterSpacing: '0.1em', marginBottom: '4px' }}>
+                  {p.icon}
+                </div>
+                <div style={{ fontSize: '9px', color: 'white', lineHeight: 1.4 }}>
+                  {p.text}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+      </div>
+    </div>
+  )
+
+  return (
+    <>
+      <style>{PRINT_CSS}</style>
       {createPortal(sheet, document.body)}
     </>
   )
@@ -554,6 +798,8 @@ export function PropertyUnitsSection({
   currency,
   rentalYield,
   capitalGrowth,
+  propertyImages = [],
+  propertyDescription,
   onUnitImagesChange,
 }: Props) {
   const { add, remove, has } = useComparator()
@@ -570,6 +816,14 @@ export function PropertyUnitsSection({
 
   // Print state — when set, shows the UnitSheetPrint overlay for a full unit (all finish options)
   const [printUnit, setPrintUnit] = useState<Unit | null>(null)
+  // Print state for a single finish option (includes project context + images)
+  const [printOption, setPrintOption] = useState<{ unit: Unit; option: UnitOption } | null>(null)
+
+  // Collapsed/expanded state for per-unit sub-sections (ROI, Documents)
+  const [roiOpen, setRoiOpen] = useState<Record<string, boolean>>({})
+  const [docsOpen, setDocsOpen] = useState<Record<string, boolean>>({})
+  const toggleRoi = (unitId: string) => setRoiOpen(p => ({ ...p, [unitId]: !p[unitId] }))
+  const toggleDocs = (unitId: string) => setDocsOpen(p => ({ ...p, [unitId]: !p[unitId] }))
 
   // Logo URL from branding settings
   const [logoUrl, setLogoUrl] = useState<string | undefined>(undefined)
@@ -797,8 +1051,8 @@ export function PropertyUnitsSection({
                               </div>
                             </div>
 
-                            {/* Add to Comparator */}
-                            <div className="mt-4 pt-3 border-t border-[#C49A2E]/20 flex items-center gap-2">
+                            {/* Actions: compare + per-option PDF */}
+                            <div className="mt-4 pt-3 border-t border-[#C49A2E]/20 flex items-center gap-2 flex-wrap">
                               <Button
                                 size="sm"
                                 variant={inComparator ? 'outline' : 'default'}
@@ -840,53 +1094,99 @@ export function PropertyUnitsSection({
                                   : <><GitCompare className="w-3.5 h-3.5 mr-1.5" />Add to Compare</>
                                 }
                               </Button>
+                              <button
+                                type="button"
+                                onClick={() => setPrintOption({ unit, option: selOpt })}
+                                className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md text-xs font-semibold bg-white border-2 border-[#C49A2E] text-[#C49A2E] hover:bg-[#C49A2E] hover:text-white transition-colors"
+                                title={`Export ${selOpt.name} proposal PDF (includes project details)`}
+                              >
+                                <FileDown className="w-3.5 h-3.5" />
+                                Export {selOpt.name} PDF
+                              </button>
                             </div>
                           </div>
                         )}
                       </div>
                     )}
 
-                    {/* ROI panel for selected option */}
+                    {/* ── Collapsible: ROI & Payment Breakdown ── */}
                     {selOpt && totalPrice > 0 && (
-                      <OptionRoiPanel
-                        totalPrice={totalPrice}
-                        currency={selOpt.currency || currency}
-                        initialPayment={selOpt.initialPayment}
-                        paymentPlanDetails={selOpt.paymentPlanDetails}
-                        rentalYield={rentalYield}
-                      />
+                      <div className="border-t border-slate-200 bg-white">
+                        <button
+                          type="button"
+                          onClick={() => toggleRoi(unit.id)}
+                          className="w-full flex items-center justify-between px-5 py-3 hover:bg-slate-50 transition-colors"
+                        >
+                          <span className="flex items-center gap-2 text-sm font-semibold text-[#1B3A5C]">
+                            <Calculator className="w-4 h-4" />
+                            ROI &amp; Payment Breakdown
+                            <span className="text-xs text-slate-400 font-normal">(click to {roiOpen[unit.id] ? 'hide' : 'view'})</span>
+                          </span>
+                          {roiOpen[unit.id]
+                            ? <ChevronUp className="w-4 h-4 text-slate-400" />
+                            : <ChevronDown className="w-4 h-4 text-slate-400" />
+                          }
+                        </button>
+                        {roiOpen[unit.id] && (
+                          <div className="border-t border-slate-100">
+                            <OptionRoiPanel
+                              totalPrice={totalPrice}
+                              currency={selOpt.currency || currency}
+                              initialPayment={selOpt.initialPayment}
+                              paymentPlanDetails={selOpt.paymentPlanDetails}
+                              rentalYield={rentalYield}
+                            />
+                          </div>
+                        )}
+                      </div>
                     )}
 
-                    {/* Documents for selected option + unit + project */}
+                    {/* ── Collapsible: Related Documents ── */}
                     {unitDocs.length > 0 && (
-                      <div className="border-t border-slate-100 px-4 py-3">
-                        <p className="text-xs font-semibold text-slate-500 mb-2 flex items-center gap-1">
-                          <FileText className="w-3.5 h-3.5" /> Related Documents
-                        </p>
-                        <div className="space-y-1.5">
-                          {unitDocs.map(doc => (
-                            <a
-                              key={doc.id}
-                              href={doc.fileUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="flex items-center gap-2 p-2 rounded-lg border border-slate-100 hover:border-[#1B3A5C] hover:bg-slate-50 transition-all group text-sm"
-                            >
-                              <div className="w-7 h-7 rounded bg-[#E0EDF7] flex items-center justify-center flex-shrink-0 group-hover:bg-[#1B3A5C] transition-colors">
-                                <FileText className="w-3.5 h-3.5 text-[#1B3A5C] group-hover:text-white transition-colors" />
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <span className="font-medium text-slate-900 truncate block">{doc.title}</span>
-                                <span className="text-xs text-slate-400">
-                                  {DOC_TYPE_LABELS[doc.type] || 'Document'}
-                                  {doc.unitOptionId ? ` · ${selOpt?.name ?? 'Option'}` : doc.unitId ? ' · Unit' : ' · Project'}
-                                  {doc.fileSize ? ` · ${formatFileSize(doc.fileSize)}` : ''}
-                                </span>
-                              </div>
-                              <Download className="w-3.5 h-3.5 text-slate-300 group-hover:text-[#1B3A5C] flex-shrink-0 transition-colors" />
-                            </a>
-                          ))}
-                        </div>
+                      <div className="border-t border-slate-200 bg-white">
+                        <button
+                          type="button"
+                          onClick={() => toggleDocs(unit.id)}
+                          className="w-full flex items-center justify-between px-5 py-3 hover:bg-slate-50 transition-colors"
+                        >
+                          <span className="flex items-center gap-2 text-sm font-semibold text-[#1B3A5C]">
+                            <FileText className="w-4 h-4" />
+                            Related Documents
+                            <span className="text-xs text-slate-400 font-normal">({unitDocs.length})</span>
+                          </span>
+                          {docsOpen[unit.id]
+                            ? <ChevronUp className="w-4 h-4 text-slate-400" />
+                            : <ChevronDown className="w-4 h-4 text-slate-400" />
+                          }
+                        </button>
+                        {docsOpen[unit.id] && (
+                          <div className="border-t border-slate-100 px-5 py-3">
+                            <div className="space-y-1.5">
+                              {unitDocs.map(doc => (
+                                <a
+                                  key={doc.id}
+                                  href={doc.fileUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="flex items-center gap-2 p-2 rounded-lg border border-slate-100 hover:border-[#1B3A5C] hover:bg-slate-50 transition-all group text-sm"
+                                >
+                                  <div className="w-7 h-7 rounded bg-[#E0EDF7] flex items-center justify-center flex-shrink-0 group-hover:bg-[#1B3A5C] transition-colors">
+                                    <FileText className="w-3.5 h-3.5 text-[#1B3A5C] group-hover:text-white transition-colors" />
+                                  </div>
+                                  <div className="flex-1 min-w-0">
+                                    <span className="font-medium text-slate-900 truncate block">{doc.title}</span>
+                                    <span className="text-xs text-slate-400">
+                                      {DOC_TYPE_LABELS[doc.type] || 'Document'}
+                                      {doc.unitOptionId ? ` · ${selOpt?.name ?? 'Option'}` : doc.unitId ? ' · Unit' : ' · Project'}
+                                      {doc.fileSize ? ` · ${formatFileSize(doc.fileSize)}` : ''}
+                                    </span>
+                                  </div>
+                                  <Download className="w-3.5 h-3.5 text-slate-300 group-hover:text-[#1B3A5C] flex-shrink-0 transition-colors" />
+                                </a>
+                              ))}
+                            </div>
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
@@ -930,7 +1230,7 @@ export function PropertyUnitsSection({
         </div>
       )}
 
-      {/* ─── Unit Investment Proposal PDF Overlay ────────── */}
+      {/* ─── Unit Investment Proposal PDF Overlay (all finish options side-by-side) ────────── */}
       {printUnit && (
         <UnitSheetPrint
           propertyTitle={propertyTitle}
@@ -943,6 +1243,25 @@ export function PropertyUnitsSection({
           capitalGrowth={capitalGrowth}
           logoUrl={logoUrl}
           onClose={() => setPrintUnit(null)}
+        />
+      )}
+
+      {/* ─── Per-Finish-Option PDF Overlay (project details + pictures + single option) ────── */}
+      {printOption && (
+        <OptionSheetPrint
+          propertyTitle={propertyTitle}
+          propertyCountry={propertyCountry}
+          propertyCity={propertyCity}
+          propertyStatus={propertyStatus}
+          propertyImages={propertyImages}
+          propertyDescription={propertyDescription}
+          unit={printOption.unit}
+          option={printOption.option}
+          currency={currency}
+          rentalYield={rentalYield}
+          capitalGrowth={capitalGrowth}
+          logoUrl={logoUrl}
+          onClose={() => setPrintOption(null)}
         />
       )}
     </div>

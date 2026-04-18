@@ -151,6 +151,8 @@ export default async function PropertyPage({ params }: PropertyPageProps) {
               currency={property.currency || 'USD'}
               rentalYield={property.investmentData?.rentalYield}
               capitalGrowth={property.investmentData?.capitalGrowth}
+              propertyImages={property.images || []}
+              propertyDescription={property.description || null}
             />
 
             {/* Description */}
