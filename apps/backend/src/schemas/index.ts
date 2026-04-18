@@ -204,6 +204,7 @@ export const unitSchema = z.object({
   floor: z.number().nullish(),
   parkingSpaces: z.number().nullish(),
   notes: z.string().nullish(),
+  images: z.array(z.string()).optional(),
   availabilityStatus: z.enum(['AVAILABLE', 'RESERVED', 'SOLD', 'OFF_MARKET']).optional(),
 });
 

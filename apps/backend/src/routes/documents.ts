@@ -38,10 +38,12 @@ router.get(
   authenticateToken,
   requireAdmin,
   asyncHandler(async (req: Request, res: Response) => {
-    const { propertyId, type } = req.query;
+    const { propertyId, unitId, unitOptionId, type } = req.query;
 
     const where: Record<string, unknown> = {};
     if (propertyId) where.propertyId = propertyId;
+    if (unitId) where.unitId = unitId;
+    if (unitOptionId) where.unitOptionId = unitOptionId;
     if (type) where.type = type;
 
     const documents = await prisma.propertyDocument.findMany({
@@ -49,6 +51,12 @@ router.get(
       include: {
         property: {
           select: { id: true, title: true, country: true },
+        },
+        unit: {
+          select: { id: true, name: true },
+        },
+        unitOption: {
+          select: { id: true, name: true },
         },
       },
       orderBy: { createdAt: 'desc' },
@@ -76,7 +84,7 @@ router.post(
   asyncHandler(async (req: Request, res: Response) => {
     const authReq = req as AuthenticatedRequest;
     const file = req.file;
-    const { propertyId, title, description, type, isPublic } = req.body;
+    const { propertyId, unitId, unitOptionId, title, description, type, isPublic } = req.body;
 
     if (!file) {
       res.status(400).json({ error: 'No file provided' });
@@ -134,6 +142,8 @@ router.post(
     const document = await prisma.propertyDocument.create({
       data: {
         propertyId,
+        unitId: unitId || null,
+        unitOptionId: unitOptionId || null,
         title,
         description: description || null,
         type: docType,
@@ -143,9 +153,9 @@ router.post(
         isPublic: isPublic === 'true',
       },
       include: {
-        property: {
-          select: { id: true, title: true, country: true },
-        },
+        property: { select: { id: true, title: true, country: true } },
+        unit: { select: { id: true, name: true } },
+        unitOption: { select: { id: true, name: true } },
       },
     });
 
@@ -153,6 +163,8 @@ router.post(
       title,
       type: docType,
       propertyId,
+      unitId: unitId || null,
+      unitOptionId: unitOptionId || null,
       propertyTitle: property.title,
       fileSize: file.size,
     }, authReq);
@@ -205,7 +217,7 @@ router.put(
   },
   asyncHandler(async (req: Request, res: Response) => {
     const authReq = req as AuthenticatedRequest;
-    const { title, description, type, isPublic } = req.body;
+    const { title, description, type, isPublic, unitId, unitOptionId } = req.body;
     const newFile = req.file;
 
     const existing = await prisma.propertyDocument.findUnique({
@@ -233,6 +245,8 @@ router.put(
     if (description !== undefined) updateData.description = description || null;
     if (normalizedType !== undefined) updateData.type = normalizedType;
     if (normalizedIsPublic !== undefined) updateData.isPublic = normalizedIsPublic;
+    if (unitId !== undefined) updateData.unitId = unitId || null;
+    if (unitOptionId !== undefined) updateData.unitOptionId = unitOptionId || null;
 
     // Handle optional file replacement
     if (newFile) {
@@ -279,6 +293,8 @@ router.put(
       data: updateData,
       include: {
         property: { select: { id: true, title: true, country: true } },
+        unit: { select: { id: true, name: true } },
+        unitOption: { select: { id: true, name: true } },
       },
     });
 

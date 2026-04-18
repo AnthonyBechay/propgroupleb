@@ -59,10 +59,60 @@ export interface Unit {
   floor?: number | null;
   parkingSpaces?: number | null;
   notes?: string | null;
+  images: string[];
   availabilityStatus: 'AVAILABLE' | 'RESERVED' | 'SOLD' | 'OFF_MARKET';
   options: UnitOption[];
   createdAt: string;
   updatedAt: string;
+}
+
+export interface PropertyDocument {
+  id: string;
+  propertyId: string;
+  unitId?: string | null;
+  unitOptionId?: string | null;
+  title: string;
+  description?: string | null;
+  type: 'FLOOR_PLAN' | 'BROCHURE' | 'CONTRACT' | 'LEGAL_DOCUMENT' | 'CERTIFICATE' | 'OTHER';
+  fileUrl: string;
+  fileSize?: number | null;
+  mimeType?: string | null;
+  isPublic: boolean;
+  createdAt: string;
+}
+
+// Comparator types
+export interface ComparatorItem {
+  propertyId: string;
+  propertyTitle: string;
+  propertySlug: string;
+  propertyCountry: string;
+  propertyCity?: string | null;
+  propertyStatus: string;
+  propertyType: string;
+  unitId: string;
+  unitName: string;
+  bedrooms: number;
+  bathrooms: number;
+  area: number;
+  floor?: number | null;
+  optionId: string;
+  optionName: string;
+  totalPrice: number;
+  pricePerSqm: number;
+  currency: string;
+  initialPayment?: number | null;
+  paymentPlanDetails?: PaymentPlanDetails | null;
+}
+
+export interface PaymentPlanDetails {
+  summary?: string;
+  installmentMonths?: number;
+  milestones?: Array<{
+    percentage: number;
+    label: string;
+    type?: 'upfront' | 'installment' | 'handover';
+  }>;
 }
 
 // Property types
@@ -128,6 +178,7 @@ export interface Property {
   };
   favoriteProperties?: any[];
   units?: Unit[];
+  documents?: PropertyDocument[];
 }
 
 // Portfolio types

@@ -16,7 +16,9 @@ export const PROPERTY_LIST_INCLUDE = {
     },
   },
   units: {
-    include: { options: true },
+    include: {
+      options: true,
+    },
     orderBy: { createdAt: 'asc' },
   },
   _count: {
@@ -59,12 +61,16 @@ export const PROPERTY_DETAIL_INCLUDE = {
       fileSize: true,
       mimeType: true,
       type: true,
+      unitId: true,
+      unitOptionId: true,
       createdAt: true,
     },
     orderBy: { createdAt: 'desc' },
   },
   units: {
-    include: { options: true },
+    include: {
+      options: true,
+    },
     orderBy: { createdAt: 'asc' },
   },
   _count: {

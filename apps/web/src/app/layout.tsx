@@ -2,11 +2,13 @@ import type { Metadata } from "next";
 import { Inter, Plus_Jakarta_Sans } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/contexts/AuthContext";
+import { ComparatorProvider } from "@/contexts/ComparatorContext";
 import { ConditionalNavbar } from "@/components/layout/ConditionalNavbar";
 import { ConditionalFooter } from "@/components/layout/ConditionalFooter";
 import { Toaster } from "@/components/ui/toast";
 import { ConditionalScrollToTop } from "@/components/layout/ConditionalScrollToTop";
 import { ConditionalAIAssistantFab } from "@/components/ai/ConditionalAIAssistantFab";
+import { ComparatorBar } from "@/components/ComparatorBar";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -91,14 +93,17 @@ export default function RootLayout({
       </head>
       <body className="font-plus-jakarta antialiased min-h-screen flex flex-col bg-slate-50 overflow-x-hidden">
         <AuthProvider>
-          <ConditionalNavbar />
-          <div className="flex-1">
-            {children}
-          </div>
-          <ConditionalFooter />
-          <ConditionalScrollToTop />
-          <ConditionalAIAssistantFab />
-          <Toaster />
+          <ComparatorProvider>
+            <ConditionalNavbar />
+            <div className="flex-1">
+              {children}
+            </div>
+            <ConditionalFooter />
+            <ConditionalScrollToTop />
+            <ConditionalAIAssistantFab />
+            <ComparatorBar />
+            <Toaster />
+          </ComparatorProvider>
         </AuthProvider>
       </body>
     </html>

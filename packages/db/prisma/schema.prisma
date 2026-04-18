@@ -631,8 +631,10 @@ model PropertyAmenity {
 }
 
 model PropertyDocument {
-  id         String @id @default(cuid())
-  propertyId String
+  id           String  @id @default(cuid())
+  propertyId   String
+  unitId       String? // null = project-level document
+  unitOptionId String? // null = not specific to a finish option
 
   title       String
   description String?
@@ -646,9 +648,13 @@ model PropertyDocument {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  property Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  property   Property    @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  unit       Unit?       @relation(fields: [unitId], references: [id], onDelete: SetNull)
+  unitOption UnitOption? @relation(fields: [unitOptionId], references: [id], onDelete: SetNull)
 
   @@index([propertyId])
+  @@index([unitId])
+  @@index([unitOptionId])
   @@index([type])
   @@map("property_documents")
 }
@@ -983,14 +989,16 @@ model Unit {
   floor         Int?
   parkingSpaces Int?    @default(0)
   notes         String?
+  images        String[] // unit-specific photos shown when this unit is selected
 
   availabilityStatus PropertyAvailabilityStatus @default(AVAILABLE)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  property Property     @relation(fields: [propertyId], references: [id], onDelete: Cascade)
-  options  UnitOption[]
+  property  Property           @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  options   UnitOption[]
+  documents PropertyDocument[]
 
   @@index([propertyId])
   @@index([availabilityStatus])
@@ -1001,17 +1009,18 @@ model UnitOption {
   id     String @id @default(cuid())
   unitId String
 
-  name           String  // "Turnkey", "White Frame", "Black Frame", "Renovated"
-  pricePerSqm    Float
-  currency       String  @default("USD")
-  initialPayment Float?  // upfront/down payment amount
-  paymentPlanDetails Json? // {summary: "...", milestones: [...]}
-  description    String?
+  name               String  // "Turnkey", "White Frame", "Black Frame", "Renovated"
+  pricePerSqm        Float
+  currency           String  @default("USD")
+  initialPayment     Float?  // upfront/down payment amount
+  paymentPlanDetails Json?   // {summary: "...", installmentMonths: N, milestones: [{percentage, label, type}]}
+  description        String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  unit Unit @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  unit      Unit               @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  documents PropertyDocument[]
 
   @@index([unitId])
   @@map("unit_options")

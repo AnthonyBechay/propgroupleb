@@ -1,13 +1,13 @@
 import { notFound } from 'next/navigation'
 import { normalizeApiUrl } from '@/lib/utils/api-url'
 import { resolveGoogleMapsEmbedUrl } from '@/lib/utils/map-embed'
-import { CollapsibleRoiCalculator } from '@/components/property/CollapsibleRoiCalculator'
 import { PropertyImageGallery } from '@/components/PropertyImageGallery'
 import { PropertyDescription } from '@/components/property/PropertyDescription'
 import { PropertySidebar } from '@/components/property/PropertySidebar'
+import { PropertyUnitsSection } from '@/components/property/PropertyUnitsSection'
 import {
-  MapPin, Bed, Bath, Maximize, TrendingUp, DollarSign, Shield,
-  Building2, CreditCard, FileText, Download, Map as MapIcon,
+  MapPin, TrendingUp, DollarSign, Shield,
+  Building2, CreditCard, Map as MapIcon,
   Home, Calendar, Sparkles,
 } from 'lucide-react'
 
@@ -45,21 +45,7 @@ function hasInvestmentData(investmentData: any): boolean {
   )
 }
 
-function formatFileSize(bytes: number | null | undefined): string {
-  if (!bytes) return ''
-  if (bytes < 1024) return `${bytes} B`
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
-}
 
-const DOCUMENT_TYPE_LABELS: Record<string, string> = {
-  FLOOR_PLAN: 'Floor Plan',
-  BROCHURE: 'Brochure',
-  CONTRACT: 'Contract',
-  LEGAL_DOCUMENT: 'Legal Document',
-  CERTIFICATE: 'Certificate',
-  OTHER: 'Document',
-}
 
 export default async function PropertyPage({ params }: PropertyPageProps) {
   const { slug } = await params
@@ -68,10 +54,6 @@ export default async function PropertyPage({ params }: PropertyPageProps) {
   if (!property) {
     notFound()
   }
-
-  const estimatedRent = property.investmentData?.rentalYield
-    ? (property.price * property.investmentData.rentalYield / 100) / 12
-    : property.price * 0.005
 
   const statusLabel = property.status?.replace('_', ' ') || ''
   const statusColors: Record<string, string> = {
@@ -138,8 +120,7 @@ export default async function PropertyPage({ params }: PropertyPageProps) {
 
             {/* Project Quick Facts */}
             <div className="bg-white rounded-xl border border-slate-200 p-5">
-              {/* Basic project info row */}
-              <div className="flex flex-wrap gap-4 text-sm text-slate-600 mb-4">
+              <div className="flex flex-wrap gap-4 text-sm text-slate-600">
                 <span className="flex items-center gap-1.5">
                   <Home className="w-4 h-4 text-[#1B3A5C]" />
                   <span className="capitalize">{property.propertyType?.toLowerCase() || 'Project'}</span>
@@ -154,60 +135,22 @@ export default async function PropertyPage({ params }: PropertyPageProps) {
                   <span>{property.parkingSpaces} parking</span>
                 )}
               </div>
-
-              {/* Available Units */}
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-lg font-semibold text-slate-900">Available Units</h2>
-                <span className="text-sm text-slate-500">{property.units?.length ?? 0} unit type{property.units?.length !== 1 ? 's' : ''}</span>
-              </div>
-              {(!property.units || property.units.length === 0) ? (
-                <p className="text-sm text-slate-500">Unit details coming soon.</p>
-              ) : (
-                <div className="space-y-3">
-                  {property.units.map((unit: any) => (
-                    <div key={unit.id} className="border border-slate-200 rounded-xl overflow-hidden">
-                      <div className="flex items-center justify-between px-4 py-3 bg-slate-50 border-b border-slate-100">
-                        <div className="flex items-center gap-3 flex-wrap">
-                          <span className="font-semibold text-slate-900">{unit.name}</span>
-                          {unit.unitNumber && <span className="text-xs bg-[#E0EDF7] text-[#1B3A5C] px-2 py-0.5 rounded font-mono">{unit.unitNumber}</span>}
-                          <div className="flex items-center gap-3 text-sm text-slate-600">
-                            <span className="flex items-center gap-1"><Bed className="w-3.5 h-3.5" />{unit.bedrooms} bed</span>
-                            <span className="flex items-center gap-1"><Bath className="w-3.5 h-3.5" />{unit.bathrooms} bath</span>
-                            <span className="flex items-center gap-1"><Maximize className="w-3.5 h-3.5" />{unit.area} m²</span>
-                            {unit.floor && <span>Floor {unit.floor}</span>}
-                          </div>
-                        </div>
-                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                          unit.availabilityStatus === 'AVAILABLE' ? 'bg-emerald-100 text-emerald-700' :
-                          unit.availabilityStatus === 'RESERVED' ? 'bg-amber-100 text-amber-700' :
-                          unit.availabilityStatus === 'SOLD' ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-600'
-                        }`}>{unit.availabilityStatus.replace('_', ' ')}</span>
-                      </div>
-                      {unit.options && unit.options.length > 0 && (
-                        <div className="divide-y divide-slate-100">
-                          {unit.options.map((opt: any) => {
-                            const total = opt.pricePerSqm * unit.area
-                            const fmt = (v: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: opt.currency || 'USD', maximumFractionDigits: 0 }).format(v)
-                            return (
-                              <div key={opt.id} className="flex items-center justify-between px-4 py-3">
-                                <div>
-                                  <span className="text-sm font-medium text-slate-900">{opt.name}</span>
-                                  {opt.description && <span className="text-xs text-slate-500 ml-2">· {opt.description}</span>}
-                                  <div className="text-xs text-slate-500 mt-0.5">{fmt(opt.pricePerSqm)}/m²{opt.initialPayment ? ` · Initial: ${fmt(opt.initialPayment)}` : ''}</div>
-                                </div>
-                                <div className="text-right">
-                                  <div className="text-lg font-bold text-[#1B3A5C]">{fmt(total)}</div>
-                                </div>
-                              </div>
-                            )
-                          })}
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
             </div>
+
+            {/* Units (interactive: selection, images, docs, ROI, comparator) */}
+            <PropertyUnitsSection
+              propertyId={property.id}
+              propertyTitle={property.title}
+              propertySlug={property.slug || property.id}
+              propertyCountry={property.country}
+              propertyCity={property.city}
+              propertyStatus={property.status || ''}
+              propertyType={property.propertyType || ''}
+              units={property.units || []}
+              documents={publicDocuments}
+              currency={property.currency || 'USD'}
+              rentalYield={property.investmentData?.rentalYield}
+            />
 
             {/* Description */}
             {property.description && (
@@ -347,49 +290,7 @@ export default async function PropertyPage({ params }: PropertyPageProps) {
               </div>
             )}
 
-            {/* Documents */}
-            {publicDocuments.length > 0 && (
-              <div className="bg-white rounded-xl border border-slate-200 p-6">
-                <h2 className="text-lg font-semibold text-slate-900 mb-4 flex items-center gap-2">
-                  <FileText className="w-5 h-5 text-[#1B3A5C]" />
-                  Documents
-                </h2>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  {publicDocuments.map((doc) => (
-                    <a
-                      key={doc.id}
-                      href={doc.fileUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex items-center gap-3 p-3 border border-slate-200 rounded-lg hover:border-[#1B3A5C] hover:bg-slate-50 transition-all group"
-                    >
-                      <div className="w-10 h-10 rounded-lg bg-[#E0EDF7] flex items-center justify-center flex-shrink-0 group-hover:bg-[#1B3A5C] transition-colors">
-                        <FileText className="w-5 h-5 text-[#1B3A5C] group-hover:text-white transition-colors" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="font-medium text-slate-900 truncate">{doc.title}</div>
-                        <div className="text-xs text-slate-500 flex items-center gap-2">
-                          <span>{DOCUMENT_TYPE_LABELS[doc.type] || 'Document'}</span>
-                          {doc.fileSize && (
-                            <>
-                              <span>·</span>
-                              <span>{formatFileSize(doc.fileSize)}</span>
-                            </>
-                          )}
-                        </div>
-                      </div>
-                      <Download className="w-4 h-4 text-slate-400 group-hover:text-[#1B3A5C] flex-shrink-0 transition-colors" />
-                    </a>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* ROI Calculator (collapsible) */}
-            <CollapsibleRoiCalculator
-              propertyPrice={property.price}
-              estimatedRent={estimatedRent}
-            />
+            {/* Documents and ROI are now embedded inside PropertyUnitsSection per unit/option */}
           </div>
 
           {/* Sidebar */}
