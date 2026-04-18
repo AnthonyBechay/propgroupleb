@@ -1,46 +1,13 @@
 import { NextResponse, type NextRequest } from 'next/server'
 
-export async function middleware(request: NextRequest) {
-  try {
-    // Check for JWT token in cookies
-    const token = request.cookies.get('token')?.value
-
-    // Check protected routes
-    const protectedPaths = ['/portal', '/admin']
-    const isProtectedPath = protectedPaths.some(path =>
-      request.nextUrl.pathname.startsWith(path)
-    )
-
-    // Special handling for login page - prevent redirect loop
-    const isLoginPage = request.nextUrl.pathname.startsWith('/auth/login')
-
-    if (isProtectedPath) {
-      if (!token) {
-        // No token, redirect to login with next parameter
-        const redirectUrl = request.nextUrl.clone()
-        redirectUrl.pathname = '/auth/login'
-        redirectUrl.searchParams.set('next', request.nextUrl.pathname)
-        return NextResponse.redirect(redirectUrl)
-      }
-
-      // Token exists, let the request continue
-      // The actual token validation will happen in the API routes and layouts
-      return NextResponse.next()
-    }
-
-    // If user has a token and tries to visit login, allow it
-    // The login page itself will handle the redirect
-    if (isLoginPage && token) {
-      // Let the login page handle the redirect based on user role
-      return NextResponse.next()
-    }
-
-    return NextResponse.next()
-  } catch (e) {
-    // Handle any unexpected errors
-    console.error('[Middleware] Error:', e)
-    return NextResponse.next()
-  }
+// NOTE: Authentication is enforced client-side by AdminLayoutClient /
+// PortalLayoutClient via the backend /api/auth/me endpoint. We intentionally
+// do NOT gate routes here on a `token` cookie, because that cookie is set by
+// the backend on the API origin (e.g. api.propgroup.com) and is not present
+// on the Next.js origin — any cookie-based middleware guard would always
+// fail and kick authenticated users back to /auth/login.
+export async function middleware(_request: NextRequest) {
+  return NextResponse.next()
 }
 
 export const config = {
