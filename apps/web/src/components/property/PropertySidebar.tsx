@@ -25,7 +25,7 @@ interface PropertySidebarProps {
   title: string
   price: number
   currency: string
-  area: number
+  area?: number | null
   expectedROI?: number | null
 }
 
@@ -177,7 +177,7 @@ export function PropertySidebar({
             <div className="text-3xl font-bold text-slate-900 mb-1">
               {currency} {price?.toLocaleString()}
             </div>
-            {area > 0 && (
+            {area != null && area > 0 && (
               <div className="text-sm text-slate-500">
                 {currency} {Math.round(price / area).toLocaleString()} / m²
               </div>

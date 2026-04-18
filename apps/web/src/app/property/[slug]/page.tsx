@@ -1,5 +1,5 @@
 import { notFound } from 'next/navigation'
-import { normalizeApiUrl, normalizeFileUrl } from '@/lib/utils/api-url'
+import { normalizeApiUrl } from '@/lib/utils/api-url'
 import { resolveGoogleMapsEmbedUrl } from '@/lib/utils/map-embed'
 import { CollapsibleRoiCalculator } from '@/components/property/CollapsibleRoiCalculator'
 import { PropertyImageGallery } from '@/components/PropertyImageGallery'
@@ -118,7 +118,9 @@ export default async function PropertyPage({ params }: PropertyPageProps) {
             {property.title}
           </h1>
           <div className="mt-2 text-2xl md:text-3xl font-bold text-[#1B3A5C]">
-            {formatPrice(property.price)}
+            {property.units && property.units.length > 0 && property.price > 0
+              ? `From ${formatPrice(property.price)}`
+              : property.price > 0 ? formatPrice(property.price) : 'Price on Request'}
           </div>
         </header>
 
@@ -134,80 +136,75 @@ export default async function PropertyPage({ params }: PropertyPageProps) {
               title={property.title}
             />
 
-            {/* Quick Facts Row */}
+            {/* Project Quick Facts */}
             <div className="bg-white rounded-xl border border-slate-200 p-5">
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-lg bg-[#E0EDF7] flex items-center justify-center">
-                    <Bed className="w-5 h-5 text-[#1B3A5C]" />
-                  </div>
-                  <div>
-                    <div className="text-xs text-slate-500">Bedrooms</div>
-                    <div className="text-lg font-semibold text-slate-900">{property.bedrooms}</div>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-lg bg-[#E0EDF7] flex items-center justify-center">
-                    <Bath className="w-5 h-5 text-[#1B3A5C]" />
-                  </div>
-                  <div>
-                    <div className="text-xs text-slate-500">Bathrooms</div>
-                    <div className="text-lg font-semibold text-slate-900">{property.bathrooms}</div>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-lg bg-[#E0EDF7] flex items-center justify-center">
-                    <Maximize className="w-5 h-5 text-[#1B3A5C]" />
-                  </div>
-                  <div>
-                    <div className="text-xs text-slate-500">Area</div>
-                    <div className="text-lg font-semibold text-slate-900">{property.area} m²</div>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-lg bg-[#E0EDF7] flex items-center justify-center">
-                    <Home className="w-5 h-5 text-[#1B3A5C]" />
-                  </div>
-                  <div>
-                    <div className="text-xs text-slate-500">Type</div>
-                    <div className="text-lg font-semibold text-slate-900 capitalize">
-                      {property.propertyType?.toLowerCase() || 'Property'}
-                    </div>
-                  </div>
-                </div>
+              {/* Basic project info row */}
+              <div className="flex flex-wrap gap-4 text-sm text-slate-600 mb-4">
+                <span className="flex items-center gap-1.5">
+                  <Home className="w-4 h-4 text-[#1B3A5C]" />
+                  <span className="capitalize">{property.propertyType?.toLowerCase() || 'Project'}</span>
+                </span>
+                {property.floors && (
+                  <span className="flex items-center gap-1.5">
+                    <Building2 className="w-4 h-4 text-[#1B3A5C]" />
+                    {property.floors} floors
+                  </span>
+                )}
+                {property.parkingSpaces != null && property.parkingSpaces > 0 && (
+                  <span>{property.parkingSpaces} parking</span>
+                )}
               </div>
 
-              {/* Secondary details (if any) */}
-              {(property.furnishingStatus || property.ownershipType || property.floors || property.parkingSpaces) && (
-                <div className="mt-5 pt-5 border-t border-slate-100 grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                  {property.furnishingStatus && (
-                    <div>
-                      <div className="text-slate-500 text-xs">Furnishing</div>
-                      <div className="font-medium text-slate-800 capitalize">
-                        {property.furnishingStatus.toLowerCase().replace('_', ' ')}
+              {/* Available Units */}
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-semibold text-slate-900">Available Units</h2>
+                <span className="text-sm text-slate-500">{property.units?.length ?? 0} unit type{property.units?.length !== 1 ? 's' : ''}</span>
+              </div>
+              {(!property.units || property.units.length === 0) ? (
+                <p className="text-sm text-slate-500">Unit details coming soon.</p>
+              ) : (
+                <div className="space-y-3">
+                  {property.units.map((unit: any) => (
+                    <div key={unit.id} className="border border-slate-200 rounded-xl overflow-hidden">
+                      <div className="flex items-center justify-between px-4 py-3 bg-slate-50 border-b border-slate-100">
+                        <div className="flex items-center gap-3 flex-wrap">
+                          <span className="font-semibold text-slate-900">{unit.name}</span>
+                          {unit.unitNumber && <span className="text-xs bg-[#E0EDF7] text-[#1B3A5C] px-2 py-0.5 rounded font-mono">{unit.unitNumber}</span>}
+                          <div className="flex items-center gap-3 text-sm text-slate-600">
+                            <span className="flex items-center gap-1"><Bed className="w-3.5 h-3.5" />{unit.bedrooms} bed</span>
+                            <span className="flex items-center gap-1"><Bath className="w-3.5 h-3.5" />{unit.bathrooms} bath</span>
+                            <span className="flex items-center gap-1"><Maximize className="w-3.5 h-3.5" />{unit.area} m²</span>
+                            {unit.floor && <span>Floor {unit.floor}</span>}
+                          </div>
+                        </div>
+                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                          unit.availabilityStatus === 'AVAILABLE' ? 'bg-emerald-100 text-emerald-700' :
+                          unit.availabilityStatus === 'RESERVED' ? 'bg-amber-100 text-amber-700' :
+                          unit.availabilityStatus === 'SOLD' ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-600'
+                        }`}>{unit.availabilityStatus.replace('_', ' ')}</span>
                       </div>
+                      {unit.options && unit.options.length > 0 && (
+                        <div className="divide-y divide-slate-100">
+                          {unit.options.map((opt: any) => {
+                            const total = opt.pricePerSqm * unit.area
+                            const fmt = (v: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: opt.currency || 'USD', maximumFractionDigits: 0 }).format(v)
+                            return (
+                              <div key={opt.id} className="flex items-center justify-between px-4 py-3">
+                                <div>
+                                  <span className="text-sm font-medium text-slate-900">{opt.name}</span>
+                                  {opt.description && <span className="text-xs text-slate-500 ml-2">· {opt.description}</span>}
+                                  <div className="text-xs text-slate-500 mt-0.5">{fmt(opt.pricePerSqm)}/m²{opt.initialPayment ? ` · Initial: ${fmt(opt.initialPayment)}` : ''}</div>
+                                </div>
+                                <div className="text-right">
+                                  <div className="text-lg font-bold text-[#1B3A5C]">{fmt(total)}</div>
+                                </div>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      )}
                     </div>
-                  )}
-                  {property.ownershipType && (
-                    <div>
-                      <div className="text-slate-500 text-xs">Ownership</div>
-                      <div className="font-medium text-slate-800 capitalize">
-                        {property.ownershipType.toLowerCase()}
-                      </div>
-                    </div>
-                  )}
-                  {property.floors && (
-                    <div>
-                      <div className="text-slate-500 text-xs">Floors</div>
-                      <div className="font-medium text-slate-800">{property.floors}</div>
-                    </div>
-                  )}
-                  {property.parkingSpaces != null && property.parkingSpaces > 0 && (
-                    <div>
-                      <div className="text-slate-500 text-xs">Parking</div>
-                      <div className="font-medium text-slate-800">{property.parkingSpaces}</div>
-                    </div>
-                  )}
+                  ))}
                 </div>
               )}
             </div>
@@ -402,43 +399,9 @@ export default async function PropertyPage({ params }: PropertyPageProps) {
               title={property.title}
               price={property.price}
               currency={property.currency}
-              area={property.area}
+              area={property.units?.[0]?.area ?? null}
               expectedROI={property.investmentData?.expectedROI}
             />
-
-            {/* Developer */}
-            {property.developer && (
-              <div className="bg-white rounded-xl border border-slate-200 p-5">
-                <h3 className="text-sm font-semibold text-slate-900 mb-3 flex items-center gap-2">
-                  <Building2 className="w-4 h-4 text-[#1B3A5C]" />
-                  Developer
-                </h3>
-                <div className="flex items-center gap-3">
-                  {property.developer.logo && (
-                    <img
-                      src={normalizeFileUrl(property.developer.logo)}
-                      alt={property.developer.name}
-                      className="w-12 h-12 rounded-lg object-cover border border-slate-200"
-                    />
-                  )}
-                  <div className="min-w-0">
-                    <div className="font-semibold text-slate-900 truncate">
-                      {property.developer.name}
-                    </div>
-                    {property.developer.website && (
-                      <a
-                        href={property.developer.website}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-xs text-[#1B3A5C] hover:underline"
-                      >
-                        Visit Website
-                      </a>
-                    )}
-                  </div>
-                </div>
-              </div>
-            )}
 
             {/* Location Guide */}
             {property.locationGuide && (

@@ -69,12 +69,8 @@ export const propertySchema = z.object({
   currency: z.string().min(3, 'Currency is required'),
 
   propertyType: z.enum(['APARTMENT', 'VILLA', 'TOWNHOUSE', 'PENTHOUSE', 'STUDIO', 'DUPLEX', 'LAND', 'COMMERCIAL', 'OFFICE']),
-  bedrooms: z.number().min(0, 'Bedrooms must be non-negative'),
-  bathrooms: z.number().min(0, 'Bathrooms must be non-negative'),
-  area: z.number().min(0, 'Area must be positive'),
   builtYear: z.number().nullish(),
   floors: z.number().nullish(),
-  floor: z.number().nullish(),
   parkingSpaces: z.number().nullish(),
 
   country: z.enum(['GEORGIA', 'CYPRUS', 'GREECE', 'LEBANON']),
@@ -90,7 +86,7 @@ export const propertySchema = z.object({
   availabilityStatus: z.enum(['AVAILABLE', 'RESERVED', 'SOLD', 'OFF_MARKET']).nullish(),
   visibility: z.enum(['PUBLIC', 'ELITE_ONLY', 'HIDDEN']).nullish(),
 
-  furnishingStatus: z.enum(['UNFURNISHED', 'SEMI_FURNISHED', 'FULLY_FURNISHED']).nullish(),
+  furnishingStatus: z.enum(['UNFURNISHED', 'SEMI_FURNISHED', 'FULLY_FURNISHED']).nullish(), // kept for legacy
   ownershipType: z.enum(['FREEHOLD', 'LEASEHOLD']).nullish(),
   isGoldenVisaEligible: z.boolean().nullish(),
   hasPool: z.boolean().nullish(),
@@ -195,6 +191,29 @@ export const aiSearchSchema = z.object({
     userId: z.string().optional(),
     previousSearches: z.array(z.string()).optional(),
   }).optional(),
+});
+
+// ─── Unit & UnitOption Schemas ──────────────────────────────────────────────
+
+export const unitSchema = z.object({
+  name: z.string().min(1, 'Unit name is required'),
+  unitNumber: z.string().nullish(),
+  bedrooms: z.number().min(0),
+  bathrooms: z.number().min(0),
+  area: z.number().min(1, 'Area must be positive'),
+  floor: z.number().nullish(),
+  parkingSpaces: z.number().nullish(),
+  notes: z.string().nullish(),
+  availabilityStatus: z.enum(['AVAILABLE', 'RESERVED', 'SOLD', 'OFF_MARKET']).optional(),
+});
+
+export const unitOptionSchema = z.object({
+  name: z.string().min(1, 'Option name is required'),
+  pricePerSqm: z.number().min(0, 'Price per sqm must be positive'),
+  currency: z.string().default('USD'),
+  initialPayment: z.number().nullish(),
+  paymentPlanDetails: z.any().nullish(),
+  description: z.string().nullish(),
 });
 
 // ─── Utility: Extract investment data from validated property data ───────────

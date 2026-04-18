@@ -18,7 +18,9 @@ import {
   X,
   Share2,
   Check,
+  LayoutGrid,
 } from 'lucide-react'
+import Link from 'next/link'
 import { normalizeApiUrl } from '@/lib/utils/api-url'
 
 type PropertyTableProps = {
@@ -306,7 +308,7 @@ export function PropertyTable({ properties }: PropertyTableProps) {
                 </td>
                 <td className="px-4 py-3">
                   <span className="font-semibold text-gray-900">
-                    {formatCurrency(property.price, property.currency)}
+                    From {formatCurrency(property.price, property.currency)}
                   </span>
                 </td>
                 <td className="px-4 py-3">
@@ -316,7 +318,7 @@ export function PropertyTable({ properties }: PropertyTableProps) {
                   </div>
                 </td>
                 <td className="px-4 py-3 text-gray-600">
-                  {property.bedrooms} bed · {property.bathrooms} bath · {property.area} m²
+                  {`${property.units?.length ?? 0} unit${property.units?.length !== 1 ? 's' : ''}`}
                 </td>
                 <td className="px-4 py-3">
                   <div className="flex flex-wrap gap-1.5">
@@ -368,10 +370,17 @@ export function PropertyTable({ properties }: PropertyTableProps) {
                     >
                       {copiedId === property.id ? <Check className="h-4 w-4" /> : <Share2 className="h-4 w-4" />}
                     </button>
+                    <Link
+                      href={`/admin/properties/${property.id}/units`}
+                      className="p-1.5 rounded-lg text-gray-400 hover:text-[#1B3A5C] hover:bg-[#E0EDF7] transition-colors"
+                      title="Manage Units"
+                    >
+                      <LayoutGrid className="h-4 w-4" />
+                    </Link>
                     <button
                       onClick={() => handleEdit(property)}
                       className="p-1.5 rounded-lg text-gray-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"
-                      title="Edit"
+                      title="Edit project info"
                     >
                       <Edit className="h-4 w-4" />
                     </button>

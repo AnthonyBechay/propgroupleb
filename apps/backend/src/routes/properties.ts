@@ -6,7 +6,7 @@ import { logger } from '../utils/logger.js';
 import { sendSuccess, sendCreated, sendPaginated, sendNotFound } from '../utils/response.js';
 import { buildPaginationResponse } from '../utils/pagination.js';
 import { PROPERTY_LIST_INCLUDE, PROPERTY_DETAIL_INCLUDE } from '../utils/prisma-includes.js';
-import { propertySchema, propertyQuerySchema, extractInvestmentData, buildInvestmentDataPayload } from '../schemas/index.js';
+import { propertySchema, propertyQuerySchema, extractInvestmentData, buildInvestmentDataPayload, unitSchema, unitOptionSchema } from '../schemas/index.js';
 import { deleteFile, extractKeyFromUrl } from '../services/upload.service.js';
 import type { AuthenticatedRequest } from '../types/index.js';
 
@@ -415,5 +415,108 @@ router.delete(
     sendSuccess(res, null, 'Share link revoked');
   })
 );
+
+// Auto-compute and store the minimum price across all unit options
+async function updatePropertyMinPrice(propertyId: string) {
+  try {
+    const units = await prisma.unit.findMany({
+      where: { propertyId },
+      include: { options: true },
+    });
+    const prices = units.flatMap(u => u.options.map(o => o.pricePerSqm * u.area));
+    if (prices.length > 0) {
+      await prisma.property.update({
+        where: { id: propertyId },
+        data: { price: Math.min(...prices) },
+      });
+    }
+  } catch (err) {
+    logger.error('Failed to update property min price', err, { propertyId });
+  }
+}
+
+// ─── Unit Routes ──────────────────────────────────────────────────────────────
+
+// List units for a property
+router.get('/:id/units', asyncHandler(async (req: Request, res: Response) => {
+  const units = await prisma.unit.findMany({
+    where: { propertyId: req.params.id },
+    include: { options: true },
+    orderBy: { createdAt: 'asc' },
+  });
+  sendSuccess(res, units);
+}));
+
+// Create unit
+router.post('/:id/units', authenticateToken, requireAdmin, asyncHandler(async (req: Request, res: Response) => {
+  const authReq = req as AuthenticatedRequest;
+  const data = unitSchema.parse(req.body);
+  const unit = await prisma.unit.create({
+    data: { ...data, propertyId: req.params.id },
+    include: { options: true },
+  });
+  await logAdminAction('CREATE_UNIT', 'unit', unit.id, { propertyId: req.params.id, name: unit.name }, authReq);
+  sendCreated(res, unit, 'Unit created successfully');
+}));
+
+// Update unit
+router.put('/:id/units/:unitId', authenticateToken, requireAdmin, asyncHandler(async (req: Request, res: Response) => {
+  const authReq = req as AuthenticatedRequest;
+  const data = unitSchema.partial().parse(req.body);
+  const unit = await prisma.unit.update({
+    where: { id: req.params.unitId },
+    data,
+    include: { options: true },
+  });
+  await logAdminAction('UPDATE_UNIT', 'unit', unit.id, { name: unit.name }, authReq);
+  sendSuccess(res, unit, 'Unit updated successfully');
+}));
+
+// Delete unit
+router.delete('/:id/units/:unitId', authenticateToken, requireAdmin, asyncHandler(async (req: Request, res: Response) => {
+  const authReq = req as AuthenticatedRequest;
+  const unit = await prisma.unit.findUnique({ where: { id: req.params.unitId }, select: { id: true, name: true } });
+  if (!unit) { sendNotFound(res, 'Unit'); return; }
+  await prisma.unit.delete({ where: { id: req.params.unitId } });
+  await logAdminAction('DELETE_UNIT', 'unit', req.params.unitId, { name: unit.name }, authReq);
+  sendSuccess(res, null, 'Unit deleted successfully');
+}));
+
+// ─── Unit Option Routes ───────────────────────────────────────────────────────
+
+// Create option for a unit
+router.post('/:id/units/:unitId/options', authenticateToken, requireAdmin, asyncHandler(async (req: Request, res: Response) => {
+  const authReq = req as AuthenticatedRequest;
+  const data = unitOptionSchema.parse(req.body);
+  const option = await prisma.unitOption.create({
+    data: { ...data, unitId: req.params.unitId },
+  });
+  // Auto-update property minPrice from cheapest option
+  await updatePropertyMinPrice(req.params.id);
+  await logAdminAction('CREATE_UNIT_OPTION', 'unitOption', option.id, { name: option.name }, authReq);
+  sendCreated(res, option, 'Option created successfully');
+}));
+
+// Update option
+router.put('/:id/units/:unitId/options/:optionId', authenticateToken, requireAdmin, asyncHandler(async (req: Request, res: Response) => {
+  const authReq = req as AuthenticatedRequest;
+  const data = unitOptionSchema.partial().parse(req.body);
+  const option = await prisma.unitOption.update({
+    where: { id: req.params.optionId },
+    data,
+  });
+  await updatePropertyMinPrice(req.params.id);
+  await logAdminAction('UPDATE_UNIT_OPTION', 'unitOption', option.id, { name: option.name }, authReq);
+  sendSuccess(res, option, 'Option updated successfully');
+}));
+
+// Delete option
+router.delete('/:id/units/:unitId/options/:optionId', authenticateToken, requireAdmin, asyncHandler(async (req: Request, res: Response) => {
+  const authReq = req as AuthenticatedRequest;
+  await prisma.unitOption.delete({ where: { id: req.params.optionId } });
+  await updatePropertyMinPrice(req.params.id);
+  await logAdminAction('DELETE_UNIT_OPTION', 'unitOption', req.params.optionId, {}, authReq);
+  sendSuccess(res, null, 'Option deleted successfully');
+}));
 
 export default router;

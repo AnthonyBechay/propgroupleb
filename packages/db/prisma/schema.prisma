@@ -292,12 +292,8 @@ model Property {
 
   // Details
   propertyType  PropertyType
-  bedrooms      Int
-  bathrooms     Int
-  area          Float
   builtYear     Int?
   floors        Int?
-  floor         Int?
   parkingSpaces Int?         @default(0)
 
   // Location
@@ -316,7 +312,8 @@ model Property {
   visibility         PropertyVisibility         @default(PUBLIC)
 
   // Features
-  furnishingStatus     FurnishingStatus?
+  furnishingStatus     FurnishingStatus? // kept for legacy data
+
   ownershipType        OwnershipType?
   isGoldenVisaEligible Boolean           @default(false)
   hasPool              Boolean           @default(false)
@@ -376,6 +373,7 @@ model Property {
   tours              PropertyTour[]
   transactions       Transaction[]
   priceHistory       PropertyPriceHistory[]
+  units              Unit[]
 
   @@index([country])
   @@index([propertyType])
@@ -971,6 +969,52 @@ model SiteContent {
   @@index([section])
   @@index([isActive])
   @@map("site_content")
+}
+
+model Unit {
+  id         String @id @default(cuid())
+  propertyId String
+
+  name          String  // e.g., "1BR - Type A", "2BR Corner Unit"
+  unitNumber    String? // e.g., "A101"
+  bedrooms      Int     @default(1)
+  bathrooms     Int     @default(1)
+  area          Float   // m²
+  floor         Int?
+  parkingSpaces Int?    @default(0)
+  notes         String?
+
+  availabilityStatus PropertyAvailabilityStatus @default(AVAILABLE)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  property Property     @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  options  UnitOption[]
+
+  @@index([propertyId])
+  @@index([availabilityStatus])
+  @@map("units")
+}
+
+model UnitOption {
+  id     String @id @default(cuid())
+  unitId String
+
+  name           String  // "Turnkey", "White Frame", "Black Frame", "Renovated"
+  pricePerSqm    Float
+  currency       String  @default("USD")
+  initialPayment Float?  // upfront/down payment amount
+  paymentPlanDetails Json? // {summary: "...", milestones: [...]}
+  description    String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  unit Unit @relation(fields: [unitId], references: [id], onDelete: Cascade)
+
+  @@index([unitId])
+  @@map("unit_options")
 }
 
 model SiteMedia {

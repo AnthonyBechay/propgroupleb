@@ -32,6 +32,39 @@ export interface User {
   updatedAt?: string;
 }
 
+// Unit / UnitOption types
+export interface UnitOption {
+  id: string;
+  unitId: string;
+  name: string;
+  pricePerSqm: number;
+  currency: string;
+  initialPayment?: number | null;
+  paymentPlanDetails?: any;
+  description?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  // computed
+  totalPrice?: number;
+}
+
+export interface Unit {
+  id: string;
+  propertyId: string;
+  name: string;
+  unitNumber?: string | null;
+  bedrooms: number;
+  bathrooms: number;
+  area: number;
+  floor?: number | null;
+  parkingSpaces?: number | null;
+  notes?: string | null;
+  availabilityStatus: 'AVAILABLE' | 'RESERVED' | 'SOLD' | 'OFF_MARKET';
+  options: UnitOption[];
+  createdAt: string;
+  updatedAt: string;
+}
+
 // Property types
 export interface Property {
   id: string;
@@ -94,6 +127,7 @@ export interface Property {
     favoriteProperties?: number;
   };
   favoriteProperties?: any[];
+  units?: Unit[];
 }
 
 // Portfolio types

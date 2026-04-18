@@ -102,8 +102,12 @@ export const getPropertiesWithFilters = unstable_cache(
       if (minPrice !== undefined) where.price.gte = minPrice
       if (maxPrice !== undefined) where.price.lte = maxPrice
     }
-    if (bedrooms !== undefined) where.bedrooms = { gte: bedrooms }
-    if (bathrooms !== undefined) where.bathrooms = { gte: bathrooms }
+    if (bedrooms !== undefined || bathrooms !== undefined) {
+      const unitWhere: Record<string, unknown> = {}
+      if (bedrooms !== undefined) unitWhere.bedrooms = { gte: bedrooms }
+      if (bathrooms !== undefined) unitWhere.bathrooms = { gte: bathrooms }
+      where.units = { some: unitWhere }
+    }
     if (isGoldenVisaEligible !== undefined) where.isGoldenVisaEligible = isGoldenVisaEligible
 
     const orderBy: any = {}
@@ -318,12 +322,18 @@ export async function getSimilarProperties(
     select: {
       country: true,
       price: true,
-      bedrooms: true,
       status: true,
+      units: {
+        select: { bedrooms: true },
+        orderBy: { bedrooms: 'asc' },
+        take: 1,
+      },
     },
   })
 
   if (!property) return []
+
+  const minBedrooms = property.units[0]?.bedrooms
 
   return prisma.property.findMany({
     where: {
@@ -338,10 +348,12 @@ export async function getSimilarProperties(
           },
         },
         // Same bedrooms and status
-        {
-          bedrooms: property.bedrooms,
-          status: property.status,
-        },
+        ...(minBedrooms !== undefined
+          ? [{
+              status: property.status,
+              units: { some: { bedrooms: minBedrooms } },
+            }]
+          : []),
       ],
     },
     include: {

@@ -8,7 +8,7 @@ import { normalizeApiUrl } from '@/lib/utils/api-url'
 import { PaymentPlanBuilder, type PaymentPlanDetails } from './PaymentPlanBuilder'
 import {
   PROPERTY_TYPES, COUNTRIES, STATUSES, CURRENCIES,
-  FURNISHING, OWNERSHIP, AMENITY_OPTIONS,
+  OWNERSHIP, AMENITY_OPTIONS,
 } from '@/lib/constants/property'
 
 const API_BASE_URL = normalizeApiUrl(process.env.NEXT_PUBLIC_API_URL)
@@ -51,9 +51,6 @@ const INITIAL_FORM = {
   price: 0,
   currency: 'USD',
   propertyType: 'APARTMENT' as string,
-  bedrooms: 0,
-  bathrooms: 0,
-  area: 0,
   country: 'GEORGIA' as string,
   status: 'NEW_BUILD' as string,
   isGoldenVisaEligible: false,
@@ -67,9 +64,7 @@ const INITIAL_FORM = {
   nearbyFacilities: '',
   builtYear: '' as string | number,
   floors: '' as string | number,
-  floor: '' as string | number,
   parkingSpaces: '' as string | number,
-  furnishingStatus: '' as string,
   ownershipType: '' as string,
   hasPool: false,
   hasGym: false,
@@ -97,9 +92,6 @@ function buildPayload(form: typeof INITIAL_FORM, imageUrls: string[], videoUrl: 
     price: Number(form.price),
     currency: form.currency,
     propertyType: form.propertyType,
-    bedrooms: Number(form.bedrooms),
-    bathrooms: Number(form.bathrooms),
-    area: Number(form.area),
     country: form.country,
     status: form.status,
     isGoldenVisaEligible: form.isGoldenVisaEligible,
@@ -114,9 +106,7 @@ function buildPayload(form: typeof INITIAL_FORM, imageUrls: string[], videoUrl: 
     nearbyFacilities: form.nearbyFacilities || null,
     builtYear: form.builtYear ? Number(form.builtYear) : null,
     floors: form.floors ? Number(form.floors) : null,
-    floor: form.floor ? Number(form.floor) : null,
     parkingSpaces: form.parkingSpaces ? Number(form.parkingSpaces) : null,
-    furnishingStatus: form.furnishingStatus || null,
     ownershipType: form.ownershipType || null,
     hasPool: form.hasPool,
     hasGym: form.hasGym,
@@ -175,9 +165,6 @@ export function PropertyFormModal(props: PropertyFormModalProps) {
         price: property.price || 0,
         currency: property.currency || 'USD',
         propertyType: p.propertyType || 'APARTMENT',
-        bedrooms: property.bedrooms || 0,
-        bathrooms: property.bathrooms || 0,
-        area: property.area || 0,
         country: property.country || 'GEORGIA',
         status: property.status || 'NEW_BUILD',
         isGoldenVisaEligible: property.isGoldenVisaEligible || false,
@@ -189,9 +176,7 @@ export function PropertyFormModal(props: PropertyFormModalProps) {
         nearbyFacilities: p.nearbyFacilities || '',
         builtYear: p.builtYear || '',
         floors: p.floors || '',
-        floor: p.floor || '',
         parkingSpaces: p.parkingSpaces || '',
-        furnishingStatus: p.furnishingStatus || '',
         ownershipType: p.ownershipType || '',
         hasPool: p.hasPool || false,
         hasGym: p.hasGym || false,
@@ -281,8 +266,8 @@ export function PropertyFormModal(props: PropertyFormModalProps) {
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
           <div>
-            <h2 className="text-lg font-bold text-gray-900">{isEdit ? 'Edit Property' : 'Create New Property'}</h2>
-            <p className="text-sm text-gray-500">{isEdit ? 'Update property information' : 'Add a new property listing to your platform'}</p>
+            <h2 className="text-lg font-bold text-gray-900">{isEdit ? 'Edit Project' : 'Create New Project'}</h2>
+            <p className="text-sm text-gray-500">{isEdit ? 'Update project information' : 'Add a new development project to your platform'}</p>
           </div>
           <button onClick={() => setIsOpen(false)} className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">
             <X className="h-5 w-5" />
@@ -308,7 +293,7 @@ export function PropertyFormModal(props: PropertyFormModalProps) {
                 <textarea className={`${inputClass} resize-none`} rows={3} value={form.description} onChange={(e) => updateField('description', e.target.value)} placeholder="Property description" />
               </div>
               <div>
-                <label className={labelClass}>Price *</label>
+                <label className={labelClass}>Starting Price (auto-computed or override)</label>
                 <input className={inputClass} type="number" value={form.price} onChange={(e) => updateField('price', e.target.value)} />
               </div>
               <div>
@@ -328,18 +313,6 @@ export function PropertyFormModal(props: PropertyFormModalProps) {
                 <select className={selectClass} value={form.status} onChange={(e) => updateField('status', e.target.value)}>
                   {STATUSES.map((s) => <option key={s} value={s}>{s.replace('_', ' ')}</option>)}
                 </select>
-              </div>
-              <div>
-                <label className={labelClass}>Bedrooms</label>
-                <input className={inputClass} type="number" value={form.bedrooms} onChange={(e) => updateField('bedrooms', e.target.value)} />
-              </div>
-              <div>
-                <label className={labelClass}>Bathrooms</label>
-                <input className={inputClass} type="number" value={form.bathrooms} onChange={(e) => updateField('bathrooms', e.target.value)} />
-              </div>
-              <div>
-                <label className={labelClass}>Area (m²)</label>
-                <input className={inputClass} type="number" value={form.area} onChange={(e) => updateField('area', e.target.value)} />
               </div>
               <div>
                 <label className={labelClass}>Country</label>
@@ -456,19 +429,8 @@ export function PropertyFormModal(props: PropertyFormModalProps) {
                 <input className={inputClass} type="number" value={form.floors} onChange={(e) => updateField('floors', e.target.value)} placeholder="e.g. 12" />
               </div>
               <div>
-                <label className={labelClass}>Floor</label>
-                <input className={inputClass} type="number" value={form.floor} onChange={(e) => updateField('floor', e.target.value)} placeholder="e.g. 5" />
-              </div>
-              <div>
                 <label className={labelClass}>Parking Spaces</label>
                 <input className={inputClass} type="number" value={form.parkingSpaces} onChange={(e) => updateField('parkingSpaces', e.target.value)} placeholder="0" />
-              </div>
-              <div>
-                <label className={labelClass}>Furnishing</label>
-                <select className={selectClass} value={form.furnishingStatus} onChange={(e) => updateField('furnishingStatus', e.target.value)}>
-                  <option value="">Not specified</option>
-                  {FURNISHING.map((f) => <option key={f} value={f}>{f.replace(/_/g, ' ').toLowerCase().replace(/^\w/, c => c.toUpperCase())}</option>)}
-                </select>
               </div>
               <div>
                 <label className={labelClass}>Ownership</label>
@@ -531,7 +493,7 @@ export function PropertyFormModal(props: PropertyFormModalProps) {
           </button>
           <button disabled={isSubmitting} onClick={handleSubmit} className="px-5 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2">
             {isSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
-            {isSubmitting ? (isEdit ? 'Updating...' : 'Creating...') : (isEdit ? 'Update Property' : 'Create Property')}
+            {isSubmitting ? (isEdit ? 'Updating...' : 'Creating...') : (isEdit ? 'Update Project' : 'Create Project')}
           </button>
         </div>
       </div>

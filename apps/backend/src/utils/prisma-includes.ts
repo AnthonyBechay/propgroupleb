@@ -15,6 +15,10 @@ export const PROPERTY_LIST_INCLUDE = {
       agentCompany: true,
     },
   },
+  units: {
+    include: { options: true },
+    orderBy: { createdAt: 'asc' },
+  },
   _count: {
     select: {
       favoriteProperties: true,
@@ -58,6 +62,10 @@ export const PROPERTY_DETAIL_INCLUDE = {
       createdAt: true,
     },
     orderBy: { createdAt: 'desc' },
+  },
+  units: {
+    include: { options: true },
+    orderBy: { createdAt: 'asc' },
   },
   _count: {
     select: {
