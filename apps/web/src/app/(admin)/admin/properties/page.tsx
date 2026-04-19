@@ -1,5 +1,5 @@
 import { PropertyTable } from '@/components/admin/PropertyTable'
-import { CreatePropertyModal } from '@/components/admin/PropertyFormModal'
+import { CreatePropertyModalLazy as CreatePropertyModal } from '@/components/admin/CreatePropertyModalLazy'
 import { Button } from '@/components/ui/button'
 import { Plus, Building2 } from 'lucide-react'
 import { Property } from '@/lib/types/api'

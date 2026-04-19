@@ -29,6 +29,10 @@ const nextConfig: NextConfig = {
     serverActions: {
       bodySizeLimit: '2mb',
     },
+    // Tree-shake icon/UI packages even behind grouped imports
+    // `import { A, B, C } from 'lucide-react'`. Cuts ~30-50KB first-load JS
+    // on heavy icon users (property cards, admin tables).
+    optimizePackageImports: ['lucide-react', 'date-fns'],
   },
   // Enable strict mode for better debugging
   reactStrictMode: true,

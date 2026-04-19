@@ -1,24 +1,22 @@
 import type { Prisma } from '@propgroup/db';
 
-/** Standard include for property list views */
+/** Standard include for property list views.
+ *
+ * Kept deliberately narrow: list consumers (public PropertyCard, admin
+ * PropertyTable) need basic property fields + developer name + investmentData
+ * + units count + engagement counts. They never read `agent`, never iterate
+ * `units[].options`, and never read `paymentPlanDetails`. Those heavy fields
+ * are included only by PROPERTY_DETAIL_INCLUDE on the single-property route.
+ *
+ * Units are selected (not included) with just { id } so `units.length`
+ * still works on the client without shipping a paymentPlanDetails JSON blob
+ * per option per unit per row. */
 export const PROPERTY_LIST_INCLUDE = {
   developer: true,
   locationGuide: true,
   investmentData: true,
-  agent: {
-    select: {
-      id: true,
-      firstName: true,
-      lastName: true,
-      email: true,
-      phone: true,
-      agentCompany: true,
-    },
-  },
   units: {
-    include: {
-      options: true,
-    },
+    select: { id: true },
     orderBy: { createdAt: 'asc' },
   },
   _count: {

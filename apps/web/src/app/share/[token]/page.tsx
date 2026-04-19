@@ -233,34 +233,38 @@ export default async function SharedPropertyPage({ params }: { params: Promise<{
               </div>
             </div>
 
-            {/* Key Stats */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div className="bg-white rounded-xl p-4 border border-slate-200 text-center">
-                <DollarSign className="w-5 h-5 text-[#C49A2E] mx-auto mb-1" />
-                <div className="text-xl font-bold text-slate-900">
-                  {stats.priceFromLabel && (
-                    <span className="text-xs font-normal text-slate-500 mr-1">{stats.priceFromLabel}</span>
-                  )}
-                  {stats.priceDisplay}
+            {/* Key Stats — hidden for unit/option shares since the scoped
+                unit card below already shows bed/bath/sqm. Without this guard
+                the viewer saw the same numbers twice. */}
+            {!sharedUnit && (
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="bg-white rounded-xl p-4 border border-slate-200 text-center">
+                  <DollarSign className="w-5 h-5 text-[#C49A2E] mx-auto mb-1" />
+                  <div className="text-xl font-bold text-slate-900">
+                    {stats.priceFromLabel && (
+                      <span className="text-xs font-normal text-slate-500 mr-1">{stats.priceFromLabel}</span>
+                    )}
+                    {stats.priceDisplay}
+                  </div>
+                  <div className="text-xs text-slate-500">Price</div>
                 </div>
-                <div className="text-xs text-slate-500">Price</div>
+                <div className="bg-white rounded-xl p-4 border border-slate-200 text-center">
+                  <Bed className="w-5 h-5 text-[#1B3A5C] mx-auto mb-1" />
+                  <div className="text-xl font-bold text-slate-900">{stats.bedroomsDisplay}</div>
+                  <div className="text-xs text-slate-500">Bedrooms</div>
+                </div>
+                <div className="bg-white rounded-xl p-4 border border-slate-200 text-center">
+                  <Bath className="w-5 h-5 text-[#1B3A5C] mx-auto mb-1" />
+                  <div className="text-xl font-bold text-slate-900">{stats.bathroomsDisplay}</div>
+                  <div className="text-xs text-slate-500">Bathrooms</div>
+                </div>
+                <div className="bg-white rounded-xl p-4 border border-slate-200 text-center">
+                  <Maximize className="w-5 h-5 text-[#1B3A5C] mx-auto mb-1" />
+                  <div className="text-xl font-bold text-slate-900">{stats.areaDisplay}</div>
+                  <div className="text-xs text-slate-500">sqm</div>
+                </div>
               </div>
-              <div className="bg-white rounded-xl p-4 border border-slate-200 text-center">
-                <Bed className="w-5 h-5 text-[#1B3A5C] mx-auto mb-1" />
-                <div className="text-xl font-bold text-slate-900">{stats.bedroomsDisplay}</div>
-                <div className="text-xs text-slate-500">Bedrooms</div>
-              </div>
-              <div className="bg-white rounded-xl p-4 border border-slate-200 text-center">
-                <Bath className="w-5 h-5 text-[#1B3A5C] mx-auto mb-1" />
-                <div className="text-xl font-bold text-slate-900">{stats.bathroomsDisplay}</div>
-                <div className="text-xs text-slate-500">Bathrooms</div>
-              </div>
-              <div className="bg-white rounded-xl p-4 border border-slate-200 text-center">
-                <Maximize className="w-5 h-5 text-[#1B3A5C] mx-auto mb-1" />
-                <div className="text-xl font-bold text-slate-900">{stats.areaDisplay}</div>
-                <div className="text-xs text-slate-500">sqm</div>
-              </div>
-            </div>
+            )}
 
             {/* Description */}
             <div className="bg-white rounded-xl p-6 border border-slate-200">
@@ -523,28 +527,6 @@ export default async function SharedPropertyPage({ params }: { params: Promise<{
                 </Link>
               </div>
             </div>
-
-            {/* Developer Info */}
-            {property.developer && (
-              <div className="bg-white rounded-xl p-6 border border-slate-200">
-                <h3 className="text-sm font-semibold text-slate-900 mb-3 flex items-center gap-2">
-                  <Building2 className="w-4 h-4 text-slate-400" /> Developer
-                </h3>
-                <div className="flex items-center gap-3">
-                  {property.developer.logo && (
-                    <img
-                      src={normalizeFileUrl(property.developer.logo)}
-                      alt={property.developer.name}
-                      className="w-12 h-12 rounded-lg object-cover border border-slate-200"
-                    />
-                  )}
-                  <div>
-                    <p className="font-medium text-slate-900">{property.developer.name}</p>
-                    <p className="text-xs text-slate-500">{property.developer.country}</p>
-                  </div>
-                </div>
-              </div>
-            )}
 
             {/* Documents */}
             {property.documents?.length > 0 && (

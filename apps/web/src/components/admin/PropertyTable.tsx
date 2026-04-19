@@ -1,8 +1,15 @@
 'use client'
 
 import { useState } from 'react'
+import dynamic from 'next/dynamic'
 import { Property } from '@/lib/types/api'
-import { EditPropertyModal } from './PropertyFormModal'
+
+// Heavy form with many fields/validators — only pulled in when an admin
+// actually clicks Edit. Keeps the table route lean on first paint.
+const EditPropertyModal = dynamic(
+  () => import('./PropertyFormModal').then(m => ({ default: m.EditPropertyModal })),
+  { ssr: false, loading: () => null },
+)
 import {
   Edit,
   Trash2,

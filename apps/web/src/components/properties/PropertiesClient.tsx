@@ -1,13 +1,20 @@
 'use client'
 
 import { useState, useMemo } from 'react'
+import dynamic from 'next/dynamic'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { PropertyCard } from '@/components/PropertyCard'
 import { PropertyFilters } from '@/components/properties/PropertyFilters'
 import { PropertySort } from '@/components/properties/PropertySort'
 import { PropertyGridSkeleton } from '@/components/properties/PropertyGridSkeleton'
 import { MapView } from '@/components/properties/MapView'
-import { AIPropertySearch } from '@/components/ai/AIPropertySearch'
+
+// AI search is only shown when the filter banner indicates a q/goal/budget —
+// defer its bundle (chat state, markdown, icons) until that banner renders.
+const AIPropertySearch = dynamic(
+  () => import('@/components/ai/AIPropertySearch').then(m => ({ default: m.AIPropertySearch })),
+  { ssr: false, loading: () => null },
+)
 import {
   Grid3x3,
   Map,

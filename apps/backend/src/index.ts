@@ -1,4 +1,5 @@
 import express from 'express';
+import compression from 'compression';
 import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
@@ -42,6 +43,19 @@ app.use(
     // which combined with Cloudflare's alt-svc header causes Chrome to lock
     // into QUIC aggressively and fail intermittently.
     strictTransportSecurity: false,
+  })
+);
+
+// Gzip/brotli-equivalent compression — property lists and admin payloads are
+// JSON-heavy and compress 3-5×. Placed before routes so every response passes
+// through. `threshold: 1024` skips tiny bodies where framing overhead > win.
+app.use(
+  compression({
+    threshold: 1024,
+    // Allow clients to opt out via `x-no-compression` header (useful for
+    // debugging raw bytes with curl).
+    filter: (req, res) =>
+      req.headers['x-no-compression'] ? false : compression.filter(req, res),
   })
 );
 // Request logging — structured JSON in production, readable in dev

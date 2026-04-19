@@ -1077,19 +1077,72 @@ function ProjectSheetPrint({
                     </div>
                   </div>
 
-                  {/* Option chips */}
+                  {/* Options with payment plan — every available finish for
+                      this unit shown with price + payment-plan milestones so
+                      the PDF is a self-contained report. */}
                   {unit.options.length > 0 && (
-                    <div style={{ marginTop: '8px', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '6px' }}>
+                    <div style={{ marginTop: '10px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
                       {unit.options.map(opt => {
                         const price = opt.pricePerSqm * unit.area
+                        const ppd = opt.paymentPlanDetails as PaymentPlanDetails | null
+                        const monthly = calcMonthlyPayment(price, ppd)
+                        const installmentMonths = ppd?.installmentMonths ?? ppd?.totalInstallments
                         return (
                           <div key={opt.id} style={{
-                            border: '1px solid #e2e8f0', borderRadius: '5px',
-                            padding: '6px 10px', background: '#F8FAFC',
-                            display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px',
+                            border: '1px solid #e2e8f0', borderRadius: '6px',
+                            padding: '8px 10px', background: '#F8FAFC',
                           }}>
-                            <span style={{ fontSize: '10px', fontWeight: 700, color: '#1B3A5C' }}>{opt.name}</span>
-                            <span style={{ fontSize: '10px', fontWeight: 800, color: '#C49A2E' }}>{fmt(price)}</span>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: '8px', flexWrap: 'wrap' }}>
+                              <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', minWidth: 0, flex: 1 }}>
+                                <span style={{ fontSize: '11px', fontWeight: 800, color: '#1B3A5C' }}>{opt.name}</span>
+                                {opt.initialPayment != null && opt.initialPayment > 0 && (
+                                  <span style={{ fontSize: '9px', color: '#D97706', fontWeight: 700 }}>
+                                    Initial {fmt(opt.initialPayment)}
+                                  </span>
+                                )}
+                              </div>
+                              <span style={{ fontSize: '12px', fontWeight: 900, color: '#C49A2E' }}>{fmt(price)}</span>
+                            </div>
+
+                            {/* Payment plan milestones */}
+                            {ppd?.milestones && ppd.milestones.length > 0 && (
+                              <div style={{ marginTop: '6px' }}>
+                                {ppd.summary && (
+                                  <div style={{ fontSize: '9px', color: '#64748b', fontStyle: 'italic', marginBottom: '4px' }}>
+                                    {ppd.summary}
+                                  </div>
+                                )}
+                                <div style={{ display: 'flex', borderRadius: '999px', overflow: 'hidden', height: '4px', marginBottom: '4px', background: '#e2e8f0' }}>
+                                  {ppd.milestones.map((m, i) => {
+                                    const colors = ['#1B3A5C', '#C49A2E', '#10b981', '#f59e0b', '#64748b']
+                                    return <div key={i} style={{ background: colors[i % colors.length], width: `${m.percentage}%` }} />
+                                  })}
+                                </div>
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2px 8px' }}>
+                                  {ppd.milestones.map((m, i) => (
+                                    <div key={i} style={{
+                                      fontSize: '9px', color: '#475569',
+                                      display: 'flex', justifyContent: 'space-between', gap: '6px',
+                                    }}>
+                                      <span>{m.label}</span>
+                                      <span style={{ color: '#1B3A5C', fontWeight: 700 }}>
+                                        {m.percentage}% · {fmt(price * m.percentage / 100)}
+                                      </span>
+                                    </div>
+                                  ))}
+                                </div>
+                                {(installmentMonths || monthly) && (
+                                  <div style={{
+                                    marginTop: '4px', fontSize: '9px', color: '#475569',
+                                    borderTop: '1px dashed #cbd5e1', paddingTop: '3px',
+                                    display: 'flex', justifyContent: 'space-between', gap: '8px',
+                                  }}>
+                                    {installmentMonths && <span>{installmentMonths} installments</span>}
+                                    {monthly && <span style={{ color: '#10b981', fontWeight: 700 }}>~{fmt(monthly)}/mo</span>}
+                                  </div>
+                                )}
+                              </div>
+                            )}
                           </div>
                         )
                       })}
