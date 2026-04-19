@@ -61,6 +61,21 @@ router.get(
       where.bedrooms = bedrooms;
     }
 
+    // Area range
+    if (query.minArea !== undefined || query.maxArea !== undefined) {
+      const area: Record<string, number> = {};
+      if (query.minArea !== undefined) area.gte = query.minArea;
+      if (query.maxArea !== undefined) area.lte = query.maxArea;
+      where.area = area;
+    }
+
+    // High ROI filter — requires InvestmentData relation row with expectedROI >= 15
+    if (query.highRoi) {
+      where.investmentData = {
+        is: { expectedROI: { gte: 15 } },
+      };
+    }
+
     if (query.search) {
       where.OR = [
         { title: { contains: query.search, mode: 'insensitive' } },

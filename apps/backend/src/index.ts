@@ -22,6 +22,7 @@ import aiSearchRoutes from './routes/ai-search.js';
 import contentRoutes from './routes/content.js';
 import contactRoutes from './routes/contact.js';
 import uploadRoutes from './routes/upload.js';
+import shareRoutes from './routes/share.js';
 import documentRoutes from './routes/documents.js';
 import fileRoutes from './routes/files.js';
 import locationGuideRoutes from './routes/location-guides.js';
@@ -182,6 +183,7 @@ app.use('/api/upload', uploadRoutes);
 app.use('/api/documents', documentRoutes);
 app.use('/api/files', fileRoutes);
 app.use('/api/location-guides', locationGuideRoutes);
+app.use('/api/share', shareRoutes);
 
 // Global error handler
 app.use(errorHandler);

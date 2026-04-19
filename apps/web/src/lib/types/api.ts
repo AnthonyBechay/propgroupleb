@@ -108,11 +108,20 @@ export interface ComparatorItem {
 }
 
 export interface PaymentPlanDetails {
+  planType?: string;
   summary?: string;
   installmentMonths?: number;
+  totalInstallments?: number;
+  installmentFrequency?: string; // monthly, quarterly, yearly, semi-annual
+  installmentAmount?: number;
+  postHandoverMonths?: number;
+  postHandoverPercentage?: number;
+  notes?: string;
   milestones?: Array<{
     percentage: number;
     label: string;
+    description?: string;
+    dueDate?: string;
     type?: 'upfront' | 'installment' | 'handover';
   }>;
 }

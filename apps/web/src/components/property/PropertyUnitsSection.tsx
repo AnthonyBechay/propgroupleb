@@ -7,9 +7,12 @@ import {
   FileText, Download, CreditCard, Calculator,
   GitCompare, Check, X, Image as ImageIcon,
   FileDown, MapPin, TrendingUp, Gem, Zap, Target,
+  Share2, Link2,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useComparator } from '@/contexts/ComparatorContext'
+import { useAuth } from '@/contexts/AuthContext'
+import { normalizeApiUrl } from '@/lib/utils/api-url'
 import type { Unit, UnitOption, PropertyDocument, PaymentPlanDetails, ComparatorItem } from '@/lib/types/api'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -61,10 +64,21 @@ function formatFileSize(bytes?: number | null) {
 // ── Payment plan helpers ──────────────────────────────────────────────────────
 
 function calcMonthlyPayment(totalPrice: number, ppd: PaymentPlanDetails | null | undefined): number | null {
-  if (!ppd?.installmentMonths || !ppd.milestones) return null
-  const installmentMilestone = ppd.milestones.find(m => m.type === 'installment')
-  const installmentPct = installmentMilestone?.percentage ?? (100 - (ppd.milestones.find(m => m.type === 'upfront')?.percentage ?? 0))
-  return (totalPrice * installmentPct / 100) / ppd.installmentMonths
+  if (!ppd) return null
+  const months = ppd.installmentMonths ?? ppd.totalInstallments
+  if (!months) return null
+  // Use explicit installmentAmount if present
+  if (ppd.installmentAmount && ppd.installmentAmount > 0) return ppd.installmentAmount
+  if (!ppd.milestones || ppd.milestones.length === 0) return null
+  // Prefer typed milestone, fall back to label-matched, fall back to label containing "install" or "monthly"
+  const installMs = ppd.milestones.find(m => m.type === 'installment')
+    ?? ppd.milestones.find(m => /install|monthly|month/i.test(m.label || ''))
+  const upfrontMs = ppd.milestones.find(m => m.type === 'upfront')
+    ?? ppd.milestones.find(m => /down|booking|upfront|initial/i.test(m.label || ''))
+  const installmentPct = installMs?.percentage
+    ?? (upfrontMs ? 100 - (upfrontMs.percentage || 0) : null)
+  if (installmentPct == null) return null
+  return (totalPrice * installmentPct / 100) / months
 }
 
 // ── ROI mini-calculator (inline, option-aware) ─────────────────────────────
@@ -153,9 +167,15 @@ const PRINT_CSS = `
   @media print {
     * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; color-adjust: exact !important; }
     @page { size: A4 portrait; margin: 10mm; }
-    html, body { margin: 0 !important; padding: 0 !important; background: white !important; height: auto !important; overflow: visible !important; }
-    body * { visibility: hidden !important; }
-    .propgroup-print-sheet, .propgroup-print-sheet * { visibility: visible !important; }
+
+    /* Hide EVERY body child except our portal'd sheet.
+       display:none removes layout space entirely — no blank preceding pages. */
+    html, body {
+      margin: 0 !important; padding: 0 !important;
+      background: white !important; height: auto !important; overflow: visible !important;
+    }
+    body > *:not(.propgroup-print-sheet) { display: none !important; }
+
     .propgroup-print-sheet {
       position: static !important;
       inset: auto !important;
@@ -165,6 +185,7 @@ const PRINT_CSS = `
       min-height: 0 !important;
       overflow: visible !important;
       background: white !important;
+      padding: 0 !important;
       display: block !important;
     }
     .propgroup-print-content {
@@ -172,6 +193,7 @@ const PRINT_CSS = `
       padding: 0 !important;
       margin: 0 !important;
       box-shadow: none !important;
+      border-radius: 0 !important;
       page-break-after: avoid !important;
       break-after: avoid !important;
     }
@@ -359,13 +381,11 @@ function UnitSheetPrint({
                 const totalPrice = opt.pricePerSqm * unit.area
                 const ppd = opt.paymentPlanDetails as PaymentPlanDetails | null
                 const monthly = calcMonthlyPayment(totalPrice, ppd)
-                const upfrontPct = ppd?.milestones?.find(m => m.type === 'upfront')?.percentage
-                  ?? ppd?.milestones?.[0]?.percentage
-                const installmentPct = ppd?.milestones?.find(m => m.type === 'installment')?.percentage
-                  ?? (upfrontPct != null ? 100 - upfrontPct : undefined)
-                const installmentTotal = installmentPct != null ? totalPrice * installmentPct / 100 : null
                 const bullets = parseBullets(opt.description)
-                const installmentMonths = ppd?.installmentMonths
+                const installmentMonths = ppd?.installmentMonths ?? ppd?.totalInstallments
+                const freqLabel = ppd?.installmentFrequency
+                  ? ppd.installmentFrequency.charAt(0).toUpperCase() + ppd.installmentFrequency.slice(1).replace('-', ' ')
+                  : null
 
                 return (
                   <div key={opt.id} className="print-section" style={{ display: 'flex', flexDirection: 'column' }}>
@@ -381,43 +401,68 @@ function UnitSheetPrint({
                       <div style={{ fontSize: '17px', fontWeight: 900, letterSpacing: '0.02em' }}>
                         TOTAL: {fmt(totalPrice)}
                       </div>
+                      <div style={{ fontSize: '9px', opacity: 0.85, marginTop: '3px' }}>
+                        {fmt(opt.pricePerSqm)}/m² · {unit.area} m²
+                      </div>
                     </div>
 
-                    {/* Payment steps */}
-                    <div style={{ marginBottom: '14px' }}>
+                    {/* Initial payment (if present) */}
+                    {opt.initialPayment != null && opt.initialPayment > 0 && (
                       <div style={{ marginBottom: '10px' }}>
-                        <div style={{ fontSize: '11px', fontWeight: 800, color: '#1B3A5C', marginBottom: '2px' }}>1. AGREEMENT</div>
-                        <div style={{ fontSize: '10px', color: '#475569' }}>Execution of Sales Agreement</div>
-                      </div>
-
-                      {((opt.initialPayment != null && opt.initialPayment > 0) || upfrontPct != null) && (
-                        <div style={{ marginBottom: '10px' }}>
-                          <div style={{ fontSize: '11px', fontWeight: 800, color: '#1B3A5C', marginBottom: '2px' }}>2. DOWN PAYMENT</div>
-                          <div style={{ fontSize: '10px', color: '#475569' }}>
-                            {opt.initialPayment != null && opt.initialPayment > 0
-                              ? fmt(opt.initialPayment)
-                              : fmt(totalPrice * (upfrontPct! / 100))}
-                            {upfrontPct != null && ` (${upfrontPct}%)`} Upon Signing
-                          </div>
+                        <div style={{ fontSize: '10px', fontWeight: 800, color: '#1B3A5C', letterSpacing: '0.1em', marginBottom: '2px' }}>
+                          INITIAL PAYMENT
                         </div>
-                      )}
-
-                      {(installmentTotal || monthly || installmentMonths) && (
-                        <div style={{ marginBottom: '10px' }}>
-                          <div style={{ fontSize: '11px', fontWeight: 800, color: '#1B3A5C', marginBottom: '2px' }}>3. INSTALLMENT PLAN</div>
-                          <div style={{ fontSize: '10px', color: '#475569', lineHeight: 1.4 }}>
-                            {installmentTotal && <>{fmt(installmentTotal)} Total</>}
-                            {monthly && <> (~{fmt(monthly)} Monthly)</>}
-                            {installmentMonths && <><br />{installmentMonths} Months Interest-Free</>}
-                          </div>
+                        <div style={{ fontSize: '11px', color: '#D97706', fontWeight: 700 }}>
+                          {fmt(opt.initialPayment)} <span style={{ color: '#64748b', fontWeight: 500 }}>upon signing</span>
                         </div>
-                      )}
-
-                      <div>
-                        <div style={{ fontSize: '11px', fontWeight: 800, color: '#1B3A5C', marginBottom: '2px' }}>4. OWNERSHIP</div>
-                        <div style={{ fontSize: '10px', color: '#475569' }}>Full Ownership Transfer Upon Completion of Payment Plan</div>
                       </div>
-                    </div>
+                    )}
+
+                    {/* Payment plan — dynamic from milestones */}
+                    {ppd?.milestones && ppd.milestones.length > 0 ? (
+                      <div style={{ marginBottom: '14px' }}>
+                        <div style={{ fontSize: '10px', fontWeight: 800, color: '#1B3A5C', letterSpacing: '0.1em', marginBottom: '6px' }}>
+                          PAYMENT PLAN
+                        </div>
+                        {ppd.summary && (
+                          <div style={{ fontSize: '10px', color: '#64748b', fontStyle: 'italic', marginBottom: '8px' }}>
+                            {ppd.summary}
+                          </div>
+                        )}
+                        {ppd.milestones.map((m, i) => {
+                          const amount = totalPrice * (m.percentage || 0) / 100
+                          return (
+                            <div key={i} style={{ marginBottom: '8px' }}>
+                              <div style={{ fontSize: '11px', fontWeight: 700, color: '#1B3A5C', display: 'flex', justifyContent: 'space-between', gap: '8px' }}>
+                                <span>{i + 1}. {(m.label || 'Milestone').toUpperCase()}</span>
+                                <span style={{ color: scheme.accent }}>{m.percentage}%</span>
+                              </div>
+                              <div style={{ fontSize: '10px', color: '#475569', lineHeight: 1.4 }}>
+                                {fmt(amount)}
+                                {m.description && <> · {m.description}</>}
+                                {m.dueDate && <> · {new Date(m.dueDate).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}</>}
+                              </div>
+                            </div>
+                          )
+                        })}
+                        {(installmentMonths || freqLabel || monthly) && (
+                          <div style={{
+                            marginTop: '6px', paddingTop: '6px',
+                            borderTop: '1px dashed #cbd5e1',
+                            fontSize: '10px', color: '#475569',
+                          }}>
+                            {installmentMonths && <>{installmentMonths} installments</>}
+                            {freqLabel && <> · {freqLabel}</>}
+                            {monthly && <> · ~{fmt(monthly)}/mo</>}
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      /* Fallback when no milestones — show simple pricing */
+                      <div style={{ marginBottom: '14px', fontSize: '10px', color: '#64748b' }}>
+                        Full payment on booking
+                      </div>
+                    )}
 
                     {/* Includes */}
                     {bullets.length > 0 && (
@@ -570,7 +615,7 @@ function OptionSheetPrint({
   const sheet = (
     <div className="propgroup-print-sheet" style={{
       position: 'fixed', inset: 0, zIndex: 9999,
-      background: 'rgba(15, 23, 42, 0.6)', overflowY: 'auto',
+      background: 'rgba(15, 23, 42, 0.65)', overflowY: 'auto',
       fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
       color: '#1e293b', padding: '24px',
     }}>
@@ -803,6 +848,64 @@ export function PropertyUnitsSection({
   onUnitImagesChange,
 }: Props) {
   const { add, remove, has } = useComparator()
+  const { user } = useAuth()
+  const isAdmin = user?.role === 'ADMIN' || user?.role === 'SUPER_ADMIN'
+
+  // Share-link UI state. Key is `${unitId}:${optionId ?? ''}` so one copy
+  // indicator per scope without clashing with others on the same page.
+  const [sharing, setSharing] = useState<string | null>(null)
+  const [sharedKey, setSharedKey] = useState<string | null>(null)
+
+  const copyToClipboard = async (text: string): Promise<boolean> => {
+    try {
+      await navigator.clipboard.writeText(text)
+      return true
+    } catch {
+      const ta = document.createElement('textarea')
+      ta.value = text
+      ta.style.position = 'fixed'
+      ta.style.opacity = '0'
+      document.body.appendChild(ta)
+      ta.select()
+      const ok = document.execCommand('copy')
+      document.body.removeChild(ta)
+      return ok
+    }
+  }
+
+  const handleShare = async (unitId: string | null, optionId: string | null) => {
+    const key = `${unitId ?? ''}:${optionId ?? ''}`
+    setSharing(key)
+    try {
+      const apiUrl = normalizeApiUrl(process.env.NEXT_PUBLIC_API_URL)
+      const res = await fetch(`${apiUrl}/api/share`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ propertyId, unitId, unitOptionId: optionId }),
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error(err.error || err.message || `Server error ${res.status}`)
+      }
+      const json = await res.json()
+      const token = json.data?.token ?? json.token
+      if (!token) throw new Error('No token returned')
+      const shareUrl = `${window.location.origin}/share/${token}`
+      const copied = await copyToClipboard(shareUrl)
+      if (copied) {
+        setSharedKey(key)
+        setTimeout(() => setSharedKey(null), 2000)
+      } else {
+        window.prompt('Share link (copy it):', shareUrl)
+      }
+    } catch (error) {
+      console.error('Failed to create share link:', error)
+      alert(`Failed to generate share link: ${error instanceof Error ? error.message : 'Unknown error'}`)
+    } finally {
+      setSharing(null)
+    }
+  }
 
   // selectedOptionId per unit — tracks which option tab is active for each unit
   const [selectedOptions, setSelectedOptions] = useState<Record<string, string>>(() => {
@@ -964,6 +1067,30 @@ export function PropertyUnitsSection({
                           <span className="hidden sm:inline">Export PDF</span>
                         </button>
                       )}
+                      {/* Share Unit — admin only */}
+                      {isExpanded && isAdmin && (() => {
+                        const key = `${unit.id}:`
+                        const isCopied = sharedKey === key
+                        const isLoading = sharing === key
+                        return (
+                          <button
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); handleShare(unit.id, null) }}
+                            disabled={isLoading}
+                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+                              isCopied
+                                ? 'bg-emerald-600 text-white'
+                                : 'bg-white border-2 border-[#1B3A5C] text-[#1B3A5C] hover:bg-[#1B3A5C] hover:text-white'
+                            } disabled:opacity-60`}
+                            title={`Copy a share link scoped to ${unit.name}`}
+                          >
+                            {isCopied
+                              ? <><Check className="w-3.5 h-3.5" /><span className="hidden sm:inline">Copied!</span></>
+                              : <><Share2 className="w-3.5 h-3.5" /><span className="hidden sm:inline">{isLoading ? 'Generating…' : 'Share Unit'}</span></>
+                            }
+                          </button>
+                        )
+                      })()}
                       {isExpanded
                         ? <ChevronUp className={`w-5 h-5 ${isExpanded ? 'text-white' : 'text-slate-400'}`} />
                         : <ChevronDown className="w-5 h-5 text-slate-400" />
@@ -1103,6 +1230,30 @@ export function PropertyUnitsSection({
                                 <FileDown className="w-3.5 h-3.5" />
                                 Export {selOpt.name} PDF
                               </button>
+                              {/* Share this finish option — admin only */}
+                              {isAdmin && (() => {
+                                const key = `${unit.id}:${selOpt.id}`
+                                const isCopied = sharedKey === key
+                                const isLoading = sharing === key
+                                return (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleShare(unit.id, selOpt.id)}
+                                    disabled={isLoading}
+                                    className={`inline-flex items-center gap-1.5 h-8 px-3 rounded-md text-xs font-semibold transition-colors ${
+                                      isCopied
+                                        ? 'bg-emerald-600 text-white border-2 border-emerald-600'
+                                        : 'bg-white border-2 border-[#1B3A5C] text-[#1B3A5C] hover:bg-[#1B3A5C] hover:text-white'
+                                    } disabled:opacity-60`}
+                                    title={`Copy a share link scoped to ${selOpt.name}`}
+                                  >
+                                    {isCopied
+                                      ? <><Check className="w-3.5 h-3.5" />Copied!</>
+                                      : <><Link2 className="w-3.5 h-3.5" />{isLoading ? 'Generating…' : `Share ${selOpt.name}`}</>
+                                    }
+                                  </button>
+                                )
+                              })()}
                             </div>
                           </div>
                         )}

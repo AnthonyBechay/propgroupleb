@@ -1029,6 +1029,31 @@ model UnitOption {
   @@map("unit_options")
 }
 
+enum ShareScope {
+  PROPERTY
+  UNIT
+  UNIT_OPTION
+}
+
+model ShareToken {
+  id           String     @id @default(cuid())
+  token        String     @unique
+  scope        ShareScope
+  propertyId   String
+  unitId       String?
+  unitOptionId String?
+  createdById  String?
+
+  createdAt DateTime  @default(now())
+  expiresAt DateTime?
+  revokedAt DateTime?
+
+  @@index([propertyId])
+  @@index([unitId])
+  @@index([unitOptionId])
+  @@map("share_tokens")
+}
+
 model SiteMedia {
   id      String @id @default(cuid())
   key     String @unique

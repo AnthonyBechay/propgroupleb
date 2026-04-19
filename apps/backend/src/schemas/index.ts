@@ -131,9 +131,13 @@ export const propertyQuerySchema = z.object({
   bedrooms: z.string().optional().transform(val => val ? parseInt(val) : undefined),
   minBedrooms: z.string().optional().transform(val => val ? parseInt(val) : undefined),
   maxBedrooms: z.string().optional().transform(val => val ? parseInt(val) : undefined),
+  minArea: z.string().optional().transform(val => val ? parseFloat(val) : undefined),
+  maxArea: z.string().optional().transform(val => val ? parseFloat(val) : undefined),
   isGoldenVisaEligible: z.string().optional().transform(val => val === 'true'),
   featured: z.string().optional().transform(val => val === 'true'),
   hasPool: z.string().optional().transform(val => val === 'true'),
+  // "High ROI" convenience flag — filters to properties with expected ROI ≥ 15%
+  highRoi: z.string().optional().transform(val => val === 'true'),
   furnishingStatus: z.string().optional(),
   search: z.string().optional(),
   sortBy: z.string().optional(),

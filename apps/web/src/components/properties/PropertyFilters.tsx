@@ -101,11 +101,11 @@ export function PropertyFilters({ filters, onChange, onClose }: PropertyFiltersP
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {/* Location */}
+        {/* Country */}
         <div className="space-y-2">
           <Label className="flex items-center gap-2">
             <MapPin className="w-4 h-4 text-slate-500" />
-            Location
+            Country
           </Label>
           <Select
             value={localFilters.country}
@@ -125,6 +125,20 @@ export function PropertyFilters({ filters, onChange, onClose }: PropertyFiltersP
               ))}
             </SelectContent>
           </Select>
+        </div>
+
+        {/* City (free-text contains) */}
+        <div className="space-y-2">
+          <Label className="flex items-center gap-2">
+            <MapPin className="w-4 h-4 text-slate-500" />
+            City
+          </Label>
+          <Input
+            type="text"
+            placeholder="e.g. Batumi, Tbilisi"
+            value={localFilters.city || ''}
+            onChange={(e) => handleFilterChange('city', e.target.value)}
+          />
         </div>
 
         {/* Property Type */}

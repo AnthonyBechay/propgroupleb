@@ -2,20 +2,36 @@ import { notFound } from 'next/navigation'
 import { normalizeApiUrl, normalizeFileUrl } from '@/lib/utils/api-url'
 import { PropertyImageGallery } from '@/components/PropertyImageGallery'
 import { PropertyDescription } from '@/components/property/PropertyDescription'
-import { MapPin, Bed, Bath, Maximize, TrendingUp, DollarSign, Shield, Building2, CreditCard, FileText, Download, Calendar, ArrowLeft } from 'lucide-react'
+import { MapPin, Bed, Bath, Maximize, TrendingUp, DollarSign, Shield, Building2, CreditCard, FileText, Download, Calendar, ArrowLeft, Package } from 'lucide-react'
 import Image from 'next/image'
 import Link from 'next/link'
 
 const API_BASE_URL = normalizeApiUrl(process.env.NEXT_PUBLIC_API_URL)
 
-async function getSharedProperty(token: string) {
+type ShareInfo = {
+  scope: 'PROPERTY' | 'UNIT' | 'UNIT_OPTION'
+  unitId: string | null
+  unitOptionId: string | null
+}
+
+async function getSharedResource(token: string): Promise<{ property: any; share: ShareInfo } | null> {
   try {
-    const res = await fetch(`${API_BASE_URL}/api/properties/shared/${token}`, {
-      cache: 'no-store',
-    })
-    if (!res.ok) return null
-    const json = await res.json()
-    return json.data
+    // New scoped share endpoint — supports PROPERTY / UNIT / UNIT_OPTION scopes
+    // and falls back to legacy Property.shareToken internally.
+    const res = await fetch(`${API_BASE_URL}/api/share/${token}`, { cache: 'no-store' })
+    if (res.ok) {
+      const json = await res.json()
+      const data = json.data ?? json
+      if (data?.property) return data
+    }
+    // Ultimate fallback to legacy endpoint (kept for old links that may hit this page)
+    const legacy = await fetch(`${API_BASE_URL}/api/properties/shared/${token}`, { cache: 'no-store' })
+    if (!legacy.ok) return null
+    const legacyJson = await legacy.json()
+    return {
+      property: legacyJson.data,
+      share: { scope: 'PROPERTY', unitId: null, unitOptionId: null },
+    }
   } catch {
     return null
   }
@@ -39,11 +55,29 @@ function formatFileSize(bytes: number | null) {
 
 export default async function SharedPropertyPage({ params }: { params: Promise<{ token: string }> }) {
   const { token } = await params
-  const property = await getSharedProperty(token)
+  const resource = await getSharedResource(token)
 
-  if (!property) {
+  if (!resource) {
     notFound()
   }
+
+  const { property, share } = resource
+
+  // Narrow the data to the shared scope so viewers only see what was intended.
+  const sharedUnit = share.unitId
+    ? (property.units ?? []).find((u: any) => u.id === share.unitId) ?? null
+    : null
+  const sharedOption = share.unitOptionId && sharedUnit
+    ? (sharedUnit.options ?? []).find((o: any) => o.id === share.unitOptionId) ?? null
+    : null
+
+  // Scope label for the banner
+  const scopeLabel =
+    share.scope === 'UNIT_OPTION' && sharedOption && sharedUnit
+      ? `Finish Option · ${sharedUnit.name}${sharedUnit.unitNumber ? ` #${sharedUnit.unitNumber}` : ''} · ${sharedOption.name}`
+      : share.scope === 'UNIT' && sharedUnit
+        ? `Unit · ${sharedUnit.name}${sharedUnit.unitNumber ? ` #${sharedUnit.unitNumber}` : ''}`
+        : 'Full Project'
 
   const hasInvestmentData = property.investmentData && (
     property.investmentData.expectedROI ||
@@ -62,15 +96,36 @@ export default async function SharedPropertyPage({ params }: { params: Promise<{
             <Image src="/logo.png" alt="PropGroup" width={32} height={32} className="rounded" />
             <span className="font-bold text-[#1B3A5C]">PropGroup</span>
           </Link>
-          <span className="text-xs text-slate-400 bg-slate-100 px-3 py-1 rounded-full">Shared Property</span>
+          <span className="text-xs font-medium text-[#1B3A5C] bg-[#E0EDF7] border border-[#1B3A5C]/20 px-3 py-1 rounded-full">
+            Shared · {scopeLabel}
+          </span>
         </div>
       </header>
 
       <main className="max-w-6xl mx-auto px-4 py-8">
         {/* Back link */}
         <Link href="/properties" className="inline-flex items-center gap-1 text-sm text-[#1B3A5C] hover:underline mb-6">
-          <ArrowLeft className="w-4 h-4" /> Browse all properties
+          <ArrowLeft className="w-4 h-4" /> Browse all projects
         </Link>
+
+        {/* Scope banner — surfaces exactly what the recipient is looking at */}
+        {(share.scope === 'UNIT' || share.scope === 'UNIT_OPTION') && sharedUnit && (
+          <div className="mb-6 rounded-xl border border-[#C49A2E]/40 bg-gradient-to-r from-[#FDF8EF] to-white p-4 flex items-start gap-3">
+            <Package className="w-5 h-5 text-[#C49A2E] flex-shrink-0 mt-0.5" />
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-bold uppercase tracking-wider text-[#C49A2E] mb-0.5">
+                {share.scope === 'UNIT_OPTION' ? 'Shared Finish Option' : 'Shared Unit'}
+              </p>
+              <p className="text-sm text-slate-700">
+                You're viewing a scoped share for{' '}
+                <span className="font-semibold text-[#1B3A5C]">{sharedUnit.name}</span>
+                {sharedUnit.unitNumber && <> (#{sharedUnit.unitNumber})</>}
+                {sharedOption && <> — finish <span className="font-semibold text-[#1B3A5C]">{sharedOption.name}</span></>}
+                . Only the relevant details and documents are shown below.
+              </p>
+            </div>
+          </div>
+        )}
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Main Content */}
@@ -120,6 +175,112 @@ export default async function SharedPropertyPage({ params }: { params: Promise<{
               <h2 className="text-lg font-semibold text-slate-900 mb-4">Description</h2>
               <PropertyDescription description={property.description} />
             </div>
+
+            {/* Scoped Unit / Option details — only when the share is narrower than the whole project */}
+            {sharedUnit && (
+              <div className="bg-white rounded-xl p-6 border-2 border-[#C49A2E]/40">
+                <h2 className="text-lg font-semibold text-slate-900 mb-4 flex items-center gap-2">
+                  <Building2 className="w-5 h-5 text-[#1B3A5C]" />
+                  {sharedOption ? `${sharedUnit.name} — ${sharedOption.name}` : sharedUnit.name}
+                  {sharedUnit.unitNumber && (
+                    <span className="text-xs font-mono bg-[#E0EDF7] text-[#1B3A5C] px-2 py-0.5 rounded">
+                      #{sharedUnit.unitNumber}
+                    </span>
+                  )}
+                </h2>
+
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+                  <div className="bg-slate-50 rounded-lg p-3 text-center">
+                    <Bed className="w-4 h-4 text-[#1B3A5C] mx-auto mb-1" />
+                    <div className="text-lg font-bold text-slate-900">{sharedUnit.bedrooms}</div>
+                    <div className="text-xs text-slate-500">Bedrooms</div>
+                  </div>
+                  <div className="bg-slate-50 rounded-lg p-3 text-center">
+                    <Bath className="w-4 h-4 text-[#1B3A5C] mx-auto mb-1" />
+                    <div className="text-lg font-bold text-slate-900">{sharedUnit.bathrooms}</div>
+                    <div className="text-xs text-slate-500">Bathrooms</div>
+                  </div>
+                  <div className="bg-slate-50 rounded-lg p-3 text-center">
+                    <Maximize className="w-4 h-4 text-[#1B3A5C] mx-auto mb-1" />
+                    <div className="text-lg font-bold text-slate-900">{sharedUnit.area}</div>
+                    <div className="text-xs text-slate-500">sqm</div>
+                  </div>
+                  {sharedUnit.floor != null && (
+                    <div className="bg-slate-50 rounded-lg p-3 text-center">
+                      <Building2 className="w-4 h-4 text-[#1B3A5C] mx-auto mb-1" />
+                      <div className="text-lg font-bold text-slate-900">{sharedUnit.floor}</div>
+                      <div className="text-xs text-slate-500">Floor</div>
+                    </div>
+                  )}
+                </div>
+
+                {sharedOption ? (
+                  /* Single-option view: price + plan for just this finish */
+                  <div className="bg-gradient-to-br from-[#FDF8EF] to-white border border-[#C49A2E]/30 rounded-lg p-4">
+                    <div className="flex justify-between items-start flex-wrap gap-3 mb-3">
+                      <div>
+                        <div className="text-xs font-bold uppercase tracking-wider text-[#C49A2E] mb-0.5">Selected Finish</div>
+                        <div className="text-xl font-bold text-[#1B3A5C]">{sharedOption.name}</div>
+                        {sharedOption.description && (
+                          <p className="text-sm text-slate-600 mt-1">{sharedOption.description}</p>
+                        )}
+                      </div>
+                      <div className="text-right">
+                        <div className="text-xs text-slate-500 uppercase">Total</div>
+                        <div className="text-2xl font-black text-[#1B3A5C]">
+                          {formatPrice(sharedOption.pricePerSqm * sharedUnit.area, sharedOption.currency || property.currency)}
+                        </div>
+                        <div className="text-xs text-slate-500">
+                          {formatPrice(sharedOption.pricePerSqm, sharedOption.currency || property.currency)}/m²
+                        </div>
+                      </div>
+                    </div>
+                    {sharedOption.paymentPlanDetails?.milestones?.length > 0 && (
+                      <div className="mt-3 pt-3 border-t border-[#C49A2E]/20">
+                        <div className="text-xs font-bold uppercase tracking-wider text-[#1B3A5C] mb-2">Payment Plan</div>
+                        <div className="flex rounded-full overflow-hidden h-2 mb-2">
+                          {sharedOption.paymentPlanDetails.milestones.map((m: any, i: number) => {
+                            const colors = ['bg-[#1B3A5C]', 'bg-[#C49A2E]', 'bg-emerald-500', 'bg-amber-500']
+                            return <div key={i} className={colors[i % colors.length]} style={{ width: `${m.percentage}%` }} />
+                          })}
+                        </div>
+                        <div className="grid grid-cols-2 gap-2">
+                          {sharedOption.paymentPlanDetails.milestones.map((m: any, i: number) => (
+                            <div key={i} className="bg-white rounded p-2 border border-slate-100 flex justify-between text-sm">
+                              <span className="text-slate-600">{m.label}</span>
+                              <span className="font-semibold text-[#1B3A5C]">{m.percentage}%</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  /* Unit-level view: list all finish options available */
+                  sharedUnit.options?.length > 0 && (
+                    <div className="space-y-2">
+                      <div className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">Available Finish Options</div>
+                      {sharedUnit.options.map((opt: any) => (
+                        <div key={opt.id} className="flex justify-between items-center p-3 bg-slate-50 rounded-lg border border-slate-100">
+                          <div>
+                            <div className="font-semibold text-slate-900">{opt.name}</div>
+                            {opt.description && <div className="text-xs text-slate-500 mt-0.5">{opt.description}</div>}
+                          </div>
+                          <div className="text-right">
+                            <div className="font-bold text-[#1B3A5C]">
+                              {formatPrice(opt.pricePerSqm * sharedUnit.area, opt.currency || property.currency)}
+                            </div>
+                            <div className="text-xs text-slate-500">
+                              {formatPrice(opt.pricePerSqm, opt.currency || property.currency)}/m²
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )
+                )}
+              </div>
+            )}
 
             {/* Investment Data */}
             {hasInvestmentData && (

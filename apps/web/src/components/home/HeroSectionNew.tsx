@@ -62,7 +62,7 @@ export function HeroSectionNew() {
                 className="w-full sm:w-auto h-12 px-8 text-base font-semibold bg-white hover:bg-slate-100 text-[#1B3A5C] rounded-xl shadow-lg transition-all"
               >
                 <span className="flex items-center gap-2">
-                  Browse Properties
+                  Browse Projects
                   <ArrowRight className="w-5 h-5" />
                 </span>
               </Button>

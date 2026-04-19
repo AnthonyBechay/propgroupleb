@@ -16,7 +16,6 @@ import {
   ChevronDown,
   LogOut,
   Settings,
-  Bell,
   Sparkles,
   Shield,
   LayoutDashboard
@@ -48,7 +47,6 @@ export function Navbar() {
 
   const profileLinks = [
     { href: '/portal/settings', label: 'Settings', icon: <Settings className="w-4 h-4" /> },
-    { href: '/portal/notifications', label: 'Notifications', icon: <Bell className="w-4 h-4" /> },
   ]
 
   return (
@@ -109,17 +107,6 @@ export function Navbar() {
               </div>
             ) : user ? (
               <div className="flex items-center space-x-2 flex-shrink-0">
-                {/* Notification Bell */}
-                <Link href="/portal/notifications">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="relative text-slate-600 hover:text-slate-900"
-                  >
-                    <Bell className="w-5 h-5" />
-                  </Button>
-                </Link>
-
                 {/* User Profile Dropdown */}
                 <div className="relative">
                   <button

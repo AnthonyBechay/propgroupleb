@@ -30,8 +30,10 @@ interface Property {
   bedrooms: number
   bathrooms: number
   area: number
+  city?: string
   country: string
   status: string
+  propertyType?: string
   images: string[]
   isGoldenVisaEligible?: boolean
   investmentData?: {
@@ -79,8 +81,37 @@ export function PropertiesClient({
       filtered = filtered.filter(p => p.price <= parseInt(searchParams.maxPrice))
     }
 
-    if (searchParams.goal === 'GOLDEN_VISA') {
+    if (searchParams.goal === 'GOLDEN_VISA' || searchParams.isGoldenVisaEligible === 'true') {
       filtered = filtered.filter(p => p.isGoldenVisaEligible)
+    }
+
+    if (searchParams.city) {
+      const needle = searchParams.city.toLowerCase()
+      filtered = filtered.filter(p => (p.city || '').toLowerCase().includes(needle))
+    }
+
+    if (searchParams.propertyType) {
+      filtered = filtered.filter(p =>
+        p.propertyType?.toLowerCase() === searchParams.propertyType.toLowerCase()
+      )
+    }
+
+    if (searchParams.bedrooms) {
+      const minBd = parseInt(searchParams.bedrooms)
+      filtered = filtered.filter(p => (p.bedrooms ?? 0) >= minBd)
+    }
+
+    if (searchParams.minArea) {
+      const minA = parseFloat(searchParams.minArea)
+      filtered = filtered.filter(p => (p.area ?? 0) >= minA)
+    }
+    if (searchParams.maxArea) {
+      const maxA = parseFloat(searchParams.maxArea)
+      filtered = filtered.filter(p => (p.area ?? 0) <= maxA)
+    }
+
+    if (searchParams.highRoi === 'true') {
+      filtered = filtered.filter(p => (p.investmentData?.expectedROI ?? 0) >= 15)
     }
 
     if (searchParams.sort) {
@@ -141,18 +172,18 @@ export function PropertiesClient({
           <div className="max-w-4xl mx-auto text-center">
             <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-white/15 backdrop-blur-sm border border-white/25 rounded-full text-xs font-semibold mb-3">
               <Sparkles className="w-3.5 h-3.5 text-[#C49A2E]" />
-              <span className="text-white/80">CURATED PROPERTIES</span>
+              <span className="text-white/80">CURATED PROJECTS</span>
             </div>
             <h1 className="text-2xl sm:text-3xl md:text-4xl font-black mb-2">
               <span className="text-white">Premium Investment </span>
-              <span className="text-[#C49A2E]">Properties</span>
+              <span className="text-[#C49A2E]">Projects</span>
             </h1>
             <p className="text-sm sm:text-base text-white/70 mb-4 max-w-2xl mx-auto">
               Hand-picked opportunities with verified returns
             </p>
 
             <div className="text-xl sm:text-2xl font-bold text-white">
-              {filteredProperties.length} <span className="text-sm font-normal text-white/60">properties available</span>
+              {filteredProperties.length} <span className="text-sm font-normal text-white/60">projects available</span>
             </div>
           </div>
         </div>
@@ -384,7 +415,7 @@ export function PropertiesClient({
                   <Search className="w-8 h-8 text-slate-500" />
                 </div>
                 <h3 className="text-2xl font-black text-slate-900 mb-2">
-                  No properties found
+                  No projects found
                 </h3>
                 <p className="text-sm text-slate-600 mb-6">
                   Try adjusting your filters or search criteria

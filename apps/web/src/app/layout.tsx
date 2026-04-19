@@ -42,40 +42,79 @@ const getMetadataBase = () => {
   return 'https://bechays.com';
 };
 
+const SITE_URL = getMetadataBase();
+const DEFAULT_TITLE = "Invest in Batumi & Georgia Real Estate | PropGroup";
+const DEFAULT_DESCRIPTION =
+  "PropGroup — Georgia and Batumi's trusted real-estate investment platform. Hand-picked off-plan & new-build projects, transparent ROI, flexible payment plans, and expert investor support.";
+const DEFAULT_KEYWORDS = [
+  "Batumi real estate investment",
+  "Georgia property investment",
+  "invest in Batumi",
+  "invest in Georgia",
+  "Batumi apartments for sale",
+  "Tbilisi investment properties",
+  "Georgia off-plan property",
+  "Black Sea real estate",
+  "Batumi rental yield",
+  "Georgia golden visa",
+  "Batumi property ROI",
+  "Georgia new build apartments",
+  "Batumi sea view apartments",
+  "Adjara real estate",
+  "Georgia residency by investment",
+];
+
 export const metadata: Metadata = {
-  metadataBase: new URL(getMetadataBase()),
+  metadataBase: new URL(SITE_URL),
   title: {
-    default: "PropGroup - Smart Real Estate Investment Platform",
-    template: "%s | PropGroup"
+    default: DEFAULT_TITLE,
+    template: "%s | PropGroup — Georgia Real Estate",
   },
-  description: "Your gateway to international real estate investment opportunities with data-driven insights and expert guidance",
-  keywords: ["real estate", "investment", "property", "international", "golden visa", "ROI", "portfolio"],
-  authors: [{ name: "PropGroup" }],
+  description: DEFAULT_DESCRIPTION,
+  keywords: DEFAULT_KEYWORDS,
+  applicationName: "PropGroup",
+  authors: [{ name: "PropGroup", url: SITE_URL }],
+  creator: "PropGroup",
+  publisher: "PropGroup",
+  category: "real estate",
+  alternates: {
+    canonical: SITE_URL,
+  },
   openGraph: {
     type: "website",
     locale: "en_US",
-    url: "https://www.bechays.com",
-    title: "PropGroup - Smart Real Estate Investment Platform",
-    description: "Your gateway to international real estate investment opportunities",
+    url: SITE_URL,
+    title: DEFAULT_TITLE,
+    description: DEFAULT_DESCRIPTION,
     siteName: "PropGroup",
     images: [
       {
         url: "/og-image.png",
         width: 1200,
         height: 630,
-        alt: "PropGroup",
+        alt: "PropGroup — Batumi & Georgia Real Estate Investment",
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "PropGroup - Smart Real Estate Investment Platform",
-    description: "Your gateway to international real estate investment opportunities",
+    title: DEFAULT_TITLE,
+    description: DEFAULT_DESCRIPTION,
     images: ["/og-image.png"],
   },
   robots: {
     index: true,
     follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      "max-image-preview": "large",
+      "max-snippet": -1,
+      "max-video-preview": -1,
+    },
+  },
+  verification: {
+    // fill in when available
   },
 };
 
@@ -90,6 +129,55 @@ export default function RootLayout({
         <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png?v=3" />
         <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png?v=3" />
         <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png?v=3" />
+        {/* Organization + WebSite JSON-LD — helps Google surface brand panel + sitelinks search */}
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify({
+              "@context": "https://schema.org",
+              "@graph": [
+                {
+                  "@type": "RealEstateAgent",
+                  "@id": `${SITE_URL}#organization`,
+                  name: "PropGroup",
+                  url: SITE_URL,
+                  logo: `${SITE_URL}/logo.png`,
+                  image: `${SITE_URL}/og-image.png`,
+                  description: DEFAULT_DESCRIPTION,
+                  areaServed: [
+                    { "@type": "Country", name: "Georgia" },
+                    { "@type": "City", name: "Batumi" },
+                    { "@type": "City", name: "Tbilisi" },
+                  ],
+                  knowsAbout: [
+                    "Real estate investment",
+                    "Batumi property market",
+                    "Georgia property market",
+                    "Off-plan property",
+                    "Rental yield analysis",
+                    "Residency by investment",
+                  ],
+                },
+                {
+                  "@type": "WebSite",
+                  "@id": `${SITE_URL}#website`,
+                  url: SITE_URL,
+                  name: "PropGroup",
+                  description: DEFAULT_DESCRIPTION,
+                  publisher: { "@id": `${SITE_URL}#organization` },
+                  potentialAction: {
+                    "@type": "SearchAction",
+                    target: {
+                      "@type": "EntryPoint",
+                      urlTemplate: `${SITE_URL}/properties?q={search_term_string}`,
+                    },
+                    "query-input": "required name=search_term_string",
+                  },
+                },
+              ],
+            }),
+          }}
+        />
       </head>
       <body className="font-plus-jakarta antialiased min-h-screen flex flex-col bg-slate-50 overflow-x-hidden">
         <AuthProvider>

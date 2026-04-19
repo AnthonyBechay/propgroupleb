@@ -10,8 +10,12 @@ export interface SearchParams {
   minBedrooms?: string;
   maxBedrooms?: string;
   bathrooms?: string;
+  minArea?: string;
+  maxArea?: string;
   propertyType?: string;
   goldenVisa?: string;
+  isGoldenVisaEligible?: string;
+  highRoi?: string;
   q?: string;
   sort?: string;
   [key: string]: string | undefined;

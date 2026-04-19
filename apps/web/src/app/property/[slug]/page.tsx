@@ -1,3 +1,4 @@
+import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import { normalizeApiUrl } from '@/lib/utils/api-url'
 import { resolveGoogleMapsEmbedUrl } from '@/lib/utils/map-embed'
@@ -15,6 +16,71 @@ type PropertyPageProps = {
   params: Promise<{
     slug: string
   }>
+}
+
+const SITE_URL =
+  process.env.NEXT_PUBLIC_SITE_URL ||
+  (process.env.VERCEL_ENV === 'production' ? 'https://bechays.com' : 'http://localhost:3000')
+
+export async function generateMetadata({ params }: PropertyPageProps): Promise<Metadata> {
+  const { slug } = await params
+  const property = await getProperty(slug).catch(() => null)
+  if (!property) {
+    return {
+      title: 'Project not found',
+      description: 'This project is no longer available.',
+      robots: { index: false, follow: false },
+    }
+  }
+
+  const city = property.city || ''
+  const country = (property.country || '').charAt(0) + (property.country || '').slice(1).toLowerCase()
+  const location = [city, country].filter(Boolean).join(', ')
+  const priceLabel = property.price
+    ? new Intl.NumberFormat('en-US', { style: 'currency', currency: property.currency || 'USD', maximumFractionDigits: 0 }).format(property.price)
+    : null
+  const roi = property.investmentData?.expectedROI ?? property.investmentData?.rentalYield ?? null
+
+  const title = `${property.title}${location ? ` · ${location}` : ''}${priceLabel ? ` · from ${priceLabel}` : ''}`
+  const descriptionBits = [
+    property.description?.slice(0, 180),
+    roi ? `Projected ${roi}% ROI.` : null,
+    'Transparent pricing, flexible payment plans, investor-grade analysis from PropGroup.',
+  ].filter(Boolean)
+  const description = descriptionBits.join(' ').slice(0, 300)
+
+  const images = Array.isArray(property.images) && property.images.length > 0
+    ? property.images.slice(0, 4)
+    : ['/og-image.png']
+
+  return {
+    title,
+    description,
+    alternates: { canonical: `${SITE_URL}/property/${slug}` },
+    keywords: [
+      property.title,
+      city && `${city} real estate investment`,
+      city && `${city} apartments for sale`,
+      country && `${country} property investment`,
+      'Batumi real estate',
+      'Georgia real estate',
+      'off-plan property',
+      'rental yield',
+    ].filter(Boolean) as string[],
+    openGraph: {
+      type: 'website',
+      title,
+      description,
+      url: `${SITE_URL}/property/${slug}`,
+      images: images.map((url: string) => ({ url, width: 1200, height: 630, alt: property.title })),
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title,
+      description,
+      images,
+    },
+  }
 }
 
 async function getProperty(slug: string) {
@@ -77,8 +143,63 @@ export default async function PropertyPage({ params }: PropertyPageProps) {
       maximumFractionDigits: 0,
     }).format(v)
 
+  // ── JSON-LD: RealEstateListing + BreadcrumbList for rich results ────────────
+  const canonicalUrl = `${SITE_URL}/property/${property.slug}`
+  const countryPretty = (property.country || '').charAt(0) + (property.country || '').slice(1).toLowerCase()
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": ["Product", "Accommodation"],
+        "@id": canonicalUrl,
+        name: property.title,
+        description: typeof property.description === 'string' ? property.description.slice(0, 500) : undefined,
+        image: Array.isArray(property.images) && property.images.length > 0 ? property.images.slice(0, 6) : undefined,
+        url: canonicalUrl,
+        brand: { "@type": "Organization", name: property.developer?.name || "PropGroup" },
+        offers: property.price
+          ? {
+              "@type": "Offer",
+              priceCurrency: property.currency || "USD",
+              price: property.price,
+              availability: property.availabilityStatus === 'AVAILABLE'
+                ? "https://schema.org/InStock"
+                : "https://schema.org/LimitedAvailability",
+              url: canonicalUrl,
+            }
+          : undefined,
+        address: {
+          "@type": "PostalAddress",
+          addressLocality: property.city || undefined,
+          addressRegion: property.district || undefined,
+          addressCountry: countryPretty || undefined,
+        },
+        numberOfRooms: property.bedrooms || undefined,
+        numberOfBathroomsTotal: property.bathrooms || undefined,
+        floorSize: property.area
+          ? { "@type": "QuantitativeValue", value: property.area, unitCode: "MTK" }
+          : undefined,
+        amenityFeature: Array.isArray(property.highlightedFeatures)
+          ? property.highlightedFeatures.map((f: string) => ({
+              "@type": "LocationFeatureSpecification",
+              name: f,
+            }))
+          : undefined,
+      },
+      {
+        "@type": "BreadcrumbList",
+        itemListElement: [
+          { "@type": "ListItem", position: 1, name: "Home", item: SITE_URL },
+          { "@type": "ListItem", position: 2, name: "Projects", item: `${SITE_URL}/properties` },
+          { "@type": "ListItem", position: 3, name: property.title, item: canonicalUrl },
+        ],
+      },
+    ],
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
       <div className="container mx-auto px-4 py-8 max-w-7xl">
 
         {/* ─── Header ───────────────────────────────────────── */}

@@ -63,7 +63,7 @@ export async function FeaturedProjects() {
               className="h-12 px-8 text-base font-semibold bg-[#1B3A5C] hover:bg-[#24507D] text-white rounded-xl shadow-lg transition-all"
             >
               <span className="flex items-center gap-2">
-                View All Properties
+                View All Projects
                 <ArrowRight className="w-5 h-5" />
               </span>
             </Button>
