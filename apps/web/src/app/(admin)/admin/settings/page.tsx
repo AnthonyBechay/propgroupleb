@@ -2,6 +2,7 @@
 
 import { useAuth } from '@/contexts/AuthContext'
 import { useState, useEffect, useRef } from 'react'
+import { normalizeApiUrl } from '@/lib/utils/api-url'
 import {
   Settings as SettingsIcon,
   User,
@@ -59,7 +60,6 @@ export default function SettingsPage() {
   useEffect(() => {
     const loadBranding = async () => {
       try {
-        const { normalizeApiUrl } = await import('@/lib/utils/api-url')
         const apiUrl = normalizeApiUrl(process.env.NEXT_PUBLIC_API_URL || '')
         const res = await fetch(`${apiUrl}/api/content/media/branding.logoUrl`)
         if (res.ok) {
@@ -76,7 +76,6 @@ export default function SettingsPage() {
     if (!file) return
     setLogoUploading(true)
     try {
-      const { normalizeApiUrl } = await import('@/lib/utils/api-url')
       const apiUrl = normalizeApiUrl(process.env.NEXT_PUBLIC_API_URL || '')
       const fd = new FormData()
       fd.append('file', file)
@@ -100,7 +99,6 @@ export default function SettingsPage() {
     setLogoSaving(true)
     setMessage(null)
     try {
-      const { normalizeApiUrl } = await import('@/lib/utils/api-url')
       const apiUrl = normalizeApiUrl(process.env.NEXT_PUBLIC_API_URL || '')
       const res = await fetch(`${apiUrl}/api/content/media/branding.logoUrl`, {
         method: 'PUT',

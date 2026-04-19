@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useRef } from 'react'
+import { normalizeApiUrl } from '@/lib/utils/api-url'
 import {
   Bot,
   X,
@@ -72,7 +73,6 @@ export function AIAssistantFab() {
     setTimeout(scrollToBottom, 50)
 
     try {
-      const { normalizeApiUrl } = await import('@/lib/utils/api-url')
       const apiUrl = normalizeApiUrl(process.env.NEXT_PUBLIC_API_URL)
 
       const conversationHistory = messages.map(m => ({ role: m.role, content: m.content }))

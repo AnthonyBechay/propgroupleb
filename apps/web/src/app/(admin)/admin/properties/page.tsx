@@ -3,6 +3,7 @@ import { CreatePropertyModal } from '@/components/admin/PropertyFormModal'
 import { Button } from '@/components/ui/button'
 import { Plus, Building2 } from 'lucide-react'
 import { Property } from '@/lib/types/api'
+import { normalizeApiUrl } from '@/lib/utils/api-url'
 
 export default async function AdminPropertiesPage() {
   // Layout already handles authentication, no need to check again
@@ -12,7 +13,6 @@ export default async function AdminPropertiesPage() {
 
   try {
     // Fetch from API instead of direct database access
-    const { normalizeApiUrl } = await import('@/lib/utils/api-url')
     const apiUrl = normalizeApiUrl(process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001')
 
     // Fetch all properties

@@ -19,6 +19,7 @@ import {
   Save,
 } from 'lucide-react'
 import { apiClient } from '@/lib/api/client'
+import { normalizeApiUrl } from '@/lib/utils/api-url'
 
 interface PropertyDocument {
   id: string
@@ -142,7 +143,6 @@ export default function DocumentsPage() {
     setLoadingUnits(true)
     const load = async () => {
       try {
-        const { normalizeApiUrl } = await import('@/lib/utils/api-url')
         const apiUrl = normalizeApiUrl(process.env.NEXT_PUBLIC_API_URL || '')
         const res = await fetch(`${apiUrl}/api/properties/${uploadPropertyId}/units`, {
           credentials: 'include',
@@ -164,7 +164,6 @@ export default function DocumentsPage() {
 
   async function fetchDocuments() {
     try {
-      const { normalizeApiUrl } = await import('@/lib/utils/api-url')
       const apiUrl = normalizeApiUrl(process.env.NEXT_PUBLIC_API_URL || '')
       const response = await fetch(`${apiUrl}/api/documents`, {
         credentials: 'include',
@@ -182,7 +181,6 @@ export default function DocumentsPage() {
 
   async function fetchProperties() {
     try {
-      const { normalizeApiUrl } = await import('@/lib/utils/api-url')
       const apiUrl = normalizeApiUrl(process.env.NEXT_PUBLIC_API_URL || '')
       const response = await fetch(`${apiUrl}/api/properties?limit=1000`, {
         credentials: 'include',
@@ -207,7 +205,6 @@ export default function DocumentsPage() {
     setUploading(true)
 
     try {
-      const { normalizeApiUrl } = await import('@/lib/utils/api-url')
       const apiUrl = normalizeApiUrl(process.env.NEXT_PUBLIC_API_URL || '')
 
       const formData = new FormData()
@@ -246,7 +243,6 @@ export default function DocumentsPage() {
     if (!confirm(`Delete "${doc.title}"? This cannot be undone.`)) return
 
     try {
-      const { normalizeApiUrl } = await import('@/lib/utils/api-url')
       const apiUrl = normalizeApiUrl(process.env.NEXT_PUBLIC_API_URL || '')
       const response = await fetch(`${apiUrl}/api/documents/${doc.id}`, {
         method: 'DELETE',
@@ -281,7 +277,6 @@ export default function DocumentsPage() {
     if (!editingDoc || !editTitle.trim()) return
     setSaving(true)
     try {
-      const { normalizeApiUrl } = await import('@/lib/utils/api-url')
       const apiUrl = normalizeApiUrl(process.env.NEXT_PUBLIC_API_URL || '')
 
       // Use multipart if a file replacement is provided, otherwise JSON

@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { normalizeApiUrl } from '@/lib/utils/api-url'
 import {
   MapPin,
   Plus,
@@ -53,7 +54,6 @@ export default function LocationGuidesPage() {
   }, [])
 
   async function apiBase() {
-    const { normalizeApiUrl } = await import('@/lib/utils/api-url')
     return normalizeApiUrl(process.env.NEXT_PUBLIC_API_URL || '')
   }
 

@@ -33,118 +33,38 @@ export const metadata: Metadata = {
   },
 };
 
+import { normalizeApiUrl } from '@/lib/utils/api-url';
+
 export default async function PropertiesPage({ searchParams }: PropertiesPageProps) {
   // Await searchParams as it's now a Promise in Next.js 15
   const params = await searchParams;
-  
-  // Fetch properties from API instead of direct Prisma
+
+  // Fetch the FULL unfiltered catalog once on the server so the client can
+  // narrow/widen filters entirely locally — no additional server roundtrip on
+  // every filter change. The browser then filters `liveParams` via useMemo.
   let properties: any[] = [];
 
   try {
-    // Build query parameters for API
-    const queryParams: any = {
-      page: 1,
-      limit: 100,
-    };
-    
-    if (params.country) {
-      queryParams.country = params.country.toUpperCase();
-    }
-    
-    if (params.status) {
-      queryParams.status = params.status.toUpperCase();
-    }
-    
-    if (params.minPrice) {
-      queryParams.minPrice = parseInt(params.minPrice);
-    }
-
-    if (params.maxPrice) {
-      queryParams.maxPrice = parseInt(params.maxPrice);
-    }
-
-    // Handle budget parameter from investment matchmaker
-    if (params.budget) {
-      queryParams.maxPrice = parseInt(params.budget);
-    }
-
-    if (params.bedrooms) {
-      queryParams.bedrooms = parseInt(params.bedrooms);
-    }
-
-    if (params.minBedrooms) {
-      queryParams.minBedrooms = parseInt(params.minBedrooms);
-    }
-
-    if (params.propertyType) {
-      queryParams.propertyType = params.propertyType.toUpperCase();
-    }
-
-    // City (case-insensitive contains)
-    if (params.city) {
-      queryParams.city = params.city;
-    }
-
-    // Area range
-    if (params.minArea) {
-      queryParams.minArea = parseFloat(params.minArea);
-    }
-    if (params.maxArea) {
-      queryParams.maxArea = parseFloat(params.maxArea);
-    }
-
-    // High-ROI convenience flag
-    if (params.highRoi === 'true') {
-      queryParams.highRoi = 'true';
-    }
-
-    // Golden Visa checkbox from filters
-    if (params.isGoldenVisaEligible === 'true') {
-      queryParams.isGoldenVisaEligible = 'true';
-    }
-
-    // Handle goal parameter
-    if (params.goal === 'GOLDEN_VISA') {
-      queryParams.isGoldenVisaEligible = 'true';
-    }
-
-    // Fetch from API - Use fetch directly for server-side rendering
-    const { normalizeApiUrl } = await import('@/lib/utils/api-url');
     const apiUrl = normalizeApiUrl(process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001');
-    
-    const queryString = new URLSearchParams(
-      Object.entries(queryParams)
-        .filter(([_, v]) => v !== undefined && v !== null)
-        .map(([k, v]) => [k, String(v)])
-    ).toString();
-    
-    const response = await fetch(`${apiUrl}/api/properties?${queryString}`, {
+
+    const response = await fetch(`${apiUrl}/api/properties?page=1&limit=500`, {
       method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      cache: 'no-store', // Always fetch fresh data
+      headers: { 'Content-Type': 'application/json' },
+      cache: 'no-store',
     });
-    
+
     if (response.ok) {
       const data = await response.json();
-      if (data.success && data.data) {
-        if (Array.isArray(data.data)) {
-          properties = data.data;
-        }
+      if (data.success && Array.isArray(data.data)) {
+        properties = data.data;
       }
     } else {
-      const errorText = await response.text();
       console.error('[Properties Page] Failed to fetch properties:', {
         status: response.status,
         statusText: response.statusText,
-        error: errorText,
-        url: `${apiUrl}/api/properties?${queryString}`
       });
     }
-  } catch (error) {
-    // Silently fall back to empty list on fetch failure
-    // Use empty array as fallback
+  } catch {
     properties = [];
   }
 

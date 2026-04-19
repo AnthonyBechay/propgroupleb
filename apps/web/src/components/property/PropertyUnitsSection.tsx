@@ -163,13 +163,17 @@ function OptionRoiPanel({
 
 // ── Print CSS (shared by both PDF variants) ────────────────────────────────────
 
+// Print CSS. Goals:
+//  • No chrome from the app (nav / modals / overlays) leaks onto the page.
+//  • No blank trailing page — root cause is browsers flushing margins / tiny
+//    overflow after the last element. We neutralise last-child margins and
+//    clip the sheet to a strict single-page max-height for "single-page"
+//    variants. Multi-page variants opt out via .propgroup-print-multipage.
 const PRINT_CSS = `
   @media print {
     * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; color-adjust: exact !important; }
     @page { size: A4 portrait; margin: 10mm; }
 
-    /* Hide EVERY body child except our portal'd sheet.
-       display:none removes layout space entirely — no blank preceding pages. */
     html, body {
       margin: 0 !important; padding: 0 !important;
       background: white !important; height: auto !important; overflow: visible !important;
@@ -197,8 +201,22 @@ const PRINT_CSS = `
       page-break-after: avoid !important;
       break-after: avoid !important;
     }
+    /* Single-page variant — clip to one A4 page so any stray overflow
+       (a trailing margin, a rounding pixel) cannot force a blank page 2. */
+    .propgroup-print-content:not(.propgroup-print-multipage) {
+      max-height: calc(297mm - 20mm) !important;
+      overflow: hidden !important;
+    }
+    .propgroup-print-content > *:last-child {
+      margin-bottom: 0 !important;
+      padding-bottom: 0 !important;
+      page-break-after: avoid !important;
+      break-after: avoid !important;
+    }
     .print-section { break-inside: avoid; page-break-inside: avoid; }
+    .propgroup-print-multipage .print-section { break-inside: avoid-page; page-break-inside: avoid; }
     .print-close-btn { display: none !important; }
+    .print-page-break { page-break-after: always; break-after: page; }
   }
 `
 
@@ -818,6 +836,302 @@ function OptionSheetPrint({
   )
 }
 
+// ── Project-level Investment Proposal PDF ─────────────────────────────────────
+// Lists all units at a glance with key commercials — suitable for sharing the
+// whole project as one document. Multi-page by design.
+
+interface ProjectSheetProps {
+  propertyTitle: string
+  propertyCountry: string
+  propertyCity?: string | null
+  propertyStatus: string
+  propertyType: string
+  propertyImages: string[]
+  propertyDescription?: string | null
+  units: Unit[]
+  currency: string
+  rentalYield?: number | null
+  capitalGrowth?: number | null
+  logoUrl?: string
+  onClose: () => void
+}
+
+function ProjectSheetPrint({
+  propertyTitle, propertyCountry, propertyCity, propertyStatus, propertyType,
+  propertyImages, propertyDescription,
+  units, currency, rentalYield, capitalGrowth, logoUrl, onClose,
+}: ProjectSheetProps) {
+  const [mounted, setMounted] = useState(false)
+  const hasPrinted = useRef(false)
+
+  useEffect(() => { setMounted(true) }, [])
+
+  useEffect(() => {
+    if (!mounted || hasPrinted.current) return
+    hasPrinted.current = true
+    const t = setTimeout(() => {
+      window.print()
+      const cleanup = () => { onClose(); window.removeEventListener('focus', cleanup) }
+      window.addEventListener('focus', cleanup, { once: true })
+      setTimeout(() => onClose(), 2500)
+    }, 400)
+    return () => clearTimeout(t)
+  }, [mounted, onClose])
+
+  if (!mounted || typeof window === 'undefined') return null
+
+  const fmt = (v: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency, maximumFractionDigits: 0 }).format(v)
+
+  // Derive min/max price across the whole project
+  const allPrices: number[] = []
+  units.forEach(u => u.options.forEach(o => { if (u.area) allPrices.push(o.pricePerSqm * u.area) }))
+  const minPrice = allPrices.length ? Math.min(...allPrices) : 0
+  const maxPrice = allPrices.length ? Math.max(...allPrices) : 0
+
+  const heroImages = propertyImages.slice(0, 3)
+  const shortDesc = propertyDescription
+    ? propertyDescription.slice(0, 480) + (propertyDescription.length > 480 ? '…' : '')
+    : null
+
+  const pillars = [
+    {
+      icon: 'CAPITAL APPRECIATION',
+      text: capitalGrowth && capitalGrowth > 0
+        ? `${capitalGrowth}% appreciation by project completion`
+        : '15-20% appreciation by project completion',
+    },
+    {
+      icon: 'HIGH RENTAL YIELD',
+      text: rentalYield && rentalYield > 0
+        ? `${rentalYield.toFixed(1)}% yield — premium location drives strong ADR`
+        : 'Premium location drives strong ADR',
+    },
+    { icon: 'HIGH LIQUIDITY', text: 'Attractive price point & premium location' },
+    { icon: 'STRATEGIC EXIT', text: 'Flexible resale or long-term rental income strategy' },
+  ]
+
+  const sheet = (
+    <div className="propgroup-print-sheet" style={{
+      position: 'fixed', inset: 0, zIndex: 9999,
+      background: 'rgba(15, 23, 42, 0.65)', overflowY: 'auto',
+      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+      color: '#1e293b', padding: '24px',
+    }}>
+      <button
+        onClick={onClose}
+        className="print-close-btn"
+        style={{
+          position: 'fixed', top: '16px', right: '16px', zIndex: 10000,
+          background: '#1B3A5C', color: 'white', border: 'none',
+          width: '40px', height: '40px', borderRadius: '50%', cursor: 'pointer',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+        }}
+        aria-label="Close"
+      >
+        <X className="w-5 h-5" />
+      </button>
+
+      <div className="propgroup-print-content propgroup-print-multipage" style={{
+        maxWidth: '794px', margin: '0 auto', background: 'white',
+        boxSizing: 'border-box', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)',
+      }}>
+
+        {/* Cream header */}
+        <div className="print-section" style={{
+          background: '#FDF8EF', padding: '28px 36px 22px',
+          borderBottom: '3px solid #C49A2E', textAlign: 'center',
+        }}>
+          {logoUrl && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={logoUrl} alt="Logo" style={{ height: '36px', objectFit: 'contain', display: 'block', margin: '0 auto 10px' }} />
+          )}
+          <div style={{ fontSize: '10px', fontWeight: 600, letterSpacing: '0.2em', color: '#C49A2E', marginBottom: '6px' }}>
+            PROJECT INVESTMENT REPORT
+          </div>
+          <h1 style={{ fontSize: '22px', fontWeight: 900, color: '#1B3A5C', margin: '0 0 6px', letterSpacing: '0.02em' }}>
+            {propertyTitle.toUpperCase()}
+          </h1>
+          <div style={{ fontSize: '11px', color: '#64748b', letterSpacing: '0.1em', textTransform: 'uppercase' }}>
+            {[propertyCity, propertyCountry].filter(Boolean).join(', ')} · {propertyStatus.replace(/_/g, ' ')} · {propertyType.replace(/_/g, ' ')}
+          </div>
+        </div>
+
+        <div style={{ padding: '20px 28px 24px' }}>
+
+          {/* Hero strip */}
+          {heroImages.length > 0 && (
+            <div className="print-section" style={{
+              display: 'grid',
+              gridTemplateColumns: heroImages.length === 1 ? '1fr' : heroImages.length === 2 ? '1fr 1fr' : 'repeat(3, 1fr)',
+              gap: '8px', marginBottom: '18px',
+            }}>
+              {heroImages.map((img, i) => (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img key={i} src={img} alt="" style={{
+                  width: '100%', height: '140px', objectFit: 'cover',
+                  borderRadius: '6px', display: 'block',
+                }} />
+              ))}
+            </div>
+          )}
+
+          {/* Top KPI row */}
+          <div className="print-section" style={{
+            display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px', marginBottom: '18px',
+          }}>
+            <div style={{ padding: '10px 12px', background: '#F8FAFC', border: '1px solid #e2e8f0', borderRadius: '6px' }}>
+              <div style={{ fontSize: '9px', color: '#64748b', fontWeight: 700, letterSpacing: '0.1em' }}>FROM PRICE</div>
+              <div style={{ fontSize: '15px', fontWeight: 900, color: '#1B3A5C', marginTop: '2px' }}>
+                {minPrice ? fmt(minPrice) : '—'}
+              </div>
+              {minPrice !== maxPrice && <div style={{ fontSize: '9px', color: '#94a3b8' }}>up to {fmt(maxPrice)}</div>}
+            </div>
+            <div style={{ padding: '10px 12px', background: '#F8FAFC', border: '1px solid #e2e8f0', borderRadius: '6px' }}>
+              <div style={{ fontSize: '9px', color: '#64748b', fontWeight: 700, letterSpacing: '0.1em' }}>UNITS</div>
+              <div style={{ fontSize: '15px', fontWeight: 900, color: '#1B3A5C', marginTop: '2px' }}>{units.length}</div>
+              <div style={{ fontSize: '9px', color: '#94a3b8' }}>available types</div>
+            </div>
+            <div style={{ padding: '10px 12px', background: '#F8FAFC', border: '1px solid #e2e8f0', borderRadius: '6px' }}>
+              <div style={{ fontSize: '9px', color: '#64748b', fontWeight: 700, letterSpacing: '0.1em' }}>RENTAL YIELD</div>
+              <div style={{ fontSize: '15px', fontWeight: 900, color: '#10b981', marginTop: '2px' }}>
+                {rentalYield ? `${rentalYield.toFixed(1)}%` : '—'}
+              </div>
+              <div style={{ fontSize: '9px', color: '#94a3b8' }}>gross p.a.</div>
+            </div>
+            <div style={{ padding: '10px 12px', background: '#F8FAFC', border: '1px solid #e2e8f0', borderRadius: '6px' }}>
+              <div style={{ fontSize: '9px', color: '#64748b', fontWeight: 700, letterSpacing: '0.1em' }}>CAPITAL GROWTH</div>
+              <div style={{ fontSize: '15px', fontWeight: 900, color: '#C49A2E', marginTop: '2px' }}>
+                {capitalGrowth ? `${capitalGrowth}%` : '—'}
+              </div>
+              <div style={{ fontSize: '9px', color: '#94a3b8' }}>by completion</div>
+            </div>
+          </div>
+
+          {/* Description */}
+          {shortDesc && (
+            <div className="print-section" style={{
+              fontSize: '11px', color: '#475569', lineHeight: 1.55,
+              marginBottom: '18px', paddingBottom: '14px', borderBottom: '1px solid #e2e8f0',
+            }}>
+              <div style={{ fontSize: '10px', fontWeight: 800, color: '#1B3A5C', letterSpacing: '0.15em', marginBottom: '6px' }}>
+                ABOUT THE PROJECT
+              </div>
+              {shortDesc}
+            </div>
+          )}
+
+          {/* Units list */}
+          <div style={{
+            fontSize: '10px', fontWeight: 800, color: '#1B3A5C',
+            letterSpacing: '0.15em', marginBottom: '10px',
+          }}>
+            AVAILABLE UNITS
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            {units.map(unit => {
+              const prices = unit.options.map(o => o.pricePerSqm * unit.area).filter(n => n > 0)
+              const uMin = prices.length ? Math.min(...prices) : 0
+              const uMax = prices.length ? Math.max(...prices) : 0
+              return (
+                <div key={unit.id} className="print-section" style={{
+                  border: '1px solid #e2e8f0', borderRadius: '8px',
+                  padding: '12px 14px', background: '#FFFFFF',
+                }}>
+                  {/* Unit header row */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px', flexWrap: 'wrap' }}>
+                    <div style={{ minWidth: 0, flex: 1 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '2px', flexWrap: 'wrap' }}>
+                        <span style={{ fontSize: '13px', fontWeight: 800, color: '#1B3A5C' }}>{unit.name}</span>
+                        {unit.unitNumber && (
+                          <span style={{ fontSize: '9px', fontFamily: 'monospace', fontWeight: 700, background: '#E0EDF7', color: '#1B3A5C', padding: '2px 6px', borderRadius: '3px' }}>
+                            #{unit.unitNumber}
+                          </span>
+                        )}
+                        <span style={{
+                          fontSize: '8px', fontWeight: 700, padding: '2px 6px', borderRadius: '3px',
+                          textTransform: 'uppercase', letterSpacing: '0.08em',
+                          background: unit.availabilityStatus === 'AVAILABLE' ? '#D1FAE5' : unit.availabilityStatus === 'RESERVED' ? '#FEF3C7' : unit.availabilityStatus === 'SOLD' ? '#FEE2E2' : '#F1F5F9',
+                          color: unit.availabilityStatus === 'AVAILABLE' ? '#047857' : unit.availabilityStatus === 'RESERVED' ? '#92400E' : unit.availabilityStatus === 'SOLD' ? '#991B1B' : '#475569',
+                        }}>
+                          {unit.availabilityStatus.replace(/_/g, ' ')}
+                        </span>
+                      </div>
+                      <div style={{ fontSize: '10px', color: '#64748b' }}>
+                        {unit.bedrooms} bd · {unit.bathrooms} ba · {unit.area} m²
+                        {unit.floor != null && <> · Floor {unit.floor}</>}
+                        {unit.propertyType && <> · {unit.propertyType}</>}
+                      </div>
+                    </div>
+                    <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                      <div style={{ fontSize: '9px', color: '#64748b', letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+                        {uMin !== uMax ? 'From' : 'Price'}
+                      </div>
+                      <div style={{ fontSize: '15px', fontWeight: 900, color: '#1B3A5C' }}>
+                        {uMin ? fmt(uMin) : '—'}
+                      </div>
+                      {uMin !== uMax && uMax > 0 && (
+                        <div style={{ fontSize: '9px', color: '#94a3b8' }}>up to {fmt(uMax)}</div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Option chips */}
+                  {unit.options.length > 0 && (
+                    <div style={{ marginTop: '8px', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '6px' }}>
+                      {unit.options.map(opt => {
+                        const price = opt.pricePerSqm * unit.area
+                        return (
+                          <div key={opt.id} style={{
+                            border: '1px solid #e2e8f0', borderRadius: '5px',
+                            padding: '6px 10px', background: '#F8FAFC',
+                            display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px',
+                          }}>
+                            <span style={{ fontSize: '10px', fontWeight: 700, color: '#1B3A5C' }}>{opt.name}</span>
+                            <span style={{ fontSize: '10px', fontWeight: 800, color: '#C49A2E' }}>{fmt(price)}</span>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+
+        </div>
+
+        {/* Bottom pillars */}
+        <div className="print-section" style={{
+          background: '#1B3A5C', color: 'white', padding: '16px 24px',
+        }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px' }}>
+            {pillars.map((p, i) => (
+              <div key={i} style={{ textAlign: 'center' }}>
+                <div style={{ fontSize: '9px', fontWeight: 800, color: '#C49A2E', letterSpacing: '0.1em', marginBottom: '4px' }}>
+                  {p.icon}
+                </div>
+                <div style={{ fontSize: '9px', color: 'white', lineHeight: 1.4 }}>
+                  {p.text}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+      </div>
+    </div>
+  )
+
+  return (
+    <>
+      <style>{PRINT_CSS}</style>
+      {createPortal(sheet, document.body)}
+    </>
+  )
+}
+
 function getFloorSuffix(n: number): string {
   const lastDigit = n % 10
   const lastTwo = n % 100
@@ -921,6 +1235,8 @@ export function PropertyUnitsSection({
   const [printUnit, setPrintUnit] = useState<Unit | null>(null)
   // Print state for a single finish option (includes project context + images)
   const [printOption, setPrintOption] = useState<{ unit: Unit; option: UnitOption } | null>(null)
+  // Print state for the full project report (all units)
+  const [printProject, setPrintProject] = useState(false)
 
   // Collapsed/expanded state for per-unit sub-sections (ROI, Documents)
   const [roiOpen, setRoiOpen] = useState<Record<string, boolean>>({})
@@ -933,7 +1249,6 @@ export function PropertyUnitsSection({
   useEffect(() => {
     const fetchLogo = async () => {
       try {
-        const { normalizeApiUrl } = await import('@/lib/utils/api-url')
         const apiUrl = normalizeApiUrl(process.env.NEXT_PUBLIC_API_URL || '')
         const res = await fetch(`${apiUrl}/api/content/media/branding.logoUrl`)
         if (res.ok) {
@@ -984,9 +1299,22 @@ export function PropertyUnitsSection({
     <div className="space-y-4">
       {/* ─── Unit cards ─────────────────────────────────── */}
       <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 gap-3 flex-wrap">
           <h2 className="text-lg font-semibold text-slate-900">Available Units</h2>
-          <span className="text-sm text-slate-500">{units.length} type{units.length !== 1 ? 's' : ''}</span>
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-slate-500">{units.length} type{units.length !== 1 ? 's' : ''}</span>
+            {units.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setPrintProject(true)}
+                className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md text-xs font-semibold bg-[#1B3A5C] hover:bg-[#24507D] text-white transition-colors"
+                title="Export a clean project-wide PDF listing every unit"
+              >
+                <FileDown className="w-3.5 h-3.5" />
+                Export Project PDF
+              </button>
+            )}
+          </div>
         </div>
 
         <div className="divide-y divide-slate-100">
@@ -1413,6 +1741,25 @@ export function PropertyUnitsSection({
           capitalGrowth={capitalGrowth}
           logoUrl={logoUrl}
           onClose={() => setPrintOption(null)}
+        />
+      )}
+
+      {/* ─── Project-wide PDF Overlay (lists every unit with clean details) ────── */}
+      {printProject && (
+        <ProjectSheetPrint
+          propertyTitle={propertyTitle}
+          propertyCountry={propertyCountry}
+          propertyCity={propertyCity}
+          propertyStatus={propertyStatus}
+          propertyType={propertyType}
+          propertyImages={propertyImages}
+          propertyDescription={propertyDescription}
+          units={units}
+          currency={currency}
+          rentalYield={rentalYield}
+          capitalGrowth={capitalGrowth}
+          logoUrl={logoUrl}
+          onClose={() => setPrintProject(false)}
         />
       )}
     </div>

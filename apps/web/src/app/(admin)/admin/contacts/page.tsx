@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { normalizeApiUrl } from '@/lib/utils/api-url'
 import {
   Mail,
   Phone,
@@ -54,7 +55,6 @@ export default function AdminContactsPage() {
   async function fetchMessages() {
     try {
       setLoading(true)
-      const { normalizeApiUrl } = await import('@/lib/utils/api-url')
       const apiUrl = normalizeApiUrl(process.env.NEXT_PUBLIC_API_URL || '')
       const response = await fetch(`${apiUrl}/api/contact?page=${page}&limit=20`, {
         credentials: 'include',
@@ -76,7 +76,6 @@ export default function AdminContactsPage() {
 
   async function markAsRead(id: string) {
     try {
-      const { normalizeApiUrl } = await import('@/lib/utils/api-url')
       const apiUrl = normalizeApiUrl(process.env.NEXT_PUBLIC_API_URL || '')
       await fetch(`${apiUrl}/api/contact/${id}/read`, {
         method: 'PATCH',
@@ -92,7 +91,6 @@ export default function AdminContactsPage() {
     if (!confirm('Delete this contact message?')) return
     setDeleting(id)
     try {
-      const { normalizeApiUrl } = await import('@/lib/utils/api-url')
       const apiUrl = normalizeApiUrl(process.env.NEXT_PUBLIC_API_URL || '')
       const response = await fetch(`${apiUrl}/api/contact/${id}`, {
         method: 'DELETE',

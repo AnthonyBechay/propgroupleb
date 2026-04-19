@@ -53,6 +53,61 @@ function formatFileSize(bytes: number | null) {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
+function formatRange(min: number, max: number, suffix = '') {
+  if (!min && !max) return '—'
+  if (min === max || !max) return `${min}${suffix}`
+  return `${min}–${max}${suffix}`
+}
+
+/**
+ * Project-level aggregates — the Property row itself doesn't carry
+ * price/bed/bath/area on the new data model; those live on Units + Options.
+ * We derive a display-friendly "from $X" style range so the share card is
+ * never blank even for project-scope shares.
+ */
+function deriveProjectStats(property: any) {
+  const units: any[] = property.units ?? []
+  if (units.length === 0) {
+    return {
+      priceDisplay: property.price ? formatPrice(property.price, property.currency) : '—',
+      priceFromLabel: null as string | null,
+      bedroomsDisplay: property.bedrooms ? String(property.bedrooms) : '—',
+      bathroomsDisplay: property.bathrooms ? String(property.bathrooms) : '—',
+      areaDisplay: property.area ? String(property.area) : '—',
+    }
+  }
+
+  // Min price across all units × their cheapest option
+  const prices: number[] = []
+  for (const u of units) {
+    const opts = u.options ?? []
+    if (!u.area) continue
+    for (const o of opts) {
+      if (typeof o.pricePerSqm === 'number') {
+        prices.push(o.pricePerSqm * u.area)
+      }
+    }
+  }
+  const minPrice = prices.length ? Math.min(...prices) : 0
+  const maxPrice = prices.length ? Math.max(...prices) : 0
+
+  const beds = units.map(u => u.bedrooms).filter((n: unknown): n is number => typeof n === 'number')
+  const baths = units.map(u => u.bathrooms).filter((n: unknown): n is number => typeof n === 'number')
+  const areas = units.map(u => u.area).filter((n: unknown): n is number => typeof n === 'number' && n > 0)
+
+  return {
+    priceDisplay: minPrice
+      ? formatPrice(minPrice, property.currency)
+      : property.price
+        ? formatPrice(property.price, property.currency)
+        : '—',
+    priceFromLabel: minPrice && minPrice !== maxPrice ? 'from' : null,
+    bedroomsDisplay: beds.length ? formatRange(Math.min(...beds), Math.max(...beds)) : '—',
+    bathroomsDisplay: baths.length ? formatRange(Math.min(...baths), Math.max(...baths)) : '—',
+    areaDisplay: areas.length ? formatRange(Math.min(...areas), Math.max(...areas)) : '—',
+  }
+}
+
 export default async function SharedPropertyPage({ params }: { params: Promise<{ token: string }> }) {
   const { token } = await params
   const resource = await getSharedResource(token)
@@ -78,6 +133,40 @@ export default async function SharedPropertyPage({ params }: { params: Promise<{
       : share.scope === 'UNIT' && sharedUnit
         ? `Unit · ${sharedUnit.name}${sharedUnit.unitNumber ? ` #${sharedUnit.unitNumber}` : ''}`
         : 'Full Project'
+
+  // Derive display stats — respect share scope so the recipient sees the
+  // relevant numbers, falling back to project-level aggregates for full shares.
+  const stats = sharedOption && sharedUnit
+    ? {
+        priceDisplay: formatPrice(
+          sharedOption.pricePerSqm * sharedUnit.area,
+          sharedOption.currency || property.currency,
+        ),
+        priceFromLabel: null,
+        bedroomsDisplay: String(sharedUnit.bedrooms ?? '—'),
+        bathroomsDisplay: String(sharedUnit.bathrooms ?? '—'),
+        areaDisplay: String(sharedUnit.area ?? '—'),
+      }
+    : sharedUnit
+      ? (() => {
+          const opts = sharedUnit.options ?? []
+          const cheapest = opts.reduce(
+            (best: any, o: any) =>
+              !best || (typeof o.pricePerSqm === 'number' && o.pricePerSqm < best.pricePerSqm) ? o : best,
+            null,
+          )
+          const price = cheapest ? cheapest.pricePerSqm * sharedUnit.area : 0
+          return {
+            priceDisplay: price
+              ? formatPrice(price, cheapest?.currency || property.currency)
+              : '—',
+            priceFromLabel: opts.length > 1 ? 'from' : null,
+            bedroomsDisplay: String(sharedUnit.bedrooms ?? '—'),
+            bathroomsDisplay: String(sharedUnit.bathrooms ?? '—'),
+            areaDisplay: String(sharedUnit.area ?? '—'),
+          }
+        })()
+      : deriveProjectStats(property)
 
   const hasInvestmentData = property.investmentData && (
     property.investmentData.expectedROI ||
@@ -149,23 +238,26 @@ export default async function SharedPropertyPage({ params }: { params: Promise<{
               <div className="bg-white rounded-xl p-4 border border-slate-200 text-center">
                 <DollarSign className="w-5 h-5 text-[#C49A2E] mx-auto mb-1" />
                 <div className="text-xl font-bold text-slate-900">
-                  {formatPrice(property.price, property.currency)}
+                  {stats.priceFromLabel && (
+                    <span className="text-xs font-normal text-slate-500 mr-1">{stats.priceFromLabel}</span>
+                  )}
+                  {stats.priceDisplay}
                 </div>
                 <div className="text-xs text-slate-500">Price</div>
               </div>
               <div className="bg-white rounded-xl p-4 border border-slate-200 text-center">
                 <Bed className="w-5 h-5 text-[#1B3A5C] mx-auto mb-1" />
-                <div className="text-xl font-bold text-slate-900">{property.bedrooms}</div>
+                <div className="text-xl font-bold text-slate-900">{stats.bedroomsDisplay}</div>
                 <div className="text-xs text-slate-500">Bedrooms</div>
               </div>
               <div className="bg-white rounded-xl p-4 border border-slate-200 text-center">
                 <Bath className="w-5 h-5 text-[#1B3A5C] mx-auto mb-1" />
-                <div className="text-xl font-bold text-slate-900">{property.bathrooms}</div>
+                <div className="text-xl font-bold text-slate-900">{stats.bathroomsDisplay}</div>
                 <div className="text-xs text-slate-500">Bathrooms</div>
               </div>
               <div className="bg-white rounded-xl p-4 border border-slate-200 text-center">
                 <Maximize className="w-5 h-5 text-[#1B3A5C] mx-auto mb-1" />
-                <div className="text-xl font-bold text-slate-900">{property.area}</div>
+                <div className="text-xl font-bold text-slate-900">{stats.areaDisplay}</div>
                 <div className="text-xs text-slate-500">sqm</div>
               </div>
             </div>
@@ -374,7 +466,10 @@ export default async function SharedPropertyPage({ params }: { params: Promise<{
             {/* Property Details Card */}
             <div className="bg-white rounded-xl p-6 border border-slate-200 sticky top-20">
               <div className="text-2xl font-bold text-[#1B3A5C] mb-4">
-                {formatPrice(property.price, property.currency)}
+                {stats.priceFromLabel && (
+                  <span className="text-sm font-normal text-slate-500 mr-1">{stats.priceFromLabel}</span>
+                )}
+                {stats.priceDisplay}
               </div>
 
               <div className="space-y-3 text-sm">

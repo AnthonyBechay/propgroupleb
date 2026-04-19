@@ -124,7 +124,6 @@ export function PropertyTable({ properties }: PropertyTableProps) {
       return
     }
     try {
-      const { normalizeApiUrl } = await import('@/lib/utils/api-url')
       const apiUrl = normalizeApiUrl(process.env.NEXT_PUBLIC_API_URL || '')
       const response = await fetch(`${apiUrl}/api/properties/${property.id}`, {
         method: 'DELETE',
@@ -146,7 +145,6 @@ export function PropertyTable({ properties }: PropertyTableProps) {
     if (selectedIds.size === 0) return
     setBulkDeleting(true)
     try {
-      const { normalizeApiUrl } = await import('@/lib/utils/api-url')
       const apiUrl = normalizeApiUrl(process.env.NEXT_PUBLIC_API_URL || '')
       const response = await fetch(`${apiUrl}/api/properties/bulk-delete`, {
         method: 'POST',

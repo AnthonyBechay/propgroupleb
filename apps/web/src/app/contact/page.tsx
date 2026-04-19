@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
+import { normalizeApiUrl } from '@/lib/utils/api-url'
 
 const contactFormSchema = z.object({
   email: z.string().email('Invalid email address'),
@@ -50,7 +51,6 @@ export default function ContactPage() {
     setIsSubmitting(true)
     setSubmitError(null)
     try {
-      const { normalizeApiUrl } = await import('@/lib/utils/api-url')
       const baseUrl = normalizeApiUrl(process.env.NEXT_PUBLIC_API_URL)
       const response = await fetch(`${baseUrl}/api/contact`, {
         method: 'POST',

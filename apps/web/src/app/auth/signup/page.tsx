@@ -12,6 +12,7 @@ import { Label } from '@/components/ui/label'
 import { Loader2, Mail, Lock, User as UserIcon } from 'lucide-react'
 import Image from 'next/image'
 import Link from 'next/link'
+import { normalizeApiUrl } from '@/lib/utils/api-url'
 
 const signupSchema = z.object({
   email: z.string().email('Invalid email address'),
@@ -58,7 +59,6 @@ function SignupForm() {
     setError(null)
 
     try {
-      const { normalizeApiUrl } = await import('@/lib/utils/api-url')
       const apiUrl = normalizeApiUrl(process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001')
 
       if (typeof window !== 'undefined') {

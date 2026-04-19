@@ -6,6 +6,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useAuth } from "@/contexts/AuthContext";
 import { Loader2 } from "lucide-react";
+import { normalizeApiUrl } from '@/lib/utils/api-url'
 import {
   Dialog,
   DialogContent,
@@ -142,7 +143,6 @@ export function AuthModal({ children, defaultMode = "login" }: AuthModalProps) {
 
     try {
       // Get the API base URL - normalize it
-      const { normalizeApiUrl } = await import('@/lib/utils/api-url');
       const apiUrl = normalizeApiUrl(process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001");
 
       // Store that we're in a modal flow

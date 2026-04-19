@@ -46,7 +46,7 @@ interface Property {
 
 export function PropertiesClient({
   initialProperties,
-  searchParams
+  searchParams: serverSearchParams
 }: {
   initialProperties: Property[]
   searchParams: any
@@ -58,64 +58,73 @@ export function PropertiesClient({
   const [viewMode, setViewMode] = useState<'grid' | 'map'>('grid')
   const [showFilters, setShowFilters] = useState(false)
   const [showAISearch, setShowAISearch] = useState(false)
+
+  // Read live URL params — keeps filter results reactive without a server roundtrip.
+  // Falls back to the server-rendered params on first paint before hydration.
+  const liveParams = useMemo(() => {
+    const out: Record<string, string> = { ...serverSearchParams }
+    urlSearchParams.forEach((v, k) => { out[k] = v })
+    return out
+  }, [urlSearchParams, serverSearchParams])
+
   const filteredProperties = useMemo(() => {
     let filtered = [...initialProperties]
 
-    if (searchParams.country) {
+    if (liveParams.country) {
       filtered = filtered.filter(p =>
-        p.country.toLowerCase() === searchParams.country.toLowerCase()
+        p.country.toLowerCase() === liveParams.country.toLowerCase()
       )
     }
 
-    if (searchParams.status) {
+    if (liveParams.status) {
       filtered = filtered.filter(p =>
-        p.status.toLowerCase() === searchParams.status.toLowerCase()
+        p.status.toLowerCase() === liveParams.status.toLowerCase()
       )
     }
 
-    if (searchParams.minPrice) {
-      filtered = filtered.filter(p => p.price >= parseInt(searchParams.minPrice))
+    if (liveParams.minPrice) {
+      filtered = filtered.filter(p => p.price >= parseInt(liveParams.minPrice))
     }
 
-    if (searchParams.maxPrice) {
-      filtered = filtered.filter(p => p.price <= parseInt(searchParams.maxPrice))
+    if (liveParams.maxPrice) {
+      filtered = filtered.filter(p => p.price <= parseInt(liveParams.maxPrice))
     }
 
-    if (searchParams.goal === 'GOLDEN_VISA' || searchParams.isGoldenVisaEligible === 'true') {
+    if (liveParams.goal === 'GOLDEN_VISA' || liveParams.isGoldenVisaEligible === 'true') {
       filtered = filtered.filter(p => p.isGoldenVisaEligible)
     }
 
-    if (searchParams.city) {
-      const needle = searchParams.city.toLowerCase()
+    if (liveParams.city) {
+      const needle = liveParams.city.toLowerCase()
       filtered = filtered.filter(p => (p.city || '').toLowerCase().includes(needle))
     }
 
-    if (searchParams.propertyType) {
+    if (liveParams.propertyType) {
       filtered = filtered.filter(p =>
-        p.propertyType?.toLowerCase() === searchParams.propertyType.toLowerCase()
+        p.propertyType?.toLowerCase() === liveParams.propertyType.toLowerCase()
       )
     }
 
-    if (searchParams.bedrooms) {
-      const minBd = parseInt(searchParams.bedrooms)
+    if (liveParams.bedrooms) {
+      const minBd = parseInt(liveParams.bedrooms)
       filtered = filtered.filter(p => (p.bedrooms ?? 0) >= minBd)
     }
 
-    if (searchParams.minArea) {
-      const minA = parseFloat(searchParams.minArea)
+    if (liveParams.minArea) {
+      const minA = parseFloat(liveParams.minArea)
       filtered = filtered.filter(p => (p.area ?? 0) >= minA)
     }
-    if (searchParams.maxArea) {
-      const maxA = parseFloat(searchParams.maxArea)
+    if (liveParams.maxArea) {
+      const maxA = parseFloat(liveParams.maxArea)
       filtered = filtered.filter(p => (p.area ?? 0) <= maxA)
     }
 
-    if (searchParams.highRoi === 'true') {
+    if (liveParams.highRoi === 'true') {
       filtered = filtered.filter(p => (p.investmentData?.expectedROI ?? 0) >= 15)
     }
 
-    if (searchParams.sort) {
-      switch (searchParams.sort) {
+    if (liveParams.sort) {
+      switch (liveParams.sort) {
         case 'price-asc':
           filtered.sort((a, b) => a.price - b.price)
           break
@@ -134,7 +143,21 @@ export function PropertiesClient({
     }
 
     return filtered
-  }, [initialProperties, searchParams])
+  }, [initialProperties, liveParams])
+
+  // Update URL in-place without triggering a server roundtrip.
+  // `window.history.replaceState` in Next.js 15 App Router is honored by
+  // `useSearchParams()`, so the filtered list updates instantly (no skeleton,
+  // no scroll jump, no full page reload).
+  const writeUrl = (params: URLSearchParams) => {
+    const qs = params.toString()
+    const url = qs ? `/properties?${qs}` : '/properties'
+    window.history.replaceState(null, '', url)
+    // Force React to re-read useSearchParams on the next tick.
+    // Next.js rebinds useSearchParams when history changes; dispatching popstate
+    // ensures any external listeners also sync.
+    window.dispatchEvent(new PopStateEvent('popstate'))
+  }
 
   const handleFilterChange = (filters: any) => {
     const params = new URLSearchParams(urlSearchParams.toString())
@@ -147,21 +170,21 @@ export function PropertiesClient({
       }
     })
 
-    router.push(`/properties?${params.toString()}`)
+    writeUrl(params)
   }
 
   const handleSortChange = (sort: string) => {
     const params = new URLSearchParams(urlSearchParams.toString())
     params.set('sort', sort)
-    router.push(`/properties?${params.toString()}`)
+    writeUrl(params)
   }
 
   const clearFilters = () => {
-    router.push('/properties')
+    writeUrl(new URLSearchParams())
   }
 
-  const activeFiltersCount = Object.keys(searchParams).filter(
-    key => key !== 'sort' && searchParams[key]
+  const activeFiltersCount = Object.keys(liveParams).filter(
+    key => key !== 'sort' && liveParams[key]
   ).length
 
   return (
@@ -324,7 +347,7 @@ export function PropertiesClient({
 
           {/* Sort dropdown */}
           <PropertySort
-            value={searchParams.sort || 'newest'}
+            value={liveParams.sort || 'newest'}
             onChange={handleSortChange}
           />
         </div>
@@ -333,7 +356,7 @@ export function PropertiesClient({
         {showFilters && (
           <div className="mb-8 animate-in fade-in slide-in-from-top-2">
             <PropertyFilters
-              filters={searchParams}
+              filters={liveParams}
               onChange={handleFilterChange}
               onClose={() => setShowFilters(false)}
             />
@@ -341,32 +364,32 @@ export function PropertiesClient({
         )}
 
         {/* Results summary */}
-        {(searchParams.q || searchParams.goal || searchParams.budget) && (
+        {(liveParams.q || liveParams.goal || liveParams.budget) && (
           <div className="mb-4 p-4 bg-[#E0EDF7] border border-[#1B3A5C]/20 rounded-xl shadow-sm">
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
               <div className="flex items-center gap-3">
                 <div className="w-8 h-8 bg-[#1B3A5C] rounded-lg flex items-center justify-center shrink-0">
-                  {searchParams.q ? <Bot className="w-4 h-4 text-white" /> : <Search className="w-4 h-4 text-white" />}
+                  {liveParams.q ? <Bot className="w-4 h-4 text-white" /> : <Search className="w-4 h-4 text-white" />}
                 </div>
                 <div>
                   <span className="text-sm font-bold text-slate-900 flex items-center gap-2">
-                    {searchParams.q ? 'AI Search Results' : 'Search Results'}
-                    {searchParams.q && (
+                    {liveParams.q ? 'AI Search Results' : 'Search Results'}
+                    {liveParams.q && (
                       <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-semibold bg-[#C49A2E]/10 text-[#C49A2E] rounded-full">
                         <Sparkles className="w-2.5 h-2.5" />
                         AI
                       </span>
                     )}
                   </span>
-                  {searchParams.q && (
-                    <p className="text-xs text-slate-600 mt-0.5">&quot;{searchParams.q}&quot;</p>
+                  {liveParams.q && (
+                    <p className="text-xs text-slate-600 mt-0.5">&quot;{liveParams.q}&quot;</p>
                   )}
                 </div>
               </div>
               <span className="text-xs font-medium text-slate-700 bg-white px-3 py-1.5 rounded-md">
                 <span className="font-bold text-[#1B3A5C]">{filteredProperties.length}</span> found
-                {searchParams.goal && ` for ${searchParams.goal.replace('_', ' ').toLowerCase()}`}
-                {searchParams.budget && ` under $${parseInt(searchParams.budget).toLocaleString()}`}
+                {liveParams.goal && ` for ${liveParams.goal.replace('_', ' ').toLowerCase()}`}
+                {liveParams.budget && ` under $${parseInt(liveParams.budget).toLocaleString()}`}
               </span>
             </div>
           </div>

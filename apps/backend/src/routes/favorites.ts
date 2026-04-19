@@ -38,12 +38,16 @@ router.post(
     const property = await prisma.property.findUnique({ where: { id: propertyId } });
     if (!property) { sendNotFound(res, 'Property'); return; }
 
+    // Idempotent: if already favorited, return the existing record rather than 400.
+    // The heart button is a toggle and can race — this avoids breaking UX when the
+    // client's cached state disagrees with the backend.
     const existing = await prisma.favoriteProperty.findUnique({
       where: { userId_propertyId: { userId: authReq.user.id, propertyId } },
+      include: { property: { include: PROPERTY_WITH_STATS_INCLUDE } },
     });
 
     if (existing) {
-      res.status(400).json({ error: 'Already Favorited', message: 'Property is already in your favorites' });
+      sendSuccess(res, existing, 'Property is already in your favorites');
       return;
     }
 
@@ -53,6 +57,37 @@ router.post(
     });
 
     sendCreated(res, favorite, 'Property added to favorites');
+  })
+);
+
+// Toggle favorite — single endpoint that handles the full state transition
+// atomically. Preferred by the UI over POST+DELETE which can race.
+router.post(
+  '/:propertyId/toggle',
+  authenticateToken,
+  asyncHandler(async (req: Request, res: Response) => {
+    const authReq = req as AuthenticatedRequest;
+    const { propertyId } = req.params;
+
+    const property = await prisma.property.findUnique({ where: { id: propertyId } });
+    if (!property) { sendNotFound(res, 'Property'); return; }
+
+    const existing = await prisma.favoriteProperty.findUnique({
+      where: { userId_propertyId: { userId: authReq.user.id, propertyId } },
+    });
+
+    if (existing) {
+      await prisma.favoriteProperty.delete({
+        where: { userId_propertyId: { userId: authReq.user.id, propertyId } },
+      });
+      sendSuccess(res, { isFavorited: false }, 'Removed from favorites');
+      return;
+    }
+
+    await prisma.favoriteProperty.create({
+      data: { userId: authReq.user.id, propertyId },
+    });
+    sendSuccess(res, { isFavorited: true }, 'Added to favorites');
   })
 );
 
