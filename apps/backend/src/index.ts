@@ -9,6 +9,7 @@ import { prisma } from '@propgroup/db';
 import passport from './config/passport.js';
 import { errorHandler } from './utils/errors.js';
 import { logger } from './utils/logger.js';
+import { validateEnv } from './utils/validate-env.js';
 
 // Import routes
 import authRoutes from './routes/auth.js';
@@ -233,6 +234,8 @@ process.on('uncaughtException', (error) => {
 // Startup
 async function startServer() {
   try {
+    // Validate env before touching DB so missing config surfaces first
+    validateEnv();
     await prisma.$queryRaw`SELECT 1`;
     logger.info('Database connected');
 

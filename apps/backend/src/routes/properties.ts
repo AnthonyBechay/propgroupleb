@@ -1,4 +1,5 @@
 import express, { type Request, type Response, type Router } from 'express';
+import { randomBytes } from 'crypto';
 import { prisma } from '@propgroup/db';
 import { authenticateToken, requireAdmin, logAdminAction } from '../middleware/auth.js';
 import { asyncHandler } from '../utils/errors.js';
@@ -327,14 +328,19 @@ async function cleanupPropertyFiles(propertyId: string) {
       ...property.documents.map(d => d.fileUrl),
     ];
 
-    for (const url of urlsToDelete) {
-      try {
-        const key = extractKeyFromUrl(url);
-        if (key) await deleteFile(key);
-      } catch (err) {
-        logger.error('Failed to delete R2 file', err, { url });
-      }
-    }
+    // Parallelize R2 deletes — serial `await` in the old loop meant a
+    // property with 20 images blocked admin for 20× the per-delete latency.
+    // Each delete swallows its own error so one bad key can't abort cleanup.
+    await Promise.all(
+      urlsToDelete.map(async (url) => {
+        try {
+          const key = extractKeyFromUrl(url);
+          if (key) await deleteFile(key);
+        } catch (err) {
+          logger.error('Failed to delete R2 file', err, { url });
+        }
+      })
+    );
   } catch (err) {
     logger.error('Failed to cleanup files for property', err, { propertyId });
   }
@@ -388,7 +394,6 @@ router.post(
     let { shareToken } = property;
     if (!shareToken) {
       // Generate a URL-safe random token
-      const { randomBytes } = await import('crypto');
       shareToken = randomBytes(24).toString('base64url');
       await prisma.property.update({
         where: { id: req.params.id },
@@ -434,9 +439,14 @@ router.delete(
 // Auto-compute and store the minimum price across all unit options
 async function updatePropertyMinPrice(propertyId: string) {
   try {
+    // Narrow select — we only need area (number) and pricePerSqm (number),
+    // not the full unit/option rows with paymentPlanDetails JSON.
     const units = await prisma.unit.findMany({
       where: { propertyId },
-      include: { options: true },
+      select: {
+        area: true,
+        options: { select: { pricePerSqm: true } },
+      },
     });
     const prices = units.flatMap(u => u.options.map(o => o.pricePerSqm * u.area));
     if (prices.length > 0) {

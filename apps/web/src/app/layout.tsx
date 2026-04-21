@@ -15,10 +15,12 @@ const inter = Inter({
   variable: "--font-inter",
 });
 
+// Omitting `weight` makes next/font load the variable font file (one WOFF2
+// covering every weight) instead of six separate static files. Saves ~60–90
+// kB on first paint while preserving every Tailwind weight class (300–800).
 const plusJakarta = Plus_Jakarta_Sans({
   subsets: ["latin"],
   variable: "--font-plus-jakarta",
-  weight: ["300", "400", "500", "600", "700", "800"],
 });
 
 // Determine the base URL for metadata

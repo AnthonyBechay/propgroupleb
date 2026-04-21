@@ -207,6 +207,9 @@ export function Navbar() {
               size="sm"
               onClick={() => setIsMenuOpen(!isMenuOpen)}
               className="p-2"
+              aria-label={isMenuOpen ? 'Close menu' : 'Open menu'}
+              aria-expanded={isMenuOpen}
+              aria-controls="mobile-navigation"
             >
               {isMenuOpen ? <X size={24} /> : <Menu size={24} />}
             </Button>
@@ -214,9 +217,12 @@ export function Navbar() {
         </div>
 
         {/* Mobile Navigation */}
-        <div className={`lg:hidden transition-all duration-300 ease-in-out ${
-          isMenuOpen ? 'max-h-screen opacity-100' : 'max-h-0 opacity-0 overflow-hidden'
-        }`}>
+        <div
+          id="mobile-navigation"
+          className={`lg:hidden transition-all duration-300 ease-in-out ${
+            isMenuOpen ? 'max-h-screen opacity-100' : 'max-h-0 opacity-0 overflow-hidden'
+          }`}
+        >
           <div className="py-4 space-y-1 border-t border-slate-200">
             <MobileNavLink
               href="/properties"

@@ -37,18 +37,49 @@ export function Footer() {
             <p className="text-xs text-slate-300 mb-3">
               AI-powered real estate investment platform helping you make smarter property decisions.
             </p>
+            {/* Social icons rendered as disabled placeholders until real
+                URLs are wired. href="#" alone would jump the page to top
+                on click — preventDefault keeps the layout stable. */}
             <div className="flex gap-2">
-              <a href="#" aria-label="Facebook" className="w-8 h-8 bg-white/10 rounded-lg flex items-center justify-center hover:bg-white/20 transition-colors">
-                <Facebook className="w-4 h-4 text-slate-300 hover:text-white" />
+              <a
+                href="#"
+                aria-label="Facebook (coming soon)"
+                aria-disabled="true"
+                tabIndex={-1}
+                onClick={(e) => e.preventDefault()}
+                className="w-8 h-8 bg-white/10 rounded-lg flex items-center justify-center cursor-default opacity-60"
+              >
+                <Facebook className="w-4 h-4 text-slate-300" />
               </a>
-              <a href="#" aria-label="Twitter" className="w-8 h-8 bg-white/10 rounded-lg flex items-center justify-center hover:bg-white/20 transition-colors">
-                <Twitter className="w-4 h-4 text-slate-300 hover:text-white" />
+              <a
+                href="#"
+                aria-label="Twitter (coming soon)"
+                aria-disabled="true"
+                tabIndex={-1}
+                onClick={(e) => e.preventDefault()}
+                className="w-8 h-8 bg-white/10 rounded-lg flex items-center justify-center cursor-default opacity-60"
+              >
+                <Twitter className="w-4 h-4 text-slate-300" />
               </a>
-              <a href="#" aria-label="LinkedIn" className="w-8 h-8 bg-white/10 rounded-lg flex items-center justify-center hover:bg-white/20 transition-colors">
-                <Linkedin className="w-4 h-4 text-slate-300 hover:text-white" />
+              <a
+                href="#"
+                aria-label="LinkedIn (coming soon)"
+                aria-disabled="true"
+                tabIndex={-1}
+                onClick={(e) => e.preventDefault()}
+                className="w-8 h-8 bg-white/10 rounded-lg flex items-center justify-center cursor-default opacity-60"
+              >
+                <Linkedin className="w-4 h-4 text-slate-300" />
               </a>
-              <a href="#" aria-label="Instagram" className="w-8 h-8 bg-white/10 rounded-lg flex items-center justify-center hover:bg-white/20 transition-colors">
-                <Instagram className="w-4 h-4 text-slate-300 hover:text-white" />
+              <a
+                href="#"
+                aria-label="Instagram (coming soon)"
+                aria-disabled="true"
+                tabIndex={-1}
+                onClick={(e) => e.preventDefault()}
+                className="w-8 h-8 bg-white/10 rounded-lg flex items-center justify-center cursor-default opacity-60"
+              >
+                <Instagram className="w-4 h-4 text-slate-300" />
               </a>
             </div>
           </div>

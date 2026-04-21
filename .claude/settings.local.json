@@ -305,7 +305,9 @@
       "Bash(pnpm --filter @propgroup/db exec prisma migrate dev --name add_unit_property_type --create-only)",
       "Bash(DATABASE_URL=\"postgresql://placeholder\" pnpm exec prisma generate)",
       "Bash(pnpm --filter propgroup-backend add compression)",
-      "Bash(pnpm --filter propgroup-backend add -D @types/compression)"
+      "Bash(pnpm --filter propgroup-backend add -D @types/compression)",
+      "Bash(pnpm --filter web run type-check)",
+      "Bash(pnpm --filter web exec tsc --noEmit)"
     ],
     "deny": [],
     "ask": []

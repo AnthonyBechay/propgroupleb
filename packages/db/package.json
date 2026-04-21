@@ -12,6 +12,7 @@
     }
   },
   "scripts": {
+    "postinstall": "prisma generate",
     "build": "prisma generate && tsc",
     "dev": "tsc --watch",
     "db:generate": "prisma generate",

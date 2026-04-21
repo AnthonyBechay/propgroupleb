@@ -30,6 +30,14 @@ function getFileBaseUrl(): string {
   if (PUBLIC_URL) {
     return PUBLIC_URL;
   }
+  // Dev fallback only — in production, silently returning a localhost URL
+  // produces broken image links for every uploaded file. Fail loudly so the
+  // misconfiguration is caught at first upload instead of after launch.
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error(
+      'Upload service misconfigured: set NEXT_PUBLIC_API_URL, API_URL, or R2_PUBLIC_URL in production'
+    );
+  }
   return 'http://localhost:3001/api/files';
 }
 

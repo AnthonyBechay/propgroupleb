@@ -7,7 +7,9 @@ import { PropertyCard } from '@/components/PropertyCard'
 import { PropertyFilters } from '@/components/properties/PropertyFilters'
 import { PropertySort } from '@/components/properties/PropertySort'
 import { PropertyGridSkeleton } from '@/components/properties/PropertyGridSkeleton'
-import { MapView } from '@/components/properties/MapView'
+// MapView is not yet production-ready — kept in repo as a placeholder for a
+// future release; its toggle was removed pre-launch to avoid confusing users
+// with a "Coming Soon" stub (see MapView.tsx).
 
 // AI search is only shown when the filter banner indicates a q/goal/budget —
 // defer its bundle (chat state, markdown, icons) until that banner renders.
@@ -16,8 +18,6 @@ const AIPropertySearch = dynamic(
   { ssr: false, loading: () => null },
 )
 import {
-  Grid3x3,
-  Map,
   Filter,
   X,
   Sparkles,
@@ -62,7 +62,6 @@ export function PropertiesClient({
   const urlSearchParams = useSearchParams()
   const [properties, setProperties] = useState(initialProperties)
   const [loading, setLoading] = useState(false)
-  const [viewMode, setViewMode] = useState<'grid' | 'map'>('grid')
   const [showFilters, setShowFilters] = useState(false)
   const [showAISearch, setShowAISearch] = useState(false)
 
@@ -310,34 +309,6 @@ export function PropertiesClient({
               )}
             </Button>
 
-            {/* View mode toggle */}
-            <div className="flex items-center bg-white rounded-lg shadow-sm border-2 border-slate-200">
-              <Button
-                variant={viewMode === 'grid' ? 'default' : 'ghost'}
-                size="sm"
-                onClick={() => setViewMode('grid')}
-                className={`rounded-r-none ${
-                  viewMode === 'grid'
-                    ? 'bg-[#1B3A5C] text-white hover:bg-[#24507D]'
-                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
-                }`}
-              >
-                <Grid3x3 className="w-4 h-4" />
-              </Button>
-              <Button
-                variant={viewMode === 'map' ? 'default' : 'ghost'}
-                size="sm"
-                onClick={() => setViewMode('map')}
-                className={`rounded-l-none ${
-                  viewMode === 'map'
-                    ? 'bg-[#1B3A5C] text-white hover:bg-[#24507D]'
-                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
-                }`}
-              >
-                <Map className="w-4 h-4" />
-              </Button>
-            </div>
-
             {/* Active filters */}
             {activeFiltersCount > 0 && (
               <Button
@@ -405,7 +376,7 @@ export function PropertiesClient({
         {/* Content - Properties Grid */}
         {loading ? (
           <PropertyGridSkeleton />
-        ) : viewMode === 'grid' ? (
+        ) : (
           filteredProperties.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {filteredProperties.map((property: Property, index: number) => (
@@ -460,8 +431,6 @@ export function PropertiesClient({
               </div>
             </div>
           )
-        ) : (
-          <MapView properties={filteredProperties} />
         )}
 
         {/* Load more button - Compact */}

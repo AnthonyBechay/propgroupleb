@@ -1,4 +1,5 @@
 import express, { type Request, type Response, type Router } from 'express';
+import { randomBytes } from 'crypto';
 import { prisma } from '@propgroup/db';
 import { authenticateToken, requireAdmin, logAdminAction } from '../middleware/auth.js';
 import { asyncHandler } from '../utils/errors.js';
@@ -75,7 +76,6 @@ router.post(
     if (existing) {
       token = existing.token;
     } else {
-      const { randomBytes } = await import('crypto');
       token = randomBytes(24).toString('base64url');
       await prisma.shareToken.create({
         data: {

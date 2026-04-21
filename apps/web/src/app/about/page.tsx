@@ -8,6 +8,13 @@ export const metadata = {
   description: 'AI-powered platform for verified real estate investments with data-driven ROI projections.',
 }
 
+// ISR: Without this, the page is built once at deploy time with whatever
+// content the API returned then (often nothing if the backend wasn't up
+// during build). With revalidate, Next regenerates the page in the
+// background at most every 60s, so admin CMS edits surface within a
+// minute instead of requiring a redeploy.
+export const revalidate = 60
+
 export default async function AboutPage() {
   const content = await fetchSectionContent('about')
 
