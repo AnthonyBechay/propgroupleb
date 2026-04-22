@@ -37,7 +37,7 @@ const nextConfig: NextConfig = {
   // Enable strict mode for better debugging
   reactStrictMode: true,
   // Transpile packages for better compatibility
-  transpilePackages: ['@propgroup/config', '@propgroup/db', '@propgroup/supabase', '@propgroup/ui'],
+  transpilePackages: ['@propgroup/config', '@propgroup/db'],
   eslint: {
     ignoreDuringBuilds: false,
   },

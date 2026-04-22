@@ -469,10 +469,6 @@ class ApiClient {
     return this.request(`/api/content?section=${encodeURIComponent(section)}`);
   }
 
-  async getContentByKey(key: string) {
-    return this.request(`/api/content/key/${encodeURIComponent(key)}`);
-  }
-
   async getAllContent() {
     return this.request('/api/content/all');
   }
@@ -488,14 +484,6 @@ class ApiClient {
     return this.request(`/api/content/${encodeURIComponent(key)}`, {
       method: 'DELETE',
     });
-  }
-
-  async getMediaBySection(section: string) {
-    return this.request(`/api/content/media?section=${encodeURIComponent(section)}`);
-  }
-
-  async getAllMedia() {
-    return this.request('/api/content/media');
   }
 
   async updateMedia(key: string, data: { section?: string; url: string; alt?: string; caption?: string }) {

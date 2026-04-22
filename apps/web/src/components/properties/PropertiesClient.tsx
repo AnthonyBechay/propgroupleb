@@ -7,9 +7,6 @@ import { PropertyCard } from '@/components/PropertyCard'
 import { PropertyFilters } from '@/components/properties/PropertyFilters'
 import { PropertySort } from '@/components/properties/PropertySort'
 import { PropertyGridSkeleton } from '@/components/properties/PropertyGridSkeleton'
-// MapView is not yet production-ready — kept in repo as a placeholder for a
-// future release; its toggle was removed pre-launch to avoid confusing users
-// with a "Coming Soon" stub (see MapView.tsx).
 
 // AI search is only shown when the filter banner indicates a q/goal/budget —
 // defer its bundle (chat state, markdown, icons) until that banner renders.

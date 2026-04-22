@@ -107,10 +107,6 @@ test-results/
 playwright-report/
 playwright/.cache/
 
-# Documentation build
-docs/.docusaurus/
-docs/build/
-
 # Cleanup and old files
 _old_files/
 _cleanup_temp/

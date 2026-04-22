@@ -174,16 +174,8 @@ router.get(
   })
 );
 
-// Logout
-router.post('/logout', (req: Request, res: Response) => {
-  if (req.session) {
-    req.session.destroy(() => {});
-  }
-
-  if (req.logout) {
-    req.logout(() => {});
-  }
-
+// Logout — stateless JWT, just clear the cookie.
+router.post('/logout', (_req: Request, res: Response) => {
   const cookieOptions = {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',

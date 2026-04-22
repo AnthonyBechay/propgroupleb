@@ -36,31 +36,10 @@ function extractLatLng(url: string): { lat: string; lng: string } | null {
 }
 
 /**
- * Synchronous version — safe in client components.
- * Won't resolve short links, but handles direct URL patterns.
- */
-export function toGoogleMapsEmbedUrl(url: string | null | undefined): string | null {
-  if (!url || typeof url !== 'string') return null
-  const trimmed = url.trim()
-  if (!trimmed) return null
-
-  if (trimmed.includes('/maps/embed')) return trimmed
-
-  const coords = extractLatLng(trimmed)
-  if (coords) return buildEmbedFromLatLng(coords.lat, coords.lng)
-
-  // Last resort: only works for very simple strings, not full URLs
-  if (!/^https?:\/\//i.test(trimmed)) {
-    return `https://maps.google.com/maps?q=${encodeURIComponent(trimmed)}&hl=en&z=15&output=embed`
-  }
-
-  return null
-}
-
-/**
- * Async version — resolves short links (maps.app.goo.gl) by following redirects
- * on the server, then extracts coordinates from the resolved URL.
- * Safe to call in server components.
+ * Async resolver — safe to call in server components.
+ * Handles direct URL patterns immediately, and resolves short links
+ * (maps.app.goo.gl, goo.gl/maps) by following redirects on the server,
+ * then extracts coordinates from the resolved URL.
  */
 export async function resolveGoogleMapsEmbedUrl(
   url: string | null | undefined

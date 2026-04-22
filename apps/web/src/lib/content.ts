@@ -35,14 +35,3 @@ export async function fetchSectionContent(section: string): Promise<Record<strin
   }
 }
 
-/**
- * Fetch a single content item by key.
- */
-export async function fetchContentByKey(key: string): Promise<string | null> {
-  try {
-    const response = await apiClient.getContentByKey(key) as ApiResponse<SiteContentItem>;
-    return response.data?.content || null;
-  } catch {
-    return null;
-  }
-}

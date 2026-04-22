@@ -1,61 +1,46 @@
-# Smart Investment Portal - Web App
+# PropGroup — Web App
 
-This is the Next.js web application for the Smart Investment Portal.
+Next.js 15 (App Router) frontend for the PropGroup real-estate investment platform.
 
-## Features
+## Stack
 
-- **Authentication**: Supabase Auth with email/password login
-- **Protected Routes**: Middleware-based route protection for `/portal/*`
-- **API Routes**: Contact form with Zod validation and Resend email integration
-- **Shared Components**: Uses shared UI components from `@propgroup/ui`
-- **Type Safety**: Full TypeScript support with shared types from `@propgroup/config`
-
-## Environment Setup
-
-1. Copy the environment variables:
-   ```bash
-   cp ../../env.example .env.local
-   ```
-
-2. Update the following variables in `.env.local`:
-   ```
-   NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
-   NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
-   SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key
-   RESEND_API_KEY=your_resend_api_key
-   ```
+- **Framework**: Next.js 15 App Router, React 19
+- **Styling**: Tailwind CSS v4 + shadcn/ui, custom design tokens in `src/styles/design-system.css`
+- **Auth**: JWT cookies (httpOnly) issued by the backend; `AuthContext` hydrates the current user
+- **State**: React Context for auth and the property comparator; otherwise server components + server actions where appropriate
+- **Shared code**: `@propgroup/config` (calculator formulas, Zod schemas), `@propgroup/db` (Prisma types only — runtime DB access lives in the backend)
 
 ## Development
 
+Run from the monorepo root — this app is part of a pnpm workspace.
+
 ```bash
-npm run dev
+pnpm install
+pnpm dev:web    # runs next dev
 ```
 
-## Authentication Flow
+Do not run the dev server just to verify changes; prefer `pnpm --filter web run build` to catch issues.
 
-1. **Sign Up**: Users can create accounts with email/password
-2. **Sign In**: Existing users can sign in
-3. **Protected Routes**: `/portal/*` routes require authentication
-4. **Middleware**: Automatically redirects unauthenticated users
+## Environment
 
-## API Routes
+Copy `.env.example` at the repo root and set at minimum:
 
-### POST /api/contact
+```
+NEXT_PUBLIC_API_URL=http://localhost:3001
+NEXT_PUBLIC_SITE_URL=http://localhost:3000
+```
 
-Handles property inquiry submissions with:
-- Zod validation using `contactFormSchema`
-- Email notifications via Resend
-- Proper error handling and responses
+Optional vars (Google OAuth, R2, Anthropic, Resend) are validated by the backend on boot, not here.
 
-## Components
+## Route Layout
 
-- **AuthModal**: Login/signup modal with form validation
-- **AuthSection**: Authentication state display and controls
-- **PropertyCard**: Shared property display component
+- `/` — marketing home (ISR)
+- `/properties`, `/property/[slug]` — catalog and detail
+- `/portal/*` — authenticated user area (dashboard, favorites, portfolio, calculator)
+- `/(admin)/admin/*` — admin area, gated by `requireAdmin` middleware on API calls
+- `/auth/*` — login, signup, forgot/reset password
+- `/about`, `/contact`, `/compare`, `/ai-search`, `/get-started` — marketing / feature pages
 
-## Security Features
+## Conventions
 
-- **Route Protection**: Middleware-based authentication
-- **Input Validation**: Zod schemas for all API inputs
-- **Error Handling**: Comprehensive error responses
-- **Type Safety**: Full TypeScript coverage
+See the root `CLAUDE.md` for project-wide conventions (colors, layout patterns, portal/admin separation).

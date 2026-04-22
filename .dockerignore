@@ -29,7 +29,6 @@ npm-debug.log*
 Thumbs.db
 
 # Documentation
-docs/
 *.md
 !README.md
 

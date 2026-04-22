@@ -28,18 +28,6 @@ export function normalizeApiUrl(url?: string): string {
 }
 
 /**
- * Gets the full API URL for an endpoint
- * @param endpoint - The API endpoint (should start with /api/)
- * @returns Full URL
- */
-export function getApiUrl(endpoint: string): string {
-  const baseUrl = normalizeApiUrl(process.env.NEXT_PUBLIC_API_URL);
-  // Ensure endpoint starts with /
-  const normalizedEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
-  return `${baseUrl}${normalizedEndpoint}`;
-}
-
-/**
  * Rewrites R2 public URLs to use the backend proxy.
  * Old files stored with pub-*.r2.dev URLs will be proxied through /api/files/*.
  * New files already use the proxy URL.

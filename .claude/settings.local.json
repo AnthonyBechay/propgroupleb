@@ -307,7 +307,13 @@
       "Bash(pnpm --filter propgroup-backend add compression)",
       "Bash(pnpm --filter propgroup-backend add -D @types/compression)",
       "Bash(pnpm --filter web run type-check)",
-      "Bash(pnpm --filter web exec tsc --noEmit)"
+      "Bash(pnpm --filter web exec tsc --noEmit)",
+      "Bash(chmod +x /tmp/check_models.sh)",
+      "Bash(/tmp/check_models.sh)",
+      "Bash(chmod +x /tmp/check_deps.sh)",
+      "Bash(/tmp/check_deps.sh)",
+      "Bash(pnpm --filter propgroup-backend remove express-session connect-pg-simple passport-jwt @types/express-session @types/connect-pg-simple @types/passport-jwt)",
+      "Bash(pnpm --filter web remove @propgroup/ui)"
     ],
     "deny": [],
     "ask": []
