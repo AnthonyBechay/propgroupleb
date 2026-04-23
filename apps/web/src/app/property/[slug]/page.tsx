@@ -6,6 +6,7 @@ import { PropertyImageGallery } from '@/components/PropertyImageGallery'
 import { PropertyDescription } from '@/components/property/PropertyDescription'
 import { PropertySidebar } from '@/components/property/PropertySidebar'
 import { PropertyUnitsSection } from '@/components/property/PropertyUnitsSection'
+import { PropertyVideos } from '@/components/property/PropertyVideos'
 import {
   MapPin, TrendingUp, DollarSign, Shield,
   Building2, CreditCard, Map as MapIcon,
@@ -282,6 +283,11 @@ export default async function PropertyPage({ params }: PropertyPageProps) {
                 <h2 className="text-lg font-semibold text-slate-900 mb-3">About this Property</h2>
                 <PropertyDescription description={property.description} />
               </div>
+            )}
+
+            {/* YouTube videos (compact — only renders if URLs are present) */}
+            {Array.isArray(property.youtubeUrls) && property.youtubeUrls.length > 0 && (
+              <PropertyVideos urls={property.youtubeUrls} />
             )}
 
             {/* Investment Overview (only if data exists) */}

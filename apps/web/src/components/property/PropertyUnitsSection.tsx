@@ -386,6 +386,30 @@ function UnitSheetPrint({
           </div>
         </div>
 
+        {/* Unit images strip — shown only if the unit has dedicated photos.
+            Compact (70px tall) so the single-page A4 layout doesn't overflow. */}
+        {unit.images && unit.images.length > 0 && (
+          <div className="print-section" style={{ padding: '14px 28px 0' }}>
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: unit.images.length === 1
+                ? '1fr'
+                : unit.images.length === 2
+                  ? '1fr 1fr'
+                  : 'repeat(3, 1fr)',
+              gap: '6px',
+            }}>
+              {unit.images.slice(0, 3).map((img, i) => (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img key={i} src={img} alt="" style={{
+                  width: '100%', height: '70px', objectFit: 'cover',
+                  borderRadius: '4px', display: 'block',
+                }} />
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Options grid */}
         <div style={{ padding: '24px 28px' }}>
           {options.length > 0 ? (
@@ -695,6 +719,36 @@ function OptionSheetPrint({
                   borderRadius: '6px', display: 'block',
                 }} />
               ))}
+            </div>
+          )}
+
+          {/* Unit-specific images — labeled separately so the reader sees
+              photos of the actual unit, not just the project exterior. */}
+          {unit.images && unit.images.length > 0 && (
+            <div className="print-section" style={{ marginBottom: '18px' }}>
+              <div style={{
+                fontSize: '10px', fontWeight: 800, color: '#1B3A5C',
+                letterSpacing: '0.15em', marginBottom: '6px',
+              }}>
+                UNIT PHOTOS {unit.unitNumber ? `· #${unit.unitNumber}` : ''}
+              </div>
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: unit.images.length === 1
+                  ? '1fr'
+                  : unit.images.length === 2
+                    ? '1fr 1fr'
+                    : 'repeat(3, 1fr)',
+                gap: '6px',
+              }}>
+                {unit.images.slice(0, 3).map((img, i) => (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img key={i} src={img} alt="" style={{
+                    width: '100%', height: '90px', objectFit: 'cover',
+                    borderRadius: '4px', display: 'block',
+                  }} />
+                ))}
+              </div>
             </div>
           )}
 

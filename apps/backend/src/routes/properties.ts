@@ -188,6 +188,7 @@ router.post(
         ...propertyData,
         images: (propertyData as Record<string, unknown>).images as string[] || [],
         highlightedFeatures: (propertyData as Record<string, unknown>).highlightedFeatures as string[] || [],
+        youtubeUrls: (propertyData as Record<string, unknown>).youtubeUrls as string[] || [],
         publishedAt: new Date(),
       };
       const property = await tx.property.create({ data: createData });

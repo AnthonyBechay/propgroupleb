@@ -50,10 +50,12 @@ interface Property {
 
 export function PropertiesClient({
   initialProperties,
-  searchParams: serverSearchParams
 }: {
   initialProperties: Property[]
-  searchParams: any
+  // `searchParams` is accepted from the server page for backward compatibility
+  // but ignored here — URL state is read live via `useSearchParams()` so that
+  // clearFilters() (which wipes the URL) actually clears the active filters.
+  searchParams?: any
 }) {
   const router = useRouter()
   const urlSearchParams = useSearchParams()
@@ -63,12 +65,15 @@ export function PropertiesClient({
   const [showAISearch, setShowAISearch] = useState(false)
 
   // Read live URL params — keeps filter results reactive without a server roundtrip.
-  // Falls back to the server-rendered params on first paint before hydration.
+  // Source of truth is `urlSearchParams` (Next.js keeps this in sync with the
+  // URL after writeUrl's history.replaceState + popstate). We must NOT merge
+  // `serverSearchParams` in, or keys from the initial URL (e.g. `ids` set by
+  // the AI search) leak back after clearFilters() wipes the URL.
   const liveParams = useMemo(() => {
-    const out: Record<string, string> = { ...serverSearchParams }
+    const out: Record<string, string> = {}
     urlSearchParams.forEach((v, k) => { out[k] = v })
     return out
-  }, [urlSearchParams, serverSearchParams])
+  }, [urlSearchParams])
 
   const filteredProperties = useMemo(() => {
     let filtered = [...initialProperties]

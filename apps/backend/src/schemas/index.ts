@@ -98,7 +98,8 @@ export const propertySchema = z.object({
   hasCentralAC: z.boolean().nullish(),
 
   images: z.array(z.string()).nullish(),
-  videoUrl: z.string().nullish(),
+  videoUrl: z.string().nullish(), // deprecated — retained so old payloads don't break
+  youtubeUrls: z.array(z.string().url()).nullish(),
   virtualTourUrl: z.string().nullish(),
 
   slug: z.string().nullish(),

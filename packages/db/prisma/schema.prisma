@@ -326,7 +326,8 @@ model Property {
 
   // Media
   images         String[]
-  videoUrl       String?
+  videoUrl       String? // deprecated — legacy single uploaded video URL; kept for old data. New entries should use youtubeUrls.
+  youtubeUrls    String[] @default([]) // YouTube video URLs embedded on the property view
   virtualTourUrl String?
 
   // SEO & Marketing
