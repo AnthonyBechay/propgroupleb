@@ -227,6 +227,9 @@ interface UnitSheetProps {
   propertyCountry: string
   propertyCity?: string | null
   propertyStatus: string
+  propertyType: string
+  propertyImages: string[]
+  propertyDescription?: string | null
   unit: Unit
   currency: string
   rentalYield?: number | null
@@ -247,8 +250,146 @@ function parseBullets(desc?: string | null): string[] {
   return byComma.length >= 2 ? byComma : byLine
 }
 
+/**
+ * Truncate a string at a word boundary, preserving full grapheme clusters
+ * (so emojis and combining characters aren't split mid-surrogate). Avoids
+ * the classic ".slice(0, N)" artefact that produced cuts like "investmen 💰"
+ * or half-emojis in PDF exports.
+ */
+function truncateAtWord(s: string, maxChars: number): string {
+  const chars = Array.from(s.trim())
+  if (chars.length <= maxChars) return s.trim()
+  let cut = chars.slice(0, maxChars).join('')
+  const lastSpace = cut.lastIndexOf(' ')
+  // Only back up to whitespace if we don't lose too much content
+  if (lastSpace > maxChars * 0.6) cut = cut.slice(0, lastSpace)
+  // Strip trailing punctuation that looks odd before an ellipsis
+  cut = cut.replace(/[\s,.;:·–—-]+$/, '')
+  return cut + '…'
+}
+
+// ── Shared report header ──────────────────────────────────────────────────────
+// Unified header used across all three PDF variants so the documents feel like
+// a series. Variants differ only by the scope line (the gold caps subtitle).
+
+interface ReportHeaderProps {
+  logoUrl?: string
+  propertyTitle: string
+  scopeLine: string   // e.g. "PROJECT OVERVIEW" / "UNIT #501 – WHITE FRAME"
+  locationLine: string  // e.g. "BATUMI, GEORGIA · UNDER CONSTRUCTION · APARTMENT"
+}
+
+function ReportHeader({ logoUrl, propertyTitle, scopeLine, locationLine }: ReportHeaderProps) {
+  return (
+    <div className="print-section" style={{
+      background: '#FDF8EF', padding: '26px 36px 20px',
+      borderBottom: '3px solid #C49A2E', textAlign: 'center',
+      boxSizing: 'border-box',
+    }}>
+      {logoUrl && (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={logoUrl} alt="Logo" style={{
+          height: '34px', objectFit: 'contain', display: 'block', margin: '0 auto 10px',
+        }} />
+      )}
+      <div style={{
+        fontSize: '10px', fontWeight: 700, letterSpacing: '0.25em',
+        color: '#C49A2E', marginBottom: '8px',
+      }}>
+        INVESTMENT REPORT
+      </div>
+      <h1 style={{
+        fontSize: '22px', fontWeight: 900, color: '#1B3A5C',
+        margin: '0 0 6px', letterSpacing: '0.02em', lineHeight: 1.2,
+      }}>
+        {propertyTitle.toUpperCase()}
+      </h1>
+      {scopeLine && (
+        <div style={{
+          fontSize: '11px', fontWeight: 700, color: '#C49A2E',
+          letterSpacing: '0.12em', marginBottom: '4px',
+        }}>
+          {scopeLine}
+        </div>
+      )}
+      {locationLine && (
+        <div style={{
+          fontSize: '10px', color: '#64748b',
+          letterSpacing: '0.12em', textTransform: 'uppercase',
+        }}>
+          {locationLine}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// KPI row shared by all three PDFs so key commercials are always visible.
+interface ReportKpiRowProps {
+  fmt: (v: number) => string
+  minPrice: number
+  maxPrice: number
+  unitsCount?: number | null
+  rentalYield?: number | null
+  capitalGrowth?: number | null
+}
+
+function ReportKpiRow({ fmt, minPrice, maxPrice, unitsCount, rentalYield, capitalGrowth }: ReportKpiRowProps) {
+  const showUnitsCount = unitsCount != null
+  return (
+    <div className="print-section" style={{
+      display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px', marginBottom: '16px',
+    }}>
+      <div style={{ padding: '10px 12px', background: '#F8FAFC', border: '1px solid #e2e8f0', borderRadius: '6px' }}>
+        <div style={{ fontSize: '9px', color: '#64748b', fontWeight: 700, letterSpacing: '0.1em' }}>FROM PRICE</div>
+        <div style={{ fontSize: '15px', fontWeight: 900, color: '#1B3A5C', marginTop: '2px' }}>
+          {minPrice ? fmt(minPrice) : '—'}
+        </div>
+        {minPrice !== maxPrice && maxPrice > 0 && (
+          <div style={{ fontSize: '9px', color: '#94a3b8' }}>up to {fmt(maxPrice)}</div>
+        )}
+      </div>
+      <div style={{ padding: '10px 12px', background: '#F8FAFC', border: '1px solid #e2e8f0', borderRadius: '6px' }}>
+        <div style={{ fontSize: '9px', color: '#64748b', fontWeight: 700, letterSpacing: '0.1em' }}>
+          {showUnitsCount ? 'UNITS' : 'FINISH'}
+        </div>
+        <div style={{ fontSize: '15px', fontWeight: 900, color: '#1B3A5C', marginTop: '2px' }}>
+          {showUnitsCount ? unitsCount : '—'}
+        </div>
+        <div style={{ fontSize: '9px', color: '#94a3b8' }}>
+          {showUnitsCount ? 'available types' : ''}
+        </div>
+      </div>
+      <div style={{ padding: '10px 12px', background: '#F8FAFC', border: '1px solid #e2e8f0', borderRadius: '6px' }}>
+        <div style={{ fontSize: '9px', color: '#64748b', fontWeight: 700, letterSpacing: '0.1em' }}>RENTAL YIELD</div>
+        <div style={{ fontSize: '15px', fontWeight: 900, color: '#10b981', marginTop: '2px' }}>
+          {rentalYield ? `${rentalYield.toFixed(1)}%` : '—'}
+        </div>
+        <div style={{ fontSize: '9px', color: '#94a3b8' }}>gross p.a.</div>
+      </div>
+      <div style={{ padding: '10px 12px', background: '#F8FAFC', border: '1px solid #e2e8f0', borderRadius: '6px' }}>
+        <div style={{ fontSize: '9px', color: '#64748b', fontWeight: 700, letterSpacing: '0.1em' }}>CAPITAL GROWTH</div>
+        <div style={{ fontSize: '15px', fontWeight: 900, color: '#C49A2E', marginTop: '2px' }}>
+          {capitalGrowth ? `${capitalGrowth}%` : '—'}
+        </div>
+        <div style={{ fontSize: '9px', color: '#94a3b8' }}>by completion</div>
+      </div>
+    </div>
+  )
+}
+
+function formatLocationLine(city: string | null | undefined, country: string, status: string, propertyType?: string): string {
+  const parts: string[] = []
+  const place = [city, country].filter(Boolean).join(', ')
+  if (place) parts.push(place)
+  if (status) parts.push(status.replace(/_/g, ' '))
+  if (propertyType) parts.push(propertyType.replace(/_/g, ' '))
+  return parts.join(' · ')
+}
+
 function UnitSheetPrint({
-  propertyTitle, propertyCountry, propertyCity, propertyStatus,
+  propertyTitle, propertyCountry, propertyCity, propertyStatus, propertyType,
+  propertyImages, propertyDescription,
   unit, currency, rentalYield, capitalGrowth, logoUrl, onClose,
 }: UnitSheetProps) {
   const [mounted, setMounted] = useState(false)
@@ -284,12 +425,24 @@ function UnitSheetPrint({
     { header: '#475569', headerText: '#FFFFFF', priceText: '#FFFFFF', accent: '#475569' },
   ]
 
-  // Subtitle line from unit (floor, unit number, notes)
-  const subtitleParts: string[] = []
-  if (unit.unitNumber) subtitleParts.push(unit.unitNumber)
-  if (unit.floor != null) subtitleParts.push(`${unit.floor}${getFloorSuffix(unit.floor)} Floor`)
-  if (unit.notes) subtitleParts.push(unit.notes)
-  const subtitle = subtitleParts.join(' | ').toUpperCase()
+  // Unified scope line for the header: UNIT #X · Y BD/Z BA · A m² · Floor N
+  const scopeParts: string[] = []
+  const unitLabel = unit.unitNumber ? `UNIT #${unit.unitNumber}` : 'UNIT PROPOSAL'
+  scopeParts.push(unitLabel)
+  if (unit.bedrooms != null || unit.bathrooms != null) {
+    scopeParts.push(`${unit.bedrooms ?? 0} BD / ${unit.bathrooms ?? 0} BA · ${unit.area} M²`)
+  }
+  if (unit.floor != null) scopeParts.push(`${unit.floor}${getFloorSuffix(unit.floor)} FLOOR`)
+  const scopeLine = scopeParts.join(' · ')
+  const locationLine = formatLocationLine(propertyCity, propertyCountry, propertyStatus, propertyType)
+
+  // KPI row inputs: price range across options for this unit
+  const unitPrices = options.map(o => o.pricePerSqm * unit.area).filter(n => n > 0)
+  const unitMinPrice = unitPrices.length ? Math.min(...unitPrices) : 0
+  const unitMaxPrice = unitPrices.length ? Math.max(...unitPrices) : 0
+
+  const heroImages = propertyImages.slice(0, 3)
+  const shortDesc = propertyDescription ? truncateAtWord(propertyDescription, 420) : null
 
   // Pillars from investment data (fallbacks if not set)
   const pillars = [
@@ -336,7 +489,7 @@ function UnitSheetPrint({
         <X className="w-5 h-5" />
       </button>
 
-      <div className="propgroup-print-content" style={{
+      <div className="propgroup-print-content propgroup-print-multipage" style={{
         maxWidth: '794px',
         margin: '0 auto',
         background: 'white',
@@ -344,74 +497,101 @@ function UnitSheetPrint({
         boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)',
       }}>
 
-        {/* Cream header block — full width, no negative margins */}
-        <div className="print-section" style={{
-          background: '#FDF8EF',
-          padding: '28px 36px 24px',
-          borderBottom: '3px solid #C49A2E',
-          textAlign: 'center',
-          boxSizing: 'border-box',
-        }}>
-          {logoUrl && (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={logoUrl} alt="Logo" style={{
-              height: '36px', objectFit: 'contain', display: 'block', margin: '0 auto 12px',
-            }} />
-          )}
-          <div style={{
-            fontSize: '10px', fontWeight: 600, letterSpacing: '0.2em',
-            color: '#C49A2E', marginBottom: '8px',
-          }}>
-            INVESTMENT PROPOSAL
-          </div>
-          <h1 style={{
-            fontSize: '22px', fontWeight: 900, color: '#1B3A5C',
-            margin: '0 0 8px', letterSpacing: '0.02em', lineHeight: 1.2,
-          }}>
-            {propertyTitle.toUpperCase()}{unit.unitNumber ? ` – UNIT ${unit.unitNumber}` : ''}
-          </h1>
-          {subtitle && (
-            <div style={{
-              fontSize: '12px', fontWeight: 600, color: '#C49A2E',
-              letterSpacing: '0.1em', marginBottom: '6px',
-            }}>
-              {subtitle}
-            </div>
-          )}
-          <div style={{ fontSize: '9px', color: '#64748b', letterSpacing: '0.15em', textTransform: 'uppercase' }}>
-            {options.length >= 2 ? 'Acquisition Options — Investment Organigram' : 'Acquisition Details'}
-          </div>
-          <div style={{ fontSize: '9px', color: '#94a3b8', marginTop: '3px' }}>
-            {[propertyCity, propertyCountry].filter(Boolean).join(', ')} · {propertyStatus.replace(/_/g, ' ')}
-          </div>
-        </div>
+        {/* Unified header */}
+        <ReportHeader
+          logoUrl={logoUrl}
+          propertyTitle={propertyTitle}
+          scopeLine={scopeLine}
+          locationLine={locationLine}
+        />
 
-        {/* Unit images strip — shown only if the unit has dedicated photos.
-            Compact (70px tall) so the single-page A4 layout doesn't overflow. */}
-        {unit.images && unit.images.length > 0 && (
-          <div className="print-section" style={{ padding: '14px 28px 0' }}>
-            <div style={{
+        <div style={{ padding: '20px 28px 0' }}>
+          {/* Project hero images — so the unit PDF actually shows the project,
+              not just finish-option thumbnails. */}
+          {heroImages.length > 0 && (
+            <div className="print-section" style={{
               display: 'grid',
-              gridTemplateColumns: unit.images.length === 1
-                ? '1fr'
-                : unit.images.length === 2
-                  ? '1fr 1fr'
-                  : 'repeat(3, 1fr)',
-              gap: '6px',
+              gridTemplateColumns: heroImages.length === 1 ? '1fr' : heroImages.length === 2 ? '1fr 1fr' : 'repeat(3, 1fr)',
+              gap: '8px', marginBottom: '16px',
             }}>
-              {unit.images.slice(0, 3).map((img, i) => (
+              {heroImages.map((img, i) => (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img key={i} src={img} alt="" style={{
-                  width: '100%', height: '70px', objectFit: 'cover',
-                  borderRadius: '4px', display: 'block',
+                  width: '100%', height: '130px', objectFit: 'cover',
+                  borderRadius: '6px', display: 'block',
                 }} />
               ))}
             </div>
+          )}
+
+          {/* KPI row — same module as the project/option PDFs for consistency */}
+          <ReportKpiRow
+            fmt={fmt}
+            minPrice={unitMinPrice}
+            maxPrice={unitMaxPrice}
+            unitsCount={options.length || null}
+            rentalYield={rentalYield}
+            capitalGrowth={capitalGrowth}
+          />
+
+          {/* About the project */}
+          {shortDesc && (
+            <div className="print-section" style={{
+              fontSize: '11px', color: '#475569', lineHeight: 1.55,
+              marginBottom: '16px', paddingBottom: '12px',
+              borderBottom: '1px solid #e2e8f0',
+            }}>
+              <div style={{
+                fontSize: '10px', fontWeight: 800, color: '#1B3A5C',
+                letterSpacing: '0.15em', marginBottom: '6px',
+              }}>
+                ABOUT THE PROJECT
+              </div>
+              {shortDesc}
+            </div>
+          )}
+
+          {/* Unit-specific photos (if the unit was photographed individually).
+              Labeled separately from project hero shots. */}
+          {unit.images && unit.images.length > 0 && (
+            <div className="print-section" style={{ marginBottom: '16px' }}>
+              <div style={{
+                fontSize: '10px', fontWeight: 800, color: '#1B3A5C',
+                letterSpacing: '0.15em', marginBottom: '6px',
+              }}>
+                UNIT PHOTOS {unit.unitNumber ? `· #${unit.unitNumber}` : ''}
+              </div>
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: unit.images.length === 1
+                  ? '1fr'
+                  : unit.images.length === 2
+                    ? '1fr 1fr'
+                    : 'repeat(3, 1fr)',
+                gap: '6px',
+              }}>
+                {unit.images.slice(0, 3).map((img, i) => (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img key={i} src={img} alt="" style={{
+                    width: '100%', height: '90px', objectFit: 'cover',
+                    borderRadius: '4px', display: 'block',
+                  }} />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Acquisition options header */}
+          <div style={{
+            fontSize: '10px', fontWeight: 800, color: '#1B3A5C',
+            letterSpacing: '0.15em', marginBottom: '10px',
+          }}>
+            {options.length >= 2 ? 'ACQUISITION OPTIONS' : 'ACQUISITION DETAILS'}
           </div>
-        )}
+        </div>
 
         {/* Options grid */}
-        <div style={{ padding: '24px 28px' }}>
+        <div style={{ padding: '0 28px 24px' }}>
           {options.length > 0 ? (
             <div style={{
               display: 'grid',
@@ -591,6 +771,7 @@ interface OptionSheetProps {
   propertyCountry: string
   propertyCity?: string | null
   propertyStatus: string
+  propertyType: string
   propertyImages: string[]
   propertyDescription?: string | null
   unit: Unit
@@ -603,7 +784,7 @@ interface OptionSheetProps {
 }
 
 function OptionSheetPrint({
-  propertyTitle, propertyCountry, propertyCity, propertyStatus,
+  propertyTitle, propertyCountry, propertyCity, propertyStatus, propertyType,
   propertyImages, propertyDescription,
   unit, option, currency, rentalYield, capitalGrowth, logoUrl, onClose,
 }: OptionSheetProps) {
@@ -631,11 +812,13 @@ function OptionSheetPrint({
   const ppd = option.paymentPlanDetails as PaymentPlanDetails | null
   const monthly = calcMonthlyPayment(totalPrice, ppd)
   const bullets = parseBullets(option.description)
-  const shortDesc = propertyDescription
-    ? propertyDescription.slice(0, 320) + (propertyDescription.length > 320 ? '…' : '')
-    : null
+  const shortDesc = propertyDescription ? truncateAtWord(propertyDescription, 340) : null
 
   const heroImages = propertyImages.slice(0, 3)
+
+  // Unified header lines
+  const scopeLine = `${unit.unitNumber ? `UNIT #${unit.unitNumber}` : 'UNIT'} · ${option.name.toUpperCase()}`
+  const locationLine = formatLocationLine(propertyCity, propertyCountry, propertyStatus, propertyType)
 
   const pillars = [
     {
@@ -676,34 +859,30 @@ function OptionSheetPrint({
         <X className="w-5 h-5" />
       </button>
 
-      <div className="propgroup-print-content" style={{
+      <div className="propgroup-print-content propgroup-print-multipage" style={{
         maxWidth: '794px', margin: '0 auto', background: 'white',
         boxSizing: 'border-box', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)',
       }}>
 
-        {/* Cream header */}
-        <div className="print-section" style={{
-          background: '#FDF8EF', padding: '24px 32px 20px',
-          borderBottom: '3px solid #C49A2E', textAlign: 'center',
-        }}>
-          {logoUrl && (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={logoUrl} alt="Logo" style={{
-              height: '34px', objectFit: 'contain', display: 'block', margin: '0 auto 10px',
-            }} />
-          )}
-          <div style={{ fontSize: '10px', fontWeight: 600, letterSpacing: '0.2em', color: '#C49A2E', marginBottom: '6px' }}>
-            INVESTMENT PROPOSAL · {option.name.toUpperCase()}
-          </div>
-          <h1 style={{ fontSize: '22px', fontWeight: 900, color: '#1B3A5C', margin: '0 0 6px', letterSpacing: '0.02em' }}>
-            {propertyTitle.toUpperCase()}
-          </h1>
-          <div style={{ fontSize: '11px', color: '#64748b', letterSpacing: '0.1em', textTransform: 'uppercase' }}>
-            {[propertyCity, propertyCountry].filter(Boolean).join(', ')} · {propertyStatus.replace(/_/g, ' ')}
-          </div>
-        </div>
+        {/* Unified header */}
+        <ReportHeader
+          logoUrl={logoUrl}
+          propertyTitle={propertyTitle}
+          scopeLine={scopeLine}
+          locationLine={locationLine}
+        />
 
         <div style={{ padding: '20px 28px' }}>
+
+          {/* KPI row for parity with project & unit PDFs */}
+          <ReportKpiRow
+            fmt={fmt}
+            minPrice={totalPrice}
+            maxPrice={totalPrice}
+            unitsCount={null}
+            rentalYield={rentalYield}
+            capitalGrowth={capitalGrowth}
+          />
 
           {/* Project images */}
           {heroImages.length > 0 && (
@@ -943,9 +1122,9 @@ function ProjectSheetPrint({
   const maxPrice = allPrices.length ? Math.max(...allPrices) : 0
 
   const heroImages = propertyImages.slice(0, 3)
-  const shortDesc = propertyDescription
-    ? propertyDescription.slice(0, 480) + (propertyDescription.length > 480 ? '…' : '')
-    : null
+  const shortDesc = propertyDescription ? truncateAtWord(propertyDescription, 500) : null
+
+  const locationLine = formatLocationLine(propertyCity, propertyCountry, propertyStatus, propertyType)
 
   const pillars = [
     {
@@ -991,25 +1170,13 @@ function ProjectSheetPrint({
         boxSizing: 'border-box', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)',
       }}>
 
-        {/* Cream header */}
-        <div className="print-section" style={{
-          background: '#FDF8EF', padding: '28px 36px 22px',
-          borderBottom: '3px solid #C49A2E', textAlign: 'center',
-        }}>
-          {logoUrl && (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={logoUrl} alt="Logo" style={{ height: '36px', objectFit: 'contain', display: 'block', margin: '0 auto 10px' }} />
-          )}
-          <div style={{ fontSize: '10px', fontWeight: 600, letterSpacing: '0.2em', color: '#C49A2E', marginBottom: '6px' }}>
-            PROJECT INVESTMENT REPORT
-          </div>
-          <h1 style={{ fontSize: '22px', fontWeight: 900, color: '#1B3A5C', margin: '0 0 6px', letterSpacing: '0.02em' }}>
-            {propertyTitle.toUpperCase()}
-          </h1>
-          <div style={{ fontSize: '11px', color: '#64748b', letterSpacing: '0.1em', textTransform: 'uppercase' }}>
-            {[propertyCity, propertyCountry].filter(Boolean).join(', ')} · {propertyStatus.replace(/_/g, ' ')} · {propertyType.replace(/_/g, ' ')}
-          </div>
-        </div>
+        {/* Unified header */}
+        <ReportHeader
+          logoUrl={logoUrl}
+          propertyTitle={propertyTitle}
+          scopeLine="PROJECT OVERVIEW"
+          locationLine={locationLine}
+        />
 
         <div style={{ padding: '20px 28px 24px' }}>
 
@@ -1030,37 +1197,15 @@ function ProjectSheetPrint({
             </div>
           )}
 
-          {/* Top KPI row */}
-          <div className="print-section" style={{
-            display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px', marginBottom: '18px',
-          }}>
-            <div style={{ padding: '10px 12px', background: '#F8FAFC', border: '1px solid #e2e8f0', borderRadius: '6px' }}>
-              <div style={{ fontSize: '9px', color: '#64748b', fontWeight: 700, letterSpacing: '0.1em' }}>FROM PRICE</div>
-              <div style={{ fontSize: '15px', fontWeight: 900, color: '#1B3A5C', marginTop: '2px' }}>
-                {minPrice ? fmt(minPrice) : '—'}
-              </div>
-              {minPrice !== maxPrice && <div style={{ fontSize: '9px', color: '#94a3b8' }}>up to {fmt(maxPrice)}</div>}
-            </div>
-            <div style={{ padding: '10px 12px', background: '#F8FAFC', border: '1px solid #e2e8f0', borderRadius: '6px' }}>
-              <div style={{ fontSize: '9px', color: '#64748b', fontWeight: 700, letterSpacing: '0.1em' }}>UNITS</div>
-              <div style={{ fontSize: '15px', fontWeight: 900, color: '#1B3A5C', marginTop: '2px' }}>{units.length}</div>
-              <div style={{ fontSize: '9px', color: '#94a3b8' }}>available types</div>
-            </div>
-            <div style={{ padding: '10px 12px', background: '#F8FAFC', border: '1px solid #e2e8f0', borderRadius: '6px' }}>
-              <div style={{ fontSize: '9px', color: '#64748b', fontWeight: 700, letterSpacing: '0.1em' }}>RENTAL YIELD</div>
-              <div style={{ fontSize: '15px', fontWeight: 900, color: '#10b981', marginTop: '2px' }}>
-                {rentalYield ? `${rentalYield.toFixed(1)}%` : '—'}
-              </div>
-              <div style={{ fontSize: '9px', color: '#94a3b8' }}>gross p.a.</div>
-            </div>
-            <div style={{ padding: '10px 12px', background: '#F8FAFC', border: '1px solid #e2e8f0', borderRadius: '6px' }}>
-              <div style={{ fontSize: '9px', color: '#64748b', fontWeight: 700, letterSpacing: '0.1em' }}>CAPITAL GROWTH</div>
-              <div style={{ fontSize: '15px', fontWeight: 900, color: '#C49A2E', marginTop: '2px' }}>
-                {capitalGrowth ? `${capitalGrowth}%` : '—'}
-              </div>
-              <div style={{ fontSize: '9px', color: '#94a3b8' }}>by completion</div>
-            </div>
-          </div>
+          {/* KPI row */}
+          <ReportKpiRow
+            fmt={fmt}
+            minPrice={minPrice}
+            maxPrice={maxPrice}
+            unitsCount={units.length}
+            rentalYield={rentalYield}
+            capitalGrowth={capitalGrowth}
+          />
 
           {/* Description */}
           {shortDesc && (
@@ -1823,6 +1968,9 @@ export function PropertyUnitsSection({
           propertyCountry={propertyCountry}
           propertyCity={propertyCity}
           propertyStatus={propertyStatus}
+          propertyType={propertyType}
+          propertyImages={propertyImages}
+          propertyDescription={propertyDescription}
           unit={printUnit}
           currency={currency}
           rentalYield={rentalYield}
@@ -1839,6 +1987,7 @@ export function PropertyUnitsSection({
           propertyCountry={propertyCountry}
           propertyCity={propertyCity}
           propertyStatus={propertyStatus}
+          propertyType={propertyType}
           propertyImages={propertyImages}
           propertyDescription={propertyDescription}
           unit={printOption.unit}
