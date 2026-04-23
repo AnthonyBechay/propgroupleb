@@ -17,6 +17,23 @@ import type { Unit, UnitOption, PropertyDocument, PaymentPlanDetails, Comparator
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
+/**
+ * Optional investor-facing metadata surfaced in the three PDF exports:
+ * handover date (off-plan), Golden Visa eligibility (Georgia residency
+ * program hook), and annual holding costs. These live on the
+ * `PropertyInvestmentData` Prisma model and are already in the detail
+ * include — we just thread them through to the PDF sheets.
+ */
+interface PdfInvestmentMeta {
+  completionDate?: string | null
+  handoverDate?: string | null
+  expectedRentalStart?: string | null
+  isGoldenVisaEligible?: boolean
+  goldenVisaMinAmount?: number | null
+  serviceFee?: number | null
+  propertyTax?: number | null
+}
+
 interface Props {
   propertyId: string
   propertyTitle: string
@@ -34,6 +51,8 @@ interface Props {
   propertyImages?: string[]
   /** Project description (for per-option PDF export) */
   propertyDescription?: string | null
+  /** Optional investor-facing metadata surfaced in PDFs */
+  investmentMeta?: PdfInvestmentMeta | null
   /** callback to update the gallery images shown in the parent */
   onUnitImagesChange?: (images: string[]) => void
 }
@@ -164,24 +183,44 @@ function OptionRoiPanel({
 // ── Print CSS (shared by both PDF variants) ────────────────────────────────────
 
 // Print CSS. Goals:
-//  • No chrome from the app (nav / modals / overlays) leaks onto the page.
+//  • On screen, the sheet is rendered off-screen (not as a dark overlay) so
+//    the user only sees a small "Preparing PDF…" toast — no misleading flash.
+//  • No chrome from the app (nav / modals / overlays) leaks onto the printed page.
 //  • No blank trailing page — root cause is browsers flushing margins / tiny
 //    overflow after the last element. We neutralise last-child margins and
 //    clip the sheet to a strict single-page max-height for "single-page"
 //    variants. Multi-page variants opt out via .propgroup-print-multipage.
+//  • Single-page max-height uses 297mm − 24mm (≈12mm per margin incl. a safety
+//    buffer) so Safari, which is more conservative around rounding, doesn't
+//    spill onto a second blank page the way it did with 297−20.
 const PRINT_CSS = `
+  /* Screen: render the sheet off-screen, not as a visible overlay. */
+  .propgroup-print-sheet {
+    position: fixed !important;
+    left: -100vw !important;
+    top: 0 !important;
+    width: 794px !important;
+    visibility: hidden !important;
+    pointer-events: none !important;
+    background: white !important;
+    z-index: -1 !important;
+  }
+
   @media print {
     * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; color-adjust: exact !important; }
-    @page { size: A4 portrait; margin: 10mm; }
+    @page { size: A4 portrait; margin: 12mm; }
 
     html, body {
       margin: 0 !important; padding: 0 !important;
       background: white !important; height: auto !important; overflow: visible !important;
     }
     body > *:not(.propgroup-print-sheet) { display: none !important; }
+    .print-preparing-toast { display: none !important; }
 
     .propgroup-print-sheet {
       position: static !important;
+      left: auto !important;
+      top: auto !important;
       inset: auto !important;
       width: 100% !important;
       max-width: none !important;
@@ -191,6 +230,9 @@ const PRINT_CSS = `
       background: white !important;
       padding: 0 !important;
       display: block !important;
+      visibility: visible !important;
+      pointer-events: auto !important;
+      z-index: auto !important;
     }
     .propgroup-print-content {
       max-width: none !important;
@@ -201,10 +243,12 @@ const PRINT_CSS = `
       page-break-after: avoid !important;
       break-after: avoid !important;
     }
-    /* Single-page variant — clip to one A4 page so any stray overflow
-       (a trailing margin, a rounding pixel) cannot force a blank page 2. */
+    /* Single-page variant — clip to a hair under one A4 page so any stray
+       overflow (trailing margin, rounding pixel) cannot force a blank page 2.
+       12mm + 12mm page margins = 24mm non-content; subtract a further 1mm
+       safety buffer for Safari. */
     .propgroup-print-content:not(.propgroup-print-multipage) {
-      max-height: calc(297mm - 20mm) !important;
+      max-height: calc(297mm - 25mm) !important;
       overflow: hidden !important;
     }
     .propgroup-print-content > *:last-child {
@@ -220,6 +264,112 @@ const PRINT_CSS = `
   }
 `
 
+// ── Preparing toast + investor insights row ──────────────────────────────────
+
+/**
+ * Screen-only toast shown while the print dialog is being opened. Replaces
+ * the prior full-screen dark backdrop, which looked like a misleading popup.
+ */
+function PrintPreparingToast({ onClose }: { onClose: () => void }) {
+  return (
+    <div className="print-preparing-toast" style={{
+      position: 'fixed', inset: 0, zIndex: 10000,
+      background: 'rgba(15, 23, 42, 0.35)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+    }}>
+      <div style={{
+        background: 'white', borderRadius: '12px',
+        padding: '18px 22px', boxShadow: '0 20px 50px rgba(0,0,0,0.3)',
+        display: 'flex', alignItems: 'center', gap: '14px', maxWidth: '360px',
+      }}>
+        <div style={{
+          width: '28px', height: '28px', flexShrink: 0,
+          border: '3px solid #E2E8F0', borderTopColor: '#1B3A5C',
+          borderRadius: '50%', animation: 'pg-print-spin 0.9s linear infinite',
+        }} />
+        <style>{`@keyframes pg-print-spin { to { transform: rotate(360deg); } }`}</style>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: '14px', fontWeight: 700, color: '#1B3A5C' }}>
+            Preparing PDF…
+          </div>
+          <div style={{ fontSize: '12px', color: '#64748b', marginTop: '2px' }}>
+            Your print dialog will open shortly
+          </div>
+        </div>
+        <button
+          onClick={onClose}
+          aria-label="Cancel"
+          style={{
+            background: '#F1F5F9', border: 'none', padding: '6px',
+            borderRadius: '6px', cursor: 'pointer', color: '#64748b',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}
+        >
+          <X className="w-4 h-4" />
+        </button>
+      </div>
+    </div>
+  )
+}
+
+/**
+ * Compact investor-insights row. Sits beneath the main KPI row to surface
+ * the numbers an investor actually cares about: what goes in each month,
+ * how long to break even, cumulative 5-year return, and price per m².
+ */
+interface ReportInsightsRowProps {
+  fmt: (v: number) => string
+  basePrice: number
+  pricePerSqm?: number | null
+  rentalYield?: number | null
+  capitalGrowth?: number | null
+}
+
+function ReportInsightsRow({ fmt, basePrice, pricePerSqm, rentalYield, capitalGrowth }: ReportInsightsRowProps) {
+  const monthlyRent = rentalYield && rentalYield > 0 && basePrice > 0
+    ? (basePrice * rentalYield / 100) / 12
+    : null
+  const payback = rentalYield && rentalYield > 0 ? 100 / rentalYield : null
+  const fiveYrReturn = (rentalYield ?? 0) > 0 || (capitalGrowth ?? 0) > 0
+    ? (rentalYield ?? 0) * 5 + (capitalGrowth ?? 0)
+    : null
+
+  const cellStyle: React.CSSProperties = {
+    padding: '8px 12px', background: '#FDF8EF',
+    border: '1px solid #EBD99A', borderRadius: '6px',
+  }
+  const labelStyle: React.CSSProperties = {
+    fontSize: '8.5px', color: '#92691A', fontWeight: 700, letterSpacing: '0.1em',
+  }
+  const valueStyle: React.CSSProperties = {
+    fontSize: '13px', fontWeight: 900, color: '#1B3A5C', marginTop: '2px',
+  }
+
+  return (
+    <div className="print-section" style={{
+      display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px', marginBottom: '14px',
+    }}>
+      <div style={cellStyle}>
+        <div style={labelStyle}>EST. MONTHLY RENT</div>
+        <div style={valueStyle}>{monthlyRent ? fmt(monthlyRent) : '—'}</div>
+      </div>
+      <div style={cellStyle}>
+        <div style={labelStyle}>PAYBACK</div>
+        <div style={valueStyle}>{payback ? `~${payback.toFixed(1)} yrs` : '—'}</div>
+      </div>
+      <div style={cellStyle}>
+        <div style={labelStyle}>5-YR RETURN</div>
+        <div style={valueStyle}>{fiveYrReturn ? `${fiveYrReturn.toFixed(0)}%` : '—'}</div>
+      </div>
+      <div style={cellStyle}>
+        <div style={labelStyle}>PRICE / M²</div>
+        <div style={valueStyle}>{pricePerSqm ? fmt(pricePerSqm) : '—'}</div>
+      </div>
+    </div>
+  )
+}
+
 // ── Unit Investment Proposal PDF ───────────────────────────────────────────────
 
 interface UnitSheetProps {
@@ -229,7 +379,7 @@ interface UnitSheetProps {
   propertyStatus: string
   propertyType: string
   propertyImages: string[]
-  propertyDescription?: string | null
+  investmentMeta?: PdfInvestmentMeta | null
   unit: Unit
   currency: string
   rentalYield?: number | null
@@ -277,30 +427,35 @@ interface ReportHeaderProps {
   propertyTitle: string
   scopeLine: string   // e.g. "PROJECT OVERVIEW" / "UNIT #501 – WHITE FRAME"
   locationLine: string  // e.g. "BATUMI, GEORGIA · UNDER CONSTRUCTION · APARTMENT"
+  handoverLabel?: string | null   // e.g. "Handover Q3 2027"
+  isGoldenVisa?: boolean
 }
 
-function ReportHeader({ logoUrl, propertyTitle, scopeLine, locationLine }: ReportHeaderProps) {
+function ReportHeader({
+  logoUrl, propertyTitle, scopeLine, locationLine, handoverLabel, isGoldenVisa,
+}: ReportHeaderProps) {
+  const hasPills = handoverLabel || isGoldenVisa
   return (
     <div className="print-section" style={{
-      background: '#FDF8EF', padding: '26px 36px 20px',
+      background: '#FDF8EF', padding: '24px 36px 18px',
       borderBottom: '3px solid #C49A2E', textAlign: 'center',
       boxSizing: 'border-box',
     }}>
       {logoUrl && (
         // eslint-disable-next-line @next/next/no-img-element
         <img src={logoUrl} alt="Logo" style={{
-          height: '34px', objectFit: 'contain', display: 'block', margin: '0 auto 10px',
+          height: '32px', objectFit: 'contain', display: 'block', margin: '0 auto 8px',
         }} />
       )}
       <div style={{
         fontSize: '10px', fontWeight: 700, letterSpacing: '0.25em',
-        color: '#C49A2E', marginBottom: '8px',
+        color: '#C49A2E', marginBottom: '6px',
       }}>
         INVESTMENT REPORT
       </div>
       <h1 style={{
-        fontSize: '22px', fontWeight: 900, color: '#1B3A5C',
-        margin: '0 0 6px', letterSpacing: '0.02em', lineHeight: 1.2,
+        fontSize: '21px', fontWeight: 900, color: '#1B3A5C',
+        margin: '0 0 4px', letterSpacing: '0.02em', lineHeight: 1.2,
       }}>
         {propertyTitle.toUpperCase()}
       </h1>
@@ -320,8 +475,92 @@ function ReportHeader({ logoUrl, propertyTitle, scopeLine, locationLine }: Repor
           {locationLine}
         </div>
       )}
+      {hasPills && (
+        <div style={{
+          display: 'flex', justifyContent: 'center', gap: '6px',
+          marginTop: '8px', flexWrap: 'wrap',
+        }}>
+          {handoverLabel && (
+            <span style={{
+              display: 'inline-block', padding: '3px 10px',
+              fontSize: '9.5px', fontWeight: 700, letterSpacing: '0.05em',
+              color: '#1B3A5C', background: '#FFFFFF',
+              border: '1px solid #C49A2E', borderRadius: '999px',
+            }}>
+              {handoverLabel}
+            </span>
+          )}
+          {isGoldenVisa && (
+            <span style={{
+              display: 'inline-block', padding: '3px 10px',
+              fontSize: '9.5px', fontWeight: 700, letterSpacing: '0.05em',
+              color: '#065F46', background: '#D1FAE5',
+              border: '1px solid #10B981', borderRadius: '999px',
+            }}>
+              ✓ Golden Visa Eligible
+            </span>
+          )}
+        </div>
+      )}
     </div>
   )
+}
+
+/**
+ * Compact legal/context footer shown at the bottom of each PDF. Gives the
+ * document an official look and ticks the "figures are projections, not
+ * guarantees" box that investor-facing material should always carry.
+ */
+function ReportFooter({ propertyTitle }: { propertyTitle: string }) {
+  const generatedOn = new Date().toLocaleDateString('en-GB', {
+    day: '2-digit', month: 'short', year: 'numeric',
+  })
+  return (
+    <div className="print-section" style={{
+      padding: '10px 24px', background: '#F8FAFC',
+      borderTop: '1px solid #e2e8f0',
+      fontSize: '8px', color: '#64748b', lineHeight: 1.5,
+      display: 'flex', justifyContent: 'space-between', gap: '14px',
+      flexWrap: 'wrap',
+    }}>
+      <span style={{ flex: 1, minWidth: 0 }}>
+        Figures (rental yield, capital growth, payback and multi-year returns)
+        are projections based on current market assumptions, not guaranteed
+        returns. Final terms are set at contract signing.
+      </span>
+      <span style={{ flexShrink: 0, fontWeight: 600, color: '#475569' }}>
+        Generated {generatedOn} · {propertyTitle}
+      </span>
+    </div>
+  )
+}
+
+/**
+ * Build the small "Handover Q3 2027" / "Handover Jun 2027" / "Ready Now"
+ * label shown as a pill in the header. Prefers handoverDate, falls back to
+ * completionDate. Returns null if neither is set.
+ */
+function buildHandoverLabel(
+  handoverDate?: string | null,
+  completionDate?: string | null,
+  propertyStatus?: string,
+): string | null {
+  const raw = handoverDate || completionDate
+  if (!raw) {
+    // For COMPLETED / READY properties show a positive "Ready Now" pill.
+    if (propertyStatus && /COMPLETED|READY|MOVE_IN/i.test(propertyStatus)) {
+      return 'Ready Now'
+    }
+    return null
+  }
+  const d = new Date(raw)
+  if (Number.isNaN(d.getTime())) return null
+  const month = d.toLocaleDateString('en-US', { month: 'short' })
+  const year = d.getFullYear()
+  // Use a quarter if the date lands in mid/end-of-quarter month for readability.
+  const qMonth = d.getMonth()
+  const quarter = Math.floor(qMonth / 3) + 1
+  return `Handover Q${quarter} ${year} · ${month} ${year}`
 }
 
 // KPI row shared by all three PDFs so key commercials are always visible.
@@ -389,7 +628,7 @@ function formatLocationLine(city: string | null | undefined, country: string, st
 
 function UnitSheetPrint({
   propertyTitle, propertyCountry, propertyCity, propertyStatus, propertyType,
-  propertyImages, propertyDescription,
+  propertyImages, investmentMeta,
   unit, currency, rentalYield, capitalGrowth, logoUrl, onClose,
 }: UnitSheetProps) {
   const [mounted, setMounted] = useState(false)
@@ -442,7 +681,12 @@ function UnitSheetPrint({
   const unitMaxPrice = unitPrices.length ? Math.max(...unitPrices) : 0
 
   const heroImages = propertyImages.slice(0, 3)
-  const shortDesc = propertyDescription ? truncateAtWord(propertyDescription, 420) : null
+  const handoverLabel = buildHandoverLabel(
+    investmentMeta?.handoverDate,
+    investmentMeta?.completionDate,
+    propertyStatus,
+  )
+  const isGoldenVisa = !!investmentMeta?.isGoldenVisaEligible
 
   // Pillars from investment data (fallbacks if not set)
   const pillars = [
@@ -464,37 +708,14 @@ function UnitSheetPrint({
 
   const sheet = (
     <div className="propgroup-print-sheet" style={{
-      position: 'fixed',
-      inset: 0,
-      zIndex: 9999,
-      background: 'rgba(15, 23, 42, 0.6)',
-      overflowY: 'auto',
       fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
       color: '#1e293b',
-      padding: '24px',
     }}>
-      {/* Close button (screen-only) */}
-      <button
-        onClick={onClose}
-        className="print-close-btn"
-        style={{
-          position: 'fixed', top: '16px', right: '16px', zIndex: 10000,
-          background: '#1B3A5C', color: 'white', border: 'none',
-          width: '40px', height: '40px', borderRadius: '50%', cursor: 'pointer',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
-        }}
-        aria-label="Close"
-      >
-        <X className="w-5 h-5" />
-      </button>
-
-      <div className="propgroup-print-content propgroup-print-multipage" style={{
+      <div className="propgroup-print-content" style={{
         maxWidth: '794px',
         margin: '0 auto',
         background: 'white',
         boxSizing: 'border-box',
-        boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)',
       }}>
 
         {/* Unified header */}
@@ -503,28 +724,30 @@ function UnitSheetPrint({
           propertyTitle={propertyTitle}
           scopeLine={scopeLine}
           locationLine={locationLine}
+          handoverLabel={handoverLabel}
+          isGoldenVisa={isGoldenVisa}
         />
 
-        <div style={{ padding: '20px 28px 0' }}>
-          {/* Project hero images — so the unit PDF actually shows the project,
-              not just finish-option thumbnails. */}
+        <div style={{ padding: '16px 28px 0' }}>
+          {/* Project hero images — compact (90px) so the single-page A4 layout
+              fits header + KPI + insights + options grid + pillars cleanly. */}
           {heroImages.length > 0 && (
             <div className="print-section" style={{
               display: 'grid',
               gridTemplateColumns: heroImages.length === 1 ? '1fr' : heroImages.length === 2 ? '1fr 1fr' : 'repeat(3, 1fr)',
-              gap: '8px', marginBottom: '16px',
+              gap: '6px', marginBottom: '12px',
             }}>
               {heroImages.map((img, i) => (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img key={i} src={img} alt="" style={{
-                  width: '100%', height: '130px', objectFit: 'cover',
+                  width: '100%', height: '90px', objectFit: 'cover',
                   borderRadius: '6px', display: 'block',
                 }} />
               ))}
             </div>
           )}
 
-          {/* KPI row — same module as the project/option PDFs for consistency */}
+          {/* KPI row — asset fundamentals */}
           <ReportKpiRow
             fmt={fmt}
             minPrice={unitMinPrice}
@@ -534,57 +757,19 @@ function UnitSheetPrint({
             capitalGrowth={capitalGrowth}
           />
 
-          {/* About the project */}
-          {shortDesc && (
-            <div className="print-section" style={{
-              fontSize: '11px', color: '#475569', lineHeight: 1.55,
-              marginBottom: '16px', paddingBottom: '12px',
-              borderBottom: '1px solid #e2e8f0',
-            }}>
-              <div style={{
-                fontSize: '10px', fontWeight: 800, color: '#1B3A5C',
-                letterSpacing: '0.15em', marginBottom: '6px',
-              }}>
-                ABOUT THE PROJECT
-              </div>
-              {shortDesc}
-            </div>
-          )}
-
-          {/* Unit-specific photos (if the unit was photographed individually).
-              Labeled separately from project hero shots. */}
-          {unit.images && unit.images.length > 0 && (
-            <div className="print-section" style={{ marginBottom: '16px' }}>
-              <div style={{
-                fontSize: '10px', fontWeight: 800, color: '#1B3A5C',
-                letterSpacing: '0.15em', marginBottom: '6px',
-              }}>
-                UNIT PHOTOS {unit.unitNumber ? `· #${unit.unitNumber}` : ''}
-              </div>
-              <div style={{
-                display: 'grid',
-                gridTemplateColumns: unit.images.length === 1
-                  ? '1fr'
-                  : unit.images.length === 2
-                    ? '1fr 1fr'
-                    : 'repeat(3, 1fr)',
-                gap: '6px',
-              }}>
-                {unit.images.slice(0, 3).map((img, i) => (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img key={i} src={img} alt="" style={{
-                    width: '100%', height: '90px', objectFit: 'cover',
-                    borderRadius: '4px', display: 'block',
-                  }} />
-                ))}
-              </div>
-            </div>
-          )}
+          {/* Insights row — cash flow & return fundamentals */}
+          <ReportInsightsRow
+            fmt={fmt}
+            basePrice={unitMinPrice}
+            pricePerSqm={options.length ? Math.min(...options.map(o => o.pricePerSqm).filter(n => n > 0)) : null}
+            rentalYield={rentalYield}
+            capitalGrowth={capitalGrowth}
+          />
 
           {/* Acquisition options header */}
           <div style={{
             fontSize: '10px', fontWeight: 800, color: '#1B3A5C',
-            letterSpacing: '0.15em', marginBottom: '10px',
+            letterSpacing: '0.15em', marginBottom: '8px',
           }}>
             {options.length >= 2 ? 'ACQUISITION OPTIONS' : 'ACQUISITION DETAILS'}
           </div>
@@ -736,7 +921,7 @@ function UnitSheetPrint({
         {/* Bottom pillars band — full width, no negative margins */}
         <div className="print-section" style={{
           background: '#1B3A5C', color: 'white',
-          padding: '16px 24px',
+          padding: '14px 24px',
         }}>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px' }}>
             {pillars.map((p, i) => (
@@ -752,6 +937,8 @@ function UnitSheetPrint({
           </div>
         </div>
 
+        <ReportFooter propertyTitle={propertyTitle} />
+
       </div>
     </div>
   )
@@ -759,7 +946,13 @@ function UnitSheetPrint({
   return (
     <>
       <style>{PRINT_CSS}</style>
-      {createPortal(sheet, document.body)}
+      {createPortal(
+        <>
+          <PrintPreparingToast onClose={onClose} />
+          {sheet}
+        </>,
+        document.body,
+      )}
     </>
   )
 }
@@ -774,6 +967,7 @@ interface OptionSheetProps {
   propertyType: string
   propertyImages: string[]
   propertyDescription?: string | null
+  investmentMeta?: PdfInvestmentMeta | null
   unit: Unit
   option: UnitOption
   currency: string
@@ -785,7 +979,7 @@ interface OptionSheetProps {
 
 function OptionSheetPrint({
   propertyTitle, propertyCountry, propertyCity, propertyStatus, propertyType,
-  propertyImages, propertyDescription,
+  propertyImages, propertyDescription, investmentMeta,
   unit, option, currency, rentalYield, capitalGrowth, logoUrl, onClose,
 }: OptionSheetProps) {
   const [mounted, setMounted] = useState(false)
@@ -812,13 +1006,21 @@ function OptionSheetPrint({
   const ppd = option.paymentPlanDetails as PaymentPlanDetails | null
   const monthly = calcMonthlyPayment(totalPrice, ppd)
   const bullets = parseBullets(option.description)
-  const shortDesc = propertyDescription ? truncateAtWord(propertyDescription, 340) : null
+  // Compact description so the whole proposal fits one A4 page even after the
+  // KPI + insights rows, option hero card, and payment plan are stacked.
+  const shortDesc = propertyDescription ? truncateAtWord(propertyDescription, 240) : null
 
   const heroImages = propertyImages.slice(0, 3)
 
   // Unified header lines
   const scopeLine = `${unit.unitNumber ? `UNIT #${unit.unitNumber}` : 'UNIT'} · ${option.name.toUpperCase()}`
   const locationLine = formatLocationLine(propertyCity, propertyCountry, propertyStatus, propertyType)
+  const handoverLabel = buildHandoverLabel(
+    investmentMeta?.handoverDate,
+    investmentMeta?.completionDate,
+    propertyStatus,
+  )
+  const isGoldenVisa = !!investmentMeta?.isGoldenVisaEligible
 
   const pillars = [
     {
@@ -839,29 +1041,12 @@ function OptionSheetPrint({
 
   const sheet = (
     <div className="propgroup-print-sheet" style={{
-      position: 'fixed', inset: 0, zIndex: 9999,
-      background: 'rgba(15, 23, 42, 0.65)', overflowY: 'auto',
       fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-      color: '#1e293b', padding: '24px',
+      color: '#1e293b',
     }}>
-      <button
-        onClick={onClose}
-        className="print-close-btn"
-        style={{
-          position: 'fixed', top: '16px', right: '16px', zIndex: 10000,
-          background: '#1B3A5C', color: 'white', border: 'none',
-          width: '40px', height: '40px', borderRadius: '50%', cursor: 'pointer',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
-        }}
-        aria-label="Close"
-      >
-        <X className="w-5 h-5" />
-      </button>
-
-      <div className="propgroup-print-content propgroup-print-multipage" style={{
+      <div className="propgroup-print-content" style={{
         maxWidth: '794px', margin: '0 auto', background: 'white',
-        boxSizing: 'border-box', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)',
+        boxSizing: 'border-box',
       }}>
 
         {/* Unified header */}
@@ -870,11 +1055,13 @@ function OptionSheetPrint({
           propertyTitle={propertyTitle}
           scopeLine={scopeLine}
           locationLine={locationLine}
+          handoverLabel={handoverLabel}
+          isGoldenVisa={isGoldenVisa}
         />
 
-        <div style={{ padding: '20px 28px' }}>
+        <div style={{ padding: '18px 28px 0' }}>
 
-          {/* KPI row for parity with project & unit PDFs */}
+          {/* KPI row — asset fundamentals */}
           <ReportKpiRow
             fmt={fmt}
             minPrice={totalPrice}
@@ -884,30 +1071,38 @@ function OptionSheetPrint({
             capitalGrowth={capitalGrowth}
           />
 
-          {/* Project images */}
+          {/* Insights row — cash flow & return fundamentals */}
+          <ReportInsightsRow
+            fmt={fmt}
+            basePrice={totalPrice}
+            pricePerSqm={option.pricePerSqm}
+            rentalYield={rentalYield}
+            capitalGrowth={capitalGrowth}
+          />
+
+          {/* Project images — compacted to 90px so the proposal stays single-page. */}
           {heroImages.length > 0 && (
             <div className="print-section" style={{
               display: 'grid',
               gridTemplateColumns: heroImages.length === 1 ? '1fr' : heroImages.length === 2 ? '1fr 1fr' : 'repeat(3, 1fr)',
-              gap: '8px', marginBottom: '16px',
+              gap: '6px', marginBottom: '12px',
             }}>
               {heroImages.map((img, i) => (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img key={i} src={img} alt="" style={{
-                  width: '100%', height: '120px', objectFit: 'cover',
+                  width: '100%', height: '90px', objectFit: 'cover',
                   borderRadius: '6px', display: 'block',
                 }} />
               ))}
             </div>
           )}
 
-          {/* Unit-specific images — labeled separately so the reader sees
-              photos of the actual unit, not just the project exterior. */}
+          {/* Unit-specific images — compacted row. */}
           {unit.images && unit.images.length > 0 && (
-            <div className="print-section" style={{ marginBottom: '18px' }}>
+            <div className="print-section" style={{ marginBottom: '12px' }}>
               <div style={{
-                fontSize: '10px', fontWeight: 800, color: '#1B3A5C',
-                letterSpacing: '0.15em', marginBottom: '6px',
+                fontSize: '9px', fontWeight: 800, color: '#1B3A5C',
+                letterSpacing: '0.15em', marginBottom: '4px',
               }}>
                 UNIT PHOTOS {unit.unitNumber ? `· #${unit.unitNumber}` : ''}
               </div>
@@ -923,7 +1118,7 @@ function OptionSheetPrint({
                 {unit.images.slice(0, 3).map((img, i) => (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img key={i} src={img} alt="" style={{
-                    width: '100%', height: '90px', objectFit: 'cover',
+                    width: '100%', height: '68px', objectFit: 'cover',
                     borderRadius: '4px', display: 'block',
                   }} />
                 ))}
@@ -931,16 +1126,16 @@ function OptionSheetPrint({
             </div>
           )}
 
-          {/* Project description */}
+          {/* Project description — short summary only. */}
           {shortDesc && (
             <div className="print-section" style={{
-              fontSize: '11px', color: '#475569', lineHeight: 1.55,
-              marginBottom: '18px', paddingBottom: '14px',
+              fontSize: '10.5px', color: '#475569', lineHeight: 1.5,
+              marginBottom: '12px', paddingBottom: '10px',
               borderBottom: '1px solid #e2e8f0',
             }}>
               <div style={{
-                fontSize: '10px', fontWeight: 800, color: '#1B3A5C',
-                letterSpacing: '0.15em', marginBottom: '6px',
+                fontSize: '9px', fontWeight: 800, color: '#1B3A5C',
+                letterSpacing: '0.15em', marginBottom: '4px',
               }}>
                 ABOUT THE PROJECT
               </div>
@@ -952,34 +1147,34 @@ function OptionSheetPrint({
           <div className="print-section" style={{
             background: 'linear-gradient(135deg, #FDF8EF 0%, #FFFFFF 100%)',
             border: '2px solid #C49A2E', borderRadius: '10px',
-            padding: '20px 24px', marginBottom: '18px',
+            padding: '14px 18px', marginBottom: '12px',
           }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '20px', marginBottom: '14px' }}>
-              <div>
-                <div style={{ fontSize: '10px', fontWeight: 800, color: '#C49A2E', letterSpacing: '0.15em', marginBottom: '4px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '16px', marginBottom: '10px' }}>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontSize: '9px', fontWeight: 800, color: '#C49A2E', letterSpacing: '0.15em', marginBottom: '2px' }}>
                   SELECTED FINISH OPTION
                 </div>
-                <div style={{ fontSize: '20px', fontWeight: 900, color: '#1B3A5C', lineHeight: 1.15 }}>
+                <div style={{ fontSize: '18px', fontWeight: 900, color: '#1B3A5C', lineHeight: 1.15 }}>
                   {option.name}
                 </div>
-                <div style={{ fontSize: '11px', color: '#64748b', marginTop: '4px' }}>
+                <div style={{ fontSize: '10px', color: '#64748b', marginTop: '3px' }}>
                   {unit.name}{unit.unitNumber ? ` · #${unit.unitNumber}` : ''} · {unit.bedrooms}bd / {unit.bathrooms}ba · {unit.area} m²{unit.floor != null ? ` · Floor ${unit.floor}` : ''}
                 </div>
               </div>
               <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                <div style={{ fontSize: '9px', color: '#64748b', letterSpacing: '0.1em', textTransform: 'uppercase' }}>Total Price</div>
-                <div style={{ fontSize: '26px', fontWeight: 900, color: '#1B3A5C', lineHeight: 1 }}>{fmt(totalPrice)}</div>
-                <div style={{ fontSize: '10px', color: '#64748b', marginTop: '2px' }}>{fmt(option.pricePerSqm)}/m²</div>
+                <div style={{ fontSize: '8.5px', color: '#64748b', letterSpacing: '0.1em', textTransform: 'uppercase' }}>Total Price</div>
+                <div style={{ fontSize: '22px', fontWeight: 900, color: '#1B3A5C', lineHeight: 1 }}>{fmt(totalPrice)}</div>
+                <div style={{ fontSize: '9.5px', color: '#64748b', marginTop: '2px' }}>{fmt(option.pricePerSqm)}/m²</div>
               </div>
             </div>
 
             {/* Includes bullets */}
             {bullets.length > 0 && (
-              <div style={{ fontSize: '11px', color: '#475569', lineHeight: 1.6, paddingTop: '10px', borderTop: '1px solid #C49A2E44' }}>
-                <div style={{ fontSize: '10px', fontWeight: 800, color: '#1B3A5C', letterSpacing: '0.1em', marginBottom: '6px' }}>
+              <div style={{ fontSize: '10px', color: '#475569', lineHeight: 1.5, paddingTop: '8px', borderTop: '1px solid #C49A2E44' }}>
+                <div style={{ fontSize: '9px', fontWeight: 800, color: '#1B3A5C', letterSpacing: '0.1em', marginBottom: '4px' }}>
                   INCLUDES
                 </div>
-                <div style={{ display: 'grid', gridTemplateColumns: bullets.length > 4 ? '1fr 1fr' : '1fr', gap: '2px 16px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: bullets.length > 4 ? '1fr 1fr' : '1fr', gap: '1px 16px' }}>
                   {bullets.map((b, i) => (
                     <div key={i}>✓ {b}</div>
                   ))}
@@ -992,14 +1187,14 @@ function OptionSheetPrint({
           {ppd?.milestones && ppd.milestones.length > 0 && (
             <div className="print-section" style={{
               border: '1px solid #e2e8f0', borderRadius: '8px',
-              padding: '14px 18px', marginBottom: '18px',
+              padding: '10px 14px', marginBottom: '12px',
             }}>
-              <div style={{ fontSize: '10px', fontWeight: 800, color: '#1B3A5C', letterSpacing: '0.15em', marginBottom: '8px' }}>
+              <div style={{ fontSize: '9px', fontWeight: 800, color: '#1B3A5C', letterSpacing: '0.15em', marginBottom: '6px' }}>
                 PAYMENT PLAN {ppd.summary && <span style={{ color: '#64748b', fontWeight: 500, letterSpacing: 0 }}>— {ppd.summary}</span>}
               </div>
 
               {/* Milestone bar */}
-              <div style={{ display: 'flex', borderRadius: '999px', overflow: 'hidden', height: '6px', marginBottom: '10px', background: '#f1f5f9' }}>
+              <div style={{ display: 'flex', borderRadius: '999px', overflow: 'hidden', height: '5px', marginBottom: '8px', background: '#f1f5f9' }}>
                 {ppd.milestones.map((m, i) => {
                   const colors = ['#1B3A5C', '#C49A2E', '#10b981', '#f59e0b', '#64748b']
                   return (
@@ -1009,11 +1204,11 @@ function OptionSheetPrint({
               </div>
 
               {/* Milestone rows */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 14px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px' }}>
                 {ppd.milestones.map((m, i) => (
                   <div key={i} style={{
                     display: 'flex', justifyContent: 'space-between',
-                    fontSize: '10px', padding: '4px 10px',
+                    fontSize: '9.5px', padding: '3px 8px',
                     background: '#f8fafc', borderRadius: '4px',
                   }}>
                     <span style={{ color: '#475569' }}>{m.label}</span>
@@ -1026,9 +1221,9 @@ function OptionSheetPrint({
 
               {monthly && (
                 <div style={{
-                  marginTop: '10px', padding: '8px 12px',
+                  marginTop: '8px', padding: '6px 10px',
                   background: '#F1F5F9', borderRadius: '5px',
-                  fontSize: '10px', color: '#475569', display: 'flex', justifyContent: 'space-between',
+                  fontSize: '9.5px', color: '#475569', display: 'flex', justifyContent: 'space-between',
                 }}>
                   <span>Estimated monthly installment</span>
                   <span style={{ color: '#10b981', fontWeight: 700 }}>{fmt(monthly)}</span>
@@ -1041,21 +1236,23 @@ function OptionSheetPrint({
 
         {/* Bottom pillars */}
         <div className="print-section" style={{
-          background: '#1B3A5C', color: 'white', padding: '16px 24px',
+          background: '#1B3A5C', color: 'white', padding: '10px 24px',
         }}>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '14px' }}>
             {pillars.map((p, i) => (
               <div key={i} style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: '9px', fontWeight: 800, color: '#C49A2E', letterSpacing: '0.1em', marginBottom: '4px' }}>
+                <div style={{ fontSize: '8.5px', fontWeight: 800, color: '#C49A2E', letterSpacing: '0.1em', marginBottom: '3px' }}>
                   {p.icon}
                 </div>
-                <div style={{ fontSize: '9px', color: 'white', lineHeight: 1.4 }}>
+                <div style={{ fontSize: '8.5px', color: 'white', lineHeight: 1.35 }}>
                   {p.text}
                 </div>
               </div>
             ))}
           </div>
         </div>
+
+        <ReportFooter propertyTitle={propertyTitle} />
 
       </div>
     </div>
@@ -1064,7 +1261,13 @@ function OptionSheetPrint({
   return (
     <>
       <style>{PRINT_CSS}</style>
-      {createPortal(sheet, document.body)}
+      {createPortal(
+        <>
+          <PrintPreparingToast onClose={onClose} />
+          {sheet}
+        </>,
+        document.body,
+      )}
     </>
   )
 }
@@ -1086,13 +1289,14 @@ interface ProjectSheetProps {
   rentalYield?: number | null
   capitalGrowth?: number | null
   logoUrl?: string
+  investmentMeta?: PdfInvestmentMeta | null
   onClose: () => void
 }
 
 function ProjectSheetPrint({
   propertyTitle, propertyCountry, propertyCity, propertyStatus, propertyType,
   propertyImages, propertyDescription,
-  units, currency, rentalYield, capitalGrowth, logoUrl, onClose,
+  units, currency, rentalYield, capitalGrowth, logoUrl, investmentMeta, onClose,
 }: ProjectSheetProps) {
   const [mounted, setMounted] = useState(false)
   const hasPrinted = useRef(false)
@@ -1126,6 +1330,13 @@ function ProjectSheetPrint({
 
   const locationLine = formatLocationLine(propertyCity, propertyCountry, propertyStatus, propertyType)
 
+  const handoverLabel = buildHandoverLabel(
+    investmentMeta?.handoverDate,
+    investmentMeta?.completionDate,
+    propertyStatus,
+  )
+  const isGoldenVisa = !!investmentMeta?.isGoldenVisaEligible
+
   const pillars = [
     {
       icon: 'CAPITAL APPRECIATION',
@@ -1145,29 +1356,12 @@ function ProjectSheetPrint({
 
   const sheet = (
     <div className="propgroup-print-sheet" style={{
-      position: 'fixed', inset: 0, zIndex: 9999,
-      background: 'rgba(15, 23, 42, 0.65)', overflowY: 'auto',
       fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-      color: '#1e293b', padding: '24px',
+      color: '#1e293b',
     }}>
-      <button
-        onClick={onClose}
-        className="print-close-btn"
-        style={{
-          position: 'fixed', top: '16px', right: '16px', zIndex: 10000,
-          background: '#1B3A5C', color: 'white', border: 'none',
-          width: '40px', height: '40px', borderRadius: '50%', cursor: 'pointer',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
-        }}
-        aria-label="Close"
-      >
-        <X className="w-5 h-5" />
-      </button>
-
       <div className="propgroup-print-content propgroup-print-multipage" style={{
         maxWidth: '794px', margin: '0 auto', background: 'white',
-        boxSizing: 'border-box', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)',
+        boxSizing: 'border-box',
       }}>
 
         {/* Unified header */}
@@ -1176,6 +1370,8 @@ function ProjectSheetPrint({
           propertyTitle={propertyTitle}
           scopeLine="PROJECT OVERVIEW"
           locationLine={locationLine}
+          handoverLabel={handoverLabel}
+          isGoldenVisa={isGoldenVisa}
         />
 
         <div style={{ padding: '20px 28px 24px' }}>
@@ -1203,6 +1399,18 @@ function ProjectSheetPrint({
             minPrice={minPrice}
             maxPrice={maxPrice}
             unitsCount={units.length}
+            rentalYield={rentalYield}
+            capitalGrowth={capitalGrowth}
+          />
+
+          {/* Insights row */}
+          <ReportInsightsRow
+            fmt={fmt}
+            basePrice={minPrice}
+            pricePerSqm={(() => {
+              const ppsm = units.flatMap(u => u.options.map(o => o.pricePerSqm)).filter(n => n > 0)
+              return ppsm.length ? Math.min(...ppsm) : null
+            })()}
             rentalYield={rentalYield}
             capitalGrowth={capitalGrowth}
           />
@@ -1372,6 +1580,8 @@ function ProjectSheetPrint({
           </div>
         </div>
 
+        <ReportFooter propertyTitle={propertyTitle} />
+
       </div>
     </div>
   )
@@ -1379,7 +1589,13 @@ function ProjectSheetPrint({
   return (
     <>
       <style>{PRINT_CSS}</style>
-      {createPortal(sheet, document.body)}
+      {createPortal(
+        <>
+          <PrintPreparingToast onClose={onClose} />
+          {sheet}
+        </>,
+        document.body,
+      )}
     </>
   )
 }
@@ -1411,6 +1627,7 @@ export function PropertyUnitsSection({
   capitalGrowth,
   propertyImages = [],
   propertyDescription,
+  investmentMeta,
   onUnitImagesChange,
 }: Props) {
   const { add, remove, has } = useComparator()
@@ -1970,12 +2187,12 @@ export function PropertyUnitsSection({
           propertyStatus={propertyStatus}
           propertyType={propertyType}
           propertyImages={propertyImages}
-          propertyDescription={propertyDescription}
           unit={printUnit}
           currency={currency}
           rentalYield={rentalYield}
           capitalGrowth={capitalGrowth}
           logoUrl={logoUrl}
+          investmentMeta={investmentMeta}
           onClose={() => setPrintUnit(null)}
         />
       )}
@@ -1996,6 +2213,7 @@ export function PropertyUnitsSection({
           rentalYield={rentalYield}
           capitalGrowth={capitalGrowth}
           logoUrl={logoUrl}
+          investmentMeta={investmentMeta}
           onClose={() => setPrintOption(null)}
         />
       )}
@@ -2015,6 +2233,7 @@ export function PropertyUnitsSection({
           rentalYield={rentalYield}
           capitalGrowth={capitalGrowth}
           logoUrl={logoUrl}
+          investmentMeta={investmentMeta}
           onClose={() => setPrintProject(false)}
         />
       )}

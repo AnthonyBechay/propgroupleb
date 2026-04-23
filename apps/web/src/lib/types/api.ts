@@ -172,6 +172,16 @@ export interface Property {
     maxInvestment?: number | null;
     paymentPlan?: string | null;
     completionDate?: string | null;
+    handoverDate?: string | null;
+    expectedRentalStart?: string | null;
+    isGoldenVisaEligible?: boolean;
+    goldenVisaMinAmount?: number | null;
+    serviceFee?: number | null;
+    propertyTax?: number | null;
+    averageRentPerMonth?: number | null;
+    downPaymentPercentage?: number | null;
+    annualAppreciation?: number | null;
+    mortgageAvailable?: boolean;
   };
   developer?: {
     id: string;

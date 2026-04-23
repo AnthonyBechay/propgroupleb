@@ -275,6 +275,7 @@ export default async function PropertyPage({ params }: PropertyPageProps) {
               capitalGrowth={property.investmentData?.capitalGrowth}
               propertyImages={property.images || []}
               propertyDescription={property.description || null}
+              investmentMeta={property.investmentData || null}
             />
 
             {/* Description */}
