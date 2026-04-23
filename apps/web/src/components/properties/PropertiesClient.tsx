@@ -73,6 +73,16 @@ export function PropertiesClient({
   const filteredProperties = useMemo(() => {
     let filtered = [...initialProperties]
 
+    // `ids` is set by the AI search when "View properties" is clicked — it
+    // pins the listing to exactly the properties the AI semantically matched.
+    // Must run before the broad filters so sort order is preserved.
+    if (liveParams.ids) {
+      const wanted = new Set(liveParams.ids.split(',').filter(Boolean))
+      if (wanted.size > 0) {
+        filtered = filtered.filter(p => wanted.has(p.id))
+      }
+    }
+
     if (liveParams.country) {
       filtered = filtered.filter(p =>
         p.country.toLowerCase() === liveParams.country.toLowerCase()

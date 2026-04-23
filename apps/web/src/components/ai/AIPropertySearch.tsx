@@ -94,7 +94,11 @@ export function AIPropertySearch({
   const [expandedCards, setExpandedCards] = useState<Record<string, boolean>>({})
   const inputRef = useRef<HTMLInputElement>(null)
 
-  const navigateToResults = (filters: PropertyFilters, searchQuery: string) => {
+  const navigateToResults = (
+    filters: PropertyFilters,
+    searchQuery: string,
+    propertyIds?: string[],
+  ) => {
     const params = new URLSearchParams()
     if (filters.country) params.append('country', String(filters.country))
     if (filters.city) params.append('city', String(filters.city))
@@ -107,6 +111,14 @@ export function AIPropertySearch({
     if (filters.propertyType) params.append('propertyType', String(filters.propertyType))
     if (filters.isGoldenVisaEligible) params.append('goldenVisa', 'true')
     params.append('q', searchQuery)
+
+    // Anchor the listings page to exactly the AI-matched properties.
+    // Without this, broad filters (e.g. country=Georgia, goldenVisa=true) would
+    // re-query the catalog and show every eligible property, defeating the
+    // point of the AI's semantic narrowing.
+    if (propertyIds && propertyIds.length > 0) {
+      params.append('ids', propertyIds.join(','))
+    }
 
     if (onSearch) {
       onSearch(filters)
@@ -274,7 +286,13 @@ export function AIPropertySearch({
           <div className="mt-4 animate-in fade-in slide-in-from-top-2">
             <InlineResultSummary
               message={latestResult}
-              onViewAll={() => navigateToResults(latestResult.filters!, latestResult.content)}
+              onViewAll={() =>
+                navigateToResults(
+                  latestResult.filters!,
+                  latestResult.content,
+                  latestResult.properties?.map(p => p.id),
+                )
+              }
               onNewSearch={handleNewSearch}
             />
           </div>
@@ -445,7 +463,13 @@ export function AIPropertySearch({
 
                             {msg.filters && (msg.properties?.length || 0) > 0 && (
                               <button
-                                onClick={() => navigateToResults(msg.filters!, msg.content)}
+                                onClick={() =>
+                                  navigateToResults(
+                                    msg.filters!,
+                                    msg.content,
+                                    msg.properties?.map(p => p.id),
+                                  )
+                                }
                                 className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors"
                               >
                                 Open in listings
