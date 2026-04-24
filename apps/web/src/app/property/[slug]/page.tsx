@@ -35,7 +35,8 @@ export async function generateMetadata({ params }: PropertyPageProps): Promise<M
   }
 
   const city = property.city || ''
-  const country = (property.country || '').charAt(0) + (property.country || '').slice(1).toLowerCase()
+  const rawCountry = property.country || ''
+  const country = rawCountry ? rawCountry.charAt(0) + rawCountry.slice(1).toLowerCase() : ''
   const location = [city, country].filter(Boolean).join(', ')
   const priceLabel = property.price
     ? new Intl.NumberFormat('en-US', { style: 'currency', currency: property.currency || 'USD', maximumFractionDigits: 0 }).format(property.price)
@@ -133,7 +134,10 @@ export default async function PropertyPage({ params }: PropertyPageProps) {
   const mapEmbedUrl = await resolveGoogleMapsEmbedUrl(property.locationUrl)
   const publicDocuments: any[] = Array.isArray(property.documents) ? property.documents : []
 
-  const locationBits = [property.district, property.city, property.country?.charAt(0) + property.country?.slice(1).toLowerCase()]
+  const countryPrettyLocal = property.country
+    ? property.country.charAt(0) + property.country.slice(1).toLowerCase()
+    : ''
+  const locationBits = [property.district, property.city, countryPrettyLocal]
     .filter(Boolean)
     .join(', ')
 

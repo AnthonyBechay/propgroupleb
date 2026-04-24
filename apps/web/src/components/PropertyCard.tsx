@@ -281,7 +281,7 @@ export function PropertyCard({
             </Link>
             <div className="flex items-center text-slate-500 text-sm">
               <MapPin className="w-4 h-4 mr-1.5 text-slate-400" />
-              {country.charAt(0).toUpperCase() + country.slice(1).toLowerCase()}
+              {country ? country.charAt(0).toUpperCase() + country.slice(1).toLowerCase() : ''}
             </div>
           </div>
 

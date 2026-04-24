@@ -40,6 +40,11 @@ services:
     environment:
       NODE_ENV: production
       PORT: 3000
+      # Cap V8 heap so the process OOM-exits cleanly (and gets restarted by
+      # `restart: unless-stopped`) instead of falling into a GC thrash spiral
+      # when memory climbs from image optimization under Cloudflare-unproxied
+      # traffic. 1024 MB sits below the container memory limit below.
+      NODE_OPTIONS: "--max-old-space-size=1024"
     depends_on:
       backend:
         condition: service_healthy
@@ -51,6 +56,12 @@ services:
       timeout: 10s
       retries: 10
       start_period: 60s
+    deploy:
+      resources:
+        limits:
+          memory: 1280M
+        reservations:
+          memory: 512M
 
 volumes:
   backend_uploads:

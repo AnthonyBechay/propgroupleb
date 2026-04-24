@@ -24,7 +24,18 @@ const nextConfig: NextConfig = {
         hostname: 'api.bechays.com',
       }
     ],
+    // Default is 60s. That causes every optimized variant to regenerate
+    // within a minute under normal traffic, which is the main driver of
+    // steady RAM growth when Cloudflare proxy is off and every image
+    // request reaches the origin. 30 days is safe here because image keys
+    // include a content-hash suffix (-a8d864e9.jpg); cache-busting new
+    // uploads just means a different URL, not a stale cached one.
+    minimumCacheTTL: 60 * 60 * 24 * 30,
   },
+  // Emit server source maps for production tracebacks. Without this, runtime
+  // errors surface with minified property names like `reading 'a'` and a
+  // bare digest, which is untraceable.
+  productionBrowserSourceMaps: true,
   experimental: {
     serverActions: {
       bodySizeLimit: '2mb',

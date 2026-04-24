@@ -319,7 +319,7 @@ export function PropertyTable({ properties }: PropertyTableProps) {
                 <td className="px-4 py-3">
                   <div className="flex items-center gap-1 text-gray-700">
                     <MapPin className="h-3.5 w-3.5 text-gray-400" />
-                    {property.country.charAt(0) + property.country.slice(1).toLowerCase()}
+                    {property.country ? property.country.charAt(0) + property.country.slice(1).toLowerCase() : ''}
                   </div>
                 </td>
                 <td className="px-4 py-3 text-gray-600">
