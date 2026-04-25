@@ -87,7 +87,29 @@ app.use(
       return `[${icon}] ${method} ${url} ${status} ${responseTime}ms`;
     },
     {
-      skip: (req) => req.url === '/health' || req.url === '/api/health',
+      // In production, log only what's worth reading: errors, slow requests,
+      // mutations, and uncommon GETs. Drops the routine high-volume noise that
+      // otherwise drowns the signal — health checks, OPTIONS preflights,
+      // image proxy hits, and the auth/me poll fired by every admin page.
+      skip: (req, res) => {
+        if (req.url === '/health' || req.url === '/api/health') return true;
+        if (!isProduction) return false;
+
+        const status = res.statusCode;
+        // Always keep anything that smells like a problem
+        if (status >= 400) return false;
+        // Drop OPTIONS preflights (handled by cors, always 204, never useful)
+        if (req.method === 'OPTIONS') return true;
+        // Always keep mutations
+        if (req.method !== 'GET' && req.method !== 'HEAD') return false;
+        // Drop the file proxy — this is the #1 source of log volume during
+        // admin work and marketing page renders. R2 outcomes are observable
+        // from R2 itself; here we only care if it 4xx/5xxs (kept above).
+        if (req.url.startsWith('/api/files/')) return true;
+        // Drop the session-poll endpoint hit on every admin page mount
+        if (req.url.startsWith('/api/auth/me')) return true;
+        return false;
+      },
     }
   )
 );
@@ -132,9 +154,14 @@ app.use(
 );
 
 // Rate limiting
+// `max` is per-IP per-window. 200 was tight enough that a single visitor
+// browsing ~5 properties with the CDN bypassed (image proxy + RSC chunks all
+// counting against quota) could trip it, and CGNAT/corporate NAT users share
+// IPs which compounds it. 1000/15min comfortably accommodates 100 concurrent
+// real users while still rejecting obvious abuse.
 const generalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 200,
+  max: 1000,
   standardHeaders: true,
   legacyHeaders: false,
 });

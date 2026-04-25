@@ -16,7 +16,12 @@ function buildDatasourceUrl(): string | undefined {
   if (!raw) return undefined
   const sep = raw.includes('?') ? '&' : '?'
   const extras: string[] = []
-  if (!raw.includes('connection_limit')) extras.push('connection_limit=5')
+  // Pool sized for the web tier serving ~100 concurrent users without a CDN
+  // absorbing image traffic. Each Next.js → backend hop borrows a connection
+  // for 5–100 ms; 15 slots clear ~150–300 req/s of fast queries before
+  // anything queues on `pool_timeout`. Bump if Postgres has headroom and
+  // upstream concurrency grows; lower if Postgres caps total connections.
+  if (!raw.includes('connection_limit')) extras.push('connection_limit=15')
   if (!raw.includes('connect_timeout')) extras.push('connect_timeout=10')
   if (!raw.includes('pool_timeout')) extras.push('pool_timeout=10')
   if (!raw.includes('statement_timeout')) extras.push('statement_timeout=15000')

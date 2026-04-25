@@ -22,8 +22,12 @@ export async function getFeaturedProperties(limit: number = 6) {
       availabilityStatus: { not: 'OFF_MARKET' },
     },
     take: limit,
+    // Order by last-modified so admin edits (price drops, new images, status
+    // bumps) surface to the top of the home page without needing to manually
+    // un-feature/re-feature. `createdAt` was the original sort but it pinned
+    // older listings even after fresh updates.
     orderBy: [
-      { createdAt: 'desc' },
+      { updatedAt: 'desc' },
     ],
     include: {
       investmentData: true,

@@ -44,7 +44,12 @@ services:
       # `restart: unless-stopped`) instead of falling into a GC thrash spiral
       # when memory climbs from image optimization under Cloudflare-unproxied
       # traffic. 1024 MB sits below the container memory limit below.
-      NODE_OPTIONS: "--max-old-space-size=1024"
+      # Heap sized for ~100 concurrent users with the Cloudflare proxy off.
+      # Without a CDN absorbing /_next/image and /api/files/*, every image
+      # variant resident in the in-memory cache lives on this heap. 1536 MB
+      # leaves headroom for sharp's worker buffers + cached variants while
+      # still OOM-exiting cleanly under the 2048 MB container limit below.
+      NODE_OPTIONS: "--max-old-space-size=1536"
     depends_on:
       backend:
         condition: service_healthy
@@ -59,9 +64,9 @@ services:
     deploy:
       resources:
         limits:
-          memory: 1280M
+          memory: 2048M
         reservations:
-          memory: 512M
+          memory: 768M
 
 volumes:
   backend_uploads:
