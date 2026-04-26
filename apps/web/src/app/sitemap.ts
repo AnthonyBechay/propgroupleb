@@ -1,6 +1,22 @@
 import type { MetadataRoute } from 'next'
 import { normalizeApiUrl } from '@/lib/utils/api-url'
 
+// Re-render sitemap.xml hourly at request time, not at build.
+//
+// Without this, Next.js statically generates sitemap.xml at `next build`
+// time using the env vars and network reachability of the build container.
+// In Coolify-style deploys the build runs before api.bechays.com is itself
+// up (or before DNS propagates inside the build container), so the
+// `fetchProperties()` call returns [] and the empty result gets baked in
+// permanently. Confirmed in production: sitemap.xml shipped with only the
+// 7 static marketing routes despite the codebase iterating over the API.
+//
+// `revalidate = 3600` makes it ISR — first request after a deploy
+// re-evaluates with the live runtime env (including NEXT_PUBLIC_API_URL),
+// then caches for an hour. Property updates surface within the next
+// revalidation window without rebuilding the container.
+export const revalidate = 3600
+
 const SITE_URL =
   process.env.NEXT_PUBLIC_SITE_URL ||
   (process.env.VERCEL_ENV === 'production' ? 'https://bechays.com' : 'http://localhost:3000')
