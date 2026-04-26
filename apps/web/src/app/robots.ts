@@ -19,6 +19,12 @@ export default function robots(): MetadataRoute.Robots {
           '/auth/',
           '/share/', // scoped share links should not be indexed
         ],
+        // Polite throttle for crawlers that honour it (Bing, Yandex,
+        // OAI-SearchBot, ClaudeBot — Googlebot ignores). With the
+        // Cloudflare proxy off, every bot pageview triggers ~10-15
+        // /_next/image fetches against origin; 2 s between hits keeps
+        // the per-bot CPU tax reasonable without hurting indexing.
+        crawlDelay: 2,
       },
       // Be a little more permissive for known crawlers so sitelinks/search surface
       {
