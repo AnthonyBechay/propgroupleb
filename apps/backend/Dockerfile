@@ -33,6 +33,25 @@ RUN pnpm --filter propgroup-backend run build
 ENV NODE_ENV=production \
     PORT=10000
 
+# Drop root before runtime. Same reasoning as the web Dockerfile: an RCE
+# under root in this container would have full filesystem access to
+# /app + the mounted `backend_uploads` volume + permission to drop and
+# execute binaries from /tmp. The Apr 27 incident on the web container
+# (`./XXfaBkPe` running as root for 2d11h) showed the cost of leaving
+# this default. Backend is now reachable only via the api.bechays.com
+# host and authenticated routes, so attack surface is smaller — but the
+# blast radius if exploited would include the DB credentials and R2
+# keys in env. Defense in depth.
+#
+# The `backend_uploads` volume mount needs `node` ownership too. If you
+# already have a populated volume from before this change, run
+# `docker exec <container> chown -R node:node /app/apps/backend/uploads`
+# once after deploy, or recreate the volume (`docker volume rm
+# backend_uploads`) — current image storage is R2 so the local volume
+# is largely empty.
+RUN chown -R node:node /app
+USER node
+
 EXPOSE 10000
 
 CMD ["pnpm", "--filter", "propgroup-backend", "start"]

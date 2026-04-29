@@ -332,7 +332,13 @@
       "Bash(curl -s ifconfig.me)",
       "Bash(curl -s https://bechays.com/cdn-cgi/trace)",
       "Bash(ping -c 5 -W 2000 188.114.96.7)",
-      "Bash(ping -c 5 -W 2000 172.67.133.215)"
+      "Bash(ping -c 5 -W 2000 172.67.133.215)",
+      "Bash(awk 'NR>=30 && NR<=60' /Users/anthonybechay/development/propgroup/frontendlogs.logs)",
+      "Bash(awk '/2026-Apr-27 21:39/{p=1} p; /2026-Apr-27 21:40:00/{exit}' /Users/anthonybechay/development/propgroup/backendlogs.txt)",
+      "Bash(awk 'NR<=80' /Users/anthonybechay/development/propgroup/frontendlogs.logs)",
+      "Bash(pnpm list *)",
+      "Bash(npm view *)",
+      "Bash(pnpm audit *)"
     ],
     "deny": [],
     "ask": []

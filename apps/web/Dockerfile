@@ -31,6 +31,19 @@ ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL \
 # Build Next.js
 RUN pnpm --filter web run build
 
+# Drop root before runtime. node:20-alpine ships a `node` user (uid 1000)
+# already; we just need the filesystem to be readable+writable by it.
+# Without this, anyone who finds an RCE in the runtime (a Next.js or dep
+# CVE) lands as root and can drop binaries in /tmp + run them — which is
+# exactly how the Apr 27 incident played out (a `./XXfaBkPe` cryptominer
+# accumulated 2d11h of root CPU before being noticed).
+#
+# `chown -R node:node /app` makes the build output + image cache writable
+# by the unprivileged user. The image cache (.next/cache/images) MUST be
+# writable at runtime since `next/image` writes optimized variants there.
+RUN chown -R node:node /app
+USER node
+
 EXPOSE 3000
 
 CMD ["pnpm", "--filter", "web", "start"]
