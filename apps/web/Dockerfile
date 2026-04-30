@@ -19,9 +19,13 @@ RUN NODE_ENV=development pnpm install --frozen-lockfile
 # Copy source
 COPY . .
 
-# Build shared packages
+# Build shared packages.
+# `2>/dev/null || true` was previously masking real failures here — if the
+# config build silently bailed, web later couldn't resolve types from
+# `@propgroup/config`. We surface errors now and fail the build loudly so
+# the next regression is obvious instead of producing a half-built image.
 RUN pnpm --filter @propgroup/db run build
-RUN pnpm --filter @propgroup/config run build 2>/dev/null || true
+RUN pnpm --filter @propgroup/config run build
 
 ARG NEXT_PUBLIC_API_URL
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL \
