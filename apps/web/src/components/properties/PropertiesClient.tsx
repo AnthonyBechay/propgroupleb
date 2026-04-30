@@ -417,6 +417,9 @@ export function PropertiesClient({
                     }}
                     isFavorited={property.favoriteProperties?.length ? property.favoriteProperties.length > 0 : false}
                     featured={index < 3}
+                    // Above-the-fold cards skip lazy-loading; cuts LCP
+                    // on the listing page (see PropertyCard prop docs).
+                    priority={index < 3}
                   />
                 </div>
               ))}

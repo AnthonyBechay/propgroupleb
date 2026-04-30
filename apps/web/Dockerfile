@@ -28,7 +28,9 @@ RUN pnpm --filter @propgroup/db run build
 RUN pnpm --filter @propgroup/config run build
 
 ARG NEXT_PUBLIC_API_URL
+ARG NEXT_PUBLIC_R2_PUBLIC_URL
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL \
+    NEXT_PUBLIC_R2_PUBLIC_URL=$NEXT_PUBLIC_R2_PUBLIC_URL \
     NODE_ENV=production \
     PORT=3000
 

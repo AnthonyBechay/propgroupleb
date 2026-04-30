@@ -55,6 +55,14 @@ interface PropertyCardProps {
   isFavorited?: boolean
   className?: string
   featured?: boolean
+  /**
+   * Pass `true` for above-the-fold cards (first ~3 on home page,
+   * first row of `/properties` listing). Tells next/image to skip
+   * lazy-loading and request the optimized variant immediately, which
+   * removes the 200–400 ms LCP delay from waiting for the
+   * intersection-observer to fire on the hero card.
+   */
+  priority?: boolean
 }
 
 export function PropertyCard({
@@ -74,6 +82,7 @@ export function PropertyCard({
   isFavorited: initialFavorited = false,
   className,
   featured = false,
+  priority = false,
 }: PropertyCardProps) {
   const { user } = useAuth()
   const [isFavorited, setIsFavorited] = useState(initialFavorited)
@@ -209,6 +218,14 @@ export function PropertyCard({
                     fill
                     className="object-cover group-hover:scale-110 transition-transform duration-700"
                     sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                    // Default is 75 — explicit here for documentation.
+                    // Bumping to 80 if customers report softness on
+                    // fine textures (carpet weave, brick); dropping to
+                    // 70 only saves ~5% bytes and the difference is
+                    // visible if zoomed in. 75 is the universal sweet
+                    // spot for property photography.
+                    quality={75}
+                    priority={priority}
                     onError={() => setImageError(true)}
                   />
                   {/* Gradient overlay */}

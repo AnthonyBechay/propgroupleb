@@ -3,6 +3,7 @@
 import { useState, useRef, useCallback } from 'react'
 import { Upload, X, Image as ImageIcon, AlertCircle, Loader2 } from 'lucide-react'
 import { normalizeApiUrl } from '@/lib/utils/api-url'
+import { downscaleForUpload } from '@/lib/utils/image-resize'
 
 const API_BASE_URL = normalizeApiUrl(process.env.NEXT_PUBLIC_API_URL)
 
@@ -59,9 +60,20 @@ export function ImageUpload({
       setUploadCount(files.length)
 
       try {
+        // Downscale on the client so we send max ~2400 px JPEGs instead of
+        // 4–12 MB camera originals. Saves bandwidth + server CPU. Falls
+        // back to the original file if the browser can't resize (older
+        // browsers, HEIC without decoder support, etc.) — the server
+        // still handles those correctly via sharp.
+        const prepared = await Promise.all(
+          files.map((f) =>
+            downscaleForUpload(f).catch(() => f),
+          ),
+        )
+
         const uploadedUrls: string[] = []
 
-        for (const file of files) {
+        for (const file of prepared) {
           const formData = new FormData()
           formData.append('file', file)
           if (propertySlug) formData.append('propertySlug', propertySlug)

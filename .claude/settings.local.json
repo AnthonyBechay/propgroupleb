@@ -338,7 +338,16 @@
       "Bash(awk 'NR<=80' /Users/anthonybechay/development/propgroup/frontendlogs.logs)",
       "Bash(pnpm list *)",
       "Bash(npm view *)",
-      "Bash(pnpm audit *)"
+      "Bash(pnpm audit *)",
+      "Bash(dig +short NS bechays.com)",
+      "Bash(dig +short SOA bechays.com)",
+      "Bash(dig +short bechays.com @8.8.8.8)",
+      "Bash(dig +short bechays.com @9.9.9.9)",
+      "Bash(curl -s 'https://cloudflare-dns.com/dns-query?name=bechays.com&type=A' -H 'accept: application/dns-json')",
+      "Bash(python3 -m json.tool)",
+      "Bash(curl -s 'https://cloudflare-dns.com/dns-query?name=bechays.com&type=A' -H 'accept: application/dns-json' echo \"\" echo \"=== Google DoH ===\" curl -s 'https://dns.google/resolve?name=bechays.com&type=A')",
+      "Bash(sed -n '985,1010p' /Users/anthonybechay/development/propgroup/apps/web/src/components/property/PropertyUnitsSection.tsx)",
+      "Bash(sed -n '1300,1325p' /Users/anthonybechay/development/propgroup/apps/web/src/components/property/PropertyUnitsSection.tsx)"
     ],
     "deny": [],
     "ask": []

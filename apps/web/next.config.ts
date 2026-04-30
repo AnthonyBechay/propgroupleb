@@ -22,7 +22,17 @@ const nextConfig: NextConfig = {
       {
         protocol: 'https',
         hostname: 'api.bechays.com',
-      }
+      },
+      // Cloudflare R2 public buckets. We now serve property + branding
+      // images directly from R2 (see normalizeFileUrl in lib/utils/api-url
+      // for the rewrite logic) instead of proxying every byte through the
+      // backend. Images are still passed through `next/image` for variant
+      // generation; the optimizer fetches the source from R2 once, then
+      // edge-caches the optimized variants per `minimumCacheTTL` below.
+      {
+        protocol: 'https',
+        hostname: 'pub-*.r2.dev',
+      },
     ],
     // Default is 60s. That causes every optimized variant to regenerate
     // within a minute under normal traffic, which is the main driver of

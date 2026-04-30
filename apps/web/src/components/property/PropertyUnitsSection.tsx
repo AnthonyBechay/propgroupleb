@@ -15,6 +15,48 @@ import { useAuth } from '@/contexts/AuthContext'
 import { normalizeApiUrl } from '@/lib/utils/api-url'
 import type { Unit, UnitOption, PropertyDocument, PaymentPlanDetails, ComparatorItem } from '@/lib/types/api'
 
+// ── Print helper ──────────────────────────────────────────────────────────────
+
+/**
+ * Wait for every <img> currently in the document to finish loading and
+ * being decoded, then call `window.print()`. Without this, `print()`
+ * runs on the first paint while images are still in flight — Chrome
+ * snapshots empty placeholders, which is the source of the
+ * "PDF cuts images on first export, works on second" bug. The second
+ * export works because the browser cache has the bitmaps ready by then.
+ *
+ * Per-image timeout: 5 seconds. Promise.all runs them concurrently so
+ * the total wait is capped at ~5s even if many images are slow / broken.
+ *
+ * After `print()`, listens for window focus (print dialog closing) to
+ * trigger `onClose`, with a 2.5 s safety net in case the focus event
+ * never fires (some Safari/PDF-viewer combos).
+ */
+async function awaitImagesThenPrint(onClose: () => void) {
+  const imgs = Array.from(document.querySelectorAll('img'))
+  await Promise.all(
+    imgs.map((img) =>
+      img.complete && img.naturalWidth > 0
+        ? img.decode().catch(() => null)
+        : new Promise<void>((resolve) => {
+            const done = () => resolve()
+            img.addEventListener('load', done, { once: true })
+            img.addEventListener('error', done, { once: true })
+            // Hard cap so one broken/slow image doesn't block the print
+            // dialog forever.
+            window.setTimeout(done, 5000)
+          }).then(() => img.decode().catch(() => null)),
+    ),
+  )
+  window.print()
+  const cleanup = () => {
+    onClose()
+    window.removeEventListener('focus', cleanup)
+  }
+  window.addEventListener('focus', cleanup, { once: true })
+  window.setTimeout(() => onClose(), 2500)
+}
+
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 /**
@@ -637,19 +679,12 @@ function UnitSheetPrint({
   // Portal to document.body to avoid React-tree nesting issues with @media print
   useEffect(() => { setMounted(true) }, [])
 
-  // Trigger print after render
+  // Trigger print after render — wait for all images to decode first
+  // (see awaitImagesThenPrint above for the cut-image-bug history).
   useEffect(() => {
     if (!mounted || hasPrinted.current) return
     hasPrinted.current = true
-    const t = setTimeout(() => {
-      window.print()
-      // Listen for print dialog close to auto-cleanup
-      const cleanup = () => { onClose(); window.removeEventListener('focus', cleanup) }
-      window.addEventListener('focus', cleanup, { once: true })
-      // Fallback: close after 500ms regardless
-      setTimeout(() => onClose(), 2000)
-    }, 250)
-    return () => clearTimeout(t)
+    awaitImagesThenPrint(onClose)
   }, [mounted, onClose])
 
   if (!mounted || typeof window === 'undefined') return null
@@ -990,13 +1025,7 @@ function OptionSheetPrint({
   useEffect(() => {
     if (!mounted || hasPrinted.current) return
     hasPrinted.current = true
-    const t = setTimeout(() => {
-      window.print()
-      const cleanup = () => { onClose(); window.removeEventListener('focus', cleanup) }
-      window.addEventListener('focus', cleanup, { once: true })
-      setTimeout(() => onClose(), 2000)
-    }, 300)
-    return () => clearTimeout(t)
+    awaitImagesThenPrint(onClose)
   }, [mounted, onClose])
 
   if (!mounted || typeof window === 'undefined') return null
@@ -1306,13 +1335,7 @@ function ProjectSheetPrint({
   useEffect(() => {
     if (!mounted || hasPrinted.current) return
     hasPrinted.current = true
-    const t = setTimeout(() => {
-      window.print()
-      const cleanup = () => { onClose(); window.removeEventListener('focus', cleanup) }
-      window.addEventListener('focus', cleanup, { once: true })
-      setTimeout(() => onClose(), 2500)
-    }, 400)
-    return () => clearTimeout(t)
+    awaitImagesThenPrint(onClose)
   }, [mounted, onClose])
 
   if (!mounted || typeof window === 'undefined') return null
