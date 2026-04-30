@@ -18,43 +18,42 @@ import type { Unit, UnitOption, PropertyDocument, PaymentPlanDetails, Comparator
 // ── Print helper ──────────────────────────────────────────────────────────────
 
 /**
- * Wait for every <img> currently in the document to finish loading and
- * being decoded, then call `window.print()`. Without this, `print()`
- * runs on the first paint while images are still in flight — Chrome
- * snapshots empty placeholders, which is the source of the
- * "PDF cuts images on first export, works on second" bug. The second
- * export works because the browser cache has the bitmaps ready by then.
+ * Best-effort wait for the print sheet's own images to finish decoding,
+ * scoped to elements inside `.propgroup-print-sheet`. This is the SCOPE
+ * that matters — earlier we waited for every <img> on the entire
+ * property page (gallery, About-this-Property thumbnails, sticky
+ * sidebar previews) which made PDF generation feel like it took
+ * forever and produced inconsistent output.
  *
- * Per-image timeout: 5 seconds. Promise.all runs them concurrently so
- * the total wait is capped at ~5s even if many images are slow / broken.
+ * Each image is capped at 1 second; Promise.all runs concurrently, so
+ * the total wait is bounded by the slowest single image (≤1 s). That
+ * keeps PDF generation perceptibly instant while still giving images
+ * a real chance to be present on first export.
  *
- * After `print()`, listens for window focus (print dialog closing) to
- * trigger `onClose`, with a 2.5 s safety net in case the focus event
- * never fires (some Safari/PDF-viewer combos).
+ * Returns a Promise that always resolves — never rejects — so callers
+ * can `await` it without try/catch and can rely on print firing even
+ * if every image is broken.
  */
-async function awaitImagesThenPrint(onClose: () => void) {
-  const imgs = Array.from(document.querySelectorAll('img'))
+async function waitForPrintSheetImages(): Promise<void> {
+  const sheet = document.querySelector('.propgroup-print-sheet')
+  if (!sheet) return
+  const imgs = Array.from(sheet.querySelectorAll('img'))
+  if (imgs.length === 0) return
   await Promise.all(
-    imgs.map((img) =>
-      img.complete && img.naturalWidth > 0
-        ? img.decode().catch(() => null)
-        : new Promise<void>((resolve) => {
-            const done = () => resolve()
-            img.addEventListener('load', done, { once: true })
-            img.addEventListener('error', done, { once: true })
-            // Hard cap so one broken/slow image doesn't block the print
-            // dialog forever.
-            window.setTimeout(done, 5000)
-          }).then(() => img.decode().catch(() => null)),
-    ),
+    imgs.map((img) => {
+      if (img.complete && img.naturalWidth > 0) {
+        return img.decode().catch(() => undefined)
+      }
+      return new Promise<void>((resolve) => {
+        const done = () => resolve()
+        img.addEventListener('load', done, { once: true })
+        img.addEventListener('error', done, { once: true })
+        // 1 s ceiling per image — we only stall print briefly even if a
+        // single image is slow / broken.
+        window.setTimeout(done, 1000)
+      }).then(() => img.decode().catch(() => undefined))
+    }),
   )
-  window.print()
-  const cleanup = () => {
-    onClose()
-    window.removeEventListener('focus', cleanup)
-  }
-  window.addEventListener('focus', cleanup, { once: true })
-  window.setTimeout(() => onClose(), 2500)
 }
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -679,12 +678,23 @@ function UnitSheetPrint({
   // Portal to document.body to avoid React-tree nesting issues with @media print
   useEffect(() => { setMounted(true) }, [])
 
-  // Trigger print after render — wait for all images to decode first
-  // (see awaitImagesThenPrint above for the cut-image-bug history).
+  // Trigger print after render. The setTimeout gives React time to
+  // commit the print sheet's DOM and the browser time to lay it out.
+  // Then we await `waitForPrintSheetImages` (scoped to the sheet only,
+  // 1 s/img cap) so images are decoded before the snapshot — fixes the
+  // first-export-cuts-images bug without waiting for the whole page's
+  // images, which is what made the previous attempt feel slow.
   useEffect(() => {
     if (!mounted || hasPrinted.current) return
     hasPrinted.current = true
-    awaitImagesThenPrint(onClose)
+    const t = setTimeout(async () => {
+      await waitForPrintSheetImages()
+      window.print()
+      const cleanup = () => { onClose(); window.removeEventListener('focus', cleanup) }
+      window.addEventListener('focus', cleanup, { once: true })
+      setTimeout(() => onClose(), 2000)
+    }, 250)
+    return () => clearTimeout(t)
   }, [mounted, onClose])
 
   if (!mounted || typeof window === 'undefined') return null
@@ -1025,7 +1035,14 @@ function OptionSheetPrint({
   useEffect(() => {
     if (!mounted || hasPrinted.current) return
     hasPrinted.current = true
-    awaitImagesThenPrint(onClose)
+    const t = setTimeout(async () => {
+      await waitForPrintSheetImages()
+      window.print()
+      const cleanup = () => { onClose(); window.removeEventListener('focus', cleanup) }
+      window.addEventListener('focus', cleanup, { once: true })
+      setTimeout(() => onClose(), 2500)
+    }, 300)
+    return () => clearTimeout(t)
   }, [mounted, onClose])
 
   if (!mounted || typeof window === 'undefined') return null
@@ -1335,7 +1352,14 @@ function ProjectSheetPrint({
   useEffect(() => {
     if (!mounted || hasPrinted.current) return
     hasPrinted.current = true
-    awaitImagesThenPrint(onClose)
+    const t = setTimeout(async () => {
+      await waitForPrintSheetImages()
+      window.print()
+      const cleanup = () => { onClose(); window.removeEventListener('focus', cleanup) }
+      window.addEventListener('focus', cleanup, { once: true })
+      setTimeout(() => onClose(), 2500)
+    }, 300)
+    return () => clearTimeout(t)
   }, [mounted, onClose])
 
   if (!mounted || typeof window === 'undefined') return null

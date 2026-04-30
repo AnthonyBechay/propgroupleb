@@ -37,8 +37,13 @@ services:
       args:
         NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
         # NEXT_PUBLIC_* env vars are inlined into the client bundle at
-        # build time. Pass it as a build arg so client components see it,
-        # and as a runtime env (below) so server components see it too.
+        # build time. Falls back to R2_PUBLIC_URL so a single Coolify env
+        # var keeps backend + frontend in sync. **Important:** the value
+        # must be the actual public URL of the bucket (the `r2.dev`
+        # subdomain shown on the bucket's Settings → Public Access page,
+        # NOT a leftover URL from a previous bucket). An incorrect value
+        # produces site-wide 401s — verify with
+        # `curl -I https://pub-<id>.r2.dev/<some-key>` returns 200 first.
         NEXT_PUBLIC_R2_PUBLIC_URL: ${NEXT_PUBLIC_R2_PUBLIC_URL:-${R2_PUBLIC_URL:-}}
     restart: unless-stopped
     environment:
@@ -65,9 +70,10 @@ services:
       # Public R2 bucket URL — when set, the frontend rewrites
       # `/api/files/<key>` URLs into direct R2 URLs in normalizeFileUrl,
       # so the browser fetches images directly from R2 (Cloudflare CDN
-      # in front) instead of hopping through our backend container. Cuts
-      # ~80% of /api/files/* origin load. Defaults to the existing
-      # backend-side R2_PUBLIC_URL so a single Coolify env var sets both.
+      # in front) instead of hopping through our backend container.
+      # Falls back to R2_PUBLIC_URL so a single env var sets both. Must
+      # be the bucket's actual public r2.dev subdomain — see build-arg
+      # comment above for the failure mode if it's wrong.
       NEXT_PUBLIC_R2_PUBLIC_URL: ${NEXT_PUBLIC_R2_PUBLIC_URL:-${R2_PUBLIC_URL:-}}
     depends_on:
       backend:
