@@ -23,28 +23,7 @@ const plusJakarta = Plus_Jakarta_Sans({
   variable: "--font-plus-jakarta",
 });
 
-// Determine the base URL for metadata
-const getMetadataBase = () => {
-  // Always prefer the canonical domain
-  if (process.env.NEXT_PUBLIC_SITE_URL) {
-    return process.env.NEXT_PUBLIC_SITE_URL;
-  }
-  // Production on Vercel — use canonical domain, not deployment URL
-  if (process.env.VERCEL_ENV === 'production') {
-    return 'https://bechays.com';
-  }
-  if (process.env.VERCEL_URL) {
-    return `https://${process.env.VERCEL_URL}`;
-  }
-  // For local development
-  if (process.env.NODE_ENV === 'development') {
-    return 'http://localhost:3000';
-  }
-  // Fallback
-  return 'https://bechays.com';
-};
-
-const SITE_URL = getMetadataBase();
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
 const DEFAULT_TITLE = "Invest in Batumi & Georgia Real Estate | PropGroup";
 const DEFAULT_DESCRIPTION =
   "PropGroup — Georgia and Batumi's trusted real-estate investment platform. Hand-picked off-plan & new-build projects, transparent ROI, flexible payment plans, and expert investor support.";

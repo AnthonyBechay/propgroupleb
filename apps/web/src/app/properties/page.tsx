@@ -6,9 +6,7 @@ type PropertiesPageProps = {
   searchParams: Promise<SearchParams>;
 }
 
-const SITE_URL =
-  process.env.NEXT_PUBLIC_SITE_URL ||
-  (process.env.VERCEL_ENV === 'production' ? 'https://bechays.com' : 'http://localhost:3000');
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
 
 export const metadata: Metadata = {
   title: 'Batumi & Georgia Real Estate Investment Projects',

@@ -21,9 +21,6 @@ pnpm run clean            # Clean all build artifacts and node_modules
 
 # Setup
 pnpm run setup            # Initial project setup
-
-# Deployment
-pnpm run vercel-build     # Build for Vercel deployment (frontend)
 ```
 
 ---
@@ -61,31 +58,19 @@ pnpm run dev:frontend
 
 #### `build.js`
 Master build script that builds everything in the correct order:
-1. Builds all shared packages (config, db, ui)
-2. Builds applications (backend check, web build)
+1. Builds all shared packages (config, db)
+2. Builds applications (backend, web)
 
 ```bash
 pnpm run build
 ```
 
 #### `build-packages.js`
-Builds only the shared packages (config, db, ui).
+Builds only the shared packages (config, db).
 
 ```bash
 pnpm run build:packages
 ```
-
-#### `vercel-build-monorepo.js`
-Vercel-specific build script optimized for monorepo deployment.
-
-```bash
-pnpm run vercel-build
-```
-
-Features:
-- Smart fallback for missing packages
-- Placeholder database URL for frontend builds
-- Vercel-optimized output directory handling
 
 ---
 
@@ -134,38 +119,22 @@ packages/config     # First (no dependencies)
     ↓
 packages/db         # Second (needs config)
     ↓
-packages/ui         # Third (needs config, db)
-    ↓
 apps/backend        # Uses: db, config
-apps/web            # Uses: db, config, ui
+apps/web            # Uses: db, config
 ```
 
 ---
 
-## Deployment Scripts
+## Deployment
 
-### Backend (Render)
+Both apps are deployed via Coolify on a Hetzner VPS using `docker-compose.yml`
+at the repo root. Coolify runs `docker compose up` against the compose file;
+Dockerfiles for each app live alongside the code (`apps/backend/Dockerfile`,
+`apps/web/Dockerfile`).
 
-Located in `apps/backend/`:
-
-```bash
-# Build script (runs on Render)
-pnpm run render-build
-
-# Start script (runs on Render)
-pnpm run render-start
-```
-
-See: [DEPLOYMENT.md](../DEPLOYMENT.md)
-
-### Frontend (Vercel)
-
-```bash
-# Build script (runs on Vercel)
-pnpm run vercel-build
-```
-
-See: [DEPLOYMENT.md](../DEPLOYMENT.md)
+Environment variables are configured in the Coolify panel and injected at
+build time (for `NEXT_PUBLIC_*` vars baked into the client bundle) and at
+runtime (for server-only vars).
 
 ---
 
@@ -191,11 +160,3 @@ pnpm run clean
 pnpm install
 pnpm run build
 ```
-
----
-
-## Related Documentation
-
-- [DEPLOYMENT.md](../DEPLOYMENT.md) - Full deployment guide
-- [ENV_VARIABLES.md](../ENV_VARIABLES.md) - Environment variables
-- [README.md](../README.md) - Project overview

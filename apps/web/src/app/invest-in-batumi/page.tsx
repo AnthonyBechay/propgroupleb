@@ -3,9 +3,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { MapPin, TrendingUp, Plane, Building2, Sun, Ship, ShieldCheck, Sparkles, ArrowRight } from 'lucide-react'
 
-const SITE_URL =
-  process.env.NEXT_PUBLIC_SITE_URL ||
-  (process.env.VERCEL_ENV === 'production' ? 'https://bechays.com' : 'http://localhost:3000')
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'
 
 const TITLE = 'Invest in Batumi Real Estate — Off-Plan & New Build Projects | PropGroup'
 const DESCRIPTION =

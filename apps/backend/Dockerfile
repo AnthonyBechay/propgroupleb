@@ -38,7 +38,7 @@ ENV NODE_ENV=production \
 # /app + the mounted `backend_uploads` volume + permission to drop and
 # execute binaries from /tmp. The Apr 27 incident on the web container
 # (`./XXfaBkPe` running as root for 2d11h) showed the cost of leaving
-# this default. Backend is now reachable only via the api.bechays.com
+# this default. Backend is now reachable only via the api.propgrp.com
 # host and authenticated routes, so attack surface is smaller — but the
 # blast radius if exploited would include the DB credentials and R2
 # keys in env. Defense in depth.

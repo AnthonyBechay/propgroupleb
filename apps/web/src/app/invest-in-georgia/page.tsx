@@ -2,9 +2,7 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { MapPin, TrendingUp, ShieldCheck, Scale, Globe2, Wallet, Building2, ArrowRight } from 'lucide-react'
 
-const SITE_URL =
-  process.env.NEXT_PUBLIC_SITE_URL ||
-  (process.env.VERCEL_ENV === 'production' ? 'https://bechays.com' : 'http://localhost:3000')
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'
 
 const TITLE = 'Invest in Georgia Real Estate — Tbilisi, Batumi & Beyond | PropGroup'
 const DESCRIPTION =

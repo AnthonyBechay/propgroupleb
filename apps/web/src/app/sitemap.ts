@@ -5,7 +5,7 @@ import { normalizeApiUrl } from '@/lib/utils/api-url'
 //
 // Without this, Next.js statically generates sitemap.xml at `next build`
 // time using the env vars and network reachability of the build container.
-// In Coolify-style deploys the build runs before api.bechays.com is itself
+// In Coolify-style deploys the build runs before api.propgrp.com is itself
 // up (or before DNS propagates inside the build container), so the
 // `fetchProperties()` call returns [] and the empty result gets baked in
 // permanently. Confirmed in production: sitemap.xml shipped with only the
@@ -17,9 +17,7 @@ import { normalizeApiUrl } from '@/lib/utils/api-url'
 // revalidation window without rebuilding the container.
 export const revalidate = 3600
 
-const SITE_URL =
-  process.env.NEXT_PUBLIC_SITE_URL ||
-  (process.env.VERCEL_ENV === 'production' ? 'https://bechays.com' : 'http://localhost:3000')
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'
 
 // Static marketing routes we always want indexed.
 const STATIC_ROUTES: Array<{ path: string; priority: number; changeFrequency: MetadataRoute.Sitemap[number]['changeFrequency'] }> = [

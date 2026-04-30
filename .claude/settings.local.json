@@ -347,7 +347,12 @@
       "Bash(python3 -m json.tool)",
       "Bash(curl -s 'https://cloudflare-dns.com/dns-query?name=bechays.com&type=A' -H 'accept: application/dns-json' echo \"\" echo \"=== Google DoH ===\" curl -s 'https://dns.google/resolve?name=bechays.com&type=A')",
       "Bash(sed -n '985,1010p' /Users/anthonybechay/development/propgroup/apps/web/src/components/property/PropertyUnitsSection.tsx)",
-      "Bash(sed -n '1300,1325p' /Users/anthonybechay/development/propgroup/apps/web/src/components/property/PropertyUnitsSection.tsx)"
+      "Bash(sed -n '1300,1325p' /Users/anthonybechay/development/propgroup/apps/web/src/components/property/PropertyUnitsSection.tsx)",
+      "Bash(curl -s 'https://dns.google/resolve?name=bechays.com&type=A')",
+      "Bash(python3 -m json.tool echo \"\" echo \"=== Cloudflare DoH right now ===\" curl -s 'https://cloudflare-dns.com/dns-query?name=bechays.com&type=A' -H 'accept: application/dns-json')",
+      "Bash(curl -s 'https://dns.google/resolve?name=www.bechays.com&type=A')",
+      "Bash(python3 -m json.tool echo \"\" echo \"=== End-to-end via system resolver \\(the real test\\) ===\" curl -sI https://www.bechays.com)",
+      "Bash(curl -s 'https://dns.google/resolve?name=api.bechays.com&type=A')"
     ],
     "deny": [],
     "ask": []

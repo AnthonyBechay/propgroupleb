@@ -21,7 +21,7 @@ const nextConfig: NextConfig = {
       },
       {
         protocol: 'https',
-        hostname: 'api.bechays.com',
+        hostname: 'api.propgrp.com',
       },
       // Cloudflare R2 public buckets. We now serve property + branding
       // images directly from R2 (see normalizeFileUrl in lib/utils/api-url

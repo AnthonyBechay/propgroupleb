@@ -21,7 +21,7 @@ const PUBLIC_URL = process.env.R2_PUBLIC_URL || '';
  * The /api/files/ proxy endpoint ensures files are always accessible.
  */
 function getFileBaseUrl(): string {
-  // Prefer explicit API URL (e.g., https://api.bechays.com)
+  // Prefer explicit API URL (e.g., https://api.propgrp.com)
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || process.env.API_URL;
   if (apiUrl) {
     return `${apiUrl}/api/files`;

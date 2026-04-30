@@ -59,12 +59,12 @@ services:
       # Tell Next.js to run on the public URL so server-generated absolute
       # links (sitemap, RSS, og:url) emit correct hosts instead of
       # `http://localhost:3000`.
-      NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL:-https://bechays.com}
+      NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL:-https://propgrp.com}
       # NEXT_PUBLIC_API_URL is also passed as a build arg above for the
       # client bundle. It must additionally be set at runtime so server
       # components (e.g. sitemap.ts fetching properties + location guides)
       # can resolve it. Without this, sitemap.xml ships with zero property
-      # entries — confirmed in production by `curl bechays.com/sitemap.xml`
+      # entries — confirmed in production by `curl propgrp.com/sitemap.xml`
       # returning only the static marketing routes.
       NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
       # Public R2 bucket URL — when set, the frontend rewrites
