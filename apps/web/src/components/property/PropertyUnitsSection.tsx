@@ -12,7 +12,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { useComparator } from '@/contexts/ComparatorContext'
 import { useAuth } from '@/contexts/AuthContext'
-import { normalizeApiUrl } from '@/lib/utils/api-url'
+import { normalizeApiUrl, normalizeFileUrl } from '@/lib/utils/api-url'
 import type { Unit, UnitOption, PropertyDocument, PaymentPlanDetails, ComparatorItem } from '@/lib/types/api'
 
 // ── Print helper ──────────────────────────────────────────────────────────────
@@ -725,7 +725,7 @@ function UnitSheetPrint({
   const unitMinPrice = unitPrices.length ? Math.min(...unitPrices) : 0
   const unitMaxPrice = unitPrices.length ? Math.max(...unitPrices) : 0
 
-  const heroImages = propertyImages.slice(0, 3)
+  const heroImages = propertyImages.map(normalizeFileUrl).slice(0, 3)
   const handoverLabel = buildHandoverLabel(
     investmentMeta?.handoverDate,
     investmentMeta?.completionDate,
@@ -1056,7 +1056,7 @@ function OptionSheetPrint({
   // KPI + insights rows, option hero card, and payment plan are stacked.
   const shortDesc = propertyDescription ? truncateAtWord(propertyDescription, 240) : null
 
-  const heroImages = propertyImages.slice(0, 3)
+  const heroImages = propertyImages.map(normalizeFileUrl).slice(0, 3)
 
   // Unified header lines
   const scopeLine = `${unit.unitNumber ? `UNIT #${unit.unitNumber}` : 'UNIT'} · ${option.name.toUpperCase()}`
@@ -1161,7 +1161,7 @@ function OptionSheetPrint({
                     : 'repeat(3, 1fr)',
                 gap: '6px',
               }}>
-                {unit.images.slice(0, 3).map((img, i) => (
+                {unit.images.map(normalizeFileUrl).slice(0, 3).map((img, i) => (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img key={i} src={img} alt="" style={{
                     width: '100%', height: '68px', objectFit: 'cover',
@@ -1372,7 +1372,7 @@ function ProjectSheetPrint({
   const minPrice = allPrices.length ? Math.min(...allPrices) : 0
   const maxPrice = allPrices.length ? Math.max(...allPrices) : 0
 
-  const heroImages = propertyImages.slice(0, 3)
+  const heroImages = propertyImages.map(normalizeFileUrl).slice(0, 3)
   const shortDesc = propertyDescription ? truncateAtWord(propertyDescription, 500) : null
 
   const locationLine = formatLocationLine(propertyCity, propertyCountry, propertyStatus, propertyType)
@@ -1769,7 +1769,8 @@ export function PropertyUnitsSection({
         const res = await fetch(`${apiUrl}/api/content/media/branding.logoUrl`)
         if (res.ok) {
           const data = await res.json()
-          setLogoUrl(data.data?.url || data.url || undefined)
+          const raw = data.data?.url || data.url || undefined
+          setLogoUrl(raw ? normalizeFileUrl(raw) : undefined)
         }
       } catch {}
     }
@@ -1784,7 +1785,7 @@ export function PropertyUnitsSection({
     setExpandedUnit(prev => {
       const next = prev === unit.id ? null : unit.id
       if (onUnitImagesChange) {
-        onUnitImagesChange(next && unit.images.length > 0 ? unit.images : [])
+        onUnitImagesChange(next && unit.images.length > 0 ? unit.images.map(normalizeFileUrl) : [])
       }
       return next
     })
@@ -1953,7 +1954,7 @@ export function PropertyUnitsSection({
                           <ImageIcon className="w-3.5 h-3.5" /> Unit Photos
                         </p>
                         <div className="flex gap-2 overflow-x-auto pb-1">
-                          {unit.images.map((img, i) => (
+                          {unit.images.map(normalizeFileUrl).map((img, i) => (
                             <a key={i} href={img} target="_blank" rel="noopener noreferrer" className="flex-shrink-0">
                               <img
                                 src={img}
