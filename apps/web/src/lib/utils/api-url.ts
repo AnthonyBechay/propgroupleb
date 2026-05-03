@@ -72,6 +72,15 @@ export function normalizeFileUrl(url: string): string {
     const apiBase = normalizeApiUrl(process.env.NEXT_PUBLIC_API_URL);
     return `${apiBase}/api/files/${key}`;
   }
+  // Also rewrite stale proxy URLs with a different host (e.g. api.bechays.com
+  // → api.propgrp.com). These come from DB rows written before the domain
+  // migration. The proxyMatch regex captures any host, so we just swap in the
+  // current API base and keep the key path intact.
+  if (proxyMatch) {
+    const key = proxyMatch[1];
+    const apiBase = normalizeApiUrl(process.env.NEXT_PUBLIC_API_URL);
+    return `${apiBase}/api/files/${key}`;
+  }
   return url;
 }
 

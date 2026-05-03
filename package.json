@@ -23,14 +23,10 @@
     "test:coverage": "pnpm --filter web test:coverage",
     "build:web": "pnpm run build:packages && pnpm --filter web build",
     "build:backend": "pnpm --filter backend build",
-    "build:mobile": "pnpm run build:packages && pnpm --filter mobile-capacitor build",
     "deploy": "pnpm run build",
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md,sql}\"",
     "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,md,sql}\"",
-    "db:migrate": "pnpm --filter @propgroup/db run db:migrate:deploy",
-    "mobile:ios": "pnpm --filter mobile-capacitor cap:ios",
-    "mobile:android": "pnpm --filter mobile-capacitor cap:android",
-    "mobile:sync": "pnpm --filter mobile-capacitor cap:sync"
+    "db:migrate": "pnpm --filter @propgroup/db run db:migrate:deploy"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",

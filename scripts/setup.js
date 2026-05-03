@@ -49,17 +49,22 @@ async function setup() {
   // Check for .env.local
   if (!fileExists('apps/web/.env.local')) {
     console.log('⚠️  No .env.local file found in apps/web/');
-    console.log('   Creating from example...');
-    
-    const envExample = `# Supabase
-NEXT_PUBLIC_SUPABASE_URL=http://localhost:54321
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key-here
+    console.log('   Creating a minimal example — fill in your values:');
 
-# Optional: Add your keys here
+    const envExample = `# API URL (backend)
+NEXT_PUBLIC_API_URL=http://localhost:3001
+
+# Cloudflare R2 public bucket URL (optional — enables direct R2 image serving)
+# NEXT_PUBLIC_R2_PUBLIC_URL=https://pub-<id>.r2.dev
+
+# Site URL (used for canonical links / OG tags)
+NEXT_PUBLIC_SITE_URL=http://localhost:3000
+
+# Optional features
 # RESEND_API_KEY=your-resend-key
-# OPENAI_API_KEY=your-openai-key
+# ANTHROPIC_API_KEY=your-anthropic-key
 `;
-    
+
     fs.writeFileSync(
       path.join(__dirname, '..', 'apps', 'web', '.env.local'),
       envExample
@@ -68,24 +73,13 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key-here
   } else {
     console.log('✅ .env.local file exists');
   }
-  
-  // Check for Docker
-  try {
-    execSync('docker --version', { stdio: 'ignore' });
-    console.log('✅ Docker is installed');
-  } catch {
-    console.log('⚠️  Docker not found - Supabase features will not be available');
-    console.log('   Install Docker Desktop from: https://www.docker.com/products/docker-desktop/');
-  }
-  
+
   console.log('\n' + '='.repeat(50));
   console.log('✅ Setup complete!\n');
   console.log('Next steps:');
-  console.log('1. Run "pnpm run dev" to start the development server');
-  console.log('2. Open http://localhost:3000 in your browser');
-  console.log('\nOptional:');
-  console.log('- Run "pnpm dlx supabase start" to start Supabase (requires Docker)');
-  console.log('- Run "pnpm run dev:full" to start with Supabase');
+  console.log('1. Fill in apps/web/.env.local and apps/backend/.env with your values');
+  console.log('2. Run "pnpm run dev" to start the development servers');
+  console.log('3. Open http://localhost:3000 in your browser');
   console.log('='.repeat(50) + '\n');
 }
 

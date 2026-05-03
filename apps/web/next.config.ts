@@ -3,32 +3,16 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   images: {
     remotePatterns: [
-      {
-        protocol: 'https',
-        hostname: '**.supabase.co',
-      },
-      {
-        protocol: 'https',
-        hostname: 'images.unsplash.com',
-      },
-      {
-        protocol: 'https',
-        hostname: 'res.cloudinary.com',
-      },
-      {
-        protocol: 'https',
-        hostname: 'propgroup-assets.s3.amazonaws.com',
-      },
+      // Backend image proxy (used when NEXT_PUBLIC_R2_PUBLIC_URL is unset)
       {
         protocol: 'https',
         hostname: 'api.propgrp.com',
       },
-      // Cloudflare R2 public buckets. We now serve property + branding
-      // images directly from R2 (see normalizeFileUrl in lib/utils/api-url
-      // for the rewrite logic) instead of proxying every byte through the
-      // backend. Images are still passed through `next/image` for variant
-      // generation; the optimizer fetches the source from R2 once, then
-      // edge-caches the optimized variants per `minimumCacheTTL` below.
+      // Cloudflare R2 public buckets. When NEXT_PUBLIC_R2_PUBLIC_URL is set,
+      // normalizeFileUrl rewrites proxy URLs to direct R2 URLs so the browser
+      // fetches images straight from Cloudflare's edge without hopping through
+      // the backend container. The optimizer fetches the source from R2 once
+      // then edge-caches optimized variants per `minimumCacheTTL` below.
       {
         protocol: 'https',
         hostname: 'pub-*.r2.dev',

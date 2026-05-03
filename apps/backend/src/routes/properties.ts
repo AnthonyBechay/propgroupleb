@@ -13,6 +13,36 @@ import type { AuthenticatedRequest } from '../types/index.js';
 
 const router: Router = express.Router();
 
+/**
+ * Generate a URL-safe slug from a property title.
+ * Handles collisions by appending -2, -3, … until unique.
+ */
+async function generateUniqueSlug(
+  title: string,
+  excludeId?: string,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  tx?: any,
+): Promise<string> {
+  const base = title
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .substring(0, 60);
+  const db = tx || prisma;
+
+  let candidate = base;
+  let counter = 1;
+  // eslint-disable-next-line no-constant-condition
+  while (true) {
+    const where: Record<string, unknown> = { slug: candidate };
+    if (excludeId) where.id = { not: excludeId };
+    const exists = await db.property.findFirst({ where, select: { id: true } });
+    if (!exists) return candidate;
+    counter++;
+    candidate = `${base}-${counter}`;
+  }
+}
+
 // Get all properties (public)
 router.get(
   '/',
@@ -184,8 +214,13 @@ router.post(
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const result = await prisma.$transaction(async (tx: any) => {
+      // Auto-generate slug from title if none provided
+      const slug = (propertyData as Record<string, unknown>).slug as string
+        || await generateUniqueSlug(validatedData.title, undefined, tx);
+
       const createData = {
         ...propertyData,
+        slug,
         images: (propertyData as Record<string, unknown>).images as string[] || [],
         highlightedFeatures: (propertyData as Record<string, unknown>).highlightedFeatures as string[] || [],
         youtubeUrls: (propertyData as Record<string, unknown>).youtubeUrls as string[] || [],
@@ -245,6 +280,13 @@ router.put(
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const result = await prisma.$transaction(async (tx: any) => {
+      // Backfill slug if missing (properties created before auto-slug was added)
+      // or regenerate when title changes
+      if (!existing.slug || (pd.title && pd.title !== existing.title)) {
+        const title = (pd.title as string) || existing.title;
+        pd.slug = await generateUniqueSlug(title, req.params.id, tx);
+      }
+
       const property = await tx.property.update({
         where: { id: req.params.id },
         data: pd,

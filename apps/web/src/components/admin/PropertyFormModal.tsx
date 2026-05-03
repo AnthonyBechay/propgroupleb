@@ -468,7 +468,21 @@ export function PropertyFormModal(props: PropertyFormModalProps) {
           {/* Images */}
           <section>
             <h3 className="text-sm font-semibold text-blue-600 uppercase tracking-wider mb-4">Property Images</h3>
-            <ImageUpload value={imageUrls} onChange={setImageUrls} maxFiles={10} disabled={isSubmitting} propertySlug={isEdit && property ? (property as any).slug || property.title : form.title || undefined} />
+            {/* Require a title before uploads so the slug-based R2 path is always
+                populated (properties/{slug}/images/…). Without it, images would
+                land flat at properties/{timestamp}-{name}.ext with no association
+                to the property. */}
+            {!isEdit && !form.title?.trim() ? (
+              <p className="text-sm text-slate-400 italic">Enter a property title above before uploading images.</p>
+            ) : (
+              <ImageUpload
+                value={imageUrls}
+                onChange={setImageUrls}
+                maxFiles={10}
+                disabled={isSubmitting}
+                propertySlug={isEdit && property ? (property as any).slug || property.title : form.title}
+              />
+            )}
             <div className="mt-2">
               <button type="button" onClick={() => setShowManualUrl(!showManualUrl)} className="text-xs text-gray-500 hover:text-blue-600 flex items-center gap-1 transition-colors">
                 {showManualUrl ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}

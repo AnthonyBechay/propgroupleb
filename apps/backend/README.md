@@ -1,157 +1,119 @@
 # PropGroup Backend API
 
-A Node.js/Express backend API for the PropGroup real estate platform, replacing Supabase with a self-hosted solution.
-
-## Features
-
-- **JWT Authentication** with secure httpOnly cookies
-- **User Management** with role-based access control (USER, ADMIN, SUPER_ADMIN)
-- **Property Management** with full CRUD operations
-- **Favorites System** for users to save properties
-- **Inquiry System** for property inquiries
-- **Portfolio Management** for user-owned properties
-- **Admin Dashboard** with comprehensive statistics
-- **Audit Logging** for all admin actions
-- **CORS Support** for frontend integration
+Express 4 + Prisma + PostgreSQL API for the PropGroup real estate platform.
 
 ## Tech Stack
 
-- **Node.js** with Express.js
-- **Prisma** with PostgreSQL
-- **JWT** for authentication
-- **bcryptjs** for password hashing
-- **Zod** for validation
-- **CORS** for cross-origin requests
+- **Node.js / Express 4** — HTTP server
+- **Prisma** — ORM against PostgreSQL
+- **JWT** (httpOnly cookies) — stateless auth, no session store
+- **bcryptjs** — password hashing
+- **Zod** — request validation
+- **Cloudflare R2** — file storage via `@aws-sdk/client-s3`
+- **Resend** — transactional email (feature-gated on `RESEND_API_KEY`)
+- **Anthropic SDK** — AI property search (feature-gated on `ANTHROPIC_API_KEY`)
 
 ## Setup
 
-1. **Install dependencies:**
+1. **Install dependencies** (run from monorepo root):
    ```bash
-   npm install
+   pnpm install
    ```
 
-2. **Environment Setup:**
-   Copy `env.example` to `.env` and configure:
+2. **Environment** — copy and fill in:
    ```bash
-   cp env.example .env
+   cp apps/backend/.env.example apps/backend/.env
    ```
 
-   Required environment variables:
-   - `DATABASE_URL`: PostgreSQL connection string
-   - `JWT_SECRET`: Secret key for JWT tokens
-   - `JWT_EXPIRES_IN`: Token expiration (default: 7d)
-   - `PORT`: Server port (default: 3001)
-   - `FRONTEND_URL`: Frontend URL for CORS (default: http://localhost:3000)
+   Required:
+   | Variable | Description |
+   |---|---|
+   | `DATABASE_URL` | PostgreSQL connection string |
+   | `JWT_SECRET` | Secret for signing JWT tokens |
+   | `FRONTEND_URL` | Frontend origin for CORS |
 
-3. **Database Setup:**
+   R2 storage (required for file uploads):
+   | Variable | Description |
+   |---|---|
+   | `R2_ACCOUNT_ID` | Cloudflare account ID |
+   | `R2_ACCESS_KEY_ID` | R2 API token key ID |
+   | `R2_SECRET_ACCESS_KEY` | R2 API token secret |
+   | `R2_BUCKET_NAME` | R2 bucket name |
+   | `R2_PUBLIC_URL` | Public bucket URL (`https://pub-<id>.r2.dev`) |
+
+3. **Database**:
    ```bash
-   # Generate Prisma client
-   npm run db:generate
-   
-   # Run migrations
-   npm run db:migrate
-   
-   # Seed database with sample data
-   npm run db:seed
+   pnpm --filter @propgroup/db run db:migrate:deploy
    ```
 
-4. **Start the server:**
+4. **Start**:
    ```bash
-   # Development
-   npm run dev
-   
+   # Development (with hot reload)
+   pnpm run dev:backend
+
    # Production
-   npm start
+   pnpm --filter propgroup-backend start
    ```
+
+## Deployment
+
+Deployed via Coolify on Hetzner CPX32. The `apps/backend/Dockerfile` builds a
+non-root `node` image; `docker-compose.yml` at the repo root wires it together
+with the web container and injects all env vars.
 
 ## API Endpoints
 
 ### Authentication
-- `POST /api/auth/register` - Register new user
-- `POST /api/auth/login` - Login user
-- `GET /api/auth/me` - Get current user
-- `POST /api/auth/logout` - Logout user
-- `PUT /api/auth/profile` - Update user profile
-- `PUT /api/auth/change-password` - Change password
+- `POST /api/auth/register` — register
+- `POST /api/auth/login` — login (sets httpOnly JWT cookie)
+- `GET  /api/auth/me` — current user
+- `POST /api/auth/logout` — clear cookie
+- `PUT  /api/auth/profile` — update profile
+- `PUT  /api/auth/change-password` — change password
+- `GET  /api/auth/google` — Google OAuth start
+- `GET  /api/auth/google/callback` — Google OAuth callback
 
 ### Properties
-- `GET /api/properties` - Get all properties (public)
-- `GET /api/properties/:id` - Get single property (public)
-- `POST /api/properties` - Create property (admin)
-- `PUT /api/properties/:id` - Update property (admin)
-- `DELETE /api/properties/:id` - Delete property (admin)
+- `GET    /api/properties` — list (public)
+- `GET    /api/properties/:slug` — detail (public)
+- `POST   /api/properties` — create (admin)
+- `PUT    /api/properties/:id` — update (admin)
+- `DELETE /api/properties/:id` — delete (admin)
+
+### Files
+- `POST   /api/upload` — upload file to R2
+- `DELETE /api/upload` — delete file from R2
+- `GET    /api/files/:key*` — proxy R2 file (fallback when direct R2 URL unavailable)
 
 ### Favorites
-- `GET /api/favorites` - Get user's favorites
-- `POST /api/favorites/:propertyId` - Add to favorites
-- `DELETE /api/favorites/:propertyId` - Remove from favorites
-- `GET /api/favorites/check/:propertyId` - Check if favorited
+- `GET    /api/favorites` — user's saved properties
+- `POST   /api/favorites/:propertyId` — save
+- `DELETE /api/favorites/:propertyId` — unsave
+- `GET    /api/favorites/check/:propertyId` — check status
 
 ### Inquiries
-- `POST /api/inquiries` - Create inquiry (public)
-- `GET /api/inquiries/my` - Get user's inquiries
-- `GET /api/inquiries` - Get all inquiries (admin)
-- `GET /api/inquiries/:id` - Get single inquiry (admin)
-- `DELETE /api/inquiries/:id` - Delete inquiry (admin)
-
-### Portfolio
-- `GET /api/portfolio` - Get user's portfolio
-- `POST /api/portfolio` - Add property to portfolio
-- `PUT /api/portfolio/:id` - Update owned property
-- `DELETE /api/portfolio/:id` - Remove from portfolio
-- `GET /api/portfolio/stats` - Get portfolio statistics
+- `POST /api/inquiries` — submit inquiry (public)
+- `GET  /api/inquiries/my` — user's inquiries
+- `GET  /api/inquiries` — all inquiries (admin)
+- `PUT  /api/inquiries/:id/status` — update status (admin)
 
 ### Users (Admin)
-- `GET /api/users` - Get all users
-- `GET /api/users/:id` - Get single user
-- `PUT /api/users/:id/role` - Update user role (super admin)
-- `POST /api/users/:id/ban` - Ban user (admin)
-- `POST /api/users/:id/unban` - Unban user (admin)
-- `DELETE /api/users/:id` - Delete user (super admin)
-- `POST /api/users/invite` - Invite admin (super admin)
+- `GET    /api/users` — list users
+- `GET    /api/users/:id` — get user
+- `PUT    /api/users/:id/role` — update role (super admin)
+- `POST   /api/users/:id/ban` — ban
+- `POST   /api/users/:id/unban` — unban
+- `DELETE /api/users/:id` — delete (super admin)
 
 ### Admin
-- `GET /api/admin/stats` - Get dashboard statistics
-- `GET /api/admin/audit-logs` - Get audit logs
-- `POST /api/admin/create-super-admin` - Create super admin
-- `GET /api/admin/health` - System health check
+- `GET  /api/admin/stats` — dashboard statistics
+- `GET  /api/admin/audit-logs` — admin audit log
+- `GET  /health` — health check
 
-## Authentication
+## Auth Notes
 
-The API uses JWT tokens stored in httpOnly cookies for security. Include the cookie in requests or use the Authorization header:
-
-```javascript
-// Using fetch with cookies (automatic)
-fetch('/api/properties')
-
-// Using fetch with Authorization header
-fetch('/api/properties', {
-  headers: {
-    'Authorization': 'Bearer <token>'
-  }
-})
-```
-
-## Database
-
-The backend uses the existing Prisma schema from `packages/db`. The User model has been updated to include a `password` field for JWT authentication.
-
-## Deployment
-
-This backend is designed to run on Render with a PostgreSQL database. Make sure to:
-
-1. Set all required environment variables
-2. Run database migrations
-3. Seed the database with initial data
-4. Configure CORS for your frontend domain
-
-## Migration from Supabase
-
-This backend replaces all Supabase functionality:
-
-- **Auth**: Supabase Auth → JWT with bcrypt
-- **Database**: Supabase DB → Prisma with PostgreSQL
-- **Storage**: Supabase Storage → File system (can be extended to S3)
-- **Real-time**: Supabase Realtime → WebSocket (can be added if needed)
-
-The frontend will need to be updated to use these new endpoints instead of Supabase client calls.
+- JWT stored in httpOnly cookie named `token`; no session store
+- `authenticateToken` middleware decodes JWT on every request → `req.user`
+- Logout: `res.clearCookie('token')` — stateless, nothing to destroy
+- Google OAuth: Passport redirects to Google, callback sets the same JWT cookie
+- **Do not** add `express-session`, `passport-jwt`, or `connect-pg-simple`

@@ -65,6 +65,7 @@ export default function UnitsPage({ params }: { params: Promise<{ id: string }> 
   const { id: propertyId } = use(params)
   const [units, setUnits] = useState<Unit[]>([])
   const [projectTitle, setProjectTitle] = useState('')
+  const [projectSlug, setProjectSlug] = useState('')
   const [loading, setLoading] = useState(true)
 
   // Unit form state
@@ -97,6 +98,7 @@ export default function UnitsPage({ params }: { params: Promise<{ id: string }> 
       const propData = await propRes.json()
       const unitsData = await unitsRes.json()
       setProjectTitle(propData.data?.title || propData.title || 'Project')
+      setProjectSlug(propData.data?.slug || propData.slug || '')
       setUnits(unitsData.data || [])
     } catch {
       setError('Failed to load data')
@@ -186,7 +188,8 @@ export default function UnitsPage({ params }: { params: Promise<{ id: string }> 
       for (const file of Array.from(files)) {
         const fd = new FormData()
         fd.append('file', file)
-        fd.append('folder', 'units')
+        fd.append('folder', 'properties')
+        if (projectSlug) fd.append('propertySlug', projectSlug)
         const res = await fetch(`${API}/api/upload`, {
           method: 'POST',
           credentials: 'include',
