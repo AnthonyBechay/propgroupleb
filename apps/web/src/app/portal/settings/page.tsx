@@ -242,9 +242,6 @@ export default function SettingsPage() {
                       <SelectValue placeholder="Select your country" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="georgia">Georgia</SelectItem>
-                      <SelectItem value="cyprus">Cyprus</SelectItem>
-                      <SelectItem value="greece">Greece</SelectItem>
                       <SelectItem value="lebanon">Lebanon</SelectItem>
                       <SelectItem value="other">Other</SelectItem>
                     </SelectContent>

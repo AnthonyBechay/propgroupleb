@@ -1,7 +1,4 @@
 export const SUPPORTED_COUNTRIES = [
-  { id: 'georgia', name: 'Georgia' },
-  { id: 'cyprus', name: 'Cyprus' },
-  { id: 'greece', name: 'Greece' },
   { id: 'lebanon', name: 'Lebanon' }
 ] as const;
 

@@ -150,7 +150,7 @@ function parseBlocks(description: string): Block[] {
 
     // Section header heuristic: emoji-prefixed AND (ends with ":" OR is
     // short-and-mostly-uppercase). Catches "💰 UNIT PRICING:" and
-    // "🌍 BATUMI – Georgia's Rising Investment Hotspot".
+    // "🌍 MARKET OVERVIEW – Key local context".
     const startsWithEmoji = EMOJI_PREFIX_RE.test(line)
     const endsWithColon = line.endsWith(':')
     const isShort = line.length <= 80

@@ -25,16 +25,13 @@ interface LocationGuide {
 }
 
 const COUNTRIES = [
-  { value: 'GEORGIA', label: 'Georgia' },
-  { value: 'CYPRUS', label: 'Cyprus' },
-  { value: 'GREECE', label: 'Greece' },
   { value: 'LEBANON', label: 'Lebanon' },
 ]
 
 const EMPTY_FORM = {
   title: '',
   content: '',
-  country: 'GEORGIA',
+  country: 'LEBANON',
   imageUrl: '',
 }
 
@@ -181,7 +178,7 @@ export default function LocationGuidesPage() {
           </h1>
           <p className="mt-1 text-sm text-gray-600">
             Region/city guides that can be linked to properties. Great for
-            Batumi, Tbilisi, and other Georgian regions.
+            Beirut, coastal cities, and other Lebanese regions.
           </p>
         </div>
         <button
@@ -340,7 +337,7 @@ export default function LocationGuidesPage() {
                   type="text"
                   value={form.title}
                   onChange={(e) => setForm({ ...form, title: e.target.value })}
-                  placeholder="e.g. Batumi — Seaside Investment Hub"
+                  placeholder="e.g. Beirut — Neighborhood Guide"
                   className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#1B3A5C]"
                 />
               </div>

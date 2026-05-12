@@ -41,7 +41,7 @@ export default function GetStartedPage() {
           </h1>
           <p className="text-lg text-slate-600 max-w-2xl mx-auto">
             Whether you want to explore on your own or have our team guide you,
-            we&apos;re here to help you invest in Georgia&apos;s real estate market.
+            we&apos;re here to help you navigate Lebanon&apos;s real estate market.
           </p>
         </div>
       </section>
@@ -118,8 +118,8 @@ export default function GetStartedPage() {
               I Want Guidance
             </h2>
             <p className="text-slate-600 mb-5">
-              Tell us about your investment goals and budget. Our Georgia real estate experts
-              will reach out with personalized property recommendations.
+              Tell us about your goals and budget. Our Lebanon-focused team will reach out with
+              personalized property recommendations.
             </p>
             <ul className="space-y-2.5">
               <li className="flex items-center gap-2 text-sm text-slate-700">
@@ -242,9 +242,9 @@ export default function GetStartedPage() {
               <div className="w-12 h-12 bg-[#E0EDF7] rounded-xl flex items-center justify-center mx-auto mb-3">
                 <MapPin className="w-6 h-6 text-[#1B3A5C]" />
               </div>
-              <h3 className="font-bold text-slate-900 mb-1">Georgia Focus</h3>
+              <h3 className="font-bold text-slate-900 mb-1">Lebanon Focus</h3>
               <p className="text-sm text-slate-600">
-                Specialized in Tbilisi, Batumi, and emerging Georgian markets
+                Built for Beirut and Lebanon\u2019s key neighborhoods and coastal cities
               </p>
             </div>
             <div className="text-center">

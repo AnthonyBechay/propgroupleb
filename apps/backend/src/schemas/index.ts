@@ -12,7 +12,7 @@ export const registerSchema = z.object({
   lastName: z.string().optional(),
   phone: z.string().optional(),
   country: z.string().optional(),
-  investmentGoals: z.array(z.enum(['HIGH_ROI', 'CAPITAL_GROWTH', 'GOLDEN_VISA'])).optional(),
+  investmentGoals: z.array(z.enum(['HIGH_ROI', 'CAPITAL_GROWTH'])).optional(),
 });
 
 export const loginSchema = z.object({
@@ -25,7 +25,7 @@ export const updateProfileSchema = z.object({
   lastName: z.string().optional(),
   phone: z.string().optional(),
   country: z.string().optional(),
-  investmentGoals: z.array(z.enum(['HIGH_ROI', 'CAPITAL_GROWTH', 'GOLDEN_VISA'])).optional(),
+  investmentGoals: z.array(z.enum(['HIGH_ROI', 'CAPITAL_GROWTH'])).optional(),
 });
 
 export const changePasswordSchema = z.object({
@@ -73,7 +73,7 @@ export const propertySchema = z.object({
   floors: z.number().nullish(),
   parkingSpaces: z.number().nullish(),
 
-  country: z.enum(['GEORGIA', 'CYPRUS', 'GREECE', 'LEBANON']),
+  country: z.enum(['LEBANON']),
   city: z.string().nullish(),
   district: z.string().nullish(),
   address: z.string().nullish(),

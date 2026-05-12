@@ -31,9 +31,6 @@ interface PropertyFiltersProps {
 }
 
 const countries = [
-  { value: 'GEORGIA', label: 'Georgia', flag: '\u{1F1EC}\u{1F1EA}' },
-  { value: 'CYPRUS', label: 'Cyprus', flag: '\u{1F1E8}\u{1F1FE}' },
-  { value: 'GREECE', label: 'Greece', flag: '\u{1F1EC}\u{1F1F7}' },
   { value: 'LEBANON', label: 'Lebanon', flag: '\u{1F1F1}\u{1F1E7}' },
 ]
 
@@ -135,7 +132,7 @@ export function PropertyFilters({ filters, onChange, onClose }: PropertyFiltersP
           </Label>
           <Input
             type="text"
-            placeholder="e.g. Batumi, Tbilisi"
+            placeholder="e.g. Beirut, Jounieh"
             value={localFilters.city || ''}
             onChange={(e) => handleFilterChange('city', e.target.value)}
           />

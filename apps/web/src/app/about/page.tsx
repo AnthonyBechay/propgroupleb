@@ -47,7 +47,7 @@ export default async function AboutPage() {
                   ROI Projections
                 </h3>
                 <p className="text-sm text-slate-600">
-                  Detailed return estimates backed by Georgia market analysis
+                  Clear comparisons and ROI context for each listing
                 </p>
               </div>
 
@@ -68,10 +68,10 @@ export default async function AboutPage() {
                   <Globe className="w-6 h-6 text-white" />
                 </div>
                 <h3 className="text-lg font-bold text-slate-900 mb-2">
-                  Global Markets
+                  Local Market Focus
                 </h3>
                 <p className="text-sm text-slate-600">
-                  Access premium international real estate opportunities
+                  Built for Lebanon\u2019s neighborhoods and buyer workflows
                 </p>
               </div>
 

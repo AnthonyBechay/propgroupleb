@@ -70,13 +70,13 @@ interface SearchFilters {
 }
 
 // ── Claude AI filter extraction ──
-const CLAUDE_SYSTEM_PROMPT = `You are a property search filter extractor for PropGroup, a Georgia-focused real estate investment platform.
+const CLAUDE_SYSTEM_PROMPT = `You are a property search filter extractor for PropGroup, a Lebanon-focused real estate platform.
 Extract structured filters from natural language property queries. Return ONLY a valid JSON object, no explanations.
 
 Available enum values:
-- country: GEORGIA, CYPRUS, GREECE, LEBANON
-- city: Tbilisi, Batumi, Kutaisi, Gudauri, Bakuriani (Georgian cities imply country=GEORGIA)
-- district: Vake, Saburtalo, Vera, Old Town, Didi Dighomi, New Boulevard (districts within cities)
+- country: LEBANON
+- city: Beirut, Jounieh, Byblos, Tripoli, Sidon, Tyre, Zahle
+- district: Achrafieh, Hamra, Verdun, Downtown, Gemmayzeh, Mar Mikhael, Ras Beirut
 - status: OFF_PLAN, NEW_BUILD, RESALE
 - propertyType: APARTMENT, VILLA, PENTHOUSE, STUDIO, TOWNHOUSE, DUPLEX, COMMERCIAL, OFFICE, LAND
 - furnishingStatus: UNFURNISHED, SEMI_FURNISHED, FULLY_FURNISHED
@@ -110,7 +110,7 @@ Rules:
 - "ready to move" or "move-in ready" → status: "NEW_BUILD" or "RESALE" (prefer NEW_BUILD)
 - "family" → implies minBedrooms: 3
 - "investment" → sortBy: "roi"
-- "near beach" or "beachfront" or "sea view" or "Black Sea" → city: "Batumi"
+- "near beach" or "beachfront" or "sea view" → prefer coastal cities like "Jounieh", "Byblos", "Tyre"
 - "mortgage" or "bank financing" → mortgageAvailable: true
 - If query asks for "best" or "top" properties → featured: true`;
 
@@ -182,32 +182,46 @@ function parseNaturalLanguageQuery(query: string): SearchFilters {
   const q = query.toLowerCase();
 
   // Countries
-  if (q.includes('georgia')) filters.country = 'GEORGIA';
-  else if (q.includes('cyprus')) filters.country = 'CYPRUS';
-  else if (q.includes('greece')) filters.country = 'GREECE';
-  else if (q.includes('lebanon')) filters.country = 'LEBANON';
+  if (q.includes('lebanon')) filters.country = 'LEBANON';
 
   // Cities
   const cities: Record<string, string> = {
-    tbilisi: 'Tbilisi', batumi: 'Batumi', kutaisi: 'Kutaisi', gudauri: 'Gudauri', bakuriani: 'Bakuriani',
+    beirut: 'Beirut',
+    jounieh: 'Jounieh',
+    jbeil: 'Byblos',
+    byblos: 'Byblos',
+    tripoli: 'Tripoli',
+    saida: 'Sidon',
+    sidon: 'Sidon',
+    tyre: 'Tyre',
+    sour: 'Tyre',
+    zahle: 'Zahle',
   };
   for (const [key, value] of Object.entries(cities)) {
-    if (q.includes(key)) { filters.city = value; if (!filters.country) filters.country = 'GEORGIA'; break; }
+    if (q.includes(key)) { filters.city = value; if (!filters.country) filters.country = 'LEBANON'; break; }
   }
 
   // Districts
   const districts: Record<string, string> = {
-    vake: 'Vake', saburtalo: 'Saburtalo', vera: 'Vera', 'old town': 'Old Town',
-    'didi dighomi': 'Didi Dighomi', 'new boulevard': 'New Boulevard',
+    achrafieh: 'Achrafieh',
+    ashrafieh: 'Achrafieh',
+    hamra: 'Hamra',
+    verdun: 'Verdun',
+    downtown: 'Downtown',
+    'beirut downtown': 'Downtown',
+    gemmayzeh: 'Gemmayzeh',
+    gemmayseh: 'Gemmayzeh',
+    'mar mikhael': 'Mar Mikhael',
+    'ras beirut': 'Ras Beirut',
   };
   for (const [key, value] of Object.entries(districts)) {
     if (q.includes(key)) { filters.district = value; break; }
   }
 
   // Beach / sea
-  if (q.includes('beach') || q.includes('sea view') || q.includes('black sea') || q.includes('beachfront')) {
-    if (!filters.city) filters.city = 'Batumi';
-    if (!filters.country) filters.country = 'GEORGIA';
+  if (q.includes('beach') || q.includes('sea view') || q.includes('beachfront')) {
+    if (!filters.city) filters.city = 'Jounieh';
+    if (!filters.country) filters.country = 'LEBANON';
   }
 
   // Property types
@@ -489,7 +503,7 @@ async function generateAISummary(
       max_tokens: 300,
       messages: [{
         role: 'user',
-        content: `You are a helpful real estate assistant for PropGroup (Georgia-focused investment platform).
+        content: `You are a helpful real estate assistant for PropGroup (Lebanon-focused real estate platform).
 ${isFollowUp ? 'This is a follow-up question in an ongoing conversation.' : 'This is a new search.'}
 Write a concise, helpful response (2-3 sentences). Be specific about what was found. Reference actual property names or details when relevant. No emojis. No markdown.
 If 0 results, suggest broadening the search or trying different criteria.
@@ -549,12 +563,12 @@ router.get(
   '/suggestions',
   asyncHandler(async (_req: Request, res: Response) => {
     sendSuccess(res, [
-      { text: '2-bedroom apartment in Batumi under $100k', category: 'Popular', icon: 'home' },
-      { text: 'Properties with ROI above 12% in Georgia', category: 'Investment', icon: 'trending-up' },
-      { text: 'Off-plan projects in Batumi with payment plans', category: 'New Build', icon: 'building' },
-      { text: 'Golden Visa eligible properties in Georgia', category: 'Residency', icon: 'shield' },
-      { text: 'Furnished apartment with pool in Tbilisi', category: 'Lifestyle', icon: 'dollar-sign' },
-      { text: 'Family home in Saburtalo with parking and gym', category: 'Family', icon: 'star' },
+      { text: '2-bedroom apartment in Beirut under $150k', category: 'Popular', icon: 'home' },
+      { text: 'High ROI properties above 10%', category: 'Investment', icon: 'trending-up' },
+      { text: 'Off-plan projects with payment plans', category: 'New Build', icon: 'building' },
+      { text: 'Sea view apartments in Jounieh', category: 'Lifestyle', icon: 'shield' },
+      { text: 'Furnished apartment with parking in Achrafieh', category: 'Lifestyle', icon: 'dollar-sign' },
+      { text: 'Family home near schools with parking', category: 'Family', icon: 'star' },
     ]);
   })
 );

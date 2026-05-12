@@ -24,32 +24,28 @@ const plusJakarta = Plus_Jakarta_Sans({
 });
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
-const DEFAULT_TITLE = "Invest in Batumi & Georgia Real Estate | PropGroup";
+const DEFAULT_TITLE = "Lebanon Real Estate | PropGroup";
 const DEFAULT_DESCRIPTION =
-  "PropGroup — Georgia and Batumi's trusted real-estate investment platform. Hand-picked off-plan & new-build projects, transparent ROI, flexible payment plans, and expert investor support.";
+  "PropGroup — Lebanon-focused real estate platform. Explore curated listings with transparent pricing, local market insight, and end-to-end buyer support.";
 const DEFAULT_KEYWORDS = [
-  "Batumi real estate investment",
-  "Georgia property investment",
-  "invest in Batumi",
-  "invest in Georgia",
-  "Batumi apartments for sale",
-  "Tbilisi investment properties",
-  "Georgia off-plan property",
-  "Black Sea real estate",
-  "Batumi rental yield",
-  "Georgia golden visa",
-  "Batumi property ROI",
-  "Georgia new build apartments",
-  "Batumi sea view apartments",
-  "Adjara real estate",
-  "Georgia residency by investment",
+  "Lebanon real estate",
+  "Lebanon property",
+  "Beirut apartments for sale",
+  "Beirut real estate",
+  "buy property in Lebanon",
+  "Lebanon investment property",
+  "Lebanon off-plan property",
+  "Lebanon new build apartments",
+  "Lebanon rentals",
+  "Jounieh apartments",
+  "Byblos property",
 ];
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: {
     default: DEFAULT_TITLE,
-    template: "%s | PropGroup — Georgia Real Estate",
+    template: "%s | PropGroup — Lebanon Real Estate",
   },
   description: DEFAULT_DESCRIPTION,
   keywords: DEFAULT_KEYWORDS,
@@ -73,7 +69,7 @@ export const metadata: Metadata = {
         url: "/og-image.png",
         width: 1200,
         height: 630,
-        alt: "PropGroup — Batumi & Georgia Real Estate Investment",
+        alt: "PropGroup — Lebanon Real Estate",
       },
     ],
   },
@@ -126,17 +122,16 @@ export default function RootLayout({
                   image: `${SITE_URL}/og-image.png`,
                   description: DEFAULT_DESCRIPTION,
                   areaServed: [
-                    { "@type": "Country", name: "Georgia" },
-                    { "@type": "City", name: "Batumi" },
-                    { "@type": "City", name: "Tbilisi" },
+                    { "@type": "Country", name: "Lebanon" },
+                    { "@type": "City", name: "Beirut" },
                   ],
                   knowsAbout: [
                     "Real estate investment",
-                    "Batumi property market",
-                    "Georgia property market",
+                    "Lebanon property market",
+                    "Beirut property market",
                     "Off-plan property",
                     "Rental yield analysis",
-                    "Residency by investment",
+                    "Buyer due diligence",
                   ],
                 },
                 {

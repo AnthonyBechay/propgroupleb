@@ -1,24 +1,24 @@
 /**
  * PropGroup Design System
  * Professional real estate investment platform
- * Navy blue + steel & stone greys + warm orange accent
+ * Grey-first neutrals + warm accent
  * Mobile-first, accessible, and performant
  */
 
 /* ============================================
-   COLOR PALETTE — Corporate Navy + Grey
+   COLOR PALETTE — Grey-first neutrals
    ============================================ */
 :root {
-  /* Primary Colors - Navy Blue */
-  --pg-primary-900: #0A1628;
-  --pg-primary-800: #0F2137;
-  --pg-primary-700: #152D4A;
-  --pg-primary-600: #1B3A5C;
-  --pg-primary-500: #24507D;
-  --pg-primary-400: #3E7AB5;
-  --pg-primary-300: #6FA3D2;
-  --pg-primary-200: #A8CBE8;
-  --pg-primary-100: #E0EDF7;
+  /* Primary Colors - Charcoal / Slate */
+  --pg-primary-900: #0B1220; /* deep charcoal */
+  --pg-primary-800: #0F172A;
+  --pg-primary-700: #111827;
+  --pg-primary-600: #1F2937;
+  --pg-primary-500: #374151;
+  --pg-primary-400: #4B5563;
+  --pg-primary-300: #6B7280;
+  --pg-primary-200: #D1D5DB;
+  --pg-primary-100: #F1F5F9;
 
   /* Grey 1 - Steel (cool, professional) */
   --pg-steel-900: #111827;
@@ -75,8 +75,8 @@
   --pg-warning-light: #FEF3C7;
   --pg-error: #DC2626;
   --pg-error-light: #FEE2E2;
-  --pg-info: #1B3A5C;
-  --pg-info-light: #E0EDF7;
+  --pg-info: #1F2937;
+  --pg-info-light: #F1F5F9;
 
   /* Shadows — cooler tone */
   --pg-shadow-sm: 0 1px 2px 0 rgba(15, 23, 42, 0.06);

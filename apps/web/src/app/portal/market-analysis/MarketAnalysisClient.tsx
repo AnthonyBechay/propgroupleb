@@ -129,7 +129,7 @@ export function MarketAnalysisClient({ marketData, comparisonMetrics }: MarketAn
                 Market Data Coming Soon
               </h3>
               <p className="text-gray-600 mb-6">
-                We're preparing detailed market analysis for Georgian real estate. Check back soon for investment insights.
+                We're preparing detailed market analysis for Lebanon real estate. Check back soon for updated insights.
               </p>
             </div>
           )}

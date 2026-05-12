@@ -25,7 +25,7 @@ export async function FeaturedProjects() {
             Featured <span className="text-[#1B3A5C]">Projects</span>
           </h2>
           <p className="text-lg text-slate-600">
-            Hand-picked investment opportunities in Georgia
+            Hand-picked investment opportunities in Lebanon
           </p>
         </div>
 

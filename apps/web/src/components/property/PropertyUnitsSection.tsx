@@ -60,8 +60,8 @@ async function waitForPrintSheetImages(): Promise<void> {
 
 /**
  * Optional investor-facing metadata surfaced in the three PDF exports:
- * handover date (off-plan), Golden Visa eligibility (Georgia residency
- * program hook), and annual holding costs. These live on the
+ * handover date (off-plan), eligibility flags (where applicable),
+ * and annual holding costs. These live on the
  * `PropertyInvestmentData` Prisma model and are already in the detail
  * include — we just thread them through to the PDF sheets.
  */

@@ -71,7 +71,7 @@ export function Navbar() {
               <span className="font-bold text-xl text-slate-900 block leading-tight">
                 PropGroup
               </span>
-              <span className="text-xs text-slate-500">Georgia Real Estate</span>
+              <span className="text-xs text-slate-500">Lebanon Real Estate</span>
             </div>
           </Link>
 
@@ -116,7 +116,7 @@ export function Navbar() {
                     aria-haspopup="true"
                     className="flex items-center gap-2 px-3 py-1.5 bg-slate-50 rounded-full hover:shadow-md transition-all"
                   >
-                    <div className="w-8 h-8 rounded-full bg-[#1B3A5C] flex items-center justify-center text-white text-sm font-bold">
+                    <div className="w-8 h-8 rounded-full bg-slate-900 flex items-center justify-center text-white text-sm font-bold">
                       {user.email?.charAt(0).toUpperCase()}
                     </div>
                     <span className="text-sm text-slate-700 font-medium">
@@ -165,7 +165,7 @@ export function Navbar() {
                 {/* Portal Button */}
                 {!pathname.startsWith('/portal') && !pathname.startsWith('/admin') && (
                   <Link href="/portal/dashboard">
-                    <Button size="sm" variant="ghost" className="text-slate-600 hover:text-[#1B3A5C] hover:bg-[#E0EDF7]">
+                    <Button size="sm" variant="ghost" className="text-slate-600 hover:text-slate-900 hover:bg-slate-100">
                       <LayoutDashboard className="w-4 h-4 mr-1.5" />
                       Portal
                     </Button>
@@ -175,7 +175,7 @@ export function Navbar() {
                 {/* Admin Button for Admin/Super Admin users */}
                 {(user.role === 'ADMIN' || user.role === 'SUPER_ADMIN') && !pathname.startsWith('/admin') && (
                   <Link href="/admin">
-                    <Button size="sm" variant="outline" className="border-[#1B3A5C] text-[#1B3A5C] hover:bg-[#E0EDF7]">
+                    <Button size="sm" variant="outline" className="border-slate-300 text-slate-900 hover:bg-slate-100">
                       <Shield className="w-4 h-4 mr-2" />
                       Admin Panel
                     </Button>
@@ -313,7 +313,7 @@ function NavLink({ href, icon, children, isActive }: any) {
       href={href}
       className={`px-4 py-2 rounded-lg font-medium transition-all flex items-center gap-2 whitespace-nowrap flex-shrink-0 ${
         isActive
-          ? 'bg-[#E0EDF7] text-[#1B3A5C]'
+          ? 'bg-slate-100 text-slate-900'
           : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
       }`}
     >
@@ -331,7 +331,7 @@ function MobileNavLink({ href, icon, children, isActive, onClick }: any) {
       onClick={onClick}
       className={`flex items-center gap-3 px-4 py-3 text-base font-medium transition-colors ${
         isActive
-          ? 'bg-[#E0EDF7] text-[#1B3A5C] border-l-4 border-[#1B3A5C]'
+          ? 'bg-slate-100 text-slate-900 border-l-4 border-slate-900'
           : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 border-l-4 border-transparent'
       }`}
     >

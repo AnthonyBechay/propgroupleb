@@ -1,6 +1,6 @@
 # PropGroup
 
-Real-estate investment platform focused on Georgia (Batumi, Tbilisi). Catalog, inquiries, portfolio, admin CMS, and AI-assisted property search.
+Lebanon-focused real estate platform. Catalog, inquiries, portfolio, admin CMS, and AI-assisted property search.
 
 ## Stack
 
@@ -15,7 +15,7 @@ Real-estate investment platform focused on Georgia (Batumi, Tbilisi). Catalog, i
 ## Project Layout
 
 ```
-propgroup/
+propgroupleb/
 ├── apps/
 │   ├── backend/         # Express API (port 3001)
 │   └── web/             # Next.js frontend (port 3000)

@@ -6,9 +6,6 @@
 // ============================================
 
 export enum Country {
-  GEORGIA = 'GEORGIA',
-  CYPRUS = 'CYPRUS',
-  GREECE = 'GREECE',
   LEBANON = 'LEBANON',
 }
 

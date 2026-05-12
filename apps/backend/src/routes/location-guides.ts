@@ -8,7 +8,7 @@ import type { AuthenticatedRequest } from '../types/index.js';
 
 const router: Router = express.Router();
 
-const COUNTRIES = ['GEORGIA', 'CYPRUS', 'GREECE', 'LEBANON'] as const;
+const COUNTRIES = ['LEBANON'] as const;
 
 const locationGuideSchema = z.object({
   title: z.string().min(1, 'Title is required').max(200),

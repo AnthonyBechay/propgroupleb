@@ -3,7 +3,7 @@ export const PROPERTY_TYPES = [
   'DUPLEX', 'LAND', 'COMMERCIAL', 'OFFICE'
 ] as const
 
-export const COUNTRIES = ['GEORGIA', 'CYPRUS', 'GREECE', 'LEBANON'] as const
+export const COUNTRIES = ['LEBANON'] as const
 export const STATUSES = ['OFF_PLAN', 'NEW_BUILD', 'RESALE'] as const
 export const CURRENCIES = ['USD', 'EUR', 'GBP', 'AED'] as const
 export const FURNISHING = ['UNFURNISHED', 'SEMI_FURNISHED', 'FULLY_FURNISHED'] as const

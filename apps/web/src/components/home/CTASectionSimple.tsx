@@ -12,7 +12,7 @@ export function CTASectionSimple() {
           </h2>
 
           <p className="text-lg sm:text-xl text-slate-300 mb-8 max-w-2xl mx-auto">
-            Start building wealth through Georgia&apos;s booming real estate market
+            Start exploring Lebanon\u2019s real estate market with a clean shortlist workflow
           </p>
 
           <div className="flex flex-wrap justify-center gap-x-6 gap-y-3 mb-10 text-sm text-slate-300">

@@ -25,13 +25,13 @@ Context for Claude (and human contributors) extending this codebase. Keep this f
 - **Storage**: Cloudflare R2, proxied through `/api/files/*` on the backend.
 - **Email**: Resend (optional — feature-gated on `RESEND_API_KEY`).
 - **AI**: Anthropic SDK for property search conversation (feature-gated on `ANTHROPIC_API_KEY`).
-- **Focus**: Georgia real estate (Batumi, Tbilisi). Pre-launch.
+- **Focus**: Lebanon real estate. This instance should not include Georgia/Batumi/Tbilisi copy.
 
 ---
 
 ## Visual conventions
 
-- Primary navy `#1B3A5C`, accent gold `#C49A2E`, slate neutrals.
+- Grey-first neutrals (slate/gray) with a subtle charcoal primary. Avoid strong navy-forward styling in new work.
 - CSS variables: bare HSL triples in `:root`, wrapped with `hsl(var(--…))` in the `@theme inline` block.
 - Use `pg-` prefixed utilities from `src/styles/design-system.css` where available.
 - **Three layouts**: main site (navbar + footer), `/portal/*` (its own sidebar), `/(admin)/admin/*` (sidebar + header). Pick the right one — don't wrap portal/admin pages in the marketing navbar.

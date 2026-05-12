@@ -29,12 +29,12 @@ export async function sendWelcomeEmail(to: string, firstName?: string) {
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
           <div style="background: #1B3A5C; padding: 30px; border-radius: 12px 12px 0 0; text-align: center;">
             <h1 style="color: #C49A2E; margin: 0; font-size: 28px;">PropGroup</h1>
-            <p style="color: rgba(255,255,255,0.7); margin: 8px 0 0;">Georgia Real Estate Investment</p>
+            <p style="color: rgba(255,255,255,0.7); margin: 8px 0 0;">Lebanon Real Estate</p>
           </div>
           <div style="background: #ffffff; padding: 30px; border: 1px solid #e2e8f0; border-top: none;">
             <h2 style="color: #1B3A5C; margin-top: 0;">Welcome, ${name}!</h2>
             <p style="color: #475569; line-height: 1.6;">
-              Thank you for joining PropGroup. You now have access to our curated portfolio of premium Georgian real estate investments.
+              Thank you for joining PropGroup. You now have access to our curated portfolio of Lebanon-focused real estate listings.
             </p>
             <p style="color: #475569; line-height: 1.6;">Here's what you can do:</p>
             <ul style="color: #475569; line-height: 1.8;">

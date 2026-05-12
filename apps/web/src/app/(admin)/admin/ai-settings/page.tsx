@@ -168,10 +168,10 @@ export default function AISettingsPage() {
         <div className="p-6">
           <div className="space-y-4">
             {[
-              { query: "3 bedroom apartment in Cyprus under $300k", count: 156 },
-              { query: "Golden Visa properties in Greece", count: 142 },
+              { query: "2 bedroom apartment in Beirut under $200k", count: 156 },
+              { query: "Sea view apartments near the coast", count: 142 },
               { query: "Properties with high ROI", count: 98 },
-              { query: "New build apartments in Georgia", count: 87 },
+              { query: "New build apartments in Lebanon", count: 87 },
               { query: "Luxury villas between $500k and $1M", count: 76 }
             ].map((item, index) => (
               <div key={index} className="flex items-center justify-between py-3 border-b border-gray-100 last:border-0">

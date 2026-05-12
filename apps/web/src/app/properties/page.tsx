@@ -9,23 +9,21 @@ type PropertiesPageProps = {
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
 
 export const metadata: Metadata = {
-  title: 'Batumi & Georgia Real Estate Investment Projects',
+  title: 'Lebanon Real Estate Listings',
   description:
-    'Browse curated off-plan and new-build investment projects in Batumi and across Georgia. Filter by city, price, ROI, and payment plan. Transparent pricing, vetted developers.',
+    'Browse curated Lebanon real estate listings. Filter by city, price, and property type. Transparent pricing and a clean way to shortlist and compare.',
   alternates: { canonical: `${SITE_URL}/properties` },
   keywords: [
-    'Batumi apartments for sale',
-    'Batumi investment properties',
-    'Georgia real estate',
-    'Tbilisi apartments',
-    'Georgia off-plan property',
-    'Batumi sea view',
-    'high ROI real estate Georgia',
+    'Lebanon real estate',
+    'Beirut apartments for sale',
+    'buy property in Lebanon',
+    'Lebanon new build',
+    'Lebanon off-plan',
   ],
   openGraph: {
-    title: 'Invest in Batumi & Georgia — Projects',
+    title: 'Lebanon — Listings',
     description:
-      'Hand-picked investment projects in Batumi & Georgia with transparent ROI and flexible payment plans.',
+      'Curated Lebanon real estate listings with clear filters and comparisons.',
     url: `${SITE_URL}/properties`,
     type: 'website',
   },

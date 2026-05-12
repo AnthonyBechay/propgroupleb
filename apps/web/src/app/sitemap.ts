@@ -23,8 +23,7 @@ const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'
 const STATIC_ROUTES: Array<{ path: string; priority: number; changeFrequency: MetadataRoute.Sitemap[number]['changeFrequency'] }> = [
   { path: '', priority: 1.0, changeFrequency: 'weekly' },
   { path: 'properties', priority: 0.95, changeFrequency: 'daily' },
-  { path: 'invest-in-batumi', priority: 0.95, changeFrequency: 'weekly' },
-  { path: 'invest-in-georgia', priority: 0.9, changeFrequency: 'weekly' },
+  { path: 'invest-in-lebanon', priority: 0.95, changeFrequency: 'weekly' },
   { path: 'contact', priority: 0.6, changeFrequency: 'monthly' },
   { path: 'get-started', priority: 0.7, changeFrequency: 'monthly' },
   { path: 'about', priority: 0.5, changeFrequency: 'monthly' },

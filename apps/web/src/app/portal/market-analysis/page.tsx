@@ -45,12 +45,10 @@ export default async function MarketAnalysisPage() {
       priceChange: 0, // This would need historical data
       avgROI: avgROI,
       rentalYield: avgRentalYield,
-      goldenVisa: country.country === 'CYPRUS' ? 300000 : country.country === 'GREECE' ? 250000 : 0,
+      goldenVisa: 0,
       propertyCount: country._count.id,
       marketTrend: 'Stable' as const,
-      bestFor: country.country === 'CYPRUS' ? ['Golden Visa', 'Rental Income'] : 
-               country.country === 'GREECE' ? ['Golden Visa', 'Tourism Rentals'] :
-               country.country === 'GEORGIA' ? ['High Yield', 'Low Entry Cost'] : ['Long-term Hold'],
+      bestFor: ['Long-term Hold', 'Lifestyle', 'Value'],
       insights: [
         `Strong property market with ${country._count.id} properties`,
         `Average price: $${((country._avg.price || 0) / 1000).toFixed(0)}K`,
@@ -65,7 +63,7 @@ export default async function MarketAnalysisPage() {
     { metric: 'Price Change (YoY)', key: 'priceChange', format: 'percentage' },
     { metric: 'Average ROI', key: 'avgROI', format: 'percentage' },
     { metric: 'Rental Yield', key: 'rentalYield', format: 'percentage' },
-    { metric: 'Golden Visa Threshold', key: 'goldenVisa', format: 'currency' },
+    { metric: 'Eligibility Threshold', key: 'goldenVisa', format: 'currency' },
   ]
 
   return (

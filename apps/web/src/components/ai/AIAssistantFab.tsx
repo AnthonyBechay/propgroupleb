@@ -158,12 +158,12 @@ export function AIAssistantFab() {
           {/* AI button */}
           <button
             onClick={handleOpen}
-            className="w-16 h-16 rounded-full shadow-2xl bg-[#1B3A5C] hover:bg-[#24507D] flex items-center justify-center transition-all hover:scale-105 group"
+            className="w-16 h-16 rounded-full shadow-2xl bg-slate-900 hover:bg-slate-800 flex items-center justify-center transition-all hover:scale-105 group"
             aria-label="Open AI assistant"
           >
             <div className="relative">
               <Bot className="w-7 h-7 text-white" />
-              <Sparkles className="w-3 h-3 text-[#C49A2E] absolute -top-1 -right-1 animate-pulse" />
+              <Sparkles className="w-3 h-3 text-slate-300 absolute -top-1 -right-1 animate-pulse" />
             </div>
           </button>
         </div>
@@ -183,7 +183,7 @@ export function AIAssistantFab() {
             <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 flex flex-col h-[520px] overflow-hidden">
 
               {/* Header */}
-              <div className="flex items-center justify-between px-4 py-3 bg-[#1B3A5C] text-white rounded-t-2xl shrink-0">
+              <div className="flex items-center justify-between px-4 py-3 bg-slate-900 text-white rounded-t-2xl shrink-0">
                 <div className="flex items-center gap-3">
                   <div className="w-9 h-9 bg-white/15 rounded-xl flex items-center justify-center">
                     <Bot className="w-5 h-5 text-white" />
@@ -217,22 +217,22 @@ export function AIAssistantFab() {
               <div ref={messagesRef} className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
                 {messages.length === 0 ? (
                   <div className="flex flex-col items-center justify-center h-full text-center px-2">
-                    <div className="w-12 h-12 bg-[#E0EDF7] rounded-xl flex items-center justify-center mb-3">
-                      <MessageCircle className="w-6 h-6 text-[#1B3A5C]" />
+                    <div className="w-12 h-12 bg-slate-100 rounded-xl flex items-center justify-center mb-3">
+                      <MessageCircle className="w-6 h-6 text-slate-900" />
                     </div>
                     <h4 className="text-sm font-semibold text-slate-900 mb-1">How can I help?</h4>
                     <p className="text-xs text-slate-500 mb-4">Ask about properties, prices, ROI, locations, or anything else.</p>
 
                     <div className="space-y-2 w-full">
                       {[
-                        'Best ROI properties in Batumi',
+                        'Best properties in Beirut',
                         'Apartments under $60k',
                         'Off-plan with payment plans',
                       ].map((hint, i) => (
                         <button
                           key={i}
                           onClick={() => handleSearch(hint)}
-                          className="w-full text-left px-3 py-2 text-xs font-medium bg-slate-50 border border-slate-200 rounded-lg text-slate-600 hover:border-[#1B3A5C] hover:text-[#1B3A5C] transition-all"
+                          className="w-full text-left px-3 py-2 text-xs font-medium bg-slate-50 border border-slate-200 rounded-lg text-slate-600 hover:border-slate-900 hover:text-slate-900 transition-all"
                         >
                           {hint}
                         </button>
@@ -244,14 +244,14 @@ export function AIAssistantFab() {
                     <div key={msg.id} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                       <div className={`max-w-[85%] rounded-2xl px-3.5 py-2.5 text-sm ${
                         msg.role === 'user'
-                          ? 'bg-[#1B3A5C] text-white'
+                          ? 'bg-slate-900 text-white'
                           : 'bg-slate-100 text-slate-800'
                       }`}>
                         <p className="leading-relaxed whitespace-pre-wrap">{msg.content}</p>
                         {msg.role === 'assistant' && msg.count !== undefined && msg.count > 0 && (
                           <a
                             href={buildFilterUrl(msg.filters)}
-                            className="mt-2 flex items-center gap-1 text-xs font-semibold text-[#1B3A5C] hover:underline"
+                            className="mt-2 flex items-center gap-1 text-xs font-semibold text-slate-900 hover:underline"
                           >
                             <Search className="w-3 h-3" />
                             View {msg.count} {msg.count === 1 ? 'property' : 'properties'}
@@ -265,7 +265,7 @@ export function AIAssistantFab() {
                 {isLoading && (
                   <div className="flex justify-start">
                     <div className="bg-slate-100 rounded-2xl px-3.5 py-2.5 flex items-center gap-2">
-                      <Loader2 className="w-3.5 h-3.5 animate-spin text-[#1B3A5C]" />
+                      <Loader2 className="w-3.5 h-3.5 animate-spin text-slate-900" />
                       <span className="text-xs text-slate-500">Searching...</span>
                     </div>
                   </div>
@@ -298,12 +298,12 @@ export function AIAssistantFab() {
                     onChange={(e) => setQuery(e.target.value)}
                     onKeyDown={handleKeyPress}
                     disabled={isLoading}
-                    className="flex-1 h-10 px-3 text-sm bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-[#1B3A5C] focus:ring-1 focus:ring-[#1B3A5C]/20 transition-all disabled:opacity-50"
+                    className="flex-1 h-10 px-3 text-sm bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-slate-900 focus:ring-1 focus:ring-slate-900/20 transition-all disabled:opacity-50"
                   />
                   <button
                     onClick={() => handleSearch()}
                     disabled={!query.trim() || isLoading}
-                    className="h-10 w-10 bg-[#1B3A5C] hover:bg-[#24507D] text-white rounded-xl flex items-center justify-center transition-all disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
+                    className="h-10 w-10 bg-slate-900 hover:bg-slate-800 text-white rounded-xl flex items-center justify-center transition-all disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
                   >
                     {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
                   </button>

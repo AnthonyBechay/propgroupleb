@@ -62,8 +62,6 @@ export async function generateMetadata({ params }: PropertyPageProps): Promise<M
       city && `${city} real estate investment`,
       city && `${city} apartments for sale`,
       country && `${country} property investment`,
-      'Batumi real estate',
-      'Georgia real estate',
       'off-plan property',
       'rental yield',
     ].filter(Boolean) as string[],
