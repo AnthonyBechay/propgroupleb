@@ -1,5 +1,5 @@
 // Core Types for PropGroup Application
-// Generated from Prisma Schema
+// Lebanon real estate platform
 
 // ============================================
 // ENUMS
@@ -13,25 +13,6 @@ export enum PropertyStatus {
   OFF_PLAN = 'OFF_PLAN',
   NEW_BUILD = 'NEW_BUILD',
   RESALE = 'RESALE',
-}
-
-export enum PropertyType {
-  APARTMENT = 'APARTMENT',
-  VILLA = 'VILLA',
-  TOWNHOUSE = 'TOWNHOUSE',
-  PENTHOUSE = 'PENTHOUSE',
-  STUDIO = 'STUDIO',
-  DUPLEX = 'DUPLEX',
-  LAND = 'LAND',
-  COMMERCIAL = 'COMMERCIAL',
-  OFFICE = 'OFFICE',
-}
-
-export enum PropertyAvailabilityStatus {
-  AVAILABLE = 'AVAILABLE',
-  RESERVED = 'RESERVED',
-  SOLD = 'SOLD',
-  OFF_MARKET = 'OFF_MARKET',
 }
 
 export enum PropertyVisibility {
@@ -54,7 +35,6 @@ export enum OwnershipType {
 export enum InvestmentGoal {
   HIGH_ROI = 'HIGH_ROI',
   CAPITAL_GROWTH = 'CAPITAL_GROWTH',
-  GOLDEN_VISA = 'GOLDEN_VISA',
   PASSIVE_INCOME = 'PASSIVE_INCOME',
   LIFESTYLE = 'LIFESTYLE',
 }
@@ -64,6 +44,7 @@ export enum Role {
   AGENT = 'AGENT',
   ADMIN = 'ADMIN',
   SUPER_ADMIN = 'SUPER_ADMIN',
+  PROPERTY_MANAGER = 'PROPERTY_MANAGER',
 }
 
 export enum MembershipTier {
@@ -91,6 +72,177 @@ export enum NotificationPriority {
   NORMAL = 'NORMAL',
   HIGH = 'HIGH',
   URGENT = 'URGENT',
+}
+
+// ============================================
+// BUILDING / UNIT ENUMS
+// ============================================
+
+export enum BuildingKind {
+  STANDALONE = 'STANDALONE',
+  PROJECT = 'PROJECT',
+  COMMUNITY = 'COMMUNITY',
+  MIXED_USE = 'MIXED_USE',
+}
+
+export enum UnitKind {
+  APARTMENT = 'APARTMENT',
+  SHOP = 'SHOP',
+  OFFICE = 'OFFICE',
+  STUDIO = 'STUDIO',
+  PENTHOUSE = 'PENTHOUSE',
+  DUPLEX = 'DUPLEX',
+  VILLA = 'VILLA',
+  LAND_PARCEL = 'LAND_PARCEL',
+  STORAGE = 'STORAGE',
+  PARKING = 'PARKING',
+}
+
+export enum UnitLifecycle {
+  DRAFT = 'DRAFT',
+  FOR_SALE = 'FOR_SALE',
+  RESERVED = 'RESERVED',
+  SOLD = 'SOLD',
+  OWNER_OCCUPIED = 'OWNER_OCCUPIED',
+  FOR_RENT = 'FOR_RENT',
+  RENTED = 'RENTED',
+  VACANT = 'VACANT',
+  OFF_MARKET = 'OFF_MARKET',
+}
+
+export enum UnitOwnership {
+  PLATFORM_SOLD = 'PLATFORM_SOLD',
+  EXTERNAL = 'EXTERNAL',
+}
+
+export enum ListingIntent {
+  FOR_SALE = 'FOR_SALE',
+  FOR_RENT = 'FOR_RENT',
+}
+
+export enum ListingStatus {
+  DRAFT = 'DRAFT',
+  ACTIVE = 'ACTIVE',
+  UNDER_OFFER = 'UNDER_OFFER',
+  CLOSED = 'CLOSED',
+  ARCHIVED = 'ARCHIVED',
+}
+
+export enum Currency {
+  USD = 'USD',
+  LBP = 'LBP',
+}
+
+// ============================================
+// PROPERTY MANAGEMENT ENUMS
+// ============================================
+
+export enum TenancyStatus {
+  ACTIVE = 'ACTIVE',
+  NOTICE_PERIOD = 'NOTICE_PERIOD',
+  ENDED = 'ENDED',
+  EVICTED = 'EVICTED',
+}
+
+export enum RentPeriod {
+  MONTHLY = 'MONTHLY',
+  QUARTERLY = 'QUARTERLY',
+  ANNUALLY = 'ANNUALLY',
+}
+
+export enum RentPaymentStatus {
+  DUE = 'DUE',
+  PARTIAL = 'PARTIAL',
+  PAID = 'PAID',
+  OVERDUE = 'OVERDUE',
+  WAIVED = 'WAIVED',
+}
+
+export enum PaymentMethod {
+  CASH = 'CASH',
+  BANK_TRANSFER = 'BANK_TRANSFER',
+  CHEQUE = 'CHEQUE',
+  WHATSAPP_PAY = 'WHATSAPP_PAY',
+  OTHER = 'OTHER',
+}
+
+export enum TicketScope {
+  UNIT = 'UNIT',
+  BUILDING_COMMON = 'BUILDING_COMMON',
+}
+
+export enum TicketCategory {
+  PLUMBING = 'PLUMBING',
+  ELECTRICAL = 'ELECTRICAL',
+  HVAC = 'HVAC',
+  STRUCTURAL = 'STRUCTURAL',
+  PEST_CONTROL = 'PEST_CONTROL',
+  CLEANING = 'CLEANING',
+  ELEVATOR = 'ELEVATOR',
+  GENERATOR = 'GENERATOR',
+  INTERNET = 'INTERNET',
+  SECURITY = 'SECURITY',
+  OTHER = 'OTHER',
+}
+
+export enum TicketPriority {
+  LOW = 'LOW',
+  NORMAL = 'NORMAL',
+  HIGH = 'HIGH',
+  EMERGENCY = 'EMERGENCY',
+}
+
+export enum TicketStatus {
+  OPEN = 'OPEN',
+  TRIAGED = 'TRIAGED',
+  SCHEDULED = 'SCHEDULED',
+  IN_PROGRESS = 'IN_PROGRESS',
+  RESOLVED = 'RESOLVED',
+  CANCELLED = 'CANCELLED',
+}
+
+export enum UtilityKind {
+  ELECTRICITY = 'ELECTRICITY',
+  WATER = 'WATER',
+  GENERATOR = 'GENERATOR',
+  INTERNET = 'INTERNET',
+  GAS = 'GAS',
+  SEWAGE = 'SEWAGE',
+  OTHER = 'OTHER',
+}
+
+export enum AllocationMethod {
+  EQUAL_SPLIT = 'EQUAL_SPLIT',
+  BY_AREA = 'BY_AREA',
+  BY_UNIT_COUNT = 'BY_UNIT_COUNT',
+  CUSTOM = 'CUSTOM',
+}
+
+export enum BillStatus {
+  RECORDED = 'RECORDED',
+  ALLOCATED = 'ALLOCATED',
+  INVOICED = 'INVOICED',
+  SETTLED = 'SETTLED',
+}
+
+export enum AllocationStatus {
+  PENDING = 'PENDING',
+  INVOICED = 'INVOICED',
+  PAID = 'PAID',
+  DISPUTED = 'DISPUTED',
+}
+
+export enum ChargeCadence {
+  MONTHLY = 'MONTHLY',
+  QUARTERLY = 'QUARTERLY',
+  ANNUALLY = 'ANNUALLY',
+  ONE_OFF = 'ONE_OFF',
+}
+
+export enum ChargeStatus {
+  ACTIVE = 'ACTIVE',
+  PAUSED = 'PAUSED',
+  CANCELLED = 'CANCELLED',
 }
 
 // ============================================
@@ -134,18 +286,16 @@ export interface UserWithCounts extends User {
 }
 
 // ============================================
-// PROPERTY TYPES
+// BUILDING / UNIT TYPES
 // ============================================
 
-export interface PropertyInvestmentData {
+export interface BuildingInvestmentData {
   id: string;
-  propertyId: string;
+  buildingId: string;
   expectedROI?: number | null;
   rentalYield?: number | null;
   capitalGrowth?: number | null;
   annualAppreciation?: number | null;
-  isGoldenVisaEligible: boolean;
-  goldenVisaMinAmount?: number | null;
   minInvestment?: number | null;
   maxInvestment?: number | null;
   downPaymentPercentage?: number | null;
@@ -183,100 +333,91 @@ export interface LocationGuide {
   updatedAt: Date;
 }
 
-export interface Property {
+export interface UnitOption {
   id: string;
-  title: string;
-  shortDescription?: string | null;
-  description: string;
-  slug?: string | null;
-
-  // Type & Classification
-  propertyType: PropertyType;
-
-  // Pricing
-  price: number;
-  currency: string;
-
-  // Physical Details
-  bedrooms: number;
-  bathrooms: number;
-  area: number;
-  builtYear?: number | null;
-  floor?: number | null;
-  floors?: number | null;
-  parkingSpaces?: number | null;
-
-  // Location
-  country: Country;
-  city?: string | null;
-  district?: string | null;
-  address?: string | null;
-  zipCode?: string | null;
-  latitude?: number | null;
-  longitude?: number | null;
-
-  // Status
-  status: PropertyStatus;
-  availabilityStatus: PropertyAvailabilityStatus;
-  visibility: PropertyVisibility;
-
-  // Features
-  furnishingStatus?: FurnishingStatus | null;
-  ownershipType?: OwnershipType | null;
-  isGoldenVisaEligible: boolean;
-  hasPool: boolean;
-  hasGym: boolean;
-  hasGarden: boolean;
-  hasBalcony: boolean;
-  hasSecurity: boolean;
-  hasElevator: boolean;
-  hasCentralAC: boolean;
-
-  // Media
+  unitId: string;
+  name: string;
+  description?: string | null;
   images: string[];
-  videoUrl?: string | null;
-  virtualTourUrl?: string | null;
-
-  // SEO & Marketing
-  metaTitle?: string | null;
-  metaDescription?: string | null;
-  featured: boolean;
-  featuredUntil?: Date | null;
-  highlightedFeatures: string[];
-
-  // Analytics
-  views: number;
-
-  // Dates
-  publishedAt?: Date | null;
-  reservedUntil?: Date | null;
+  askingPrice?: number | null;
+  askingCurrency?: Currency | null;
   createdAt: Date;
   updatedAt: Date;
-
-  // Foreign Keys
-  developerId?: string | null;
-  locationGuideId?: string | null;
-  agentId?: string | null;
 }
 
-export interface PropertyWithRelations extends Property {
-  developer?: Developer | null;
-  locationGuide?: LocationGuide | null;
-  investmentData?: PropertyInvestmentData | null;
-  agent?: Partial<User> | null;
-  amenities?: PropertyAmenity[];
-  tags?: PropertyTagWithTag[];
-  reviews?: PropertyReviewWithUser[];
-  _count?: {
-    favoriteProperties: number;
-    propertyInquiries: number;
-    reviews: number;
-  };
-}
-
-export interface PropertyAmenity {
+export interface Unit {
   id: string;
-  propertyId: string;
+  buildingId: string;
+  kind: UnitKind;
+  name?: string | null;
+  unitNumber?: string | null;
+  bedrooms?: number | null;
+  bathrooms?: number | null;
+  areaSqm?: number | null;
+  floor?: number | null;
+  lifecycle: UnitLifecycle;
+  ownershipSource?: UnitOwnership | null;
+  askingPrice?: number | null;
+  askingCurrency?: Currency | null;
+  rentAmount?: number | null;
+  rentCurrency?: Currency | null;
+  rentPeriod?: RentPeriod | null;
+  images: string[];
+  features: string[];
+  views: string[];
+  options?: UnitOption[];
+  building?: Building;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface Building {
+  id: string;
+  kind: BuildingKind;
+  title: string;
+  description?: string | null;
+  shortDescription?: string | null;
+  mohafazat?: string | null;
+  caza?: string | null;
+  city?: string | null;
+  neighborhood?: string | null;
+  address?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  images: string[];
+  youtubeUrls: string[];
+  virtualTourUrl?: string | null;
+  status: PropertyStatus;
+  visibility: PropertyVisibility;
+  featured: boolean;
+  slug?: string | null;
+  hasGenerator: boolean;
+  hasElevator: boolean;
+  hasPool: boolean;
+  hasGym: boolean;
+  hasSecurity: boolean;
+  hasConcierge: boolean;
+  hasSolarPower: boolean;
+  hasRooftop: boolean;
+  hasGarden: boolean;
+  investmentData?: BuildingInvestmentData | null;
+  developer?: Developer | null;
+  agent?: Partial<User> | null;
+  units?: Unit[];
+  tags?: BuildingTagWithTag[];
+  amenities?: BuildingAmenity[];
+  _count?: {
+    favorites: number;
+    inquiries: number;
+    units: number;
+  };
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface BuildingAmenity {
+  id: string;
+  buildingId: string;
   name: string;
   category?: string | null;
   description?: string | null;
@@ -296,14 +437,222 @@ export interface Tag {
   updatedAt: Date;
 }
 
-export interface PropertyTag {
-  propertyId: string;
+export interface BuildingTag {
+  buildingId: string;
   tagId: string;
   assignedAt: Date;
 }
 
-export interface PropertyTagWithTag extends PropertyTag {
+export interface BuildingTagWithTag extends BuildingTag {
   tag: Tag;
+}
+
+// ============================================
+// LISTING TYPES
+// ============================================
+
+export interface Listing {
+  id: string;
+  subjectType: 'BUILDING' | 'UNIT';
+  buildingId?: string | null;
+  unitId?: string | null;
+  intent: ListingIntent;
+  status: ListingStatus;
+  price: number;
+  currency: Currency;
+  rentPeriod?: RentPeriod | null;
+  slug: string;
+  headline?: string | null;
+  description?: string | null;
+  highlights: string[];
+  publishedAt?: Date | null;
+  building?: Building | null;
+  unit?: Unit | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+// ============================================
+// PROPERTY MANAGEMENT TYPES
+// ============================================
+
+export interface Tenancy {
+  id: string;
+  unitId: string;
+  tenantName: string;
+  tenantPhone?: string | null;
+  tenantEmail?: string | null;
+  tenantWhatsapp?: string | null;
+  startDate: Date | string;
+  endDate?: Date | string | null;
+  rentAmount: number;
+  rentCurrency: Currency;
+  rentPeriod: RentPeriod;
+  depositAmount?: number | null;
+  status: TenancyStatus;
+  unit?: Unit & { building?: Building };
+  payments?: RentPayment[];
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface RentPayment {
+  id: string;
+  tenancyId: string;
+  dueDate: Date | string;
+  paidDate?: Date | string | null;
+  amount: number;
+  currency: Currency;
+  method?: PaymentMethod | null;
+  status: RentPaymentStatus;
+  receiptFileKey?: string | null;
+  tenancy?: Tenancy;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface TicketUpdate {
+  id: string;
+  ticketId: string;
+  body: string;
+  statusTo?: TicketStatus | null;
+  authorId?: string | null;
+  author?: Partial<User> | null;
+  createdAt: Date;
+}
+
+export interface Vendor {
+  id: string;
+  name: string;
+  trades: string[];
+  phone?: string | null;
+  whatsapp?: string | null;
+  email?: string | null;
+  isActive: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface MaintenanceTicket {
+  id: string;
+  buildingId: string;
+  unitId?: string | null;
+  scope: TicketScope;
+  category: TicketCategory;
+  priority: TicketPriority;
+  status: TicketStatus;
+  title: string;
+  description?: string | null;
+  reporterName?: string | null;
+  vendorId?: string | null;
+  assignedToUserId?: string | null;
+  costEstimate?: number | null;
+  costActual?: number | null;
+  resolvedAt?: Date | null;
+  building?: Building;
+  unit?: Unit | null;
+  vendor?: Vendor | null;
+  assignedTo?: Partial<User> | null;
+  updates?: TicketUpdate[];
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface UtilityMeter {
+  id: string;
+  buildingId: string;
+  unitId?: string | null;
+  kind: UtilityKind;
+  identifier?: string | null;
+  isActive: boolean;
+  building?: Building;
+  unit?: Unit | null;
+  readings?: UtilityReading[];
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface UtilityReading {
+  id: string;
+  meterId: string;
+  readingAt: Date | string;
+  value: number;
+  photoKey?: string | null;
+  meter?: UtilityMeter;
+  createdAt: Date;
+}
+
+export interface BillAllocation {
+  id: string;
+  billId: string;
+  unitId: string;
+  method: AllocationMethod;
+  share: number;
+  amount: number;
+  currency: Currency;
+  status: AllocationStatus;
+  unit?: Unit;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface UtilityBill {
+  id: string;
+  buildingId: string;
+  kind: UtilityKind;
+  periodStart: Date | string;
+  periodEnd: Date | string;
+  totalAmount: number;
+  currency: Currency;
+  status: BillStatus;
+  allocations?: BillAllocation[];
+  building?: Building;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface ServiceCharge {
+  id: string;
+  buildingId: string;
+  name: string;
+  amount: number;
+  currency: Currency;
+  cadence: ChargeCadence;
+  splitMethod: AllocationMethod;
+  isActive: boolean;
+  building?: Building;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface UnitExpenseShare {
+  unitId: string;
+  unitNumber?: string | null;
+  kind: UnitKind;
+  share: number;
+  amount: number;
+  currency: Currency;
+}
+
+export interface BuildingExpense {
+  id: string;
+  buildingId: string;
+  category: string;
+  description?: string | null;
+  amount: number;
+  currency: Currency;
+  date: Date | string;
+  vendorId?: string | null;
+  vendor?: Vendor | null;
+  createdAt: Date;
+}
+
+export interface FxRate {
+  id: string;
+  date: Date | string;
+  usdToLbp: number;
+  source?: string | null;
+  createdAt: Date;
 }
 
 // ============================================
@@ -317,13 +666,11 @@ export interface FavoriteProperty {
   createdAt: Date;
 }
 
-export interface FavoritePropertyWithProperty extends FavoriteProperty {
-  property: PropertyWithRelations;
-}
-
 export interface PropertyInquiry {
   id: string;
-  propertyId: string;
+  propertyId?: string | null;
+  buildingId?: string | null;
+  listingId?: string | null;
   userId?: string | null;
   name: string;
   email: string;
@@ -331,52 +678,6 @@ export interface PropertyInquiry {
   message?: string | null;
   createdAt: Date;
   updatedAt: Date;
-}
-
-export interface PropertyInquiryWithRelations extends PropertyInquiry {
-  property: Property | PropertyWithRelations;
-  user?: Partial<User> | null;
-}
-
-export interface PropertyReview {
-  id: string;
-  propertyId: string;
-  userId: string;
-  rating: number;
-  title?: string | null;
-  review: string;
-  locationRating?: number | null;
-  valueRating?: number | null;
-  qualityRating?: number | null;
-  amenitiesRating?: number | null;
-  isVerifiedPurchase: boolean;
-  status: ReviewStatus;
-  moderatedAt?: Date | null;
-  moderatedBy?: string | null;
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-export interface PropertyReviewWithUser extends PropertyReview {
-  user: Partial<User>;
-}
-
-export interface UserOwnedProperty {
-  id: string;
-  userId: string;
-  propertyId?: string | null;
-  customName: string;
-  purchasePrice: number;
-  purchaseDate: Date;
-  initialMortgage?: number | null;
-  currentRent?: number | null;
-  notes?: string | null;
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-export interface UserOwnedPropertyWithRelations extends UserOwnedProperty {
-  property?: PropertyWithRelations | null;
 }
 
 // ============================================
@@ -474,52 +775,9 @@ export interface LoginFormData {
   password: string;
 }
 
-export interface PropertyFormData extends Omit<Property, 'id' | 'createdAt' | 'updatedAt' | 'slug' | 'views' | 'publishedAt'> {
-  // Investment data fields
-  expectedROI?: number;
-  rentalYield?: number;
-  capitalGrowth?: number;
-  annualAppreciation?: number;
-  minInvestment?: number;
-  maxInvestment?: number;
-  downPaymentPercentage?: number;
-  paymentPlan?: string;
-  installmentYears?: number;
-  completionDate?: string | Date;
-  handoverDate?: string | Date;
-  expectedRentalStart?: string | Date;
-  averageRentPerMonth?: number;
-  mortgageAvailable?: boolean;
-  serviceFee?: number;
-  propertyTax?: number;
-  goldenVisaMinAmount?: number;
-}
-
-export interface PropertySearchParams {
-  page?: number;
-  limit?: number;
-  country?: string;
-  city?: string;
-  propertyType?: string;
-  status?: string;
-  availabilityStatus?: string;
-  visibility?: string;
-  minPrice?: number;
-  maxPrice?: number;
-  bedrooms?: number;
-  minBedrooms?: number;
-  maxBedrooms?: number;
-  isGoldenVisaEligible?: boolean;
-  featured?: boolean;
-  hasPool?: boolean;
-  furnishingStatus?: string;
-  search?: string;
-  sortBy?: string;
-  sortOrder?: 'asc' | 'desc';
-}
-
 export interface InquiryFormData {
-  propertyId: string;
+  buildingId?: string;
+  listingId?: string;
   name: string;
   email: string;
   phone?: string;
@@ -537,16 +795,87 @@ export interface PortfolioFormData {
 }
 
 // ============================================
-// DASHBOARD/STATS TYPES
+// SEARCH PARAM TYPES
 // ============================================
 
-export interface PortfolioStats {
-  totalProperties: number;
-  totalInvestment: number;
-  totalMortgage: number;
-  totalRent: number;
-  averageROI: number;
-  netWorth: number;
+export interface BuildingSearchParams {
+  page?: number;
+  limit?: number;
+  kind?: BuildingKind | string;
+  mohafazat?: string;
+  caza?: string;
+  city?: string;
+  status?: PropertyStatus | string;
+  visibility?: PropertyVisibility | string;
+  featured?: boolean;
+  search?: string;
+  sortBy?: string;
+  sortOrder?: 'asc' | 'desc';
+}
+
+export interface ListingSearchParams {
+  page?: number;
+  limit?: number;
+  intent?: ListingIntent | string;
+  status?: ListingStatus | string;
+  unitKind?: UnitKind | string;
+  buildingKind?: BuildingKind | string;
+  mohafazat?: string;
+  caza?: string;
+  city?: string;
+  minPrice?: number;
+  maxPrice?: number;
+  currency?: Currency | string;
+  minBedrooms?: number;
+  maxBedrooms?: number;
+  minArea?: number;
+  maxArea?: number;
+  search?: string;
+  sortBy?: string;
+  sortOrder?: 'asc' | 'desc';
+}
+
+// ============================================
+// DASHBOARD / STATS TYPES
+// ============================================
+
+export interface ManagementDashboard {
+  openTickets: {
+    total: number;
+    byPriority: {
+      EMERGENCY: number;
+      HIGH: number;
+      NORMAL: number;
+      LOW: number;
+    };
+  };
+  overdueRent: {
+    count: number;
+    totalAmount: number;
+    currency: Currency;
+  };
+  vacantUnits: number;
+  rentedUnits: number;
+  billsAwaitingSettlement: number;
+  activeTenancies: number;
+}
+
+export interface RentRollEntry {
+  tenancyId: string;
+  unitId: string;
+  unitNumber?: string | null;
+  unitKind: UnitKind;
+  buildingTitle: string;
+  tenantName: string;
+  tenantPhone?: string | null;
+  rentAmount: number;
+  rentCurrency: Currency;
+  rentPeriod: RentPeriod;
+  status: TenancyStatus;
+  startDate: Date | string;
+  endDate?: Date | string | null;
+  lastPaymentDate?: Date | string | null;
+  nextDueDate?: Date | string | null;
 }
 
 export interface AdminDashboardStats {
@@ -558,11 +887,10 @@ export interface AdminDashboardStats {
   };
   recent: {
     users: Partial<User>[];
-    inquiries: PropertyInquiryWithRelations[];
+    inquiries: PropertyInquiry[];
   };
   statistics: {
     usersByRole: { role: Role; _count: { role: number } }[];
-    propertiesByCountry: { country: Country; _count: { country: number } }[];
   };
 }
 

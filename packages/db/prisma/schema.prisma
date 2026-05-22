@@ -11,30 +11,86 @@ datasource db {
 // ENUMS
 // ============================================
 
+enum Currency {
+  USD
+  LBP
+}
+
 enum Country {
-  GEORGIA
-  CYPRUS
-  GREECE
   LEBANON
 }
 
-enum PropertyStatus {
-  OFF_PLAN
-  NEW_BUILD
-  RESALE
+// Building-level kind
+enum BuildingKind {
+  STANDALONE   // single unit: one apartment, one shop
+  PROJECT      // developer project with many units for sale
+  COMMUNITY    // residential community / compound
+  MIXED_USE    // commercial + residential in same building
 }
 
-enum PropertyAvailabilityStatus {
-  AVAILABLE
-  RESERVED
-  SOLD
-  OFF_MARKET
+// Atomic unit kind — what kind of space is this unit
+enum UnitKind {
+  APARTMENT
+  STUDIO
+  DUPLEX
+  PENTHOUSE
+  VILLA
+  TOWNHOUSE
+  SHOP
+  OFFICE
+  LAND_PARCEL
+  STORAGE
+  PARKING
+}
+
+// Where is a unit in its life
+enum UnitLifecycle {
+  DRAFT          // being set up, not visible
+  FOR_SALE       // listed for purchase
+  RESERVED       // deposit taken, awaiting completion
+  SOLD           // title transferred
+  OWNER_OCCUPIED // owner lives / uses it, not rented
+  FOR_RENT       // available to rent
+  RENTED         // active tenancy
+  VACANT         // owned but empty
+  OFF_MARKET     // hidden
+}
+
+enum UnitOwnership {
+  PLATFORM_SOLD // unit came through a sale on this platform
+  EXTERNAL      // owner registered it; not sold through us
+}
+
+// Listing polymorphism
+enum ListingSubjectType {
+  BUILDING // whole building/project marketed as one
+  UNIT     // single unit marketed individually
+}
+
+enum ListingIntent {
+  FOR_SALE
+  FOR_RENT
+}
+
+enum ListingStatus {
+  DRAFT
+  ACTIVE
+  UNDER_OFFER
+  CLOSED
+  ARCHIVED
 }
 
 enum PropertyVisibility {
   PUBLIC
   ELITE_ONLY
   HIDDEN
+}
+
+// Property status (for off-plan / new builds)
+enum PropertyStatus {
+  OFF_PLAN
+  NEW_BUILD
+  RESALE
 }
 
 enum MembershipTier {
@@ -57,18 +113,6 @@ enum ReservationStatus {
   REJECTED
   EXPIRED
   CANCELLED
-}
-
-enum PropertyType {
-  APARTMENT
-  VILLA
-  TOWNHOUSE
-  PENTHOUSE
-  STUDIO
-  DUPLEX
-  LAND
-  COMMERCIAL
-  OFFICE
 }
 
 enum FurnishingStatus {
@@ -94,14 +138,16 @@ enum DocumentType {
 enum InvestmentGoal {
   HIGH_ROI
   CAPITAL_GROWTH
-  GOLDEN_VISA
+  PASSIVE_INCOME
+  LIFESTYLE
 }
 
 enum Role {
   USER
+  AGENT
+  PROPERTY_MANAGER
   ADMIN
   SUPER_ADMIN
-  AGENT
 }
 
 enum OfferStatus {
@@ -156,7 +202,130 @@ enum NotificationType {
   MEMBERSHIP_EXPIRING
   DOCUMENT_UPLOADED
   MESSAGE_RECEIVED
+  MAINTENANCE_UPDATE
+  RENT_DUE
   SYSTEM_ANNOUNCEMENT
+}
+
+// ── Property Management enums ─────────────────────────────────────────────────
+
+enum TenancyStatus {
+  ACTIVE
+  NOTICE_PERIOD
+  ENDED
+  EVICTED
+}
+
+enum RentPeriod {
+  MONTHLY
+  QUARTERLY
+  YEARLY
+}
+
+enum RentPaymentStatus {
+  DUE
+  PARTIAL
+  PAID
+  OVERDUE
+  WAIVED
+}
+
+// Lebanese-realistic payment methods
+enum PaymentMethod {
+  CASH
+  BANK_TRANSFER
+  OMT
+  WHISH
+  FRESH_USD   // actual fresh dollars (not lollar)
+  LOLLAR      // USD trapped in Lebanese banks
+  OTHER
+}
+
+enum TicketScope {
+  UNIT            // issue inside a specific unit
+  BUILDING_COMMON // elevator, water tank, lobby, etc.
+}
+
+enum TicketCategory {
+  PLUMBING
+  ELECTRICAL
+  HVAC
+  APPLIANCE
+  STRUCTURAL
+  CLEANING
+  PEST
+  KEYS_LOCKS
+  INTERNET
+  GENERATOR
+  ELEVATOR
+  WATER_TANK
+  OTHER
+}
+
+enum TicketPriority {
+  LOW
+  NORMAL
+  HIGH
+  EMERGENCY
+}
+
+enum TicketStatus {
+  OPEN
+  TRIAGED
+  SCHEDULED
+  IN_PROGRESS
+  RESOLVED
+  CANCELLED
+}
+
+// Lebanon-specific utility kinds
+enum UtilityKind {
+  ELECTRICITY_EDL        // state grid (hours/day)
+  ELECTRICITY_GENERATOR  // private generator subscription
+  WATER                  // municipal or tanker
+  INTERNET
+  GAS
+  OTHER
+}
+
+enum AllocationMethod {
+  METERED           // by kWh/m3 consumed per unit
+  AREA_PROPORTIONAL // by unit sqm share
+  FIXED_SHARE       // manually set % per unit
+  OCCUPANT_COUNT    // by number of people in tenancy
+}
+
+enum BillStatus {
+  RECORDED   // bill entered but not split yet
+  ALLOCATED  // split into per-unit amounts
+  INVOICED   // per-unit invoices issued
+  SETTLED    // all units paid
+}
+
+enum AllocationStatus {
+  PENDING
+  INVOICED
+  PAID
+  DISPUTED
+}
+
+enum ChargeCadence {
+  MONTHLY
+  QUARTERLY
+  YEARLY
+}
+
+enum ChargeStatus {
+  DUE
+  PAID
+  WAIVED
+  OVERDUE
+}
+
+enum ShareScope {
+  BUILDING
+  UNIT
+  UNIT_OPTION
 }
 
 // ============================================
@@ -243,7 +412,7 @@ model User {
   bannedByAdmin        User?                 @relation("BannedByAdmin", fields: [bannedBy], references: [id])
   invitedUsers         User[]                @relation("InvitedByAdmin")
   invitedByAdmin       User?                 @relation("InvitedByAdmin", fields: [invitedBy], references: [id])
-  managedProperties    Property[]            @relation("PropertyAgent")
+  managedBuildings     Building[]            @relation("BuildingAgent")
 
   @@index([role])
   @@index([isActive])
@@ -259,11 +428,11 @@ model Developer {
   description String?
   website     String?
   logo        String?
-  country     Country
+  country     Country  @default(LEBANON)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  properties Property[]
+  buildings Building[]
 
   @@map("developers")
 }
@@ -272,134 +441,148 @@ model LocationGuide {
   id        String   @id @default(cuid())
   title     String
   content   String
-  country   Country
+  country   Country  @default(LEBANON)
+  city      String?
+  caza      String?
   imageUrl  String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  properties Property[]
+  buildings Building[]
 
   @@map("location_guides")
 }
 
-model Property {
-  id               String  @id @default(cuid())
+// ── FX Rate (USD/LBP) ─────────────────────────────────────────────────────────
+// Admin-maintained daily rate used for display-only conversions.
+// Never auto-convert stored amounts — just annotate what rate was in effect.
+model FxRate {
+  id        String   @id @default(cuid())
+  date      DateTime @unique
+  usdToLbp  Decimal
+  source    String?  // "admin", "banque_du_liban", "market"
+  createdBy String?
+  createdAt DateTime @default(now())
+
+  @@index([date])
+  @@map("fx_rates")
+}
+
+// ── Building ──────────────────────────────────────────────────────────────────
+// The physical structure or community.  One-to-many with Unit.
+// A standalone apartment or shop is a Building(STANDALONE) with one Unit.
+// A developer project is a Building(PROJECT) with many Units.
+model Building {
+  id               String      @id @default(cuid())
+  kind             BuildingKind @default(STANDALONE)
   title            String
-  description      String
+  description      String?
   shortDescription String?
-  price            Float
-  currency         String  @default("USD")
 
-  // Details
-  propertyType  PropertyType
+  // Location — Lebanon hierarchy
+  country      Country @default(LEBANON)
+  mohafazat    String? // governorate: Beirut, Mount Lebanon, North, South, Bekaa, Akkar, Baalbek-Hermel, Nabatieh
+  caza         String? // district within mohafazat
+  city         String?
+  neighborhood String?
+  address      String?
+  zipCode      String?
+  latitude     Float?
+  longitude    Float?
+  locationUrl  String? // Google Maps embed URL
+
+  // Building specs
   builtYear     Int?
-  floors        Int?
-  parkingSpaces Int?         @default(0)
+  totalFloors   Int?
+  parkingSpaces Int?    @default(0)
+  hasConcierge  Boolean @default(false)
+  hasGenerator  Boolean @default(false)
+  hasSolarPower Boolean @default(false)
+  hasElevator   Boolean @default(false)
+  hasPool       Boolean @default(false)
+  hasGym        Boolean @default(false)
+  hasGarden     Boolean @default(false)
+  hasSecurity   Boolean @default(false)
+  hasRooftop    Boolean @default(false)
 
-  // Location
-  country     Country
-  city        String?
-  district    String?
-  address     String?
-  zipCode     String?
-  latitude    Float?
-  longitude   Float?
-  locationUrl String?  // Google Maps / OpenStreetMap URL for interactive map embedding
-
-  // Status
-  status             PropertyStatus
-  availabilityStatus PropertyAvailabilityStatus @default(AVAILABLE)
-  visibility         PropertyVisibility         @default(PUBLIC)
-
-  // Features
-  furnishingStatus     FurnishingStatus? // kept for legacy data
-
-  ownershipType        OwnershipType?
-  isGoldenVisaEligible Boolean           @default(false)
-  hasPool              Boolean           @default(false)
-  hasGym               Boolean           @default(false)
-  hasGarden            Boolean           @default(false)
-  hasBalcony           Boolean           @default(false)
-  hasSecurity          Boolean           @default(false)
-  hasElevator          Boolean           @default(false)
-  hasCentralAC         Boolean           @default(false)
+  // Status / marketing
+  status      PropertyStatus @default(RESALE)
+  visibility  PropertyVisibility @default(PUBLIC)
+  featured    Boolean   @default(false)
+  featuredUntil DateTime?
+  views       Int       @default(0)
 
   // Media
   images         String[]
-  videoUrl       String? // deprecated — legacy single uploaded video URL; kept for old data. New entries should use youtubeUrls.
-  youtubeUrls    String[] @default([]) // YouTube video URLs embedded on the property view
+  videoUrl       String?
+  youtubeUrls    String[] @default([])
   virtualTourUrl String?
 
-  // SEO & Marketing
+  // SEO
   slug            String?   @unique
   metaTitle       String?
   metaDescription String?
-  featured        Boolean   @default(false)
-  featuredUntil   DateTime?
-  views           Int       @default(0)
 
-  // Public sharing
-  shareToken String? @unique
-
-  // Availability
-  availableFrom DateTime?
-  reservedUntil DateTime?
-  soldAt        DateTime?
-
-  // Investment Highlights
+  // Investment
   highlightedFeatures String[]
+
+  // Public sharing (legacy single token kept for compat)
+  shareToken String? @unique
 
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
   publishedAt DateTime?
 
-  // Foreign Keys
+  // Foreign keys
   developerId     String?
   locationGuideId String?
   agentId         String?
 
   // Relations
-  developer          Developer?              @relation(fields: [developerId], references: [id])
-  locationGuide      LocationGuide?          @relation(fields: [locationGuideId], references: [id])
-  agent              User?                   @relation("PropertyAgent", fields: [agentId], references: [id])
-  investmentData     PropertyInvestmentData?
-  favoriteProperties FavoriteProperty[]
-  propertyInquiries  PropertyInquiry[]
-  ownedByUsers       UserOwnedProperty[]
-  reservations       PropertyReservation[]
-  documents          PropertyDocument[]
-  amenities          PropertyAmenity[]
-  tags               PropertyTag[]
-  offers             PropertyOffer[]
-  tours              PropertyTour[]
-  transactions       Transaction[]
-  priceHistory       PropertyPriceHistory[]
-  units              Unit[]
+  developer     Developer?     @relation(fields: [developerId], references: [id])
+  locationGuide LocationGuide? @relation(fields: [locationGuideId], references: [id])
+  agent         User?          @relation("BuildingAgent", fields: [agentId], references: [id])
 
+  units            Unit[]
+  listings         Listing[]
+  documents        PropertyDocument[]
+  amenities        PropertyAmenity[]
+  tags             PropertyTag[]
+  inquiries        PropertyInquiry[]
+  favorites        FavoriteProperty[]
+  tours            PropertyTour[]
+  offers           PropertyOffer[]
+  reservations     PropertyReservation[]
+  investmentData   BuildingInvestmentData?
+  priceHistory     BuildingPriceHistory[]
+  tickets          MaintenanceTicket[]
+  serviceCharges   ServiceCharge[]
+  buildingExpenses BuildingExpense[]
+  utilityMeters    UtilityMeter[]
+  utilityBills     UtilityBill[]
+
+  @@index([kind])
   @@index([country])
-  @@index([propertyType])
+  @@index([mohafazat])
+  @@index([caza])
   @@index([status])
-  @@index([availabilityStatus])
   @@index([visibility])
   @@index([featured])
-  @@index([price])
   @@index([slug])
   @@index([agentId])
   @@index([createdAt])
-  @@map("properties")
+  @@map("buildings")
 }
 
-model PropertyInvestmentData {
+model BuildingInvestmentData {
   id         String @id @default(cuid())
-  propertyId String @unique
+  buildingId String @unique
 
-  // ROI & Returns
   expectedROI        Float?
   rentalYield        Float?
   capitalGrowth      Float?
   annualAppreciation Float?
 
-  // Investment Details
   minInvestment         Float?
   maxInvestment         Float?
   downPaymentPercentage Float?
@@ -407,21 +590,13 @@ model PropertyInvestmentData {
   paymentPlanDetails    Json?
   installmentYears      Int?
 
-  // Golden Visa
-  isGoldenVisaEligible Boolean @default(false)
-  goldenVisaMinAmount  Float?
-
-  // Dates
   completionDate      DateTime?
   handoverDate        DateTime?
   expectedRentalStart DateTime?
 
-  // Market Analysis
-  averageRentPerMonth         Float?
-  propertyAppreciationHistory Float[]
-  comparableProperties        String[]
+  averageRentPerMonth Float?
+  comparableProperties String[]
 
-  // Additional
   mortgageAvailable Boolean @default(false)
   serviceFee        Float?
   propertyTax       Float?
@@ -429,9 +604,189 @@ model PropertyInvestmentData {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  property Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  building Building @relation(fields: [buildingId], references: [id], onDelete: Cascade)
 
-  @@map("property_investment_data")
+  @@map("building_investment_data")
+}
+
+model BuildingPriceHistory {
+  id         String   @id @default(cuid())
+  buildingId String
+  price      Decimal
+  currency   Currency @default(USD)
+  changedAt  DateTime @default(now())
+  changedBy  String?
+  reason     String?
+
+  building Building @relation(fields: [buildingId], references: [id], onDelete: Cascade)
+
+  @@index([buildingId])
+  @@index([changedAt])
+  @@map("building_price_history")
+}
+
+// ── Unit ──────────────────────────────────────────────────────────────────────
+// The atomic leasable / saleable space.
+// All pricing, bedrooms, area, images live HERE, not on the parent Building.
+model Unit {
+  id         String @id @default(cuid())
+  buildingId String
+
+  // Identity
+  name       String?  // "2BR Type A", "Shop 3", "Penthouse"
+  unitNumber String?  // "4B", "G-01", "P"
+  kind       UnitKind @default(APARTMENT)
+
+  // Specs
+  bedrooms      Int?
+  bathrooms     Int?
+  areaSqm       Float?
+  floor         Int?
+  parkingSpaces Int?   @default(0)
+  furnishing    FurnishingStatus?
+  ownership     OwnershipType?
+  views         String[] // SEA, MOUNTAIN, CITY, GARDEN, STREET
+  features      String[] // BALCONY, MAID_ROOM, ROOFTOP, STORAGE, ...
+
+  // Lifecycle & ownership
+  lifecycle       UnitLifecycle @default(DRAFT)
+  ownershipSource UnitOwnership @default(PLATFORM_SOLD)
+
+  // For external units: owner contact
+  ownerName        String?
+  ownerPhone       String?
+  ownerUserId      String?
+  managedByUserId  String?
+  managementNote   String?
+  managementStartedAt DateTime?
+
+  // Sale pricing (set when lifecycle = FOR_SALE/RESERVED/SOLD)
+  askingPrice    Decimal?
+  askingCurrency Currency?
+  soldPrice      Decimal?
+  soldCurrency   Currency?
+  soldAt         DateTime?
+
+  // Rental pricing (set when lifecycle = FOR_RENT/RENTED)
+  rentAmount     Decimal?
+  rentCurrency   Currency?
+  rentPeriod     RentPeriod?
+
+  // Generator ampere subscription (for fixed-share electricity split)
+  generatorAmpere Int?
+
+  // Media
+  images  String[]
+  notes   String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  building   Building     @relation(fields: [buildingId], references: [id], onDelete: Cascade)
+  options    UnitOption[]
+  listings   Listing[]
+  documents  PropertyDocument[]
+  tenancies  Tenancy[]
+  tickets    MaintenanceTicket[]
+  meters     UtilityMeter[]
+  expenses   UnitExpenseShare[]
+  allocations BillAllocation[]
+  priceHistory UnitPriceHistory[]
+
+  @@index([buildingId])
+  @@index([kind])
+  @@index([lifecycle])
+  @@index([ownershipSource])
+  @@map("units")
+}
+
+model UnitPriceHistory {
+  id        String   @id @default(cuid())
+  unitId    String
+  price     Decimal
+  currency  Currency @default(USD)
+  field     String   // "askingPrice" | "rentAmount"
+  changedAt DateTime @default(now())
+  changedBy String?
+  reason    String?
+
+  unit Unit @relation(fields: [unitId], references: [id], onDelete: Cascade)
+
+  @@index([unitId])
+  @@index([changedAt])
+  @@map("unit_price_history")
+}
+
+model UnitOption {
+  id     String @id @default(cuid())
+  unitId String
+
+  name               String  // "Turnkey", "White Frame", "Black Frame", "Renovated"
+  pricePerSqm        Decimal
+  currency           Currency @default(USD)
+  initialPayment     Decimal?
+  paymentPlanDetails Json?
+  description        String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  unit      Unit               @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  documents PropertyDocument[]
+
+  @@index([unitId])
+  @@map("unit_options")
+}
+
+// ── Listing ───────────────────────────────────────────────────────────────────
+// A marketed offer — points at either a Building (whole project) or a Unit.
+// A standalone shop becomes Unit + 1 Listing.
+// A project launch becomes Building + 1 Listing (then per-unit as handover nears).
+model Listing {
+  id String @id @default(cuid())
+
+  subjectType ListingSubjectType
+  buildingId  String?   // set when subjectType = BUILDING
+  unitId      String?   // set when subjectType = UNIT
+
+  intent     ListingIntent
+  status     ListingStatus      @default(DRAFT)
+  visibility PropertyVisibility @default(PUBLIC)
+
+  // Pricing
+  price      Decimal
+  currency   Currency @default(USD)
+  rentPeriod RentPeriod? // only for FOR_RENT
+
+  // Marketing
+  slug        String   @unique
+  headline    String?
+  description String?
+  highlights  String[]
+
+  publishedAt DateTime?
+  closedAt    DateTime?
+  closingReason String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  building Building? @relation(fields: [buildingId], references: [id], onDelete: Cascade)
+  unit     Unit?     @relation(fields: [unitId], references: [id], onDelete: Cascade)
+
+  inquiries PropertyInquiry[]
+  favorites FavoriteProperty[]
+
+  @@index([subjectType])
+  @@index([buildingId])
+  @@index([unitId])
+  @@index([intent])
+  @@index([status])
+  @@index([visibility])
+  @@index([slug])
+  @@index([createdAt])
+  @@map("listings")
 }
 
 // ============================================
@@ -441,34 +796,39 @@ model PropertyInvestmentData {
 model FavoriteProperty {
   id         String   @id @default(cuid())
   userId     String
-  propertyId String
+  buildingId String?
+  listingId  String?
   createdAt  DateTime @default(now())
 
-  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  property Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  building Building? @relation(fields: [buildingId], references: [id], onDelete: Cascade)
+  listing  Listing?  @relation(fields: [listingId], references: [id], onDelete: Cascade)
 
-  @@unique([userId, propertyId])
+  @@unique([userId, listingId])
   @@map("favorite_properties")
 }
 
 model PropertyInquiry {
-  id            String        @id @default(cuid())
-  userId        String?
-  propertyId    String?
-  propertyTitle String?
-  name          String
-  email         String
-  phone         String?
-  message       String?
-  status        InquiryStatus @default(NEW)
-  adminNotes    String?
-  repliedAt     DateTime?
-  repliedBy     String?
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @default(now()) @updatedAt
+  id         String        @id @default(cuid())
+  userId     String?
+  buildingId String?
+  listingId  String?
+  buildingTitle String?
+
+  name      String
+  email     String
+  phone     String?
+  message   String?
+  status    InquiryStatus @default(NEW)
+  adminNotes String?
+  repliedAt  DateTime?
+  repliedBy  String?
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @default(now()) @updatedAt
 
   user     User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
-  property Property? @relation(fields: [propertyId], references: [id], onDelete: SetNull)
+  building Building? @relation(fields: [buildingId], references: [id], onDelete: SetNull)
+  listing  Listing?  @relation(fields: [listingId], references: [id], onDelete: SetNull)
 
   @@index([status])
   @@map("property_inquiries")
@@ -490,18 +850,19 @@ model ContactMessage {
 model UserOwnedProperty {
   id              String   @id @default(cuid())
   userId          String
-  propertyId      String?
+  buildingId      String?
+  unitId          String?
   customName      String
-  purchasePrice   Float
+  purchasePrice   Decimal
+  purchaseCurrency Currency @default(USD)
   purchaseDate    DateTime
-  initialMortgage Float?
-  currentRent     Float?
+  initialMortgage Decimal?
+  currentRent     Decimal?
   notes           String?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
-  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  property Property? @relation(fields: [propertyId], references: [id], onDelete: SetNull)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("user_owned_properties")
 }
@@ -539,8 +900,8 @@ model Subscription {
   userId         String
   membershipTier MembershipTier
 
-  amount   Float
-  currency String @default("USD")
+  amount   Decimal
+  currency Currency @default(USD)
 
   startDate DateTime
   endDate   DateTime
@@ -555,7 +916,7 @@ model Subscription {
   cancelledAt  DateTime?
   cancelReason String?
   refundedAt   DateTime?
-  refundAmount Float?
+  refundAmount Decimal?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -574,15 +935,16 @@ model Subscription {
 
 model PropertyReservation {
   id         String @id @default(cuid())
-  propertyId String
+  buildingId String
+  unitId     String?
   userId     String
 
   status          ReservationStatus @default(PENDING)
   reservationDate DateTime          @default(now())
   expiryDate      DateTime
 
-  reservationFee Float?
-  currency       String        @default("USD")
+  reservationFee Decimal?
+  currency       Currency      @default(USD)
   paymentStatus  PaymentStatus @default(PENDING)
   transactionId  String?
 
@@ -601,10 +963,11 @@ model PropertyReservation {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  property Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
   user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  building Building @relation(fields: [buildingId], references: [id], onDelete: Cascade)
 
-  @@index([propertyId])
+  @@index([buildingId])
+  @@index([unitId])
   @@index([userId])
   @@index([status])
   @@index([expiryDate])
@@ -617,7 +980,7 @@ model PropertyReservation {
 
 model PropertyAmenity {
   id          String  @id @default(cuid())
-  propertyId  String
+  buildingId  String
   name        String
   category    String?
   description String?
@@ -625,17 +988,17 @@ model PropertyAmenity {
 
   createdAt DateTime @default(now())
 
-  property Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  building Building @relation(fields: [buildingId], references: [id], onDelete: Cascade)
 
-  @@index([propertyId])
+  @@index([buildingId])
   @@map("property_amenities")
 }
 
 model PropertyDocument {
   id           String  @id @default(cuid())
-  propertyId   String
-  unitId       String? // null = project-level document
-  unitOptionId String? // null = not specific to a finish option
+  buildingId   String
+  unitId       String?
+  unitOptionId String?
 
   title       String
   description String?
@@ -649,36 +1012,16 @@ model PropertyDocument {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  property   Property    @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  building   Building    @relation(fields: [buildingId], references: [id], onDelete: Cascade)
   unit       Unit?       @relation(fields: [unitId], references: [id], onDelete: SetNull)
   unitOption UnitOption? @relation(fields: [unitOptionId], references: [id], onDelete: SetNull)
 
-  @@index([propertyId])
+  @@index([buildingId])
   @@index([unitId])
   @@index([unitOptionId])
   @@index([type])
   @@map("property_documents")
 }
-
-model PropertyPriceHistory {
-  id         String   @id @default(cuid())
-  propertyId String
-  price      Float
-  currency   String   @default("USD")
-  changedAt  DateTime @default(now())
-  changedBy  String?
-  reason     String?
-
-  property Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
-
-  @@index([propertyId])
-  @@index([changedAt])
-  @@map("property_price_history")
-}
-
-// ============================================
-// TAGS
-// ============================================
 
 model Tag {
   id          String  @id @default(cuid())
@@ -688,14 +1031,13 @@ model Tag {
   color       String?
   icon        String?
   category    String?
-
-  isActive  Boolean @default(true)
-  sortOrder Int     @default(0)
+  isActive    Boolean @default(true)
+  sortOrder   Int     @default(0)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  properties PropertyTag[]
+  buildingTags PropertyTag[]
 
   @@index([category])
   @@index([isActive])
@@ -704,15 +1046,15 @@ model Tag {
 
 model PropertyTag {
   id         String   @id @default(cuid())
-  propertyId String
+  buildingId String
   tagId      String
   createdAt  DateTime @default(now())
 
-  property Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  building Building @relation(fields: [buildingId], references: [id], onDelete: Cascade)
   tag      Tag      @relation(fields: [tagId], references: [id], onDelete: Cascade)
 
-  @@unique([propertyId, tagId])
-  @@index([propertyId])
+  @@unique([buildingId, tagId])
+  @@index([buildingId])
   @@index([tagId])
   @@map("property_tags")
 }
@@ -723,23 +1065,23 @@ model PropertyTag {
 
 model PropertyOffer {
   id         String @id @default(cuid())
-  propertyId String
+  buildingId String
+  unitId     String?
   userId     String
 
-  offerAmount Float
-  currency    String      @default("USD")
+  offerAmount Decimal
+  currency    Currency    @default(USD)
   status      OfferStatus @default(PENDING)
 
-  downPayment         Float?
+  downPayment         Decimal?
   financingType       String?
   proposedClosingDate DateTime?
   contingencies       String?
 
-  counterAmount Float?
+  counterAmount Decimal?
   counterTerms  String?
 
   expiresAt DateTime
-
   message    String?
   adminNotes String?
 
@@ -751,10 +1093,11 @@ model PropertyOffer {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  property Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
   user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  building Building @relation(fields: [buildingId], references: [id], onDelete: Cascade)
 
-  @@index([propertyId])
+  @@index([buildingId])
+  @@index([unitId])
   @@index([userId])
   @@index([status])
   @@index([expiresAt])
@@ -763,7 +1106,8 @@ model PropertyOffer {
 
 model PropertyTour {
   id         String @id @default(cuid())
-  propertyId String
+  buildingId String
+  unitId     String?
   userId     String
 
   tourType      TourType
@@ -796,10 +1140,11 @@ model PropertyTour {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  property Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
   user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  building Building @relation(fields: [buildingId], references: [id], onDelete: Cascade)
 
-  @@index([propertyId])
+  @@index([buildingId])
+  @@index([unitId])
   @@index([userId])
   @@index([status])
   @@index([scheduledDate])
@@ -812,17 +1157,18 @@ model PropertyTour {
 
 model Transaction {
   id         String  @id @default(cuid())
-  propertyId String
+  buildingId String
+  unitId     String?
   buyerId    String
   sellerId   String?
 
   status          TransactionStatus @default(INITIATED)
   transactionType String
 
-  agreedPrice     Float
-  currency        String @default("USD")
-  downPayment     Float?
-  remainingAmount Float?
+  agreedPrice     Decimal
+  currency        Currency @default(USD)
+  downPayment     Decimal?
+  remainingAmount Decimal?
 
   paymentSchedule Json?
 
@@ -852,16 +1198,348 @@ model Transaction {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  property Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
-  buyer    User     @relation("BuyerTransactions", fields: [buyerId], references: [id], onDelete: Cascade)
-  seller   User?    @relation("SellerTransactions", fields: [sellerId], references: [id], onDelete: SetNull)
+  buyer  User  @relation("BuyerTransactions", fields: [buyerId], references: [id], onDelete: Cascade)
+  seller User? @relation("SellerTransactions", fields: [sellerId], references: [id], onDelete: SetNull)
 
-  @@index([propertyId])
+  @@index([buildingId])
+  @@index([unitId])
   @@index([buyerId])
   @@index([sellerId])
   @@index([status])
   @@index([expectedClosingDate])
   @@map("transactions")
+}
+
+// ============================================
+// PROPERTY MANAGEMENT
+// ============================================
+
+// ── Vendor ────────────────────────────────────────────────────────────────────
+model Vendor {
+  id       String   @id @default(cuid())
+  name     String
+  trades   String[] // ["PLUMBING","ELECTRICAL"]
+  phone    String?
+  whatsapp String?
+  email    String?
+  notes    String?
+  rating   Float?
+  isActive Boolean  @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tickets MaintenanceTicket[]
+
+  @@map("vendors")
+}
+
+// ── Tenancy ───────────────────────────────────────────────────────────────────
+model Tenancy {
+  id     String @id @default(cuid())
+  unitId String
+
+  tenantName     String
+  tenantUserId   String?
+  tenantPhone    String?
+  tenantEmail    String?
+  tenantWhatsapp String?
+
+  startDate DateTime
+  endDate   DateTime?
+
+  rentAmount   Decimal
+  rentCurrency Currency   @default(USD)
+  rentPeriod   RentPeriod @default(MONTHLY)
+
+  depositAmount   Decimal?
+  depositCurrency Currency?
+
+  status         TenancyStatus @default(ACTIVE)
+  contractFileKey String?
+  notes          String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  unit     Unit          @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  payments RentPayment[]
+
+  @@index([unitId])
+  @@index([status])
+  @@index([startDate])
+  @@map("tenancies")
+}
+
+model RentPayment {
+  id         String @id @default(cuid())
+  tenancyId  String
+
+  dueDate    DateTime
+  paidDate   DateTime?
+  amount     Decimal
+  currency   Currency          @default(USD)
+  method     PaymentMethod?
+  status     RentPaymentStatus @default(DUE)
+
+  receiptFileKey String?
+  notes          String?
+  recordedBy     String // userId of staff
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenancy Tenancy @relation(fields: [tenancyId], references: [id], onDelete: Cascade)
+
+  @@index([tenancyId])
+  @@index([status])
+  @@index([dueDate])
+  @@map("rent_payments")
+}
+
+// ── Maintenance ───────────────────────────────────────────────────────────────
+model MaintenanceTicket {
+  id         String      @id @default(cuid())
+  buildingId String
+  unitId     String?     // null = building-common issue
+  scope      TicketScope @default(UNIT)
+
+  category    TicketCategory  @default(OTHER)
+  priority    TicketPriority  @default(NORMAL)
+  status      TicketStatus    @default(OPEN)
+
+  title       String
+  description String
+
+  // Reporter — may or may not be a platform user
+  reportedBy    String?
+  reporterName  String?
+  reporterPhone String?
+  reporterWhatsapp String?
+
+  // Assignment
+  assignedToUserId String?
+  vendorId         String?
+
+  // Cost tracking
+  costEstimate Decimal?
+  costActual   Decimal?
+  costCurrency Currency?
+
+  scheduledFor DateTime?
+  resolvedAt   DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  building Building            @relation(fields: [buildingId], references: [id], onDelete: Cascade)
+  unit     Unit?               @relation(fields: [unitId], references: [id], onDelete: SetNull)
+  vendor   Vendor?             @relation(fields: [vendorId], references: [id], onDelete: SetNull)
+  photos   TicketPhoto[]
+  updates  TicketUpdate[]
+
+  @@index([buildingId])
+  @@index([unitId])
+  @@index([status])
+  @@index([priority])
+  @@index([category])
+  @@index([createdAt])
+  @@map("maintenance_tickets")
+}
+
+model TicketPhoto {
+  id        String @id @default(cuid())
+  ticketId  String
+  fileKey   String
+  caption   String?
+  uploadedBy String?
+  createdAt DateTime @default(now())
+
+  ticket MaintenanceTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  @@map("ticket_photos")
+}
+
+model TicketUpdate {
+  id           String       @id @default(cuid())
+  ticketId     String
+  authorUserId String
+  body         String
+  statusFrom   TicketStatus?
+  statusTo     TicketStatus?
+  createdAt    DateTime     @default(now())
+
+  ticket MaintenanceTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  @@index([ticketId])
+  @@map("ticket_updates")
+}
+
+// ── Utilities ─────────────────────────────────────────────────────────────────
+
+model UtilityMeter {
+  id          String   @id @default(cuid())
+  buildingId  String
+  unitId      String?  // null = building-level / common meter
+  kind        UtilityKind
+  identifier  String?  // meter serial or subscription ID
+  unitOfMeasure String @default("kWh") // kWh, amp, m3, GB
+  isActive    Boolean  @default(true)
+  notes       String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  building Building         @relation(fields: [buildingId], references: [id], onDelete: Cascade)
+  unit     Unit?            @relation(fields: [unitId], references: [id], onDelete: SetNull)
+  readings UtilityReading[]
+
+  @@index([buildingId])
+  @@index([unitId])
+  @@index([kind])
+  @@map("utility_meters")
+}
+
+model UtilityReading {
+  id        String   @id @default(cuid())
+  meterId   String
+  readingAt DateTime
+  value     Decimal              // cumulative meter value
+  consumed  Decimal?             // diff vs previous (computed on insert)
+  enteredBy String              // userId of staff
+  photoKey  String?             // R2 key of meter photo
+
+  createdAt DateTime @default(now())
+
+  meter UtilityMeter @relation(fields: [meterId], references: [id], onDelete: Cascade)
+
+  @@index([meterId])
+  @@index([readingAt])
+  @@map("utility_readings")
+}
+
+model UtilityBill {
+  id          String   @id @default(cuid())
+  buildingId  String
+  kind        UtilityKind
+  periodStart DateTime
+  periodEnd   DateTime
+  totalAmount Decimal
+  currency    Currency @default(USD)
+  totalConsumed Decimal? // total kWh/m3 on invoice (for METERED splits)
+  invoiceFileKey String?
+  status      BillStatus @default(RECORDED)
+  notes       String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  building    Building         @relation(fields: [buildingId], references: [id], onDelete: Cascade)
+  allocations BillAllocation[]
+
+  @@index([buildingId])
+  @@index([kind])
+  @@index([periodStart])
+  @@index([status])
+  @@map("utility_bills")
+}
+
+model BillAllocation {
+  id      String @id @default(cuid())
+  billId  String
+  unitId  String
+
+  method  AllocationMethod
+  basis   Decimal?   // kWh consumed, sqm ratio, headcount
+  share   Decimal    // fraction of total (0–1)
+  amount  Decimal    // currency amount this unit owes
+  currency Currency  @default(USD)
+
+  status   AllocationStatus @default(PENDING)
+  paidAt   DateTime?
+  notes    String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  bill UtilityBill @relation(fields: [billId], references: [id], onDelete: Cascade)
+  unit Unit        @relation(fields: [unitId], references: [id], onDelete: Cascade)
+
+  @@index([billId])
+  @@index([unitId])
+  @@index([status])
+  @@map("bill_allocations")
+}
+
+// ── Service Charges (recurring HOA / maintenance fees) ────────────────────────
+model ServiceCharge {
+  id          String   @id @default(cuid())
+  buildingId  String
+  name        String
+  description String?
+  amount      Decimal
+  currency    Currency @default(USD)
+  cadence     ChargeCadence @default(MONTHLY)
+  splitMethod AllocationMethod @default(AREA_PROPORTIONAL)
+  isActive    Boolean  @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  building  Building           @relation(fields: [buildingId], references: [id], onDelete: Cascade)
+  unitShares UnitExpenseShare[]
+
+  @@index([buildingId])
+  @@index([isActive])
+  @@map("service_charges")
+}
+
+model UnitExpenseShare {
+  id              String  @id @default(cuid())
+  unitId          String
+  serviceChargeId String?
+  billAllocationId String?
+  description     String?
+
+  amount   Decimal
+  currency Currency @default(USD)
+  dueDate  DateTime
+  paidAt   DateTime?
+  status   ChargeStatus @default(DUE)
+  notes    String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  unit          Unit          @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  serviceCharge ServiceCharge? @relation(fields: [serviceChargeId], references: [id], onDelete: SetNull)
+
+  @@index([unitId])
+  @@index([status])
+  @@index([dueDate])
+  @@map("unit_expense_shares")
+}
+
+model BuildingExpense {
+  id          String   @id @default(cuid())
+  buildingId  String
+  description String
+  amount      Decimal
+  currency    Currency @default(USD)
+  category    String   // "REPAIR", "CLEANING", "INSURANCE", "MAINTENANCE", ...
+  vendorId    String?
+  splitMethod AllocationMethod?
+  spentAt     DateTime
+  receiptFileKey String?
+  notes       String?
+
+  createdAt DateTime @default(now())
+
+  building Building @relation(fields: [buildingId], references: [id], onDelete: Cascade)
+
+  @@index([buildingId])
+  @@index([spentAt])
+  @@map("building_expenses")
 }
 
 // ============================================
@@ -909,7 +1587,7 @@ model Message {
   subject String?
   body    String
 
-  propertyId String?
+  buildingId String?
 
   attachments String[]
 
@@ -927,14 +1605,14 @@ model Message {
   @@index([senderId])
   @@index([recipientId])
   @@index([threadId])
-  @@index([propertyId])
+  @@index([buildingId])
   @@index([parentMessageId])
   @@index([createdAt])
   @@map("messages")
 }
 
 // ============================================
-// SYSTEM SETTINGS
+// SYSTEM SETTINGS & CMS
 // ============================================
 
 model SystemSetting {
@@ -952,10 +1630,6 @@ model SystemSetting {
   @@index([category])
   @@map("system_settings")
 }
-
-// ============================================
-// CMS - SITE CONTENT & MEDIA
-// ============================================
 
 model SiteContent {
   id      String @id @default(cuid())
@@ -976,83 +1650,6 @@ model SiteContent {
   @@index([section])
   @@index([isActive])
   @@map("site_content")
-}
-
-model Unit {
-  id         String @id @default(cuid())
-  propertyId String
-
-  name          String  // e.g., "1BR - Type A", "2BR Corner Unit"
-  unitNumber    String? // e.g., "A101"
-  /// Unit-level property type (overrides project-level propertyType when set).
-  /// Useful when a single project contains multiple unit types (e.g., studios + apartments + villas).
-  propertyType  PropertyType?
-  bedrooms      Int     @default(1)
-  bathrooms     Int     @default(1)
-  area          Float   // m²
-  floor         Int?
-  parkingSpaces Int?    @default(0)
-  notes         String?
-  images        String[] // unit-specific photos shown when this unit is selected
-
-  availabilityStatus PropertyAvailabilityStatus @default(AVAILABLE)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  property  Property           @relation(fields: [propertyId], references: [id], onDelete: Cascade)
-  options   UnitOption[]
-  documents PropertyDocument[]
-
-  @@index([propertyId])
-  @@index([availabilityStatus])
-  @@map("units")
-}
-
-model UnitOption {
-  id     String @id @default(cuid())
-  unitId String
-
-  name               String  // "Turnkey", "White Frame", "Black Frame", "Renovated"
-  pricePerSqm        Float
-  currency           String  @default("USD")
-  initialPayment     Float?  // upfront/down payment amount
-  paymentPlanDetails Json?   // {summary: "...", installmentMonths: N, milestones: [{percentage, label, type}]}
-  description        String?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  unit      Unit               @relation(fields: [unitId], references: [id], onDelete: Cascade)
-  documents PropertyDocument[]
-
-  @@index([unitId])
-  @@map("unit_options")
-}
-
-enum ShareScope {
-  PROPERTY
-  UNIT
-  UNIT_OPTION
-}
-
-model ShareToken {
-  id           String     @id @default(cuid())
-  token        String     @unique
-  scope        ShareScope
-  propertyId   String
-  unitId       String?
-  unitOptionId String?
-  createdById  String?
-
-  createdAt DateTime  @default(now())
-  expiresAt DateTime?
-  revokedAt DateTime?
-
-  @@index([propertyId])
-  @@index([unitId])
-  @@index([unitOptionId])
-  @@map("share_tokens")
 }
 
 model SiteMedia {
@@ -1079,4 +1676,27 @@ model SiteMedia {
   @@index([section])
   @@index([isActive])
   @@map("site_media")
+}
+
+// ============================================
+// SHARE TOKENS
+// ============================================
+
+model ShareToken {
+  id           String     @id @default(cuid())
+  token        String     @unique
+  scope        ShareScope
+  buildingId   String
+  unitId       String?
+  unitOptionId String?
+  createdById  String?
+
+  createdAt DateTime  @default(now())
+  expiresAt DateTime?
+  revokedAt DateTime?
+
+  @@index([buildingId])
+  @@index([unitId])
+  @@index([unitOptionId])
+  @@map("share_tokens")
 }

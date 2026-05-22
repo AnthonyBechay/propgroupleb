@@ -130,6 +130,7 @@ export function requireRole(...roles: string[]) {
 export const requireAdmin = requireRole('ADMIN', 'SUPER_ADMIN');
 export const requireSuperAdmin = requireRole('SUPER_ADMIN');
 export const requireAgent = requireRole('AGENT', 'ADMIN', 'SUPER_ADMIN');
+export const requirePropertyManager = requireRole('PROPERTY_MANAGER', 'ADMIN', 'SUPER_ADMIN');
 
 /**
  * Log an admin action to the audit log.
@@ -144,7 +145,8 @@ export async function logAdminAction(
 ) {
   try {
     const user = (req as AuthenticatedRequest).user;
-    if (!user || (user.role !== 'ADMIN' && user.role !== 'SUPER_ADMIN')) {
+    const privileged = ['ADMIN', 'SUPER_ADMIN', 'PROPERTY_MANAGER'];
+    if (!user || !privileged.includes(user.role)) {
       return;
     }
 
