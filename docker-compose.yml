@@ -17,7 +17,20 @@ services:
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
       GOOGLE_CALLBACK_URL: ${GOOGLE_CALLBACK_URL:-}
+      BACKEND_URL: ${BACKEND_URL:-}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      # Cloudflare R2 — required for file uploads
+      R2_ACCOUNT_ID: ${R2_ACCOUNT_ID:-}
+      R2_ACCESS_KEY_ID: ${R2_ACCESS_KEY_ID:-}
+      R2_SECRET_ACCESS_KEY: ${R2_SECRET_ACCESS_KEY:-}
+      R2_BUCKET_NAME: ${R2_BUCKET_NAME:-}
+      R2_PUBLIC_URL: ${R2_PUBLIC_URL:-}
+      # Used by upload service to build proxied file URLs
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
+      # Resend transactional email — optional, disables email if absent
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      FROM_EMAIL: ${FROM_EMAIL:-}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-}
     volumes:
       - backend_uploads:/app/apps/backend/uploads
     networks:
@@ -28,7 +41,12 @@ services:
       timeout: 10s
       retries: 10
       start_period: 120s
-    command: ["sh", "-c", "cd packages/db && npx prisma migrate deploy && cd /app && node apps/backend/dist/index.js"]
+    # `prisma db push` syncs the schema to the database without requiring
+    # committed migration files — correct for a fresh deployment where no
+    # migration history exists. When you later create a real migration baseline
+    # (`prisma migrate dev --name init`), switch this back to:
+    #   cd packages/db && npx prisma migrate deploy && cd /app && node apps/backend/dist/index.js
+    command: ["sh", "-c", "cd packages/db && npx prisma db push --skip-generate --accept-data-loss && cd /app && node apps/backend/dist/index.js"]
 
   web:
     build:
@@ -59,7 +77,7 @@ services:
       # Tell Next.js to run on the public URL so server-generated absolute
       # links (sitemap, RSS, og:url) emit correct hosts instead of
       # `http://localhost:3000`.
-      NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL:-https://propgrp.com}
+      NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL}
       # NEXT_PUBLIC_API_URL is also passed as a build arg above for the
       # client bundle. It must additionally be set at runtime so server
       # components (e.g. sitemap.ts fetching properties + location guides)

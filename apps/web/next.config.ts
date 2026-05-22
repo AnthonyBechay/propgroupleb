@@ -1,12 +1,25 @@
 import type { NextConfig } from "next";
 
+// Derive the API hostname from the build-time env var so we don't need to
+// hardcode the domain here. Falls back to 'localhost' for local dev.
+// In Coolify this is populated by the NEXT_PUBLIC_API_URL build arg.
+function apiHostname(): string {
+  const raw = process.env.NEXT_PUBLIC_API_URL || ''
+  try {
+    return raw ? new URL(raw).hostname : 'localhost'
+  } catch {
+    return 'localhost'
+  }
+}
+
 const nextConfig: NextConfig = {
   images: {
     remotePatterns: [
-      // Backend image proxy (used when NEXT_PUBLIC_R2_PUBLIC_URL is unset)
+      // Backend image proxy (used when NEXT_PUBLIC_R2_PUBLIC_URL is unset).
+      // Hostname is derived from NEXT_PUBLIC_API_URL at build time.
       {
         protocol: 'https',
-        hostname: 'api.propgrp.com',
+        hostname: apiHostname(),
       },
       // Cloudflare R2 public buckets. When NEXT_PUBLIC_R2_PUBLIC_URL is set,
       // normalizeFileUrl rewrites proxy URLs to direct R2 URLs so the browser
