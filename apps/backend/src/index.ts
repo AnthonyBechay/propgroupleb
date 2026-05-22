@@ -14,6 +14,16 @@ import { validateEnv } from './utils/validate-env.js';
 // Import routes
 import authRoutes from './routes/auth.js';
 import propertyRoutes from './routes/properties.js';
+import buildingRoutes from './routes/buildings.js';
+import unitRoutes from './routes/units.js';
+import listingRoutes from './routes/listings.js';
+import tenancyRoutes from './routes/tenancies.js';
+import ticketRoutes from './routes/tickets.js';
+import vendorRoutes from './routes/vendors.js';
+import utilityRoutes from './routes/utilities.js';
+import serviceChargeRoutes from './routes/service-charges.js';
+import managementRoutes from './routes/management.js';
+import fxRateRoutes from './routes/fx-rates.js';
 import userRoutes from './routes/users.js';
 import favoriteRoutes from './routes/favorites.js';
 import inquiryRoutes from './routes/inquiries.js';
@@ -209,9 +219,11 @@ app.get('/health', (_req, res) => {
   res.json({ status: 'ok' });
 });
 
-// API routes
+// API routes — core
 app.use('/api/auth', authRoutes);
-app.use('/api/properties', propertyRoutes);
+app.use('/api/buildings', buildingRoutes);
+app.use('/api/units', unitRoutes);
+app.use('/api/listings', listingRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/favorites', favoriteRoutes);
 app.use('/api/inquiries', inquiryRoutes);
@@ -226,6 +238,18 @@ app.use('/api/documents', documentRoutes);
 app.use('/api/files', fileRoutes);
 app.use('/api/location-guides', locationGuideRoutes);
 app.use('/api/share', shareRoutes);
+
+// API routes — property management
+app.use('/api/tenancies', tenancyRoutes);
+app.use('/api/tickets', ticketRoutes);
+app.use('/api/vendors', vendorRoutes);
+app.use('/api/utilities', utilityRoutes);
+app.use('/api/service-charges', serviceChargeRoutes);
+app.use('/api/management', managementRoutes);
+app.use('/api/fx-rates', fxRateRoutes);
+
+// Legacy alias — keep /api/properties working during transition
+app.use('/api/properties', propertyRoutes);
 
 // Global error handler
 app.use(errorHandler);

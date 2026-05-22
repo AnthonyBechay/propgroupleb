@@ -1,6 +1,28 @@
 // API Client for PropGroup Backend
 // For production, NEXT_PUBLIC_API_URL must be set in Vercel environment variables
 import { normalizeApiUrl } from '../utils/api-url';
+import type {
+  ApiResponse,
+  PaginatedResponse,
+  Building,
+  Unit,
+  UnitOption,
+  Listing,
+  Tenancy,
+  RentPayment,
+  MaintenanceTicket,
+  TicketUpdate,
+  Vendor,
+  UtilityMeter,
+  UtilityReading,
+  UtilityBill,
+  ServiceCharge,
+  ManagementDashboard,
+  RentRollEntry,
+  FxRate,
+  BuildingSearchParams,
+  ListingSearchParams,
+} from '@/types';
 
 const API_BASE_URL = normalizeApiUrl(process.env.NEXT_PUBLIC_API_URL);
 
@@ -497,6 +519,274 @@ class ApiClient {
     return this.request(`/api/content/media/${encodeURIComponent(key)}`, {
       method: 'DELETE',
     });
+  }
+
+  // ============================================
+  // BUILDINGS
+  // ============================================
+
+  private buildQueryString(params?: Record<string, any>): string {
+    if (!params) return '';
+    const sp = new URLSearchParams();
+    Object.entries(params).forEach(([key, value]) => {
+      if (value !== undefined && value !== null) {
+        sp.append(key, value.toString());
+      }
+    });
+    const qs = sp.toString();
+    return qs ? `?${qs}` : '';
+  }
+
+  async getBuildings(params?: BuildingSearchParams): Promise<PaginatedResponse<Building>> {
+    return this.request(`/api/buildings${this.buildQueryString(params)}`);
+  }
+
+  async getBuildingBySlug(slug: string): Promise<ApiResponse<Building>> {
+    return this.request(`/api/buildings/slug/${encodeURIComponent(slug)}`);
+  }
+
+  async getBuilding(id: string): Promise<ApiResponse<Building>> {
+    return this.request(`/api/buildings/${id}`);
+  }
+
+  async createBuilding(data: Partial<Building>): Promise<ApiResponse<Building>> {
+    return this.request('/api/buildings', { method: 'POST', body: JSON.stringify(data) });
+  }
+
+  async updateBuilding(id: string, data: Partial<Building>): Promise<ApiResponse<Building>> {
+    return this.request(`/api/buildings/${id}`, { method: 'PUT', body: JSON.stringify(data) });
+  }
+
+  async deleteBuilding(id: string): Promise<ApiResponse<null>> {
+    return this.request(`/api/buildings/${id}`, { method: 'DELETE' });
+  }
+
+  async getBuildingUnits(buildingId: string): Promise<ApiResponse<Unit[]>> {
+    return this.request(`/api/buildings/${buildingId}/units`);
+  }
+
+  async createUnit(buildingId: string, data: Partial<Unit>): Promise<ApiResponse<Unit>> {
+    return this.request(`/api/buildings/${buildingId}/units`, { method: 'POST', body: JSON.stringify(data) });
+  }
+
+  // ============================================
+  // UNITS
+  // ============================================
+
+  async getUnits(params?: Record<string, string>): Promise<PaginatedResponse<Unit>> {
+    return this.request(`/api/units${this.buildQueryString(params)}`);
+  }
+
+  async getUnit(id: string): Promise<ApiResponse<Unit>> {
+    return this.request(`/api/units/${id}`);
+  }
+
+  async updateUnit(id: string, data: Partial<Unit>): Promise<ApiResponse<Unit>> {
+    return this.request(`/api/units/${id}`, { method: 'PUT', body: JSON.stringify(data) });
+  }
+
+  async deleteUnit(id: string): Promise<ApiResponse<null>> {
+    return this.request(`/api/units/${id}`, { method: 'DELETE' });
+  }
+
+  async createUnitOption(unitId: string, data: Partial<UnitOption>): Promise<ApiResponse<UnitOption>> {
+    return this.request(`/api/units/${unitId}/options`, { method: 'POST', body: JSON.stringify(data) });
+  }
+
+  async updateUnitOption(unitId: string, optionId: string, data: Partial<UnitOption>): Promise<ApiResponse<UnitOption>> {
+    return this.request(`/api/units/${unitId}/options/${optionId}`, { method: 'PUT', body: JSON.stringify(data) });
+  }
+
+  async deleteUnitOption(unitId: string, optionId: string): Promise<ApiResponse<null>> {
+    return this.request(`/api/units/${unitId}/options/${optionId}`, { method: 'DELETE' });
+  }
+
+  // ============================================
+  // LISTINGS
+  // ============================================
+
+  async getListings(params?: ListingSearchParams): Promise<PaginatedResponse<Listing>> {
+    return this.request(`/api/listings${this.buildQueryString(params)}`);
+  }
+
+  async getListingBySlug(slug: string): Promise<ApiResponse<Listing>> {
+    return this.request(`/api/listings/slug/${encodeURIComponent(slug)}`);
+  }
+
+  async getListing(id: string): Promise<ApiResponse<Listing>> {
+    return this.request(`/api/listings/${id}`);
+  }
+
+  async createListing(data: Partial<Listing>): Promise<ApiResponse<Listing>> {
+    return this.request('/api/listings', { method: 'POST', body: JSON.stringify(data) });
+  }
+
+  async updateListing(id: string, data: Partial<Listing>): Promise<ApiResponse<Listing>> {
+    return this.request(`/api/listings/${id}`, { method: 'PUT', body: JSON.stringify(data) });
+  }
+
+  async deleteListing(id: string): Promise<ApiResponse<null>> {
+    return this.request(`/api/listings/${id}`, { method: 'DELETE' });
+  }
+
+  // ============================================
+  // TENANCIES
+  // ============================================
+
+  async getTenancies(params?: Record<string, string>): Promise<PaginatedResponse<Tenancy>> {
+    return this.request(`/api/tenancies${this.buildQueryString(params)}`);
+  }
+
+  async getTenancy(id: string): Promise<ApiResponse<Tenancy>> {
+    return this.request(`/api/tenancies/${id}`);
+  }
+
+  async createTenancy(data: Partial<Tenancy>): Promise<ApiResponse<Tenancy>> {
+    return this.request('/api/tenancies', { method: 'POST', body: JSON.stringify(data) });
+  }
+
+  async updateTenancy(id: string, data: Partial<Tenancy>): Promise<ApiResponse<Tenancy>> {
+    return this.request(`/api/tenancies/${id}`, { method: 'PUT', body: JSON.stringify(data) });
+  }
+
+  async endTenancy(id: string, notes?: string): Promise<ApiResponse<Tenancy>> {
+    return this.request(`/api/tenancies/${id}/end`, { method: 'POST', body: JSON.stringify({ notes }) });
+  }
+
+  async getTenancyPayments(id: string): Promise<ApiResponse<RentPayment[]>> {
+    return this.request(`/api/tenancies/${id}/payments`);
+  }
+
+  async createRentPayment(tenancyId: string, data: Partial<RentPayment>): Promise<ApiResponse<RentPayment>> {
+    return this.request(`/api/tenancies/${tenancyId}/payments`, { method: 'POST', body: JSON.stringify(data) });
+  }
+
+  async updateRentPayment(tenancyId: string, paymentId: string, data: Partial<RentPayment>): Promise<ApiResponse<RentPayment>> {
+    return this.request(`/api/tenancies/${tenancyId}/payments/${paymentId}`, { method: 'PUT', body: JSON.stringify(data) });
+  }
+
+  // ============================================
+  // TICKETS
+  // ============================================
+
+  async getTickets(params?: Record<string, string>): Promise<PaginatedResponse<MaintenanceTicket>> {
+    return this.request(`/api/tickets${this.buildQueryString(params)}`);
+  }
+
+  async getTicket(id: string): Promise<ApiResponse<MaintenanceTicket>> {
+    return this.request(`/api/tickets/${id}`);
+  }
+
+  async createTicket(data: Partial<MaintenanceTicket>): Promise<ApiResponse<MaintenanceTicket>> {
+    return this.request('/api/tickets', { method: 'POST', body: JSON.stringify(data) });
+  }
+
+  async updateTicket(id: string, data: Partial<MaintenanceTicket>): Promise<ApiResponse<MaintenanceTicket>> {
+    return this.request(`/api/tickets/${id}`, { method: 'PUT', body: JSON.stringify(data) });
+  }
+
+  async addTicketUpdate(id: string, body: string, statusTo?: string): Promise<ApiResponse<TicketUpdate>> {
+    return this.request(`/api/tickets/${id}/updates`, { method: 'POST', body: JSON.stringify({ body, statusTo }) });
+  }
+
+  // ============================================
+  // VENDORS
+  // ============================================
+
+  async getVendors(params?: Record<string, string>): Promise<PaginatedResponse<Vendor>> {
+    return this.request(`/api/vendors${this.buildQueryString(params)}`);
+  }
+
+  async createVendor(data: Partial<Vendor>): Promise<ApiResponse<Vendor>> {
+    return this.request('/api/vendors', { method: 'POST', body: JSON.stringify(data) });
+  }
+
+  async updateVendor(id: string, data: Partial<Vendor>): Promise<ApiResponse<Vendor>> {
+    return this.request(`/api/vendors/${id}`, { method: 'PUT', body: JSON.stringify(data) });
+  }
+
+  async deleteVendor(id: string): Promise<ApiResponse<null>> {
+    return this.request(`/api/vendors/${id}`, { method: 'DELETE' });
+  }
+
+  // ============================================
+  // UTILITIES
+  // ============================================
+
+  async getMeters(params?: Record<string, string>): Promise<ApiResponse<UtilityMeter[]>> {
+    return this.request(`/api/utilities/meters${this.buildQueryString(params)}`);
+  }
+
+  async createMeter(data: Partial<UtilityMeter>): Promise<ApiResponse<UtilityMeter>> {
+    return this.request('/api/utilities/meters', { method: 'POST', body: JSON.stringify(data) });
+  }
+
+  async addMeterReading(meterId: string, data: { readingAt: string; value: number; photoKey?: string }): Promise<ApiResponse<UtilityReading>> {
+    return this.request(`/api/utilities/meters/${meterId}/readings`, { method: 'POST', body: JSON.stringify(data) });
+  }
+
+  async getBills(params?: Record<string, string>): Promise<PaginatedResponse<UtilityBill>> {
+    return this.request(`/api/utilities/bills${this.buildQueryString(params)}`);
+  }
+
+  async getBill(id: string): Promise<ApiResponse<UtilityBill>> {
+    return this.request(`/api/utilities/bills/${id}`);
+  }
+
+  async createBill(data: Partial<UtilityBill>): Promise<ApiResponse<UtilityBill>> {
+    return this.request('/api/utilities/bills', { method: 'POST', body: JSON.stringify(data) });
+  }
+
+  async allocateBill(id: string, method: string, unitShares?: Array<{ unitId: string; share: number }>): Promise<ApiResponse<UtilityBill>> {
+    return this.request(`/api/utilities/bills/${id}/allocate`, { method: 'POST', body: JSON.stringify({ method, unitShares }) });
+  }
+
+  // ============================================
+  // SERVICE CHARGES
+  // ============================================
+
+  async getServiceCharges(params?: Record<string, string>): Promise<ApiResponse<ServiceCharge[]>> {
+    return this.request(`/api/service-charges${this.buildQueryString(params)}`);
+  }
+
+  async createServiceCharge(data: Partial<ServiceCharge>): Promise<ApiResponse<ServiceCharge>> {
+    return this.request('/api/service-charges', { method: 'POST', body: JSON.stringify(data) });
+  }
+
+  async updateServiceCharge(id: string, data: Partial<ServiceCharge>): Promise<ApiResponse<ServiceCharge>> {
+    return this.request(`/api/service-charges/${id}`, { method: 'PUT', body: JSON.stringify(data) });
+  }
+
+  async generateServiceChargeShares(id: string, dueDate: string): Promise<ApiResponse<{ count: number }>> {
+    return this.request(`/api/service-charges/${id}/generate`, { method: 'POST', body: JSON.stringify({ dueDate }) });
+  }
+
+  // ============================================
+  // MANAGEMENT DASHBOARD
+  // ============================================
+
+  async getManagementDashboard(): Promise<ApiResponse<ManagementDashboard>> {
+    return this.request('/api/management/dashboard');
+  }
+
+  async getRentRoll(params?: Record<string, string>): Promise<PaginatedResponse<RentRollEntry>> {
+    return this.request(`/api/management/rent-roll${this.buildQueryString(params)}`);
+  }
+
+  async getOverdueRent(): Promise<ApiResponse<RentPayment[]>> {
+    return this.request('/api/management/overdue-rent');
+  }
+
+  // ============================================
+  // FX RATES
+  // ============================================
+
+  async getLatestFxRate(): Promise<ApiResponse<FxRate>> {
+    return this.request('/api/fx-rates/latest');
+  }
+
+  async setFxRate(data: { date: string; usdToLbp: number; source?: string }): Promise<ApiResponse<FxRate>> {
+    return this.request('/api/fx-rates', { method: 'POST', body: JSON.stringify(data) });
   }
 }
 

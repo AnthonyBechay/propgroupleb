@@ -7,7 +7,6 @@ import {
   Home,
   Building2,
   Users,
-  Shield,
   FileText,
   Settings,
   BarChart3,
@@ -18,6 +17,12 @@ import {
   ArrowLeft,
   Inbox,
   MapPin,
+  Wrench,
+  Zap,
+  ListFilter,
+  DollarSign,
+  HardHat,
+  ChevronDown,
 } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 
@@ -27,11 +32,12 @@ export function Sidebar() {
 
   const navigation = [
     { name: 'Dashboard', href: '/admin', icon: Home },
-    { name: 'Properties', href: '/admin/properties', icon: Building2 },
+    { name: 'Buildings', href: '/admin/buildings', icon: Building2 },
+    { name: 'Listings', href: '/admin/listings', icon: ListFilter },
     { name: 'Location Guides', href: '/admin/location-guides', icon: MapPin },
-    { name: 'User Management', href: '/admin/users', icon: Users },
     { name: 'Inquiries', href: '/admin/inquiries', icon: MessageSquare },
     { name: 'Contact Messages', href: '/admin/contacts', icon: Inbox },
+    { name: 'User Management', href: '/admin/users', icon: Users },
     { name: 'Site Content', href: '/admin/content', icon: PenTool },
     { name: 'Analytics', href: '/admin/analytics', icon: BarChart3 },
     { name: 'AI Settings', href: '/admin/ai-settings', icon: Bot },
@@ -39,9 +45,20 @@ export function Sidebar() {
     { name: 'Settings', href: '/admin/settings', icon: Settings },
   ]
 
+  const pmNavigation = [
+    { name: 'PM Dashboard', href: '/admin/management', icon: Home },
+    { name: 'Tenancies', href: '/admin/management/tenancies', icon: DollarSign },
+    { name: 'Maintenance', href: '/admin/management/tickets', icon: Wrench },
+    { name: 'Utilities', href: '/admin/management/utilities', icon: Zap },
+    { name: 'Service Charges', href: '/admin/management/service-charges', icon: HardHat },
+    { name: 'Vendors', href: '/admin/management/vendors', icon: HardHat },
+  ]
+
+  const isPMSection = pathname.startsWith('/admin/management')
+
   return (
     <div className="hidden lg:fixed lg:inset-y-0 lg:z-50 lg:flex lg:w-64 lg:flex-col">
-      <div className="flex grow flex-col gap-y-5 overflow-y-auto bg-[#1B3A5C] px-6 pb-4 border-r border-[#153B52]">
+      <div className="flex grow flex-col gap-y-5 overflow-y-auto bg-slate-900 px-6 pb-4 border-r border-slate-800">
         <div className="flex h-16 shrink-0 items-center">
           <div className="flex items-center space-x-3">
             <Image
@@ -56,33 +73,71 @@ export function Sidebar() {
                 Admin Panel
               </span>
               {user?.role === 'SUPER_ADMIN' && (
-                <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-semibold bg-[#C49A2E] text-white mt-0.5">
+                <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-semibold bg-amber-600 text-white mt-0.5">
                   Super Admin
+                </span>
+              )}
+              {user?.role === 'PROPERTY_MANAGER' && (
+                <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-semibold bg-slate-600 text-white mt-0.5">
+                  PM
                 </span>
               )}
             </div>
           </div>
         </div>
         <nav className="flex flex-1 flex-col">
-          <ul role="list" className="flex flex-1 flex-col gap-y-7">
+          <ul role="list" className="flex flex-1 flex-col gap-y-5">
             <li>
               <ul role="list" className="-mx-2 space-y-1">
                 {navigation.map((item) => {
                   const isActive = pathname === item.href ||
-                    (item.href === '/admin/users' && pathname.startsWith('/admin/users'))
+                    (item.href !== '/admin' && pathname.startsWith(item.href))
                   return (
                     <li key={item.name}>
                       <Link
                         href={item.href}
-                        className={`group flex gap-x-3 rounded-lg p-3 text-sm font-semibold leading-6 transition-all ${
+                        className={`group flex gap-x-3 rounded-lg p-2.5 text-sm font-medium leading-6 transition-all ${
                           isActive
-                            ? 'bg-[#C49A2E] text-white'
-                            : 'text-white/70 hover:text-white hover:bg-white/10'
+                            ? 'bg-slate-700 text-white'
+                            : 'text-slate-400 hover:text-white hover:bg-slate-800'
                         }`}
                       >
                         <item.icon
                           className={`h-5 w-5 shrink-0 ${
-                            isActive ? 'text-white' : 'text-white/50 group-hover:text-white'
+                            isActive ? 'text-white' : 'text-slate-500 group-hover:text-white'
+                          }`}
+                          aria-hidden="true"
+                        />
+                        {item.name}
+                      </Link>
+                    </li>
+                  )
+                })}
+              </ul>
+            </li>
+
+            {/* Property Management section */}
+            <li>
+              <div className="text-xs font-semibold text-slate-500 uppercase tracking-wider px-2 mb-2 flex items-center gap-1">
+                <Wrench className="h-3 w-3" /> Property Management
+              </div>
+              <ul role="list" className="-mx-2 space-y-1">
+                {pmNavigation.map((item) => {
+                  const isActive = pathname === item.href ||
+                    (item.href !== '/admin/management' && pathname.startsWith(item.href))
+                  return (
+                    <li key={item.name}>
+                      <Link
+                        href={item.href}
+                        className={`group flex gap-x-3 rounded-lg p-2.5 text-sm font-medium leading-6 transition-all ${
+                          isActive
+                            ? 'bg-slate-700 text-white'
+                            : 'text-slate-400 hover:text-white hover:bg-slate-800'
+                        }`}
+                      >
+                        <item.icon
+                          className={`h-5 w-5 shrink-0 ${
+                            isActive ? 'text-white' : 'text-slate-500 group-hover:text-white'
                           }`}
                           aria-hidden="true"
                         />
@@ -97,20 +152,20 @@ export function Sidebar() {
               <Link
                 href="/"
                 target="_blank"
-                className="group flex w-full gap-x-3 rounded-lg p-3 text-sm font-semibold leading-6 text-white/70 hover:bg-white/10 hover:text-white transition-all border border-white/20 hover:border-white/30"
+                className="group flex w-full gap-x-3 rounded-lg p-2.5 text-sm font-medium leading-6 text-slate-400 hover:bg-slate-800 hover:text-white transition-all"
               >
                 <ArrowLeft
-                  className="h-5 w-5 shrink-0 text-white/50 group-hover:text-white"
+                  className="h-5 w-5 shrink-0 text-slate-500 group-hover:text-white"
                   aria-hidden="true"
                 />
                 Back to Website
               </Link>
               <button
                 onClick={signOut}
-                className="group flex w-full gap-x-3 rounded-lg p-3 text-sm font-semibold leading-6 text-white/70 hover:bg-red-500/20 hover:text-red-300 transition-all border border-white/20 hover:border-red-400/30"
+                className="group flex w-full gap-x-3 rounded-lg p-2.5 text-sm font-medium leading-6 text-slate-400 hover:bg-red-900/30 hover:text-red-400 transition-all"
               >
                 <LogOut
-                  className="h-5 w-5 shrink-0 text-white/50 group-hover:text-red-300"
+                  className="h-5 w-5 shrink-0 text-slate-500 group-hover:text-red-400"
                   aria-hidden="true"
                 />
                 Sign out
