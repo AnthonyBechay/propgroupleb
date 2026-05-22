@@ -41,7 +41,7 @@ router.get(
     const { propertyId, unitId, unitOptionId, type } = req.query;
 
     const where: Record<string, unknown> = {};
-    if (propertyId) where.propertyId = propertyId;
+    if (propertyId) where.buildingId = propertyId;
     if (unitId) where.unitId = unitId;
     if (unitOptionId) where.unitOptionId = unitOptionId;
     if (type) where.type = type;
@@ -49,8 +49,8 @@ router.get(
     const documents = await prisma.propertyDocument.findMany({
       where,
       include: {
-        property: {
-          select: { id: true, title: true, country: true },
+        building: {
+          select: { id: true, title: true, slug: true },
         },
         unit: {
           select: { id: true, name: true },
@@ -66,7 +66,7 @@ router.get(
   })
 );
 
-// Upload a document linked to a property (admin only)
+// Upload a document linked to a building (admin only)
 router.post(
   '/',
   authenticateToken,
@@ -84,14 +84,16 @@ router.post(
   asyncHandler(async (req: Request, res: Response) => {
     const authReq = req as AuthenticatedRequest;
     const file = req.file;
+    // Accept propertyId for API compatibility, map to buildingId
     const { propertyId, unitId, unitOptionId, title, description, type, isPublic } = req.body;
+    const buildingId: string | undefined = propertyId;
 
     if (!file) {
       res.status(400).json({ error: 'No file provided' });
       return;
     }
 
-    if (!propertyId) {
+    if (!buildingId) {
       res.status(400).json({ error: 'Property ID is required' });
       return;
     }
@@ -101,14 +103,14 @@ router.post(
       return;
     }
 
-    // Verify property exists
-    const property = await prisma.property.findUnique({
-      where: { id: propertyId },
+    // Verify building exists
+    const building = await prisma.building.findUnique({
+      where: { id: buildingId },
       select: { id: true, title: true, slug: true },
     });
 
-    if (!property) {
-      sendNotFound(res, 'Property');
+    if (!building) {
+      sendNotFound(res, 'Building');
       return;
     }
 
@@ -116,11 +118,11 @@ router.post(
     const validTypes = ['FLOOR_PLAN', 'BROCHURE', 'CONTRACT', 'LEGAL_DOCUMENT', 'CERTIFICATE', 'OTHER'];
     const docType = validTypes.includes(type) ? type : 'OTHER';
 
-    // Upload file to R2 with organized path: properties/{slug}/documents/{type}/{file}
+    // Upload file to R2 with organized path: buildings/{slug}/documents/{type}/{file}
     let uploaded;
     try {
       uploaded = await uploadFile(file.buffer, file.originalname, file.mimetype, 'documents', {
-        propertySlug: property.slug || property.title,
+        propertySlug: building.slug || building.title,
         documentType: docType,
         customName: title,
       });
@@ -129,7 +131,7 @@ router.post(
         fileName: file.originalname,
         mimeType: file.mimetype,
         fileSize: file.size,
-        propertySlug: property.slug || property.title,
+        buildingSlug: building.slug || building.title,
         docType,
       });
       res.status(500).json({
@@ -141,7 +143,7 @@ router.post(
 
     const document = await prisma.propertyDocument.create({
       data: {
-        propertyId,
+        buildingId,
         unitId: unitId || null,
         unitOptionId: unitOptionId || null,
         title,
@@ -153,7 +155,7 @@ router.post(
         isPublic: isPublic === 'true',
       },
       include: {
-        property: { select: { id: true, title: true, country: true } },
+        building: { select: { id: true, title: true, slug: true } },
         unit: { select: { id: true, name: true } },
         unitOption: { select: { id: true, name: true } },
       },
@@ -162,10 +164,10 @@ router.post(
     await logAdminAction('UPLOAD_DOCUMENT', 'document', document.id, {
       title,
       type: docType,
-      propertyId,
+      buildingId,
       unitId: unitId || null,
       unitOptionId: unitOptionId || null,
-      propertyTitle: property.title,
+      buildingTitle: building.title,
       fileSize: file.size,
     }, authReq);
 
@@ -223,7 +225,7 @@ router.put(
     const existing = await prisma.propertyDocument.findUnique({
       where: { id: req.params.id },
       include: {
-        property: { select: { id: true, title: true, slug: true, country: true } },
+        building: { select: { id: true, title: true, slug: true } },
       },
     });
 
@@ -257,7 +259,7 @@ router.put(
           newFile.mimetype,
           'documents',
           {
-            propertySlug: existing.property.slug || existing.property.title,
+            propertySlug: existing.building.slug || existing.building.title,
             documentType: (normalizedType || existing.type) as string,
             customName: (title || existing.title) as string,
           }
@@ -292,7 +294,7 @@ router.put(
       where: { id: req.params.id },
       data: updateData,
       include: {
-        property: { select: { id: true, title: true, country: true } },
+        building: { select: { id: true, title: true, slug: true } },
         unit: { select: { id: true, name: true } },
         unitOption: { select: { id: true, name: true } },
       },
@@ -300,7 +302,7 @@ router.put(
 
     await logAdminAction('UPDATE_DOCUMENT', 'document', req.params.id, {
       title: updated.title,
-      propertyId: updated.property.id,
+      buildingId: updated.building.id,
       fileReplaced: !!newFile,
     }, authReq);
 
@@ -318,7 +320,7 @@ router.delete(
 
     const document = await prisma.propertyDocument.findUnique({
       where: { id: req.params.id },
-      select: { id: true, title: true, fileUrl: true, propertyId: true },
+      select: { id: true, title: true, fileUrl: true, buildingId: true },
     });
 
     if (!document) {
@@ -338,7 +340,7 @@ router.delete(
 
     await logAdminAction('DELETE_DOCUMENT', 'document', req.params.id, {
       title: document.title,
-      propertyId: document.propertyId,
+      buildingId: document.buildingId,
     }, authReq);
 
     sendSuccess(res, null, 'Document deleted successfully');

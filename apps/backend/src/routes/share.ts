@@ -11,39 +11,40 @@ const router: Router = express.Router();
 
 // ─── Scoped Share Tokens ───────────────────────────────────────────────────────
 // POST /api/share
-// Body: { propertyId, unitId?, unitOptionId? }
-// Creates (or reuses) a ShareToken scoped to PROPERTY / UNIT / UNIT_OPTION.
+// Body: { buildingId (or propertyId for compat), unitId?, unitOptionId? }
+// Creates (or reuses) a ShareToken scoped to BUILDING / UNIT / UNIT_OPTION.
 router.post(
   '/',
   authenticateToken,
   requireAdmin,
   asyncHandler(async (req: Request, res: Response) => {
     const authReq = req as AuthenticatedRequest;
-    const { propertyId, unitId, unitOptionId } = req.body as {
-      propertyId: string;
+    const { unitId, unitOptionId } = req.body as {
       unitId?: string | null;
       unitOptionId?: string | null;
     };
+    // Accept both buildingId and propertyId for API compatibility
+    const buildingId: string | undefined = req.body.buildingId || req.body.propertyId;
 
-    if (!propertyId) {
-      res.status(400).json({ error: 'propertyId is required' });
+    if (!buildingId) {
+      res.status(400).json({ error: 'buildingId is required' });
       return;
     }
 
-    const property = await prisma.property.findUnique({
-      where: { id: propertyId },
+    const building = await prisma.building.findUnique({
+      where: { id: buildingId },
       select: { id: true, title: true, slug: true },
     });
-    if (!property) {
-      res.status(404).json({ error: 'Property not found' });
+    if (!building) {
+      res.status(404).json({ error: 'Building not found' });
       return;
     }
 
-    // Validate unit/option belong to property
+    // Validate unit/option belong to building
     if (unitId) {
-      const unit = await prisma.unit.findUnique({ where: { id: unitId }, select: { propertyId: true } });
-      if (!unit || unit.propertyId !== propertyId) {
-        res.status(400).json({ error: 'Unit does not belong to this property' });
+      const unit = await prisma.unit.findUnique({ where: { id: unitId }, select: { buildingId: true } });
+      if (!unit || unit.buildingId !== buildingId) {
+        res.status(400).json({ error: 'Unit does not belong to this building' });
         return;
       }
     }
@@ -59,12 +60,12 @@ router.post(
       }
     }
 
-    const scope = unitOptionId ? 'UNIT_OPTION' : unitId ? 'UNIT' : 'PROPERTY';
+    const scope = unitOptionId ? 'UNIT_OPTION' : unitId ? 'UNIT' : 'BUILDING';
 
     // Reuse an existing non-revoked token for the same scope if present
     let existing = await prisma.shareToken.findFirst({
       where: {
-        propertyId,
+        buildingId,
         unitId: unitId ?? null,
         unitOptionId: unitOptionId ?? null,
         revokedAt: null,
@@ -81,7 +82,7 @@ router.post(
         data: {
           token,
           scope,
-          propertyId,
+          buildingId,
           unitId: unitId ?? null,
           unitOptionId: unitOptionId ?? null,
           createdById: authReq.user?.id ?? null,
@@ -90,14 +91,14 @@ router.post(
 
       await logAdminAction('GENERATE_SHARE_LINK', 'shareToken', token, {
         scope,
-        propertyId,
+        buildingId,
         unitId: unitId ?? null,
         unitOptionId: unitOptionId ?? null,
-        propertyTitle: property.title,
+        buildingTitle: building.title,
       }, authReq);
     }
 
-    sendSuccess(res, { token, scope, propertyId, unitId: unitId ?? null, unitOptionId: unitOptionId ?? null }, 'Share link ready');
+    sendSuccess(res, { token, scope, buildingId, unitId: unitId ?? null, unitOptionId: unitOptionId ?? null }, 'Share link ready');
   })
 );
 
@@ -122,17 +123,17 @@ router.delete(
   })
 );
 
-// GET /api/share/:token — PUBLIC. Resolves both legacy Property.shareToken AND new ShareToken rows.
+// GET /api/share/:token — PUBLIC. Resolves scoped ShareToken rows.
 router.get(
   '/:token',
   asyncHandler(async (req: Request, res: Response) => {
     const { token } = req.params;
 
-    // 1. Try new ShareToken table (supports unit / option scope)
+    // Try new ShareToken table (supports unit / option scope)
     const st = await prisma.shareToken.findUnique({ where: { token } });
     if (st && !st.revokedAt && (!st.expiresAt || st.expiresAt > new Date())) {
-      const property = await prisma.property.findUnique({
-        where: { id: st.propertyId },
+      const building = await prisma.building.findUnique({
+        where: { id: st.buildingId ?? '' },
         include: {
           ...PROPERTY_DETAIL_INCLUDE,
           documents: {
@@ -157,13 +158,14 @@ router.get(
         },
       });
 
-      if (!property) {
+      if (!building) {
         res.status(404).json({ error: 'Shared resource no longer available' });
         return;
       }
 
+      // Return as "property" key for frontend compatibility
       sendSuccess(res, {
-        property,
+        property: building,
         share: {
           scope: st.scope,
           unitId: st.unitId,
@@ -173,19 +175,8 @@ router.get(
       return;
     }
 
-    // 2. Fallback to legacy property-level share token
-    const property = await prisma.property.findUnique({
-      where: { shareToken: token },
-      include: {
-        ...PROPERTY_DETAIL_INCLUDE,
-        documents: { where: { isPublic: true } },
-      },
-    });
-    if (!property) {
-      res.status(404).json({ error: 'Share link is invalid or has been revoked' });
-      return;
-    }
-    sendSuccess(res, { property, share: { scope: 'PROPERTY', unitId: null, unitOptionId: null } });
+    // Legacy property-level share token: Building has no shareToken field
+    res.status(404).json({ error: 'Share link is invalid or has been revoked' });
   })
 );
 

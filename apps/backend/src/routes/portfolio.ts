@@ -3,15 +3,10 @@ import { prisma } from '@propgroup/db';
 import { authenticateToken } from '../middleware/auth.js';
 import { asyncHandler } from '../utils/errors.js';
 import { sendSuccess, sendCreated, sendNotFound } from '../utils/response.js';
-import { PROPERTY_WITH_STATS_INCLUDE } from '../utils/prisma-includes.js';
 import { ownedPropertySchema } from '../schemas/index.js';
 import type { AuthenticatedRequest } from '../types/index.js';
 
 const router: Router = express.Router();
-
-const PORTFOLIO_INCLUDE = {
-  property: { include: PROPERTY_WITH_STATS_INCLUDE },
-} as const;
 
 // Get portfolio stats - must be before /:id
 router.get(
@@ -20,19 +15,17 @@ router.get(
   asyncHandler(async (req: Request, res: Response) => {
     const authReq = req as AuthenticatedRequest;
 
+    // UserOwnedProperty has no Prisma relation object — just foreign key fields
     const owned = await prisma.userOwnedProperty.findMany({
       where: { userId: authReq.user.id },
-      include: { property: { include: { investmentData: true } } },
     });
 
     const totalProperties = owned.length;
-    const totalInvestment = owned.reduce((sum: number, p) => sum + p.purchasePrice, 0);
-    const totalMortgage = owned.reduce((sum: number, p) => sum + (p.initialMortgage || 0), 0);
-    const totalRent = owned.reduce((sum: number, p) => sum + (p.currentRent || 0), 0);
-    const propertiesWithROI = owned.filter((p) => p.property?.investmentData?.expectedROI);
-    const averageROI = propertiesWithROI.length > 0
-      ? propertiesWithROI.reduce((sum: number, p) => sum + (p.property?.investmentData?.expectedROI ?? 0), 0) / propertiesWithROI.length
-      : 0;
+    const totalInvestment = owned.reduce((sum: number, p) => sum + Number(p.purchasePrice), 0);
+    const totalMortgage = owned.reduce((sum: number, p) => sum + Number(p.initialMortgage || 0), 0);
+    const totalRent = owned.reduce((sum: number, p) => sum + Number(p.currentRent || 0), 0);
+    // ROI calculation requires joining building investment data — deferred for now
+    const averageROI = 0;
 
     sendSuccess(res, {
       totalProperties,
@@ -54,7 +47,6 @@ router.get(
 
     const owned = await prisma.userOwnedProperty.findMany({
       where: { userId: authReq.user.id },
-      include: PORTFOLIO_INCLUDE,
       orderBy: { createdAt: 'desc' },
     });
 
@@ -70,9 +62,9 @@ router.post(
     const authReq = req as AuthenticatedRequest;
     const validatedData = ownedPropertySchema.parse(req.body);
 
-    if (validatedData.propertyId) {
-      const property = await prisma.property.findUnique({ where: { id: validatedData.propertyId } });
-      if (!property) { sendNotFound(res, 'Property'); return; }
+    if (validatedData.buildingId) {
+      const building = await prisma.building.findUnique({ where: { id: validatedData.buildingId } });
+      if (!building) { sendNotFound(res, 'Building'); return; }
     }
 
     const owned = await prisma.userOwnedProperty.create({
@@ -84,9 +76,9 @@ router.post(
         initialMortgage: validatedData.initialMortgage,
         currentRent: validatedData.currentRent,
         notes: validatedData.notes,
-        propertyId: validatedData.propertyId,
+        buildingId: validatedData.buildingId ?? null,
+        unitId: validatedData.unitId ?? null,
       },
-      include: PORTFOLIO_INCLUDE,
     });
 
     sendCreated(res, owned, 'Property added to portfolio');
@@ -107,9 +99,9 @@ router.put(
 
     if (!existing) { sendNotFound(res, 'Portfolio property'); return; }
 
-    if (validatedData.propertyId) {
-      const property = await prisma.property.findUnique({ where: { id: validatedData.propertyId } });
-      if (!property) { sendNotFound(res, 'Property'); return; }
+    if (validatedData.buildingId) {
+      const building = await prisma.building.findUnique({ where: { id: validatedData.buildingId } });
+      if (!building) { sendNotFound(res, 'Building'); return; }
     }
 
     const updated = await prisma.userOwnedProperty.update({
@@ -121,9 +113,9 @@ router.put(
         initialMortgage: validatedData.initialMortgage,
         currentRent: validatedData.currentRent,
         notes: validatedData.notes,
-        propertyId: validatedData.propertyId,
+        buildingId: validatedData.buildingId ?? undefined,
+        unitId: validatedData.unitId ?? undefined,
       },
-      include: PORTFOLIO_INCLUDE,
     });
 
     sendSuccess(res, updated, 'Property updated successfully');

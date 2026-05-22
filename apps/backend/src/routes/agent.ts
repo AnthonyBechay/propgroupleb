@@ -19,71 +19,59 @@ router.get(
     const agentId = authReq.user.id;
 
     const [
-      totalProperties,
-      activeProperties,
-      soldProperties,
+      totalBuildings,
+      activeBuildings,
       totalInquiries,
       pendingInquiries,
       totalViews,
       recentInquiries,
-      topProperties,
+      topBuildings,
     ] = await Promise.all([
-      prisma.property.count({ where: { agentId } }),
-      prisma.property.count({ where: { agentId, availabilityStatus: 'AVAILABLE' } }),
-      prisma.property.count({ where: { agentId, availabilityStatus: 'SOLD' } }),
-      prisma.propertyInquiry.count({ where: { property: { agentId } } }),
+      prisma.building.count({ where: { agentId } }),
+      prisma.building.count({ where: { agentId, visibility: 'PUBLIC' } }),
+      prisma.propertyInquiry.count({ where: { building: { agentId } } }),
       prisma.propertyInquiry.count({
         where: {
-          property: { agentId },
+          building: { agentId },
           createdAt: { gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) },
         },
       }),
-      prisma.property.aggregate({ where: { agentId }, _sum: { views: true } }),
+      prisma.building.aggregate({ where: { agentId }, _sum: { views: true } }),
       prisma.propertyInquiry.findMany({
-        where: { property: { agentId } },
+        where: { building: { agentId } },
         include: {
-          property: { select: { id: true, title: true, price: true, currency: true, images: true } },
+          building: { select: { id: true, title: true, images: true } },
           user: { select: { id: true, email: true, firstName: true, lastName: true, phone: true } },
         },
         orderBy: { createdAt: 'desc' },
         take: 10,
       }),
-      prisma.property.findMany({
+      prisma.building.findMany({
         where: { agentId },
-        include: { investmentData: true, _count: { select: { propertyInquiries: true, favoriteProperties: true } } },
+        include: { investmentData: true, _count: { select: { inquiries: true, favorites: true } } },
         orderBy: { views: 'desc' },
         take: 5,
       }),
     ]);
 
     const commissionRate = authReq.user.agentCommissionRate || 3.0;
-    const soldPropertiesData = await prisma.property.findMany({
-      where: { agentId, availabilityStatus: 'SOLD' },
-      select: { price: true },
-    });
-
-    const totalSalesValue = soldPropertiesData.reduce((sum: number, p) => sum + p.price, 0);
-    const estimatedCommission = (totalSalesValue * commissionRate) / 100;
 
     sendSuccess(res, {
       overview: {
-        totalProperties,
-        activeProperties,
-        soldProperties,
+        totalBuildings,
+        activeBuildings,
         totalInquiries,
         pendingInquiries,
         totalViews: totalViews._sum.views || 0,
-        totalSalesValue,
-        estimatedCommission,
         commissionRate,
       },
       recentInquiries,
-      topProperties,
+      topBuildings,
     });
   })
 );
 
-// Get agent's properties
+// Get agent's buildings
 router.get(
   '/properties',
   authenticateToken,
@@ -91,11 +79,10 @@ router.get(
   asyncHandler(async (req: Request, res: Response) => {
     const authReq = req as AuthenticatedRequest;
     const { page, limit, skip } = parsePagination(req.query as Record<string, string>);
-    const { status, availabilityStatus, search } = req.query;
+    const { status, search } = req.query;
 
     const where: Record<string, unknown> = { agentId: authReq.user.id };
     if (status) where.status = status;
-    if (availabilityStatus) where.availabilityStatus = availabilityStatus;
     if (search) {
       where.OR = [
         { title: { contains: search, mode: 'insensitive' } },
@@ -104,18 +91,18 @@ router.get(
       ];
     }
 
-    const [properties, total] = await Promise.all([
-      prisma.property.findMany({
+    const [buildings, total] = await Promise.all([
+      prisma.building.findMany({
         where,
         include: PROPERTY_LIST_INCLUDE,
         orderBy: { createdAt: 'desc' },
         skip,
         take: limit,
       }),
-      prisma.property.count({ where }),
+      prisma.building.count({ where }),
     ]);
 
-    sendPaginated(res, properties, buildPaginationResponse(page, limit, total));
+    sendPaginated(res, buildings, buildPaginationResponse(page, limit, total));
   })
 );
 
@@ -129,14 +116,14 @@ router.get(
     const { page, limit, skip } = parsePagination(req.query as Record<string, string>);
     const { propertyId } = req.query;
 
-    const where: Record<string, unknown> = { property: { agentId: authReq.user.id } };
-    if (propertyId) where.propertyId = propertyId;
+    const where: Record<string, unknown> = { building: { agentId: authReq.user.id } };
+    if (propertyId) where.buildingId = propertyId;
 
     const [inquiries, total] = await Promise.all([
       prisma.propertyInquiry.findMany({
         where,
         include: {
-          property: { select: { id: true, title: true, price: true, currency: true, images: true, country: true, city: true } },
+          building: { select: { id: true, title: true, images: true, city: true } },
           user: { select: { id: true, email: true, firstName: true, lastName: true, phone: true, country: true } },
         },
         orderBy: { createdAt: 'desc' },
@@ -164,7 +151,7 @@ router.get(
         id: true, email: true, firstName: true, lastName: true, phone: true, country: true,
         role: true, agentLicenseNumber: true, agentCompany: true, agentBio: true,
         agentCommissionRate: true, membershipTier: true, createdAt: true,
-        _count: { select: { managedProperties: true } },
+        _count: { select: { managedBuildings: true } },
       },
     });
 
@@ -199,7 +186,7 @@ router.put(
   })
 );
 
-// Update property status (agent's own properties)
+// Update building status (agent's own buildings)
 router.patch(
   '/properties/:id/status',
   authenticateToken,
@@ -207,36 +194,37 @@ router.patch(
   asyncHandler(async (req: Request, res: Response) => {
     const authReq = req as AuthenticatedRequest;
     const { id } = req.params;
-    const { availabilityStatus } = req.body;
+    const { status } = req.body;
 
-    if (!['AVAILABLE', 'RESERVED', 'SOLD', 'OFF_MARKET'].includes(availabilityStatus)) {
-      res.status(400).json({ error: 'Bad Request', message: 'Invalid availability status' });
+    const validStatuses = ['ACTIVE', 'DRAFT', 'ARCHIVED'];
+    if (!validStatuses.includes(status)) {
+      res.status(400).json({ error: 'Bad Request', message: `Invalid status. Must be one of: ${validStatuses.join(', ')}` });
       return;
     }
 
-    const property = await prisma.property.findUnique({
+    const building = await prisma.building.findUnique({
       where: { id },
       select: { id: true, agentId: true, title: true },
     });
 
-    if (!property) { sendNotFound(res, 'Property'); return; }
-    if (property.agentId !== authReq.user.id && authReq.user.role !== 'ADMIN' && authReq.user.role !== 'SUPER_ADMIN') {
-      res.status(403).json({ error: 'Forbidden', message: 'You can only update properties assigned to you' });
+    if (!building) { sendNotFound(res, 'Building'); return; }
+    if (building.agentId !== authReq.user.id && authReq.user.role !== 'ADMIN' && authReq.user.role !== 'SUPER_ADMIN') {
+      res.status(403).json({ error: 'Forbidden', message: 'You can only update buildings assigned to you' });
       return;
     }
 
-    const updated = await prisma.property.update({
+    const updated = await prisma.building.update({
       where: { id },
-      data: { availabilityStatus },
-      select: { id: true, title: true, availabilityStatus: true, updatedAt: true },
+      data: { status },
+      select: { id: true, title: true, status: true, updatedAt: true },
     });
 
-    await logAdminAction('UPDATE_PROPERTY_STATUS', 'property', id, {
-      title: property.title,
-      newStatus: availabilityStatus,
+    await logAdminAction('UPDATE_BUILDING_STATUS', 'building', id, {
+      title: building.title,
+      newStatus: status,
     }, authReq);
 
-    sendSuccess(res, updated, 'Property status updated successfully');
+    sendSuccess(res, updated, 'Building status updated successfully');
   })
 );
 
@@ -253,39 +241,35 @@ router.get(
 
     const [
       inquiriesByDay,
-      propertiesByCountry,
-      propertiesByStatus,
+      buildingsByCity,
+      buildingsByStatus,
       conversionData,
     ] = await Promise.all([
       prisma.$queryRaw`
         SELECT DATE(created_at) as date, COUNT(*)::int as count
         FROM "PropertyInquiry"
-        WHERE property_id IN (SELECT id FROM "Property" WHERE agent_id = ${agentId})
+        WHERE building_id IN (SELECT id FROM "Building" WHERE agent_id = ${agentId})
         AND created_at >= ${startDate}
         GROUP BY DATE(created_at)
         ORDER BY date ASC
       `,
-      prisma.property.groupBy({ by: ['country'], where: { agentId }, _count: { country: true } }),
-      prisma.property.groupBy({ by: ['availabilityStatus'], where: { agentId }, _count: { availabilityStatus: true } }),
-      prisma.property.findMany({
+      prisma.building.groupBy({ by: ['city'], where: { agentId }, _count: { city: true } }),
+      prisma.building.groupBy({ by: ['status'], where: { agentId }, _count: { status: true } }),
+      prisma.building.findMany({
         where: { agentId },
-        select: { availabilityStatus: true, _count: { select: { propertyInquiries: true } } },
+        select: { status: true, _count: { select: { inquiries: true } } },
       }),
     ]);
 
-    const totalInquiries = conversionData.reduce((sum: number, p) => sum + p._count.propertyInquiries, 0);
-    const totalSales = conversionData.filter((p: { availabilityStatus: string }) => p.availabilityStatus === 'SOLD').length;
-    const conversionPercentage = totalInquiries > 0 ? ((totalSales / totalInquiries) * 100) : 0;
+    const totalInquiries = conversionData.reduce((sum: number, p: { status: string; _count: { inquiries: number } }) => sum + p._count.inquiries, 0);
 
     sendSuccess(res, {
       inquiriesByDay,
-      propertiesByCountry,
-      propertiesByStatus,
+      buildingsByCity,
+      buildingsByStatus,
       avgResponseTime: 2.5, // placeholder
       conversionRate: {
         totalInquiries,
-        totalSales,
-        percentage: parseFloat(conversionPercentage.toFixed(2)),
       },
     });
   })

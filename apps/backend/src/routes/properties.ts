@@ -1,5 +1,4 @@
 import express, { type Request, type Response, type Router } from 'express';
-import { randomBytes } from 'crypto';
 import { prisma } from '@propgroup/db';
 import { authenticateToken, requireAdmin, logAdminAction } from '../middleware/auth.js';
 import { asyncHandler } from '../utils/errors.js';
@@ -7,14 +6,14 @@ import { logger } from '../utils/logger.js';
 import { sendSuccess, sendCreated, sendPaginated, sendNotFound } from '../utils/response.js';
 import { buildPaginationResponse } from '../utils/pagination.js';
 import { PROPERTY_LIST_INCLUDE, PROPERTY_DETAIL_INCLUDE } from '../utils/prisma-includes.js';
-import { propertySchema, propertyQuerySchema, extractInvestmentData, buildInvestmentDataPayload, unitSchema, unitOptionSchema } from '../schemas/index.js';
+import { buildingSchema, buildingQuerySchema, extractInvestmentData, buildInvestmentDataPayload, unitSchema, unitOptionSchema } from '../schemas/index.js';
 import { deleteFile, extractKeyFromUrl } from '../services/upload.service.js';
 import type { AuthenticatedRequest } from '../types/index.js';
 
 const router: Router = express.Router();
 
 /**
- * Generate a URL-safe slug from a property title.
+ * Generate a URL-safe slug from a building title.
  * Handles collisions by appending -2, -3, … until unique.
  */
 async function generateUniqueSlug(
@@ -36,289 +35,225 @@ async function generateUniqueSlug(
   while (true) {
     const where: Record<string, unknown> = { slug: candidate };
     if (excludeId) where.id = { not: excludeId };
-    const exists = await db.property.findFirst({ where, select: { id: true } });
+    const exists = await db.building.findFirst({ where, select: { id: true } });
     if (!exists) return candidate;
     counter++;
     candidate = `${base}-${counter}`;
   }
 }
 
-// Get all properties (public)
+// Get all buildings (public)
 router.get(
   '/',
   asyncHandler(async (req: Request, res: Response) => {
-    const query = propertyQuerySchema.parse(req.query);
+    const query = buildingQuerySchema.parse(req.query);
     const { page, limit } = query;
     const skip = (page - 1) * limit;
 
     // Build where clause
-    const where: Record<string, unknown> = {};
+    const where: Record<string, unknown> = { visibility: 'PUBLIC' };
 
-    // "all" skips the filter (used by admin panel to see everything)
-    if (query.visibility && query.visibility !== 'all') {
-      where.visibility = query.visibility;
-    } else if (!query.visibility) {
-      where.visibility = 'PUBLIC';
-    }
-
-    if (query.availabilityStatus && query.availabilityStatus !== 'all') {
-      where.availabilityStatus = query.availabilityStatus;
-    } else if (!query.availabilityStatus) {
-      where.availabilityStatus = 'AVAILABLE';
-    }
-
-    if (query.country) where.country = query.country;
+    if (query.kind) where.kind = query.kind;
     if (query.city) where.city = { contains: query.city, mode: 'insensitive' };
-    if (query.propertyType) where.propertyType = query.propertyType;
+    if (query.mohafazat) where.mohafazat = query.mohafazat;
+    if (query.caza) where.caza = query.caza;
     if (query.status) where.status = query.status;
-    if (query.furnishingStatus) where.furnishingStatus = query.furnishingStatus;
-    if (query.isGoldenVisaEligible) where.isGoldenVisaEligible = true;
     if (query.featured) where.featured = true;
-    if (query.hasPool) where.hasPool = true;
-
-    if (query.minPrice !== undefined || query.maxPrice !== undefined) {
-      const price: Record<string, number> = {};
-      if (query.minPrice !== undefined) price.gte = query.minPrice;
-      if (query.maxPrice !== undefined) price.lte = query.maxPrice;
-      where.price = price;
-    }
-
-    if (query.bedrooms !== undefined) {
-      where.bedrooms = query.bedrooms;
-    } else if (query.minBedrooms !== undefined || query.maxBedrooms !== undefined) {
-      const bedrooms: Record<string, number> = {};
-      if (query.minBedrooms !== undefined) bedrooms.gte = query.minBedrooms;
-      if (query.maxBedrooms !== undefined) bedrooms.lte = query.maxBedrooms;
-      where.bedrooms = bedrooms;
-    }
-
-    // Area range
-    if (query.minArea !== undefined || query.maxArea !== undefined) {
-      const area: Record<string, number> = {};
-      if (query.minArea !== undefined) area.gte = query.minArea;
-      if (query.maxArea !== undefined) area.lte = query.maxArea;
-      where.area = area;
-    }
-
-    // High ROI filter — requires InvestmentData relation row with expectedROI >= 15
-    if (query.highRoi) {
-      where.investmentData = {
-        is: { expectedROI: { gte: 15 } },
-      };
-    }
 
     if (query.search) {
       where.OR = [
         { title: { contains: query.search, mode: 'insensitive' } },
         { description: { contains: query.search, mode: 'insensitive' } },
         { city: { contains: query.search, mode: 'insensitive' } },
-        { district: { contains: query.search, mode: 'insensitive' } },
+        { neighborhood: { contains: query.search, mode: 'insensitive' } },
       ];
     }
 
-    let orderBy: Record<string, string> = { createdAt: 'desc' };
+    const sortOrder = query.sortOrder || 'desc';
+    let orderBy: Record<string, string> = { createdAt: sortOrder };
     if (query.sortBy) {
-      const validSortFields = ['price', 'area', 'bedrooms', 'createdAt', 'views'];
+      const validSortFields = ['createdAt', 'views', 'title'];
       if (validSortFields.includes(query.sortBy)) {
-        orderBy = { [query.sortBy]: query.sortOrder || 'asc' };
+        orderBy = { [query.sortBy]: sortOrder };
       }
     }
 
-    const [properties, total] = await Promise.all([
-      prisma.property.findMany({
+    const [buildings, total] = await Promise.all([
+      prisma.building.findMany({
         where,
         include: PROPERTY_LIST_INCLUDE,
         orderBy,
         skip,
         take: limit,
       }),
-      prisma.property.count({ where }),
+      prisma.building.count({ where }),
     ]);
 
-    sendPaginated(res, properties, buildPaginationResponse(page, limit, total));
+    sendPaginated(res, buildings, buildPaginationResponse(page, limit, total));
   })
 );
 
-// Get property by share token (PUBLIC — no auth required)
+// Get building by slug (PUBLIC — no auth required)
 router.get(
-  '/shared/:token',
+  '/slug/:slug',
   asyncHandler(async (req: Request, res: Response) => {
-    const property = await prisma.property.findUnique({
-      where: { shareToken: req.params.token },
-      include: {
-        ...PROPERTY_DETAIL_INCLUDE,
-        documents: {
-          where: { isPublic: true },
-          select: {
-            id: true,
-            title: true,
-            description: true,
-            fileUrl: true,
-            fileSize: true,
-            mimeType: true,
-            type: true,
-            createdAt: true,
-          },
-        },
-      },
+    const building = await prisma.building.findUnique({
+      where: { slug: req.params.slug },
+      include: PROPERTY_DETAIL_INCLUDE,
     });
 
-    if (!property) {
-      res.status(404).json({ error: 'Share link is invalid or has been revoked' });
+    if (!building) {
+      res.status(404).json({ error: 'Building not found' });
       return;
     }
 
-    sendSuccess(res, property);
+    sendSuccess(res, building);
   })
 );
 
-// Get single property (public)
+// Get single building (public)
 router.get(
   '/:id',
   asyncHandler(async (req: Request, res: Response) => {
-    const property = await prisma.property.findUnique({
+    const building = await prisma.building.findUnique({
       where: { id: req.params.id },
       include: PROPERTY_DETAIL_INCLUDE,
     });
 
-    if (!property) {
-      sendNotFound(res, 'Property');
+    if (!building) {
+      sendNotFound(res, 'Building');
       return;
     }
 
     // Increment view count (fire and forget)
-    prisma.property.update({
+    prisma.building.update({
       where: { id: req.params.id },
       data: { views: { increment: 1 } },
-    }).catch(err => logger.error('Failed to increment view count', err));
+    }).catch((err: unknown) => logger.error('Failed to increment view count', err));
 
-    sendSuccess(res, property);
+    sendSuccess(res, building);
   })
 );
 
-// Create property (admin only)
+// Create building (admin only)
 router.post(
   '/',
   authenticateToken,
   requireAdmin,
   asyncHandler(async (req: Request, res: Response) => {
     const authReq = req as AuthenticatedRequest;
-    const validatedData = propertySchema.parse(req.body);
-    const { investmentData: investFields, propertyData } = extractInvestmentData(validatedData);
+    const validatedData = buildingSchema.parse(req.body);
+    const { investmentData: investFields, buildingData } = extractInvestmentData(validatedData);
 
     // Convert date strings to proper DateTime objects for Prisma
-    const pd = propertyData as Record<string, unknown>;
-    if (pd.featuredUntil && typeof pd.featuredUntil === 'string') {
-      pd.featuredUntil = new Date(pd.featuredUntil);
+    const bd = buildingData as Record<string, unknown>;
+    if (bd.featuredUntil && typeof bd.featuredUntil === 'string') {
+      bd.featuredUntil = new Date(bd.featuredUntil);
     }
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const result = await prisma.$transaction(async (tx: any) => {
       // Auto-generate slug from title if none provided
-      const slug = (propertyData as Record<string, unknown>).slug as string
-        || await generateUniqueSlug(validatedData.title, undefined, tx);
+      const slug = (bd.slug as string) || await generateUniqueSlug(validatedData.title, undefined, tx);
 
       const createData = {
-        ...propertyData,
+        ...buildingData,
         slug,
-        images: (propertyData as Record<string, unknown>).images as string[] || [],
-        highlightedFeatures: (propertyData as Record<string, unknown>).highlightedFeatures as string[] || [],
-        youtubeUrls: (propertyData as Record<string, unknown>).youtubeUrls as string[] || [],
+        images: (bd.images as string[]) || [],
+        highlightedFeatures: (bd.highlightedFeatures as string[]) || [],
+        youtubeUrls: (bd.youtubeUrls as string[]) || [],
         publishedAt: new Date(),
       };
-      const property = await tx.property.create({ data: createData });
+      const building = await tx.building.create({ data: createData });
 
       const hasInvestmentData = Object.values(investFields).some((v) => v !== undefined && v !== null);
       if (hasInvestmentData) {
-        const payload = buildInvestmentDataPayload(investFields, validatedData.isGoldenVisaEligible);
-        await tx.propertyInvestmentData.create({
+        const payload = buildInvestmentDataPayload(investFields);
+        await tx.buildingInvestmentData.create({
           data: {
-            propertyId: property.id,
+            buildingId: building.id,
             ...payload,
           },
         });
       }
 
-      return property;
+      return building;
     });
 
-    await logAdminAction('CREATE_PROPERTY', 'property', result.id, {
+    await logAdminAction('CREATE_BUILDING', 'building', result.id, {
       title: result.title,
-      price: result.price,
-      country: result.country,
+      city: result.city,
     }, authReq);
 
-    sendCreated(res, result, 'Property created successfully');
+    sendCreated(res, result, 'Building created successfully');
   })
 );
 
-// Update property (admin only)
+// Update building (admin only)
 router.put(
   '/:id',
   authenticateToken,
   requireAdmin,
   asyncHandler(async (req: Request, res: Response) => {
     const authReq = req as AuthenticatedRequest;
-    const validatedData = propertySchema.partial().parse(req.body);
+    const validatedData = buildingSchema.partial().parse(req.body);
 
-    const existing = await prisma.property.findUnique({
+    const existing = await prisma.building.findUnique({
       where: { id: req.params.id },
     });
 
     if (!existing) {
-      sendNotFound(res, 'Property');
+      sendNotFound(res, 'Building');
       return;
     }
 
-    const { investmentData: investFields, propertyData } = extractInvestmentData(validatedData);
+    const { investmentData: investFields, buildingData } = extractInvestmentData(validatedData);
 
     // Convert date strings to proper DateTime objects for Prisma
-    const pd = propertyData as Record<string, unknown>;
-    if (pd.featuredUntil && typeof pd.featuredUntil === 'string') {
-      pd.featuredUntil = new Date(pd.featuredUntil);
+    const bd = buildingData as Record<string, unknown>;
+    if (bd.featuredUntil && typeof bd.featuredUntil === 'string') {
+      bd.featuredUntil = new Date(bd.featuredUntil);
     }
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const result = await prisma.$transaction(async (tx: any) => {
-      // Backfill slug if missing (properties created before auto-slug was added)
-      // or regenerate when title changes
-      if (!existing.slug || (pd.title && pd.title !== existing.title)) {
-        const title = (pd.title as string) || existing.title;
-        pd.slug = await generateUniqueSlug(title, req.params.id, tx);
+      // Backfill slug if missing or regenerate when title changes
+      if (!existing.slug || (bd.title && bd.title !== existing.title)) {
+        const title = (bd.title as string) || existing.title;
+        bd.slug = await generateUniqueSlug(title, req.params.id, tx);
       }
 
-      const property = await tx.property.update({
+      const building = await tx.building.update({
         where: { id: req.params.id },
-        data: pd,
+        data: bd,
       });
 
       const hasInvestmentData = Object.values(investFields).some((v) => v !== undefined);
       if (hasInvestmentData) {
-        const payload = buildInvestmentDataPayload(investFields, validatedData.isGoldenVisaEligible);
-        await tx.propertyInvestmentData.upsert({
-          where: { propertyId: req.params.id },
+        const payload = buildInvestmentDataPayload(investFields);
+        await tx.buildingInvestmentData.upsert({
+          where: { buildingId: req.params.id },
           update: payload,
           create: {
-            propertyId: req.params.id,
+            buildingId: req.params.id,
             ...payload,
           },
         });
       }
 
-      return property;
+      return building;
     });
 
-    await logAdminAction('UPDATE_PROPERTY', 'property', req.params.id, {
+    await logAdminAction('UPDATE_BUILDING', 'building', req.params.id, {
       title: result.title,
-      price: result.price,
-      country: result.country,
+      city: result.city,
     }, authReq);
 
-    sendSuccess(res, result, 'Property updated successfully');
+    sendSuccess(res, result, 'Building updated successfully');
   })
 );
 
-// Bulk delete properties (admin only)
+// Bulk delete buildings (admin only)
 router.post(
   '/bulk-delete',
   authenticateToken,
@@ -328,52 +263,49 @@ router.post(
     const { ids } = req.body as { ids: string[] };
 
     if (!ids || !Array.isArray(ids) || ids.length === 0) {
-      res.status(400).json({ error: 'Please provide an array of property IDs to delete' });
+      res.status(400).json({ error: 'Please provide an array of building IDs to delete' });
       return;
     }
 
     // Fetch titles for audit log
-    const properties = await prisma.property.findMany({
+    const buildings = await prisma.building.findMany({
       where: { id: { in: ids } },
       select: { id: true, title: true },
     });
 
-    if (properties.length === 0) {
-      res.status(404).json({ error: 'No matching properties found' });
+    if (buildings.length === 0) {
+      res.status(404).json({ error: 'No matching buildings found' });
       return;
     }
 
-    // Clean up R2 files for all properties
-    await Promise.all(properties.map(p => cleanupPropertyFiles(p.id)));
+    // Clean up R2 files for all buildings
+    await Promise.all(buildings.map((b: { id: string }) => cleanupBuildingFiles(b.id)));
 
-    await prisma.property.deleteMany({ where: { id: { in: ids } } });
+    await prisma.building.deleteMany({ where: { id: { in: ids } } });
 
-    await logAdminAction('BULK_DELETE_PROPERTIES', 'property', ids.join(','), {
-      count: properties.length,
-      titles: properties.map(p => p.title),
+    await logAdminAction('BULK_DELETE_BUILDINGS', 'building', ids.join(','), {
+      count: buildings.length,
+      titles: buildings.map((b: { title: string }) => b.title),
     }, authReq);
 
-    sendSuccess(res, { deleted: properties.length }, `${properties.length} properties deleted successfully`);
+    sendSuccess(res, { deleted: buildings.length }, `${buildings.length} buildings deleted successfully`);
   })
 );
 
-// Helper: clean up R2 files for a property (images + documents)
-async function cleanupPropertyFiles(propertyId: string) {
+// Helper: clean up R2 files for a building (images + documents)
+async function cleanupBuildingFiles(buildingId: string) {
   try {
-    const property = await prisma.property.findUnique({
-      where: { id: propertyId },
+    const building = await prisma.building.findUnique({
+      where: { id: buildingId },
       select: { images: true, documents: { select: { fileUrl: true } } },
     });
-    if (!property) return;
+    if (!building) return;
 
     const urlsToDelete: string[] = [
-      ...(property.images || []),
-      ...property.documents.map(d => d.fileUrl),
+      ...(building.images || []),
+      ...building.documents.map((d: { fileUrl: string }) => d.fileUrl),
     ];
 
-    // Parallelize R2 deletes — serial `await` in the old loop meant a
-    // property with 20 images blocked admin for 20× the per-delete latency.
-    // Each delete swallows its own error so one bad key can't abort cleanup.
     await Promise.all(
       urlsToDelete.map(async (url) => {
         try {
@@ -385,11 +317,11 @@ async function cleanupPropertyFiles(propertyId: string) {
       })
     );
   } catch (err) {
-    logger.error('Failed to cleanup files for property', err, { propertyId });
+    logger.error('Failed to cleanup files for building', err, { buildingId });
   }
 }
 
-// Delete property (admin only)
+// Delete building (admin only)
 router.delete(
   '/:id',
   authenticateToken,
@@ -397,118 +329,35 @@ router.delete(
   asyncHandler(async (req: Request, res: Response) => {
     const authReq = req as AuthenticatedRequest;
 
-    const existing = await prisma.property.findUnique({
+    const existing = await prisma.building.findUnique({
       where: { id: req.params.id },
       select: { id: true, title: true },
     });
 
     if (!existing) {
-      sendNotFound(res, 'Property');
+      sendNotFound(res, 'Building');
       return;
     }
 
     // Clean up R2 files before deleting from DB
-    await cleanupPropertyFiles(req.params.id);
+    await cleanupBuildingFiles(req.params.id);
 
-    await prisma.property.delete({ where: { id: req.params.id } });
+    await prisma.building.delete({ where: { id: req.params.id } });
 
-    await logAdminAction('DELETE_PROPERTY', 'property', req.params.id, {
+    await logAdminAction('DELETE_BUILDING', 'building', req.params.id, {
       title: existing.title,
     }, authReq);
 
-    sendSuccess(res, null, 'Property deleted successfully');
+    sendSuccess(res, null, 'Building deleted successfully');
   })
 );
-
-// Generate / get share link (admin only)
-router.post(
-  '/:id/share',
-  authenticateToken,
-  requireAdmin,
-  asyncHandler(async (req: Request, res: Response) => {
-    const authReq = req as AuthenticatedRequest;
-    const property = await prisma.property.findUnique({
-      where: { id: req.params.id },
-      select: { id: true, title: true, shareToken: true },
-    });
-
-    if (!property) { sendNotFound(res, 'Property'); return; }
-
-    let { shareToken } = property;
-    if (!shareToken) {
-      // Generate a URL-safe random token
-      shareToken = randomBytes(24).toString('base64url');
-      await prisma.property.update({
-        where: { id: req.params.id },
-        data: { shareToken },
-      });
-
-      await logAdminAction('GENERATE_SHARE_LINK', 'property', req.params.id, {
-        title: property.title,
-      }, authReq);
-    }
-
-    sendSuccess(res, { shareToken }, 'Share link generated');
-  })
-);
-
-// Revoke share link (admin only)
-router.delete(
-  '/:id/share',
-  authenticateToken,
-  requireAdmin,
-  asyncHandler(async (req: Request, res: Response) => {
-    const authReq = req as AuthenticatedRequest;
-    const property = await prisma.property.findUnique({
-      where: { id: req.params.id },
-      select: { id: true, title: true },
-    });
-
-    if (!property) { sendNotFound(res, 'Property'); return; }
-
-    await prisma.property.update({
-      where: { id: req.params.id },
-      data: { shareToken: null },
-    });
-
-    await logAdminAction('REVOKE_SHARE_LINK', 'property', req.params.id, {
-      title: property.title,
-    }, authReq);
-
-    sendSuccess(res, null, 'Share link revoked');
-  })
-);
-
-// Auto-compute and store the minimum price across all unit options
-async function updatePropertyMinPrice(propertyId: string) {
-  try {
-    // Narrow select — we only need area (number) and pricePerSqm (number),
-    // not the full unit/option rows with paymentPlanDetails JSON.
-    const units = await prisma.unit.findMany({
-      where: { propertyId },
-      select: {
-        area: true,
-        options: { select: { pricePerSqm: true } },
-      },
-    });
-    const prices = units.flatMap(u => u.options.map(o => o.pricePerSqm * u.area));
-    if (prices.length > 0) {
-      await prisma.property.update({
-        where: { id: propertyId },
-        data: { price: Math.min(...prices) },
-      });
-    }
-  } catch (err) {
-    logger.error('Failed to update property min price', err, { propertyId });
-  }
-}
 
 // ─── Unit Routes ──────────────────────────────────────────────────────────────
 
-// List units for a property
+// List units for a building
 router.get('/:id/units', asyncHandler(async (req: Request, res: Response) => {
   const units = await prisma.unit.findMany({
-    where: { propertyId: req.params.id },
+    where: { buildingId: req.params.id },
     include: { options: true },
     orderBy: { createdAt: 'asc' },
   });
@@ -520,10 +369,10 @@ router.post('/:id/units', authenticateToken, requireAdmin, asyncHandler(async (r
   const authReq = req as AuthenticatedRequest;
   const data = unitSchema.parse(req.body);
   const unit = await prisma.unit.create({
-    data: { ...data, propertyId: req.params.id },
+    data: { ...data, buildingId: req.params.id },
     include: { options: true },
   });
-  await logAdminAction('CREATE_UNIT', 'unit', unit.id, { propertyId: req.params.id, name: unit.name }, authReq);
+  await logAdminAction('CREATE_UNIT', 'unit', unit.id, { buildingId: req.params.id, name: unit.name }, authReq);
   sendCreated(res, unit, 'Unit created successfully');
 }));
 
@@ -533,7 +382,7 @@ router.put('/:id/units/:unitId', authenticateToken, requireAdmin, asyncHandler(a
   const data = unitSchema.partial().parse(req.body);
   const unit = await prisma.unit.update({
     where: { id: req.params.unitId },
-    data,
+    data: data as Parameters<typeof prisma.unit.update>[0]['data'],
     include: { options: true },
   });
   await logAdminAction('UPDATE_UNIT', 'unit', unit.id, { name: unit.name }, authReq);
@@ -559,8 +408,6 @@ router.post('/:id/units/:unitId/options', authenticateToken, requireAdmin, async
   const option = await prisma.unitOption.create({
     data: { ...data, unitId: req.params.unitId },
   });
-  // Auto-update property minPrice from cheapest option
-  await updatePropertyMinPrice(req.params.id);
   await logAdminAction('CREATE_UNIT_OPTION', 'unitOption', option.id, { name: option.name }, authReq);
   sendCreated(res, option, 'Option created successfully');
 }));
@@ -573,7 +420,6 @@ router.put('/:id/units/:unitId/options/:optionId', authenticateToken, requireAdm
     where: { id: req.params.optionId },
     data,
   });
-  await updatePropertyMinPrice(req.params.id);
   await logAdminAction('UPDATE_UNIT_OPTION', 'unitOption', option.id, { name: option.name }, authReq);
   sendSuccess(res, option, 'Option updated successfully');
 }));
@@ -582,7 +428,6 @@ router.put('/:id/units/:unitId/options/:optionId', authenticateToken, requireAdm
 router.delete('/:id/units/:unitId/options/:optionId', authenticateToken, requireAdmin, asyncHandler(async (req: Request, res: Response) => {
   const authReq = req as AuthenticatedRequest;
   await prisma.unitOption.delete({ where: { id: req.params.optionId } });
-  await updatePropertyMinPrice(req.params.id);
   await logAdminAction('DELETE_UNIT_OPTION', 'unitOption', req.params.optionId, {}, authReq);
   sendSuccess(res, null, 'Option deleted successfully');
 }));

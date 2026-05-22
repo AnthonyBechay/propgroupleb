@@ -21,7 +21,7 @@ router.get(
 
     const [
       totalUsers,
-      totalProperties,
+      totalBuildings,
       totalInquiries,
       totalFavorites,
       totalContactMessages,
@@ -32,15 +32,15 @@ router.get(
       newInquiriesThisMonth,
       recentUsers,
       recentInquiries,
-      recentProperties,
+      recentBuildings,
       recentContacts,
       userStats,
-      propertyStats,
+      buildingStats,
       inquiryStatusStats,
-      propertyStatusStats,
+      buildingStatusStats,
     ] = await Promise.all([
       prisma.user.count(),
-      prisma.property.count(),
+      prisma.building.count(),
       prisma.propertyInquiry.count(),
       prisma.favoriteProperty.count(),
       prisma.contactMessage.count(),
@@ -62,17 +62,17 @@ router.get(
           id: true,
           name: true,
           email: true,
-          propertyTitle: true,
+          buildingTitle: true,
           status: true,
           createdAt: true,
-          property: { select: { id: true, title: true, price: true, currency: true } },
+          building: { select: { id: true, title: true } },
           user: { select: { id: true, email: true, firstName: true, lastName: true } },
         },
       }),
-      prisma.property.findMany({
+      prisma.building.findMany({
         take: 5,
         orderBy: { createdAt: 'desc' },
-        select: { id: true, title: true, country: true, price: true, currency: true, status: true, availabilityStatus: true, createdAt: true },
+        select: { id: true, title: true, city: true, status: true, createdAt: true },
       }),
       prisma.contactMessage.findMany({
         take: 5,
@@ -80,16 +80,16 @@ router.get(
         select: { id: true, name: true, email: true, subject: true, createdAt: true },
       }),
       prisma.user.groupBy({ by: ['role'], _count: { role: true } }),
-      prisma.property.groupBy({ by: ['country'], _count: { country: true } }),
+      prisma.building.groupBy({ by: ['city'], _count: { city: true } }),
       prisma.propertyInquiry.groupBy({ by: ['status'], _count: { status: true } }),
-      prisma.property.groupBy({ by: ['availabilityStatus'], _count: { availabilityStatus: true } }),
+      prisma.building.groupBy({ by: ['status'], _count: { status: true } }),
     ]);
 
     sendSuccess(res, {
-      overview: { totalUsers, totalProperties, totalInquiries, totalFavorites, totalContactMessages, totalDocuments },
+      overview: { totalUsers, totalBuildings, totalInquiries, totalFavorites, totalContactMessages, totalDocuments },
       trends: { newUsersThisWeek, newInquiriesThisWeek, newUsersThisMonth, newInquiriesThisMonth },
-      recent: { users: recentUsers, inquiries: recentInquiries, properties: recentProperties, contacts: recentContacts },
-      statistics: { usersByRole: userStats, propertiesByCountry: propertyStats, inquiriesByStatus: inquiryStatusStats, propertiesByStatus: propertyStatusStats },
+      recent: { users: recentUsers, inquiries: recentInquiries, buildings: recentBuildings, contacts: recentContacts },
+      statistics: { usersByRole: userStats, buildingsByCity: buildingStats, inquiriesByStatus: inquiryStatusStats, buildingsByStatus: buildingStatusStats },
     });
   })
 );

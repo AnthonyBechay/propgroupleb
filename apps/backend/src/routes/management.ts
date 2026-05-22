@@ -28,6 +28,7 @@ router.get(
         by: ['priority'],
         where: { status: { notIn: ['RESOLVED', 'CANCELLED'] } },
         _count: { id: true },
+        orderBy: { priority: 'asc' },
       }),
       prisma.rentPayment.count({ where: { status: 'OVERDUE' } }),
       prisma.utilityBill.count({ where: { status: 'ALLOCATED' } }),
@@ -41,7 +42,7 @@ router.get(
 
     const ticketsByPriority: Record<string, number> = {};
     for (const row of openTicketsByPriority) {
-      ticketsByPriority[row.priority] = row._count.id;
+      ticketsByPriority[row.priority] = (row._count as { id: number } | undefined)?.id ?? 0;
     }
 
     sendSuccess(res, {

@@ -33,7 +33,7 @@ router.get(
       where,
       orderBy: [{ country: 'asc' }, { title: 'asc' }],
       include: {
-        _count: { select: { properties: true } },
+        _count: { select: { buildings: true } },
       },
     });
 
@@ -47,7 +47,7 @@ router.get(
   asyncHandler(async (req: Request, res: Response) => {
     const guide = await prisma.locationGuide.findUnique({
       where: { id: req.params.id },
-      include: { _count: { select: { properties: true } } },
+      include: { _count: { select: { buildings: true } } },
     });
     if (!guide) { sendNotFound(res, 'Location guide'); return; }
     sendSuccess(res, guide);
@@ -113,7 +113,7 @@ router.put(
   })
 );
 
-// DELETE /api/location-guides/:id — admin delete (only if no properties linked)
+// DELETE /api/location-guides/:id — admin delete (only if no buildings linked)
 router.delete(
   '/:id',
   authenticateToken,
@@ -123,14 +123,14 @@ router.delete(
 
     const existing = await prisma.locationGuide.findUnique({
       where: { id: req.params.id },
-      include: { _count: { select: { properties: true } } },
+      include: { _count: { select: { buildings: true } } },
     });
     if (!existing) { sendNotFound(res, 'Location guide'); return; }
 
-    if (existing._count.properties > 0) {
+    if (existing._count.buildings > 0) {
       res.status(409).json({
         error: 'Cannot delete',
-        message: `${existing._count.properties} propert${existing._count.properties === 1 ? 'y is' : 'ies are'} linked to this guide. Unlink them first.`,
+        message: `${existing._count.buildings} building${existing._count.buildings === 1 ? ' is' : 's are'} linked to this guide. Unlink them first.`,
       });
       return;
     }

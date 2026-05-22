@@ -323,63 +323,29 @@ function parseNaturalLanguageQuery(query: string): SearchFilters {
 }
 
 // ── Build Prisma where clause from filters ──
+// Note: Building model doesn't have bedrooms/bathrooms/area/propertyType/furnishingStatus/ownershipType —
+// those live on Unit. Filters that don't map to Building are silently ignored here;
+// a full listing-search endpoint handles unit-level filtering.
 function buildWhereClause(filters: SearchFilters): Record<string, unknown> {
   const where: Record<string, unknown> = {
     visibility: 'PUBLIC',
-    availabilityStatus: { not: 'SOLD' },
   };
 
   // Location
   if (filters.country) where.country = filters.country;
   if (filters.city) where.city = { contains: filters.city, mode: 'insensitive' };
-  if (filters.district) where.district = { contains: filters.district, mode: 'insensitive' };
+  if (filters.district) where.neighborhood = { contains: filters.district, mode: 'insensitive' };
 
-  // Price
-  if (filters.minPrice !== undefined || filters.maxPrice !== undefined) {
-    const price: Record<string, number> = {};
-    if (filters.minPrice !== undefined) price.gte = filters.minPrice;
-    if (filters.maxPrice !== undefined) price.lte = filters.maxPrice;
-    where.price = price;
-  }
-
-  // Bedrooms
-  if (filters.bedrooms !== undefined) where.bedrooms = filters.bedrooms;
-  else if (filters.minBedrooms !== undefined || filters.maxBedrooms !== undefined) {
-    const bedrooms: Record<string, number> = {};
-    if (filters.minBedrooms !== undefined) bedrooms.gte = filters.minBedrooms;
-    if (filters.maxBedrooms !== undefined) bedrooms.lte = filters.maxBedrooms;
-    where.bedrooms = bedrooms;
-  }
-
-  // Bathrooms
-  if (filters.bathrooms !== undefined) where.bathrooms = { gte: filters.bathrooms };
-
-  // Area
-  if (filters.minArea !== undefined || filters.maxArea !== undefined) {
-    const area: Record<string, number> = {};
-    if (filters.minArea !== undefined) area.gte = filters.minArea;
-    if (filters.maxArea !== undefined) area.lte = filters.maxArea;
-    where.area = area;
-  }
-
-  // Property characteristics
-  if (filters.propertyType) where.propertyType = filters.propertyType;
-  if (filters.status) where.status = filters.status;
-  if (filters.furnishingStatus) where.furnishingStatus = filters.furnishingStatus;
-  if (filters.ownershipType) where.ownershipType = filters.ownershipType;
-
-  // Amenities
+  // Building-level amenities
   if (filters.hasPool) where.hasPool = true;
   if (filters.hasGym) where.hasGym = true;
   if (filters.hasGarden) where.hasGarden = true;
-  if (filters.hasBalcony) where.hasBalcony = true;
   if (filters.hasSecurity) where.hasSecurity = true;
   if (filters.hasElevator) where.hasElevator = true;
-  if (filters.hasCentralAC) where.hasCentralAC = true;
   if (filters.hasParking) where.parkingSpaces = { gte: 1 };
 
-  // Golden visa
-  if (filters.isGoldenVisaEligible) where.isGoldenVisaEligible = true;
+  // Status maps to Building.status (OFF_PLAN, NEW_BUILD, RESALE)
+  if (filters.status) where.status = filters.status;
 
   // Featured
   if (filters.featured) {
@@ -409,17 +375,11 @@ function buildOrderBy(filters: SearchFilters) {
     case 'rentalYield':
       orderBy.push({ investmentData: { rentalYield: 'desc' } });
       break;
-    case 'price_asc':
-      orderBy.push({ price: 'asc' });
-      break;
-    case 'price_desc':
-      orderBy.push({ price: 'desc' });
-      break;
-    case 'area':
-      orderBy.push({ area: 'desc' });
-      break;
     case 'newest':
       orderBy.push({ createdAt: 'desc' });
+      break;
+    // price_asc / price_desc / area don't map to Building fields — fall through to createdAt
+    default:
       break;
   }
 
@@ -486,11 +446,11 @@ async function generateAISummary(
   if (!client) return generateFallbackSummary(filters, count);
 
   try {
-    // Build a brief property summary so AI can reference actual results
-    const propertySnippets = properties.slice(0, 6).map((p, i) => {
+    // Build a brief building summary so AI can reference actual results
+    const propertySnippets = properties.slice(0, 6).map((p: any, i: number) => {
       const roi = p.investmentData?.expectedROI;
       const yield_ = p.investmentData?.rentalYield;
-      return `${i + 1}. ${p.title} — $${p.price.toLocaleString()}, ${p.city}${roi ? `, ROI ${roi}%` : ''}${yield_ ? `, yield ${yield_}%` : ''}`;
+      return `${i + 1}. ${p.title} — ${p.city || ''}${roi ? `, ROI ${roi}%` : ''}${yield_ ? `, yield ${yield_}%` : ''}`;
     }).join('\n');
 
     const isFollowUp = conversationHistory && conversationHistory.length > 0;
@@ -538,7 +498,7 @@ router.post(
     const where = buildWhereClause(filters);
     const orderBy = buildOrderBy(filters);
 
-    const properties = await prisma.property.findMany({
+    const properties = await prisma.building.findMany({
       where,
       include: PROPERTY_LIST_INCLUDE,
       orderBy,

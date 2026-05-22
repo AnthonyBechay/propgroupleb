@@ -6,7 +6,6 @@ import { asyncHandler } from '../utils/errors.js';
 import { logger } from '../utils/logger.js';
 import { sendSuccess, sendCreated, sendPaginated, sendNotFound } from '../utils/response.js';
 import { parsePagination, buildPaginationResponse } from '../utils/pagination.js';
-import { PROPERTY_WITH_STATS_INCLUDE } from '../utils/prisma-includes.js';
 import { inquirySchema } from '../schemas/index.js';
 import { sendInquiryConfirmation, notifyAdminOfInquiry } from '../services/email.service.js';
 import type { AuthenticatedRequest, MaybeAuthRequest } from '../types/index.js';
@@ -19,7 +18,7 @@ const inquiryLimiter = rateLimit({
   message: { error: 'Too many inquiry submissions. Please try again later.' },
 });
 
-// Create property inquiry (public - no auth required)
+// Create building inquiry (public - no auth required)
 router.post(
   '/',
   inquiryLimiter,
@@ -27,17 +26,17 @@ router.post(
     const maybeReq = req as MaybeAuthRequest;
     const validatedData = inquirySchema.parse(req.body);
 
-    const property = await prisma.property.findUnique({ where: { id: validatedData.propertyId } });
-    if (!property) { sendNotFound(res, 'Property'); return; }
+    const building = await prisma.building.findUnique({ where: { id: validatedData.buildingId ?? '' } });
+    if (!building) { sendNotFound(res, 'Building'); return; }
 
     const inquiry = await prisma.propertyInquiry.create({
       data: {
         ...validatedData,
-        propertyTitle: property.title,
+        buildingTitle: building.title,
         userId: maybeReq.user?.id,
       },
       include: {
-        property: { select: { id: true, title: true, price: true, currency: true, country: true } },
+        building: { select: { id: true, title: true } },
         user: { select: { id: true, email: true, firstName: true, lastName: true } },
       },
     });
@@ -45,7 +44,7 @@ router.post(
     // Send email notifications (fire and forget)
     sendInquiryConfirmation(validatedData.email, {
       name: validatedData.name,
-      propertyTitle: property.title,
+      propertyTitle: building.title,
     }).catch(err => logger.error('Failed to send inquiry confirmation', err));
 
     notifyAdminOfInquiry({
@@ -53,7 +52,7 @@ router.post(
       email: validatedData.email,
       phone: validatedData.phone,
       message: validatedData.message,
-      propertyTitle: property.title,
+      propertyTitle: building.title,
     }).catch(err => logger.error('Failed to send admin notification', err));
 
     sendCreated(res, inquiry, 'Inquiry submitted successfully');
@@ -69,7 +68,7 @@ router.get(
 
     const inquiries = await prisma.propertyInquiry.findMany({
       where: { userId: authReq.user.id },
-      include: { property: { include: PROPERTY_WITH_STATS_INCLUDE } },
+      include: { building: { select: { id: true, title: true } } },
       orderBy: { createdAt: 'desc' },
     });
 
@@ -87,7 +86,7 @@ router.get(
     const { propertyId, status } = req.query;
 
     const where: Record<string, unknown> = {};
-    if (propertyId) where.propertyId = propertyId;
+    if (propertyId) where.buildingId = propertyId;
     if (status && status !== 'ALL') where.status = status;
 
     const [inquiries, total] = await Promise.all([
@@ -99,14 +98,14 @@ router.get(
           email: true,
           phone: true,
           message: true,
-          propertyTitle: true,
+          buildingTitle: true,
           status: true,
           adminNotes: true,
           repliedAt: true,
           repliedBy: true,
           createdAt: true,
           updatedAt: true,
-          property: { select: { id: true, title: true, price: true, currency: true, country: true } },
+          building: { select: { id: true, title: true } },
           user: { select: { id: true, email: true, firstName: true, lastName: true } },
         },
         orderBy: { createdAt: 'desc' },
@@ -129,7 +128,7 @@ router.get(
     const inquiry = await prisma.propertyInquiry.findUnique({
       where: { id: req.params.id },
       include: {
-        property: { include: { developer: true, locationGuide: true, investmentData: true } },
+        building: { select: { id: true, title: true } },
         user: { select: { id: true, email: true, firstName: true, lastName: true, phone: true, country: true } },
       },
     });
@@ -171,7 +170,7 @@ router.patch(
       where: { id: req.params.id },
       data: updateData,
       include: {
-        property: { select: { id: true, title: true, price: true, currency: true, country: true } },
+        building: { select: { id: true, title: true } },
         user: { select: { id: true, email: true, firstName: true, lastName: true } },
       },
     });
@@ -221,14 +220,14 @@ router.delete(
 
     const inquiry = await prisma.propertyInquiry.findUnique({
       where: { id: req.params.id },
-      select: { id: true, propertyId: true, name: true, email: true },
+      select: { id: true, buildingId: true, name: true, email: true },
     });
 
     if (!inquiry) { sendNotFound(res, 'Inquiry'); return; }
 
     await prisma.propertyInquiry.delete({ where: { id: req.params.id } });
     await logAdminAction('DELETE_INQUIRY', 'inquiry', req.params.id, {
-      propertyId: inquiry.propertyId,
+      buildingId: inquiry.buildingId,
       name: inquiry.name,
       email: inquiry.email,
     }, authReq);
