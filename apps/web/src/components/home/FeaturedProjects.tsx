@@ -1,77 +1,54 @@
-import { getFeaturedProperties } from '@/lib/data'
-import { PropertyCard } from '@/components/PropertyCard'
+import { fetchHomeListings } from '@/lib/data'
+import { ListingCard } from '@/components/listing/ListingCard'
 import { ArrowRight } from 'lucide-react'
-import { Button } from '@/components/ui/button'
 import Link from 'next/link'
 
 export async function FeaturedProjects() {
-  let properties: any[] = []
+  let listings: Awaited<ReturnType<typeof fetchHomeListings>> = []
   try {
-    properties = await getFeaturedProperties(6)
+    listings = await fetchHomeListings(12)
   } catch {
     return null
   }
 
-  if (!properties || properties.length === 0) {
+  if (!listings || listings.length === 0) {
     return null
   }
 
   return (
-    <section className="py-16 sm:py-20 bg-slate-50">
+    <section className="py-12 sm:py-16 bg-white">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-        {/* Section Header */}
-        <div className="text-center max-w-2xl mx-auto mb-12">
-          <h2 className="text-3xl sm:text-4xl lg:text-5xl font-black text-slate-900 mb-4">
-            Featured <span className="text-[#1B3A5C]">Projects</span>
-          </h2>
-          <p className="text-lg text-slate-600">
-            Hand-picked investment opportunities in Lebanon
-          </p>
+        {/* Section header — intentionally understated; listings ARE the content */}
+        <div className="flex items-center justify-between mb-8">
+          <h2 className="text-xl font-bold text-slate-800">Latest Properties</h2>
+          <Link
+            href="/listings"
+            className="inline-flex items-center gap-1.5 text-sm font-medium text-slate-600 hover:text-slate-900 transition-colors"
+          >
+            View all listings
+            <ArrowRight className="w-4 h-4" />
+          </Link>
         </div>
 
-        {/* Property Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-7xl mx-auto">
-          {properties.slice(0, 6).map((property: any, index: number) => (
-            <PropertyCard
-              key={property.id}
-              id={property.id}
-              title={property.title}
-              description={property.description || ''}
-              price={property.price}
-              currency={property.currency || 'USD'}
-              bedrooms={property.bedrooms}
-              bathrooms={property.bathrooms}
-              area={property.area}
-              country={property.country}
-              status={property.status}
-              images={property.images || []}
-              isGoldenVisaEligible={property.isGoldenVisaEligible}
-              investmentData={property.investmentData ? {
-                expectedROI: property.investmentData.expectedROI,
-                rentalYield: property.investmentData.rentalYield,
-                capitalGrowth: property.investmentData.capitalGrowth,
-              } : undefined}
-              // First row (3 cards on desktop, 2 on tablet, 1 on mobile)
-              // is above the fold — preload those hero images instead
-              // of lazy-loading after viewport intersection. Cuts ~200ms
-              // off LCP on the home page.
-              priority={index < 3}
+        {/* Listings grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 max-w-7xl mx-auto">
+          {listings.map((listing, idx) => (
+            <ListingCard
+              key={listing.id}
+              listing={listing}
+              priority={idx < 6}
             />
           ))}
         </div>
 
-        {/* View All Button */}
+        {/* View all — bottom link */}
         <div className="text-center mt-10">
-          <Link href="/properties">
-            <Button
-              size="lg"
-              className="h-12 px-8 text-base font-semibold bg-[#1B3A5C] hover:bg-[#24507D] text-white rounded-xl shadow-lg transition-all"
-            >
-              <span className="flex items-center gap-2">
-                View All Projects
-                <ArrowRight className="w-5 h-5" />
-              </span>
-            </Button>
+          <Link
+            href="/listings"
+            className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 text-sm font-semibold text-slate-700 transition-colors"
+          >
+            View all listings
+            <ArrowRight className="w-4 h-4" />
           </Link>
         </div>
       </div>

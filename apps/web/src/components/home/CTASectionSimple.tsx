@@ -4,15 +4,15 @@ import Link from 'next/link'
 
 export function CTASectionSimple() {
   return (
-    <section className="relative py-16 sm:py-20 bg-[#1B3A5C] overflow-hidden">
+    <section className="relative py-16 sm:py-20 bg-slate-900 overflow-hidden">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
         <div className="max-w-4xl mx-auto text-center">
           <h2 className="text-3xl sm:text-4xl lg:text-5xl font-black text-white mb-6">
-            Ready to Start <span className="text-[#C49A2E]">Investing?</span>
+            Ready to Find Your Property?
           </h2>
 
           <p className="text-lg sm:text-xl text-slate-300 mb-8 max-w-2xl mx-auto">
-            Start exploring Lebanon\u2019s real estate market with a clean shortlist workflow
+            Lebanon's trusted brokerage for buying, renting, selling, and managing real estate.
           </p>
 
           <div className="flex flex-wrap justify-center gap-x-6 gap-y-3 mb-10 text-sm text-slate-300">
@@ -22,34 +22,34 @@ export function CTASectionSimple() {
             </div>
             <div className="flex items-center gap-2">
               <CheckCircle2 className="w-4 h-4 text-green-400" />
-              <span>Curated properties</span>
+              <span>Expert local agents</span>
             </div>
             <div className="flex items-center gap-2">
               <CheckCircle2 className="w-4 h-4 text-green-400" />
-              <span>Expert support</span>
+              <span>End-to-end support</span>
             </div>
           </div>
 
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-            <Link href="/get-started">
+            <Link href="/listings">
               <Button
                 size="lg"
-                className="w-full sm:w-auto h-14 px-10 text-base font-bold bg-[#C49A2E] hover:bg-[#A98327] text-white rounded-xl shadow-xl transition-all"
+                className="w-full sm:w-auto h-14 px-10 text-base font-bold bg-white hover:bg-slate-100 text-slate-900 rounded-xl shadow-xl transition-all"
               >
                 <span className="flex items-center gap-2">
-                  Get Started Free
+                  Browse All Properties
                   <ArrowRight className="w-5 h-5" />
                 </span>
               </Button>
             </Link>
 
-            <Link href="/properties">
+            <Link href="/contact">
               <Button
                 size="lg"
                 variant="outline"
                 className="w-full sm:w-auto h-14 px-10 text-base font-semibold bg-white/5 border-2 border-white/20 text-white hover:bg-white/10 hover:border-white/30 rounded-xl backdrop-blur-sm transition-all"
               >
-                Browse Properties
+                Talk to an Agent
               </Button>
             </Link>
           </div>
