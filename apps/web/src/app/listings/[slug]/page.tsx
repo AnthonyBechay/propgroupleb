@@ -1,7 +1,6 @@
 import { notFound } from 'next/navigation'
 import Image from 'next/image'
 import Link from 'next/link'
-import dynamic from 'next/dynamic'
 import {
   MapPin,
   Bed,
@@ -21,6 +20,7 @@ import {
   TreePine,
 } from 'lucide-react'
 import { normalizeApiUrl, normalizeFileUrl } from '@/lib/utils/api-url'
+import { InquiryFormModal } from '@/components/listing/InquiryFormModal'
 import type { Listing } from '@/types'
 import {
   ListingIntent,
@@ -32,11 +32,6 @@ import {
 } from '@/types'
 
 export const revalidate = 60
-
-const InquiryFormModal = dynamic(
-  () => import('@/components/listing/InquiryFormModal').then((m) => m.InquiryFormModal),
-  { ssr: false, loading: () => null }
-)
 
 interface PageProps {
   params: Promise<{ slug: string }>
