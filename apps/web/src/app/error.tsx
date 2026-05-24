@@ -27,7 +27,7 @@ export default function GlobalError({
         </p>
         <Button
           onClick={reset}
-          className="bg-[#1B3A5C] hover:bg-[#24507D] text-white"
+          className="bg-slate-900 hover:bg-slate-800 text-white"
         >
           <RotateCcw className="w-4 h-4 mr-2" />
           Try Again

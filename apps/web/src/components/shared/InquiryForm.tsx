@@ -36,7 +36,7 @@ export function InquiryForm({
   propertyId,
   defaultName = '',
   defaultEmail = '',
-  messagePlaceholder = "Tell us about your investment goals or any specific questions...",
+  messagePlaceholder = "Tell us about your property needs or any specific questions...",
   onSuccess,
   onCancel,
   showCancel = false,
@@ -160,7 +160,7 @@ export function InquiryForm({
         <Button
           type="submit"
           disabled={isSubmitting}
-          className={`${showCancel ? 'flex-1' : 'w-full'} bg-[#1B3A5C] hover:bg-[#24507D] text-white`}
+          className={`${showCancel ? 'flex-1' : 'w-full'} bg-slate-900 hover:bg-slate-800 text-white`}
         >
           {isSubmitting ? (
             <>

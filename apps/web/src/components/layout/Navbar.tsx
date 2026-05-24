@@ -11,6 +11,7 @@ import {
   Menu,
   X,
   Building2,
+  Home,
   Info,
   Phone,
   ChevronDown,
@@ -81,10 +82,14 @@ export function Navbar() {
               Properties
             </NavLink>
 
+            <NavLink href="/listings" icon={<Home className="w-4 h-4" />} isActive={isActive('/listings')}>
+              Listings
+            </NavLink>
+
             <NavLink href="/ai-search" icon={<Sparkles className="w-4 h-4" />} isActive={isActive('/ai-search')}>
               <span className="flex items-center gap-1.5">
                 AI Search
-                <span className="inline-flex items-center px-2 py-0.5 text-xs font-semibold bg-[#C49A2E] text-white rounded-full">
+                <span className="inline-flex items-center px-2 py-0.5 text-xs font-semibold bg-slate-600 text-white rounded-full">
                   NEW
                 </span>
               </span>
@@ -191,7 +196,7 @@ export function Navbar() {
                   </Button>
                 </AuthModal>
                 <AuthModal defaultMode="signup">
-                  <Button size="sm" className="bg-[#C49A2E] hover:bg-[#A98327] text-white shadow-md hover:shadow-lg transition-all">
+                  <Button size="sm" className="bg-slate-900 hover:bg-slate-800 text-white shadow-md hover:shadow-lg transition-all">
                     <Sparkles className="w-4 h-4 mr-2" />
                     Get Started
                   </Button>
@@ -234,6 +239,15 @@ export function Navbar() {
             </MobileNavLink>
 
             <MobileNavLink
+              href="/listings"
+              icon={<Home className="w-4 h-4" />}
+              isActive={isActive('/listings')}
+              onClick={() => setIsMenuOpen(false)}
+            >
+              Listings
+            </MobileNavLink>
+
+            <MobileNavLink
               href="/about"
               icon={<Info className="w-4 h-4" />}
               isActive={isActive('/about')}
@@ -260,7 +274,7 @@ export function Navbar() {
               ) : user ? (
                 <div className="space-y-3">
                   <div className="flex items-center gap-3 px-3 py-2 bg-slate-50 rounded-lg">
-                    <div className="w-8 h-8 rounded-full bg-[#1B3A5C] flex items-center justify-center text-white text-sm font-bold">
+                    <div className="w-8 h-8 rounded-full bg-slate-900 flex items-center justify-center text-white text-sm font-bold">
                       {user.email?.charAt(0).toUpperCase()}
                     </div>
                     <div>
@@ -274,7 +288,7 @@ export function Navbar() {
                   </div>
                   {!pathname.startsWith('/portal') && !pathname.startsWith('/admin') && (
                     <Link href="/portal/dashboard" onClick={() => setIsMenuOpen(false)}>
-                      <Button variant="outline" size="sm" className="w-full border-[#1B3A5C] text-[#1B3A5C]">
+                      <Button variant="outline" size="sm" className="w-full border-slate-300 text-slate-900">
                         <LayoutDashboard className="w-4 h-4 mr-2" />
                         My Portal
                       </Button>
@@ -292,7 +306,7 @@ export function Navbar() {
                 </div>
               ) : (
                 <AuthModal>
-                  <Button size="sm" className="w-full bg-[#C49A2E] hover:bg-[#A98327] text-white">
+                  <Button size="sm" className="w-full bg-slate-900 hover:bg-slate-800 text-white">
                     <Sparkles className="w-4 h-4 mr-2" />
                     Sign In / Get Started
                   </Button>

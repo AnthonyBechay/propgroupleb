@@ -5,11 +5,11 @@ export default function NotFound() {
   return (
     <div className="min-h-screen bg-slate-50 flex items-center justify-center px-4">
       <div className="text-center max-w-md">
-        <div className="inline-flex items-center justify-center w-20 h-20 bg-[#1B3A5C] rounded-2xl mb-8 shadow-lg">
+        <div className="inline-flex items-center justify-center w-20 h-20 bg-slate-900 rounded-2xl mb-8 shadow-lg">
           <Building2 className="w-10 h-10 text-white" />
         </div>
 
-        <h1 className="text-7xl font-black text-[#1B3A5C] mb-4">
+        <h1 className="text-7xl font-black text-slate-900 mb-4">
           404
         </h1>
 
@@ -24,7 +24,7 @@ export default function NotFound() {
         <div className="flex flex-col sm:flex-row gap-3 justify-center">
           <Link
             href="/"
-            className="inline-flex items-center justify-center px-6 py-3 bg-[#1B3A5C] text-white font-semibold rounded-lg hover:bg-[#152D4A] transition-all shadow-md hover:shadow-lg"
+            className="inline-flex items-center justify-center px-6 py-3 bg-slate-900 text-white font-semibold rounded-lg hover:bg-slate-800 transition-all shadow-md hover:shadow-lg"
           >
             Go Home
           </Link>

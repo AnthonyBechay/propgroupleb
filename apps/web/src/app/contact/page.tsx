@@ -77,18 +77,18 @@ export default function ContactPage() {
 
   if (isSubmitted) {
     return (
-      <div className="min-h-screen bg-[#1B3A5C] flex items-center justify-center">
+      <div className="min-h-screen bg-slate-900 flex items-center justify-center">
         <div className="bg-white border border-slate-200 rounded-2xl p-8 max-w-md text-center">
           <CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-4" />
           <h2 className="text-2xl font-bold text-slate-900 mb-2">
             Message Sent Successfully!
           </h2>
           <p className="text-slate-600 mb-6">
-            We'll get back to you within 24 hours to discuss your investment goals.
+            We'll get back to you within 24 hours to discuss your property needs.
           </p>
           <Button
             onClick={() => setIsSubmitted(false)}
-            className="bg-[#1B3A5C] hover:bg-[#152D4A]"
+            className="bg-slate-900 hover:bg-slate-800"
           >
             Send Another Message
           </Button>
@@ -100,17 +100,17 @@ export default function ContactPage() {
   return (
     <div className="min-h-screen bg-white">
       {/* Hero Section */}
-      <section className="relative py-20 sm:py-24 bg-[#1B3A5C]">
+      <section className="relative py-20 sm:py-24 bg-slate-900">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
           <div className="max-w-3xl mx-auto text-center">
             <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black text-white mb-6">
               Start Your{' '}
-              <span className="text-[#C49A2E]">
-                Investment Journey
+              <span className="text-slate-300">
+                Real Estate Journey
               </span>
             </h1>
             <p className="text-xl text-slate-300">
-              Have questions about ROI projections or available properties? Get in touch with our investment team.
+              Have questions about buying, renting, or selling? Get in touch with our brokerage team.
             </p>
           </div>
         </div>
@@ -124,10 +124,10 @@ export default function ContactPage() {
             <div className="lg:col-span-2">
               <div className="bg-white border border-slate-200 rounded-2xl p-6 sm:p-8">
                 <h2 className="text-2xl font-bold text-slate-900 mb-2">
-                  Get Investment Details
+                  Get in Touch
                 </h2>
                 <p className="text-slate-600 mb-6">
-                  Tell us about your investment goals and we'll provide tailored property recommendations.
+                  Tell us about your property needs and we'll provide tailored recommendations.
                 </p>
                 {submitError && (
                   <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl mb-4">
@@ -188,13 +188,13 @@ export default function ContactPage() {
 
                   <div>
                     <label htmlFor="message" className="block text-sm font-medium text-slate-900 mb-1">
-                      Investment Goals *
+                      Message *
                     </label>
                     <Textarea
                       id="message"
                       rows={6}
                       {...form.register('message')}
-                      placeholder="Tell us about your budget, target ROI, preferred locations, and investment timeline..."
+                      placeholder="Tell us about your budget, preferred locations, whether you're looking to buy, rent, or sell, and any other details..."
                     />
                     {form.formState.errors.message && (
                       <p className="text-sm text-red-600 mt-1">
@@ -206,7 +206,7 @@ export default function ContactPage() {
                   <Button
                     type="submit"
                     disabled={isSubmitting}
-                    className="w-full h-12 bg-[#1B3A5C] hover:bg-[#152D4A] text-white font-semibold"
+                    className="w-full h-12 bg-slate-900 hover:bg-slate-800 text-white font-semibold"
                   >
                     {isSubmitting ? (
                       <>
@@ -216,7 +216,7 @@ export default function ContactPage() {
                     ) : (
                       <>
                         <Send className="h-4 w-4 mr-2" />
-                        Get Investment Info
+                        Send Message
                       </>
                     )}
                   </Button>
@@ -232,21 +232,21 @@ export default function ContactPage() {
                 </h3>
                 <div className="space-y-4">
                   <div className="flex items-start space-x-3">
-                    <Mail className="h-5 w-5 text-[#1B3A5C] mt-1" />
+                    <Mail className="h-5 w-5 text-slate-700 mt-1" />
                     <div>
                       <div className="font-medium text-slate-900">Email</div>
-                      <div className="text-sm text-slate-600">invest@propgroup.com</div>
+                      <div className="text-sm text-slate-600">info@propgroup.com</div>
                     </div>
                   </div>
                   <div className="flex items-start space-x-3">
-                    <Phone className="h-5 w-5 text-[#1B3A5C] mt-1" />
+                    <Phone className="h-5 w-5 text-slate-700 mt-1" />
                     <div>
                       <div className="font-medium text-slate-900">Phone</div>
                       <div className="text-sm text-slate-600">+961 71 934 001</div>
                     </div>
                   </div>
                   <div className="flex items-start space-x-3">
-                    <Clock className="h-5 w-5 text-[#1B3A5C] mt-1" />
+                    <Clock className="h-5 w-5 text-slate-700 mt-1" />
                     <div>
                       <div className="font-medium text-slate-900">Business Hours</div>
                       <div className="text-sm text-slate-600">

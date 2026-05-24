@@ -4,8 +4,8 @@ import { Button } from '@/components/ui/button'
 import { fetchSectionContent } from '@/lib/content'
 
 export const metadata = {
-  title: 'About PropGroup - Real Estate Investment Platform',
-  description: 'AI-powered platform for verified real estate investments with data-driven ROI projections.',
+  title: 'About PropGroup - Lebanon Real Estate Brokerage',
+  description: 'PropGroup is Lebanon\'s trusted real estate brokerage for buying, renting, selling, and managing properties.',
 }
 
 // ISR: Without this, the page is built once at deploy time with whatever
@@ -21,14 +21,14 @@ export default async function AboutPage() {
   return (
     <main className="min-h-screen bg-white">
       {/* Hero Section */}
-      <section className="relative py-20 sm:py-24 bg-[#1B3A5C] overflow-hidden">
+      <section className="relative py-20 sm:py-24 bg-slate-900 overflow-hidden">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
           <div className="max-w-3xl mx-auto text-center">
             <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black text-white mb-6">
-              {content['about-title'] || <>Smart Real Estate{' '}<span className="text-[#C49A2E]">Investments</span></>}
+              {content['about-title'] || <>Lebanon&apos;s Real Estate{' '}<span className="text-slate-300">Brokerage</span></>}
             </h1>
             <p className="text-xl text-slate-300">
-              {content['about-description'] || 'We help investors make data-driven real estate decisions with AI-powered analysis and verified ROI data'}
+              {content['about-description'] || 'Your trusted partner for buying, renting, selling, and managing real estate across Lebanon'}
             </p>
           </div>
         </div>
@@ -40,19 +40,19 @@ export default async function AboutPage() {
           <div className="max-w-6xl mx-auto">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
               <div className="bg-white border border-slate-200 rounded-xl p-6">
-                <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-[#1B3A5C] shadow-md mb-4">
+                <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-slate-800 shadow-md mb-4">
                   <TrendingUp className="w-6 h-6 text-white" />
                 </div>
                 <h3 className="text-lg font-bold text-slate-900 mb-2">
-                  ROI Projections
+                  Market Expertise
                 </h3>
                 <p className="text-sm text-slate-600">
-                  Clear comparisons and ROI context for each listing
+                  In-depth knowledge of Lebanon&apos;s neighborhoods and market trends
                 </p>
               </div>
 
               <div className="bg-white border border-slate-200 rounded-xl p-6">
-                <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-[#1B3A5C] shadow-md mb-4">
+                <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-slate-800 shadow-md mb-4">
                   <Shield className="w-6 h-6 text-white" />
                 </div>
                 <h3 className="text-lg font-bold text-slate-900 mb-2">
@@ -64,7 +64,7 @@ export default async function AboutPage() {
               </div>
 
               <div className="bg-white border border-slate-200 rounded-xl p-6">
-                <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-[#C49A2E] shadow-md mb-4">
+                <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-slate-800 shadow-md mb-4">
                   <Globe className="w-6 h-6 text-white" />
                 </div>
                 <h3 className="text-lg font-bold text-slate-900 mb-2">
@@ -76,7 +76,7 @@ export default async function AboutPage() {
               </div>
 
               <div className="bg-white border border-slate-200 rounded-xl p-6">
-                <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-[#C49A2E] shadow-md mb-4">
+                <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-slate-800 shadow-md mb-4">
                   <Award className="w-6 h-6 text-white" />
                 </div>
                 <h3 className="text-lg font-bold text-slate-900 mb-2">
@@ -92,20 +92,20 @@ export default async function AboutPage() {
       </section>
 
       {/* CTA Section */}
-      <section className="py-16 bg-[#1B3A5C]">
+      <section className="py-16 bg-slate-900">
         <div className="container mx-auto px-4">
           <div className="max-w-4xl mx-auto text-center">
             <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">
-              Ready to Start Investing?
+              Ready to Find Your Property?
             </h2>
             <p className="text-xl text-slate-300 mb-8">
-              Browse verified properties with transparent ROI data
+              Browse our listings and connect with our brokerage team
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Link href="/properties">
                 <Button
                   size="lg"
-                  className="w-full sm:w-auto h-14 px-10 text-base font-bold bg-[#C49A2E] hover:bg-[#b56a3a] text-white rounded-xl shadow-xl transition-all"
+                  className="w-full sm:w-auto h-14 px-10 text-base font-bold bg-slate-100 hover:bg-white text-slate-900 rounded-xl shadow-xl transition-all"
                 >
                   Browse Properties
                 </Button>

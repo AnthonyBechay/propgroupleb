@@ -35,7 +35,7 @@ export default function GetStartedPage() {
           </div>
           <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black text-slate-900 mb-4">
             How Would You Like to{' '}
-            <span className="bg-gradient-to-r from-[#1B3A5C] to-[#C49A2E] bg-clip-text text-transparent">
+            <span className="text-slate-700">
               Get Started?
             </span>
           </h1>
@@ -54,15 +54,15 @@ export default function GetStartedPage() {
             onClick={() => setSelectedPath('explore')}
             className={`group text-left p-8 rounded-2xl border-2 transition-all duration-300 ${
               selectedPath === 'explore'
-                ? 'border-[#1B3A5C] bg-[#E0EDF7] shadow-xl ring-2 ring-[#1B3A5C]/20'
-                : 'border-slate-200 bg-white hover:border-[#1B3A5C]/40 hover:shadow-lg'
+                ? 'border-slate-900 bg-slate-100 shadow-xl ring-2 ring-slate-900/10'
+                : 'border-slate-200 bg-white hover:border-slate-400 hover:shadow-lg'
             }`}
           >
             <div className={`w-14 h-14 rounded-xl flex items-center justify-center mb-5 transition-colors ${
-              selectedPath === 'explore' ? 'bg-[#1B3A5C]' : 'bg-[#E0EDF7] group-hover:bg-[#1B3A5C]'
+              selectedPath === 'explore' ? 'bg-slate-900' : 'bg-slate-100 group-hover:bg-slate-900'
             }`}>
               <Search className={`w-7 h-7 transition-colors ${
-                selectedPath === 'explore' ? 'text-white' : 'text-[#1B3A5C] group-hover:text-white'
+                selectedPath === 'explore' ? 'text-white' : 'text-slate-700 group-hover:text-white'
               }`} />
             </div>
             <h2 className="text-2xl font-bold text-slate-900 mb-3">
@@ -83,7 +83,7 @@ export default function GetStartedPage() {
               </li>
               <li className="flex items-center gap-2 text-sm text-slate-700">
                 <CheckCircle2 className="w-4 h-4 text-emerald-500 flex-shrink-0" />
-                ROI calculator & market analysis
+                Property calculator & market analysis
               </li>
               <li className="flex items-center gap-2 text-sm text-slate-700">
                 <CheckCircle2 className="w-4 h-4 text-emerald-500 flex-shrink-0" />
@@ -91,7 +91,7 @@ export default function GetStartedPage() {
               </li>
             </ul>
             <div className={`mt-6 flex items-center gap-2 font-semibold transition-colors ${
-              selectedPath === 'explore' ? 'text-[#1B3A5C]' : 'text-slate-400 group-hover:text-[#1B3A5C]'
+              selectedPath === 'explore' ? 'text-slate-900' : 'text-slate-400 group-hover:text-slate-900'
             }`}>
               Start exploring
               <ChevronRight className="w-4 h-4" />
@@ -103,15 +103,15 @@ export default function GetStartedPage() {
             onClick={() => setSelectedPath('contact')}
             className={`group text-left p-8 rounded-2xl border-2 transition-all duration-300 ${
               selectedPath === 'contact'
-                ? 'border-[#C49A2E] bg-[#FDF6F0] shadow-xl ring-2 ring-[#C49A2E]/20'
-                : 'border-slate-200 bg-white hover:border-[#C49A2E]/40 hover:shadow-lg'
+                ? 'border-slate-700 bg-slate-100 shadow-xl ring-2 ring-slate-700/10'
+                : 'border-slate-200 bg-white hover:border-slate-400 hover:shadow-lg'
             }`}
           >
             <div className={`w-14 h-14 rounded-xl flex items-center justify-center mb-5 transition-colors ${
-              selectedPath === 'contact' ? 'bg-[#C49A2E]' : 'bg-[#FDF6F0] group-hover:bg-[#C49A2E]'
+              selectedPath === 'contact' ? 'bg-slate-700' : 'bg-slate-100 group-hover:bg-slate-700'
             }`}>
               <MessageSquare className={`w-7 h-7 transition-colors ${
-                selectedPath === 'contact' ? 'text-white' : 'text-[#C49A2E] group-hover:text-white'
+                selectedPath === 'contact' ? 'text-white' : 'text-slate-600 group-hover:text-white'
               }`} />
             </div>
             <h2 className="text-2xl font-bold text-slate-900 mb-3">
@@ -124,23 +124,23 @@ export default function GetStartedPage() {
             <ul className="space-y-2.5">
               <li className="flex items-center gap-2 text-sm text-slate-700">
                 <CheckCircle2 className="w-4 h-4 text-emerald-500 flex-shrink-0" />
-                Personal investment consultation
+                Personal consultation with our team
               </li>
               <li className="flex items-center gap-2 text-sm text-slate-700">
                 <CheckCircle2 className="w-4 h-4 text-emerald-500 flex-shrink-0" />
-                Curated properties matching your goals
+                Curated properties matching your needs
               </li>
               <li className="flex items-center gap-2 text-sm text-slate-700">
                 <CheckCircle2 className="w-4 h-4 text-emerald-500 flex-shrink-0" />
-                Market insights & ROI projections
+                Local market insights & guidance
               </li>
               <li className="flex items-center gap-2 text-sm text-slate-700">
                 <CheckCircle2 className="w-4 h-4 text-emerald-500 flex-shrink-0" />
-                End-to-end purchase support
+                End-to-end transaction support
               </li>
             </ul>
             <div className={`mt-6 flex items-center gap-2 font-semibold transition-colors ${
-              selectedPath === 'contact' ? 'text-[#C49A2E]' : 'text-slate-400 group-hover:text-[#C49A2E]'
+              selectedPath === 'contact' ? 'text-slate-700' : 'text-slate-400 group-hover:text-slate-700'
             }`}>
               Get in touch
               <ChevronRight className="w-4 h-4" />
@@ -152,7 +152,7 @@ export default function GetStartedPage() {
         {selectedPath && (
           <div className="max-w-5xl mx-auto mt-8 animate-in fade-in slide-in-from-bottom-4 duration-300">
             <div className={`rounded-2xl p-6 sm:p-8 ${
-              selectedPath === 'explore' ? 'bg-[#E0EDF7] border border-[#1B3A5C]/20' : 'bg-[#FDF6F0] border border-[#C49A2E]/20'
+              selectedPath === 'explore' ? 'bg-slate-100 border border-slate-200' : 'bg-slate-100 border border-slate-200'
             }`}>
               {selectedPath === 'explore' ? (
                 <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
@@ -160,15 +160,15 @@ export default function GetStartedPage() {
                     <h3 className="text-lg font-bold text-slate-900 mb-1">Ready to explore?</h3>
                     <p className="text-slate-600 text-sm">
                       {user
-                        ? 'Head to properties or try our AI search to find your ideal investment.'
-                        : 'Create a free account to save favorites, use the ROI calculator, and more.'}
+                        ? 'Head to properties or try our AI search to find your ideal property.'
+                        : 'Create a free account to save favorites, use the property calculator, and more.'}
                     </p>
                   </div>
                   <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
                     <Link href="/properties">
                       <Button
                         size="lg"
-                        className="w-full sm:w-auto bg-[#1B3A5C] hover:bg-[#24507D] text-white rounded-xl shadow-md"
+                        className="w-full sm:w-auto bg-slate-900 hover:bg-slate-800 text-white rounded-xl shadow-md"
                       >
                         <Building2 className="w-4 h-4 mr-2" />
                         Browse Properties
@@ -178,7 +178,7 @@ export default function GetStartedPage() {
                       <Button
                         size="lg"
                         variant="outline"
-                        className="w-full sm:w-auto border-[#1B3A5C] text-[#1B3A5C] hover:bg-[#E0EDF7] rounded-xl"
+                        className="w-full sm:w-auto border-slate-300 text-slate-900 hover:bg-slate-50 rounded-xl"
                       >
                         <Sparkles className="w-4 h-4 mr-2" />
                         AI Search
@@ -203,14 +203,14 @@ export default function GetStartedPage() {
                   <div>
                     <h3 className="text-lg font-bold text-slate-900 mb-1">Let&apos;s connect</h3>
                     <p className="text-slate-600 text-sm">
-                      Fill out our contact form with your investment interests and we&apos;ll get back to you within 24 hours.
+                      Fill out our contact form with your property needs and we&apos;ll get back to you within 24 hours.
                     </p>
                   </div>
                   <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
                     <Link href="/contact">
                       <Button
                         size="lg"
-                        className="w-full sm:w-auto bg-[#C49A2E] hover:bg-[#A98327] text-white rounded-xl shadow-md"
+                        className="w-full sm:w-auto bg-slate-900 hover:bg-slate-800 text-white rounded-xl shadow-md"
                       >
                         <Phone className="w-4 h-4 mr-2" />
                         Contact Us
@@ -220,7 +220,7 @@ export default function GetStartedPage() {
                       <Button
                         size="lg"
                         variant="outline"
-                        className="w-full sm:w-auto border-[#C49A2E] text-[#C49A2E] hover:bg-[#FDF6F0] rounded-xl"
+                        className="w-full sm:w-auto border-slate-300 text-slate-900 hover:bg-slate-50 rounded-xl"
                       >
                         <Building2 className="w-4 h-4 mr-2" />
                         Browse First
@@ -239,8 +239,8 @@ export default function GetStartedPage() {
         <div className="max-w-4xl mx-auto">
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
             <div className="text-center">
-              <div className="w-12 h-12 bg-[#E0EDF7] rounded-xl flex items-center justify-center mx-auto mb-3">
-                <MapPin className="w-6 h-6 text-[#1B3A5C]" />
+              <div className="w-12 h-12 bg-slate-100 rounded-xl flex items-center justify-center mx-auto mb-3">
+                <MapPin className="w-6 h-6 text-slate-700" />
               </div>
               <h3 className="font-bold text-slate-900 mb-1">Lebanon Focus</h3>
               <p className="text-sm text-slate-600">
@@ -248,17 +248,17 @@ export default function GetStartedPage() {
               </p>
             </div>
             <div className="text-center">
-              <div className="w-12 h-12 bg-[#E0EDF7] rounded-xl flex items-center justify-center mx-auto mb-3">
-                <TrendingUp className="w-6 h-6 text-[#1B3A5C]" />
+              <div className="w-12 h-12 bg-slate-100 rounded-xl flex items-center justify-center mx-auto mb-3">
+                <TrendingUp className="w-6 h-6 text-slate-700" />
               </div>
               <h3 className="font-bold text-slate-900 mb-1">Smart Analysis</h3>
               <p className="text-sm text-slate-600">
-                AI-powered insights and ROI projections for every property
+                AI-powered search and market analysis for every buyer
               </p>
             </div>
             <div className="text-center">
-              <div className="w-12 h-12 bg-[#E0EDF7] rounded-xl flex items-center justify-center mx-auto mb-3">
-                <Shield className="w-6 h-6 text-[#1B3A5C]" />
+              <div className="w-12 h-12 bg-slate-100 rounded-xl flex items-center justify-center mx-auto mb-3">
+                <Shield className="w-6 h-6 text-slate-700" />
               </div>
               <h3 className="font-bold text-slate-900 mb-1">Trusted Process</h3>
               <p className="text-sm text-slate-600">

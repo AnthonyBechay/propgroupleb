@@ -119,7 +119,7 @@ function LoginForm() {
             </p>
 
             {next.startsWith('/admin') && (
-              <div className="mt-4 inline-flex items-center px-4 py-2 rounded-lg text-xs font-semibold bg-[#1B3A5C] text-white">
+              <div className="mt-4 inline-flex items-center px-4 py-2 rounded-lg text-xs font-semibold bg-slate-900 text-white">
                 <Shield className="h-4 w-4 mr-2" />
                 Admin Login Required
               </div>
@@ -149,7 +149,7 @@ function LoginForm() {
                 </>
               ) : (
                 <>
-                  <span className="h-5 w-5 mr-3 font-bold text-[#1B3A5C] text-lg flex items-center justify-center">G</span>
+                  <span className="h-5 w-5 mr-3 font-bold text-slate-900 text-lg flex items-center justify-center">G</span>
                   Continue with Google
                 </>
               )}
@@ -179,7 +179,7 @@ function LoginForm() {
                   type="email"
                   {...form.register('email')}
                   placeholder="admin@example.com"
-                  className="pl-10 border-slate-200 rounded-xl focus:border-[#1B3A5C] focus:ring-[#1B3A5C]"
+                  className="pl-10 border-slate-200 rounded-xl focus:border-slate-900 focus:ring-slate-900"
                   autoComplete="email"
                   disabled={isLoading || isGoogleLoading}
                   readOnly={false}
@@ -203,7 +203,7 @@ function LoginForm() {
                   type="password"
                   {...form.register('password')}
                   placeholder="Enter your password"
-                  className="pl-10 border-slate-200 rounded-xl focus:border-[#1B3A5C] focus:ring-[#1B3A5C]"
+                  className="pl-10 border-slate-200 rounded-xl focus:border-slate-900 focus:ring-slate-900"
                   autoComplete="current-password"
                   disabled={isLoading || isGoogleLoading}
                   readOnly={false}
@@ -222,7 +222,7 @@ function LoginForm() {
                   id="remember-me"
                   name="remember-me"
                   type="checkbox"
-                  className="h-4 w-4 text-[#1B3A5C] focus:ring-[#1B3A5C] border-slate-300 rounded"
+                  className="h-4 w-4 text-slate-900 focus:ring-slate-900 border-slate-300 rounded"
                 />
                 <label htmlFor="remember-me" className="ml-2 block text-sm text-slate-600">
                   Remember me
@@ -232,7 +232,7 @@ function LoginForm() {
               <div className="text-sm">
                 <a
                   href="/auth/forgot-password"
-                  className="font-medium text-[#1B3A5C] hover:underline"
+                  className="font-medium text-slate-900 hover:underline"
                 >
                   Forgot password?
                 </a>
@@ -242,7 +242,7 @@ function LoginForm() {
             <Button
               type="submit"
               disabled={isLoading}
-              className="w-full bg-[#1B3A5C] hover:bg-[#24507D] text-white rounded-xl font-semibold py-6"
+              className="w-full bg-slate-900 hover:bg-slate-800 text-white rounded-xl font-semibold py-6"
             >
               {isLoading ? (
                 <>
@@ -261,7 +261,7 @@ function LoginForm() {
               className="text-sm text-slate-600 hover:text-slate-900 font-medium"
             >
               Don&apos;t have an account?{' '}
-              <span className="text-[#C49A2E] hover:text-[#A98327] font-semibold">Sign up</span>
+              <span className="text-slate-700 hover:text-slate-900 font-semibold">Sign up</span>
             </Link>
           </div>
         </div>
@@ -280,7 +280,7 @@ export default function LoginPage() {
   return (
     <Suspense fallback={
       <div className="min-h-screen flex items-center justify-center bg-slate-100">
-        <Loader2 className="h-8 w-8 animate-spin text-[#1B3A5C]" />
+        <Loader2 className="h-8 w-8 animate-spin text-slate-900" />
       </div>
     }>
       <LoginForm />

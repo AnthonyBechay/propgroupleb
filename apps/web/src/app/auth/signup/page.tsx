@@ -98,7 +98,7 @@ function SignupForm() {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-100">
-        <Loader2 className="h-8 w-8 animate-spin text-[#1B3A5C]" />
+        <Loader2 className="h-8 w-8 animate-spin text-slate-900" />
       </div>
     )
   }
@@ -117,7 +117,7 @@ function SignupForm() {
             </h1>
 
             <p className="mt-2 text-sm text-slate-500">
-              Start your investment journey today
+              Start your real estate journey today
             </p>
           </div>
 
@@ -144,7 +144,7 @@ function SignupForm() {
                 </>
               ) : (
                 <>
-                  <span className="h-5 w-5 mr-3 font-bold text-[#1B3A5C] text-lg flex items-center justify-center">G</span>
+                  <span className="h-5 w-5 mr-3 font-bold text-slate-900 text-lg flex items-center justify-center">G</span>
                   Continue with Google
                 </>
               )}
@@ -175,7 +175,7 @@ function SignupForm() {
                     type="text"
                     {...form.register('firstName')}
                     placeholder="John"
-                    className="pl-10 border-slate-200 rounded-xl focus:border-[#1B3A5C] focus:ring-[#1B3A5C]"
+                    className="pl-10 border-slate-200 rounded-xl focus:border-slate-900 focus:ring-slate-900"
                     autoComplete="given-name"
                   />
                 </div>
@@ -197,7 +197,7 @@ function SignupForm() {
                     type="text"
                     {...form.register('lastName')}
                     placeholder="Doe"
-                    className="pl-10 border-slate-200 rounded-xl focus:border-[#1B3A5C] focus:ring-[#1B3A5C]"
+                    className="pl-10 border-slate-200 rounded-xl focus:border-slate-900 focus:ring-slate-900"
                     autoComplete="family-name"
                   />
                 </div>
@@ -220,7 +220,7 @@ function SignupForm() {
                   type="email"
                   {...form.register('email')}
                   placeholder="john@example.com"
-                  className="pl-10 border-slate-200 rounded-xl focus:border-[#1B3A5C] focus:ring-[#1B3A5C]"
+                  className="pl-10 border-slate-200 rounded-xl focus:border-slate-900 focus:ring-slate-900"
                   autoComplete="email"
                 />
               </div>
@@ -242,7 +242,7 @@ function SignupForm() {
                   type="password"
                   {...form.register('password')}
                   placeholder="Minimum 8 characters"
-                  className="pl-10 border-slate-200 rounded-xl focus:border-[#1B3A5C] focus:ring-[#1B3A5C]"
+                  className="pl-10 border-slate-200 rounded-xl focus:border-slate-900 focus:ring-slate-900"
                   autoComplete="new-password"
                 />
               </div>
@@ -264,7 +264,7 @@ function SignupForm() {
                   type="password"
                   {...form.register('confirmPassword')}
                   placeholder="Re-enter password"
-                  className="pl-10 border-slate-200 rounded-xl focus:border-[#1B3A5C] focus:ring-[#1B3A5C]"
+                  className="pl-10 border-slate-200 rounded-xl focus:border-slate-900 focus:ring-slate-900"
                   autoComplete="new-password"
                 />
               </div>
@@ -279,7 +279,7 @@ function SignupForm() {
               <Button
                 type="submit"
                 disabled={isLoading}
-                className="w-full bg-[#1B3A5C] hover:bg-[#24507D] text-white rounded-xl font-semibold py-6"
+                className="w-full bg-slate-900 hover:bg-slate-800 text-white rounded-xl font-semibold py-6"
               >
                 {isLoading ? (
                   <>
@@ -293,11 +293,11 @@ function SignupForm() {
 
               <p className="text-xs text-center text-slate-500 mt-3">
                 By signing up, you agree to our{' '}
-                <Link href="/terms" className="text-[#1B3A5C] hover:underline font-medium">
+                <Link href="/terms" className="text-slate-900 hover:underline font-medium">
                   Terms of Service
                 </Link>
                 {' '}and{' '}
-                <Link href="/privacy" className="text-[#1B3A5C] hover:underline font-medium">
+                <Link href="/privacy" className="text-slate-900 hover:underline font-medium">
                   Privacy Policy
                 </Link>
               </p>
@@ -310,7 +310,7 @@ function SignupForm() {
               className="text-sm text-slate-600 hover:text-slate-900 font-medium"
             >
               Already have an account?{' '}
-              <span className="text-[#C49A2E] hover:text-[#A98327] font-semibold">Sign in</span>
+              <span className="text-slate-700 hover:text-slate-900 font-semibold">Sign in</span>
             </Link>
           </div>
         </div>
@@ -329,7 +329,7 @@ export default function SignupPage() {
   return (
     <Suspense fallback={
       <div className="min-h-screen flex items-center justify-center bg-slate-100">
-        <Loader2 className="h-8 w-8 animate-spin text-[#1B3A5C]" />
+        <Loader2 className="h-8 w-8 animate-spin text-slate-900" />
       </div>
     }>
       <SignupForm />

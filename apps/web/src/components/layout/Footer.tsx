@@ -15,7 +15,7 @@ export function Footer() {
   const currentYear = new Date().getFullYear()
 
   return (
-    <footer className="relative bg-[#1B3A5C] text-white">
+    <footer className="relative bg-slate-900 text-white">
       {/* Main Footer */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-6">
@@ -31,11 +31,11 @@ export function Footer() {
               />
               <div>
                 <h3 className="font-bold text-base">PropGroup</h3>
-                <p className="text-xs text-slate-300">Invest Smart</p>
+                <p className="text-xs text-slate-300">Lebanon Real Estate</p>
               </div>
             </div>
             <p className="text-xs text-slate-300 mb-3">
-              AI-powered real estate investment platform helping you make smarter property decisions.
+              Lebanon's trusted brokerage for buying, renting, selling, and managing real estate.
             </p>
             {/* Social icons rendered as disabled placeholders until real
                 URLs are wired. href="#" alone would jump the page to top
@@ -86,11 +86,16 @@ export function Footer() {
 
           {/* Quick Links */}
           <div>
-            <h4 className="font-semibold text-sm mb-2">Invest</h4>
+            <h4 className="font-semibold text-sm mb-2">Explore</h4>
             <ul className="space-y-1.5">
               <li>
                 <Link href="/properties" className="text-slate-300 hover:text-white transition-colors text-xs">
                   Properties
+                </Link>
+              </li>
+              <li>
+                <Link href="/listings" className="text-slate-300 hover:text-white transition-colors text-xs">
+                  Listings
                 </Link>
               </li>
               <li>
@@ -134,8 +139,8 @@ export function Footer() {
             <ul className="space-y-1.5">
               <li className="flex items-center gap-2 text-slate-300 text-xs">
                 <Mail className="w-3 h-3 flex-shrink-0" />
-                <a href="mailto:invest@propgroup.com" className="hover:text-white transition-colors">
-                  invest@propgroup.com
+                <a href="mailto:info@propgroup.com" className="hover:text-white transition-colors">
+                  info@propgroup.com
                 </a>
               </li>
               <li className="flex items-center gap-2 text-slate-300 text-xs">
