@@ -34,7 +34,7 @@ const SERVICES = [
 
 export function WhyPropGroup() {
   return (
-    <section className="py-12 sm:py-16 bg-white">
+    <section className="py-12 sm:py-16 bg-slate-50 border-t border-slate-100">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center max-w-xl mx-auto mb-10">
           <h2 className="text-2xl sm:text-3xl font-bold text-slate-900 mb-2">

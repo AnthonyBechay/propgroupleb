@@ -16,7 +16,7 @@ export async function FeaturedProjects() {
   }
 
   return (
-    <section className="py-12 sm:py-16 bg-white">
+    <section className="py-10 sm:py-14 bg-white">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
         {/* Section header — intentionally understated; listings ARE the content */}
         <div className="flex items-center justify-between mb-8">

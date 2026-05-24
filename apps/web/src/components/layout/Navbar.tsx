@@ -10,7 +10,6 @@ import { Button } from '@/components/ui/button'
 import {
   Menu,
   X,
-  Building2,
   Home,
   Info,
   Phone,
@@ -78,12 +77,8 @@ export function Navbar() {
 
           {/* Desktop Navigation */}
           <div className="hidden lg:flex items-center space-x-1 flex-1 overflow-x-auto overflow-y-hidden px-4 mx-4 scrollbar-hide" style={{scrollbarWidth: 'none', msOverflowStyle: 'none'}}>
-            <NavLink href="/properties" icon={<Building2 className="w-4 h-4" />} isActive={isActive('/properties')}>
-              Properties
-            </NavLink>
-
             <NavLink href="/listings" icon={<Home className="w-4 h-4" />} isActive={isActive('/listings')}>
-              Listings
+              Properties
             </NavLink>
 
             <NavLink href="/ai-search" icon={<Sparkles className="w-4 h-4" />} isActive={isActive('/ai-search')}>
@@ -230,21 +225,12 @@ export function Navbar() {
         >
           <div className="py-4 space-y-1 border-t border-slate-200">
             <MobileNavLink
-              href="/properties"
-              icon={<Building2 className="w-4 h-4" />}
-              isActive={isActive('/properties')}
-              onClick={() => setIsMenuOpen(false)}
-            >
-              Properties
-            </MobileNavLink>
-
-            <MobileNavLink
               href="/listings"
               icon={<Home className="w-4 h-4" />}
               isActive={isActive('/listings')}
               onClick={() => setIsMenuOpen(false)}
             >
-              Listings
+              Properties
             </MobileNavLink>
 
             <MobileNavLink
