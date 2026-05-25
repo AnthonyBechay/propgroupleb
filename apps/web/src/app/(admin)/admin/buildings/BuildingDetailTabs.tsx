@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Settings2, LayoutList, ArrowLeft, ExternalLink } from 'lucide-react'
+import { Settings2, LayoutList, ArrowLeft, Tag } from 'lucide-react'
 import Link from 'next/link'
 import { BuildingForm } from './BuildingForm'
 import { UnitsManager } from './UnitsManager'
@@ -39,14 +39,13 @@ export function BuildingDetailTabs({ building, buildingId }: Props) {
                 {building?.title ?? 'New Building'}
               </h1>
             </div>
-            {building?.slug && (
+            {building?.id && (
               <Link
-                href={`/listings/${building.slug}`}
-                target="_blank"
+                href={`/admin/listings?buildingId=${building.id}`}
                 className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-zinc-600 border border-zinc-200 rounded-lg hover:bg-zinc-50 transition-colors flex-shrink-0"
               >
-                <ExternalLink className="h-3.5 w-3.5" />
-                View live
+                <Tag className="h-3.5 w-3.5" />
+                All listings
               </Link>
             )}
           </div>

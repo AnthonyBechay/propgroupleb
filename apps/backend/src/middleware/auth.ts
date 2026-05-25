@@ -126,6 +126,42 @@ export function requireRole(...roles: string[]) {
   };
 }
 
+/**
+ * Optional authentication middleware.
+ * Decodes the JWT if present and attaches req.user, but never rejects the
+ * request. Use on public routes that behave differently for authenticated users
+ * (e.g. admin sees all units; public sees only available ones).
+ */
+export async function optionalAuthenticateToken(req: Request, _res: Response, next: NextFunction) {
+  const token = req.cookies?.token || req.headers.authorization?.replace('Bearer ', '');
+  if (token) {
+    try {
+      const secret = process.env.JWT_SECRET;
+      if (secret) {
+        const decoded = jwt.verify(token, secret) as { userId: string };
+        const user = await prisma.user.findUnique({
+          where: { id: decoded.userId },
+          select: {
+            id: true, email: true, role: true,
+            isActive: true, bannedAt: true,
+            firstName: true, lastName: true,
+            phone: true, country: true,
+            investmentGoals: true, membershipTier: true,
+            membershipStartDate: true, membershipEndDate: true,
+            agentCommissionRate: true, createdAt: true, updatedAt: true,
+          },
+        });
+        if (user && user.isActive && !user.bannedAt) {
+          (req as AuthenticatedRequest).user = user as AuthUser;
+        }
+      }
+    } catch {
+      // Expired / invalid token — continue as unauthenticated
+    }
+  }
+  next();
+}
+
 // Convenience aliases
 export const requireAdmin = requireRole('ADMIN', 'SUPER_ADMIN');
 export const requireSuperAdmin = requireRole('SUPER_ADMIN');

@@ -5,7 +5,7 @@ import Link from 'next/link'
 import {
   Plus, Pencil, Trash2, Tag, Loader2, X,
   Building2, Bed, Square, Layers, ChevronDown, ChevronUp,
-  DollarSign, BadgePlus,
+  DollarSign, BadgePlus, ExternalLink, Archive,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { normalizeApiUrl } from '@/lib/utils/api-url'
@@ -348,9 +348,235 @@ function ListingQuickForm({
   )
 }
 
+// ── Listing edit panel ────────────────────────────────────────────────────────
+
+function ListingEditPanel({
+  listingId, listingLabel,
+  onSuccess, onCancel,
+}: {
+  listingId: string
+  listingLabel: string
+  onSuccess: () => void
+  onCancel: () => void
+}) {
+  const apiUrl = normalizeApiUrl(process.env.NEXT_PUBLIC_API_URL || '')
+  const [loading, setLoading] = useState(true)
+  const [saving,  setSaving]  = useState(false)
+  const [err,     setErr]     = useState<string | null>(null)
+  const [form, setForm] = useState({
+    status:      '',
+    visibility:  '',
+    price:       '',
+    currency:    'USD',
+    rentPeriod:  '',
+    headline:    '',
+    description: '',
+    intent:      '',
+  })
+
+  const set = (k: keyof typeof form, v: string) => setForm(p => ({ ...p, [k]: v }))
+  const inp = 'w-full px-3 py-2 border border-zinc-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-sky-600/15 focus:border-sky-500 bg-white'
+  const lbl = 'block text-xs font-medium text-zinc-600 mb-1'
+
+  useEffect(() => {
+    fetch(`${apiUrl}/api/listings/${listingId}`, { credentials: 'include' })
+      .then(r => r.json())
+      .then(d => {
+        const l = d.data ?? d
+        setForm({
+          status:      l.status ?? '',
+          visibility:  l.visibility ?? 'PUBLIC',
+          price:       l.price != null ? String(l.price) : '',
+          currency:    l.currency ?? 'USD',
+          rentPeriod:  l.rentPeriod ?? '',
+          headline:    l.headline ?? '',
+          description: l.description ?? '',
+          intent:      l.intent ?? '',
+        })
+      })
+      .catch(() => setErr('Failed to load listing'))
+      .finally(() => setLoading(false))
+  }, [apiUrl, listingId])
+
+  async function submit() {
+    if (!form.price || Number(form.price) <= 0) { setErr('Price must be greater than 0'); return }
+    setSaving(true)
+    setErr(null)
+    try {
+      const body: any = {
+        status:      form.status,
+        visibility:  form.visibility,
+        price:       parseFloat(form.price),
+        currency:    form.currency,
+        headline:    form.headline || null,
+        description: form.description || null,
+        rentPeriod:  form.intent === 'FOR_RENT' && form.rentPeriod ? form.rentPeriod : null,
+      }
+      const res = await fetch(`${apiUrl}/api/listings/${listingId}`, {
+        method: 'PUT',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}))
+        setErr(d.message || 'Failed to save')
+        return
+      }
+      onSuccess()
+    } catch {
+      setErr('Network error')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function archiveListing() {
+    if (!confirm('Archive this listing? It will be hidden from the public site.')) return
+    setSaving(true)
+    try {
+      await fetch(`${apiUrl}/api/listings/${listingId}`, { method: 'DELETE', credentials: 'include' })
+      onSuccess()
+    } catch {
+      setErr('Failed to archive')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="bg-zinc-50 border border-zinc-200 rounded-xl p-5 flex items-center gap-2 text-sm text-zinc-400">
+        <Loader2 className="h-4 w-4 animate-spin" /> Loading listing…
+      </div>
+    )
+  }
+
+  return (
+    <div className="bg-amber-50/60 border border-amber-200 rounded-xl p-5 space-y-4">
+      <div className="flex items-center justify-between">
+        <p className="text-xs font-semibold text-amber-700 uppercase tracking-wider flex items-center gap-1.5">
+          <Tag className="h-3.5 w-3.5" /> Edit listing · {listingLabel}
+        </p>
+        <div className="flex items-center gap-2">
+          <a
+            href={`/admin/listings/${listingId}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-xs text-zinc-400 hover:text-zinc-600 flex items-center gap-1"
+          >
+            <ExternalLink className="h-3 w-3" /> Full edit
+          </a>
+          <button onClick={onCancel} className="text-zinc-400 hover:text-zinc-600">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      </div>
+
+      {err && (
+        <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{err}</p>
+      )}
+
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div>
+          <label className={lbl}>Price <span className="text-red-500">*</span></label>
+          <div className="relative">
+            <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-zinc-400" />
+            <input
+              type="number" min="0" step="any"
+              value={form.price}
+              onChange={e => set('price', e.target.value)}
+              className={inp + ' pl-8'}
+            />
+          </div>
+        </div>
+        <div>
+          <label className={lbl}>Currency</label>
+          <select value={form.currency} onChange={e => set('currency', e.target.value)} className={inp}>
+            <option value="USD">USD</option>
+            <option value="LBP">LBP</option>
+          </select>
+        </div>
+        {form.intent === 'FOR_RENT' && (
+          <div>
+            <label className={lbl}>Period</label>
+            <select value={form.rentPeriod} onChange={e => set('rentPeriod', e.target.value)} className={inp}>
+              <option value="MONTHLY">Monthly</option>
+              <option value="QUARTERLY">Quarterly</option>
+              <option value="YEARLY">Yearly</option>
+            </select>
+          </div>
+        )}
+        <div>
+          <label className={lbl}>Status</label>
+          <select value={form.status} onChange={e => set('status', e.target.value)} className={inp}>
+            <option value="DRAFT">Draft</option>
+            <option value="ACTIVE">Active</option>
+            <option value="UNDER_OFFER">Under Offer</option>
+            <option value="CLOSED">Closed</option>
+          </select>
+        </div>
+        <div>
+          <label className={lbl}>Visibility</label>
+          <select value={form.visibility} onChange={e => set('visibility', e.target.value)} className={inp}>
+            <option value="PUBLIC">Public</option>
+            <option value="ELITE_ONLY">Elite Only</option>
+            <option value="HIDDEN">Hidden</option>
+          </select>
+        </div>
+      </div>
+
+      <div>
+        <label className={lbl}>Headline</label>
+        <input
+          type="text" value={form.headline}
+          onChange={e => set('headline', e.target.value)}
+          placeholder="Short headline shown on cards"
+          className={inp}
+        />
+      </div>
+
+      <div>
+        <label className={lbl}>Description <span className="text-zinc-400">(optional)</span></label>
+        <textarea
+          value={form.description}
+          onChange={e => set('description', e.target.value)}
+          rows={3} className={inp + ' resize-y'}
+          placeholder="Additional listing details…"
+        />
+      </div>
+
+      <div className="flex items-center justify-between pt-1">
+        <button
+          type="button"
+          onClick={archiveListing}
+          disabled={saving}
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+        >
+          <Archive className="h-3.5 w-3.5" /> Archive
+        </button>
+        <div className="flex items-center gap-2">
+          <button type="button" onClick={onCancel} className="px-4 py-1.5 text-sm text-zinc-600 hover:text-zinc-900 transition-colors">
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={submit}
+            disabled={saving}
+            className="px-5 py-1.5 text-sm font-medium text-white bg-amber-600 hover:bg-amber-700 rounded-lg transition-colors disabled:opacity-50 flex items-center gap-2"
+          >
+            {saving && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+            Save Changes
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ── Main component ────────────────────────────────────────────────────────────
 
-type PanelMode = 'edit' | 'listing'
+type PanelMode = 'unit-edit' | 'listing-create' | 'listing-edit'
 
 export function UnitsManager({ buildingId }: { buildingId: string }) {
   const apiUrl = normalizeApiUrl(process.env.NEXT_PUBLIC_API_URL || '')
@@ -359,8 +585,8 @@ export function UnitsManager({ buildingId }: { buildingId: string }) {
   const [loading, setLoading] = useState(true)
   const [error, setError]     = useState<string | null>(null)
 
-  // Which unit has its panel expanded, and in what mode
-  const [expanded, setExpanded] = useState<{ id: string; mode: PanelMode } | null>(null)
+  // Which unit has its panel expanded, and in what mode (+ optional listingId for edit)
+  const [expanded, setExpanded] = useState<{ id: string; mode: PanelMode; listingId?: string } | null>(null)
 
   const [showAddUnit, setShowAddUnit]     = useState(false)
   const [saving, setSaving]               = useState(false)
@@ -386,10 +612,12 @@ export function UnitsManager({ buildingId }: { buildingId: string }) {
   // Auto-load when the component mounts (the tab has been switched to)
   useEffect(() => { fetchUnits() }, [fetchUnits])
 
-  function openPanel(unitId: string, mode: PanelMode) {
-    setExpanded(prev =>
-      prev?.id === unitId && prev.mode === mode ? null : { id: unitId, mode }
-    )
+  function openPanel(unitId: string, mode: PanelMode, listingId?: string) {
+    setExpanded(prev => {
+      // Clicking the same panel closes it (toggle)
+      if (prev?.id === unitId && prev.mode === mode && prev.listingId === listingId) return null
+      return { id: unitId, mode, listingId }
+    })
     setShowAddUnit(false)
   }
 
@@ -538,10 +766,12 @@ export function UnitsManager({ buildingId }: { buildingId: string }) {
       {units.length > 0 && (
         <div className="space-y-3">
           {units.map((unit: any) => {
-            const isDeleting = deletingId === unit.id
-            const panelOpen  = expanded?.id === unit.id
-            const editOpen   = panelOpen && expanded?.mode === 'edit'
-            const listingOpen = panelOpen && expanded?.mode === 'listing'
+            const isDeleting    = deletingId === unit.id
+            const panelUnit     = expanded?.id === unit.id
+            const editOpen      = panelUnit && expanded?.mode === 'unit-edit'
+            const createOpen    = panelUnit && expanded?.mode === 'listing-create'
+            const editListingId = panelUnit && expanded?.mode === 'listing-edit' ? expanded.listingId : null
+            const panelOpen     = editOpen || createOpen || !!editListingId
             const label = unit.name || (unit.unitNumber ? `Unit ${unit.unitNumber}` : null) || `Unit ${unit.id.slice(0, 6)}`
             const listings: any[] = unit.listings ?? []
 
@@ -584,24 +814,29 @@ export function UnitsManager({ buildingId }: { buildingId: string }) {
 
                   {/* Listings + actions */}
                   <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
-                    {/* Existing listing badges */}
+                    {/* Existing listing badges — click to edit inline */}
                     {listings.map((l: any) => (
-                      <Link
+                      <button
                         key={l.id}
-                        href={`/admin/listings/${l.id}`}
-                        className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-xs font-medium transition-opacity hover:opacity-75 ${LISTING_INTENT_COLORS[l.intent] ?? 'bg-zinc-100 text-zinc-600 border-zinc-200'}`}
+                        onClick={() => openPanel(unit.id, 'listing-edit', l.id)}
+                        className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-xs font-medium transition-all ${
+                          editListingId === l.id
+                            ? 'ring-2 ring-offset-1 ring-amber-400'
+                            : 'hover:opacity-80'
+                        } ${LISTING_INTENT_COLORS[l.intent] ?? 'bg-zinc-100 text-zinc-600 border-zinc-200'}`}
+                        title="Edit this listing inline"
                       >
                         <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${LISTING_STATUS_DOT[l.status] ?? 'bg-zinc-400'}`} />
                         {l.intent === 'FOR_SALE' ? 'Sale' : 'Rent'}
                         {l.price ? ` · ${formatPrice(l.price, l.currency)}` : ''}
-                      </Link>
+                      </button>
                     ))}
 
-                    {/* Add listing button */}
+                    {/* Create new listing button */}
                     <button
-                      onClick={() => openPanel(unit.id, 'listing')}
+                      onClick={() => openPanel(unit.id, 'listing-create')}
                       className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full border text-xs font-medium transition-colors ${
-                        listingOpen
+                        createOpen
                           ? 'bg-sky-600 text-white border-sky-600'
                           : 'text-sky-600 border-sky-200 hover:bg-sky-50'
                       }`}
@@ -614,7 +849,7 @@ export function UnitsManager({ buildingId }: { buildingId: string }) {
                     {/* Edit / Delete */}
                     <div className="flex items-center gap-1 ml-auto sm:ml-0 pl-1 border-l border-zinc-100">
                       <button
-                        onClick={() => openPanel(unit.id, 'edit')}
+                        onClick={() => openPanel(unit.id, 'unit-edit')}
                         className={`p-1.5 rounded-lg transition-colors ${
                           editOpen
                             ? 'text-zinc-900 bg-zinc-200'
@@ -664,12 +899,23 @@ export function UnitsManager({ buildingId }: { buildingId: string }) {
                   </div>
                 )}
 
-                {listingOpen && (
+                {createOpen && (
                   <div className="px-5 pb-5 border-t border-zinc-100 pt-4">
                     <ListingQuickForm
                       buildingId={buildingId}
                       unitId={unit.id}
                       unitLabel={label}
+                      onSuccess={async () => { setExpanded(null); await fetchUnits() }}
+                      onCancel={() => setExpanded(null)}
+                    />
+                  </div>
+                )}
+
+                {editListingId && (
+                  <div className="px-5 pb-5 border-t border-zinc-100 pt-4">
+                    <ListingEditPanel
+                      listingId={editListingId}
+                      listingLabel={label}
                       onSuccess={async () => { setExpanded(null); await fetchUnits() }}
                       onCancel={() => setExpanded(null)}
                     />

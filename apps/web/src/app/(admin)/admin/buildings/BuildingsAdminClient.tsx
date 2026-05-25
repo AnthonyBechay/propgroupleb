@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Plus, Building2, Search, Filter, Eye, Edit, Trash2, ExternalLink } from 'lucide-react'
+import { Plus, Building2, Search, Edit, Trash2, Tag } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
@@ -179,13 +179,11 @@ export function BuildingsAdminClient({ initialBuildings }: Props) {
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center justify-end gap-1">
-                      {b.slug && (
-                        <Link href={`/listings/${b.slug}`} target="_blank">
-                          <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                            <ExternalLink className="h-3.5 w-3.5" />
-                          </Button>
-                        </Link>
-                      )}
+                      <Link href={`/admin/listings?buildingId=${b.id}`} title="View listings">
+                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-zinc-400 hover:text-sky-600">
+                          <Tag className="h-3.5 w-3.5" />
+                        </Button>
+                      </Link>
                       <Link href={`/admin/buildings/${b.id}`}>
                         <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
                           <Edit className="h-3.5 w-3.5" />
