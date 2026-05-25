@@ -84,7 +84,7 @@ export function Navbar() {
             <NavLink href="/ai-search" icon={<Sparkles className="w-4 h-4" />} isActive={isActive('/ai-search')}>
               <span className="flex items-center gap-1.5">
                 AI Search
-                <span className="inline-flex items-center px-2 py-0.5 text-xs font-semibold bg-slate-600 text-white rounded-full">
+                <span className="inline-flex items-center px-2 py-0.5 text-xs font-semibold bg-sky-600 text-white rounded-full">
                   NEW
                 </span>
               </span>
@@ -116,7 +116,7 @@ export function Navbar() {
                     aria-haspopup="true"
                     className="flex items-center gap-2 px-3 py-1.5 bg-slate-50 rounded-full hover:shadow-md transition-all"
                   >
-                    <div className="w-8 h-8 rounded-full bg-slate-900 flex items-center justify-center text-white text-sm font-bold">
+                    <div className="w-8 h-8 rounded-full bg-zinc-900 flex items-center justify-center text-white text-sm font-bold">
                       {user.email?.charAt(0).toUpperCase()}
                     </div>
                     <span className="text-sm text-slate-700 font-medium">
@@ -191,7 +191,7 @@ export function Navbar() {
                   </Button>
                 </AuthModal>
                 <AuthModal defaultMode="signup">
-                  <Button size="sm" className="bg-slate-900 hover:bg-slate-800 text-white shadow-md hover:shadow-lg transition-all">
+                  <Button size="sm" className="bg-sky-600 hover:bg-sky-700 text-white shadow-md hover:shadow-lg transition-all">
                     <Sparkles className="w-4 h-4 mr-2" />
                     Get Started
                   </Button>
@@ -260,7 +260,7 @@ export function Navbar() {
               ) : user ? (
                 <div className="space-y-3">
                   <div className="flex items-center gap-3 px-3 py-2 bg-slate-50 rounded-lg">
-                    <div className="w-8 h-8 rounded-full bg-slate-900 flex items-center justify-center text-white text-sm font-bold">
+                    <div className="w-8 h-8 rounded-full bg-zinc-900 flex items-center justify-center text-white text-sm font-bold">
                       {user.email?.charAt(0).toUpperCase()}
                     </div>
                     <div>
@@ -292,7 +292,7 @@ export function Navbar() {
                 </div>
               ) : (
                 <AuthModal>
-                  <Button size="sm" className="w-full bg-slate-900 hover:bg-slate-800 text-white">
+                  <Button size="sm" className="w-full bg-sky-600 hover:bg-sky-700 text-white">
                     <Sparkles className="w-4 h-4 mr-2" />
                     Sign In / Get Started
                   </Button>
@@ -331,8 +331,8 @@ function MobileNavLink({ href, icon, children, isActive, onClick }: any) {
       onClick={onClick}
       className={`flex items-center gap-3 px-4 py-3 text-base font-medium transition-colors ${
         isActive
-          ? 'bg-slate-100 text-slate-900 border-l-4 border-slate-900'
-          : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 border-l-4 border-transparent'
+          ? 'bg-zinc-100 text-zinc-900 border-l-4 border-sky-600'
+          : 'text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900 border-l-4 border-transparent'
       }`}
     >
       {icon}

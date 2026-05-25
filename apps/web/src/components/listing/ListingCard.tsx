@@ -80,7 +80,7 @@ export function ListingCard({ listing, priority = false }: ListingCardProps) {
   const intentColor =
     listing.intent === ListingIntent.FOR_SALE
       ? 'bg-emerald-100 text-emerald-700'
-      : 'bg-blue-100 text-blue-700'
+      : 'bg-sky-100 text-sky-700'
   const intentLabel =
     listing.intent === ListingIntent.FOR_SALE ? 'For Sale' : 'For Rent'
 
@@ -90,7 +90,7 @@ export function ListingCard({ listing, priority = false }: ListingCardProps) {
       className="group block bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm hover:shadow-lg transition-all duration-300 hover:-translate-y-1"
     >
       {/* Image */}
-      <div className="relative aspect-[4/3] overflow-hidden bg-slate-100">
+      <div className="relative aspect-[4/3] overflow-hidden bg-zinc-100">
         {firstImage ? (
           <Image
             src={firstImage}

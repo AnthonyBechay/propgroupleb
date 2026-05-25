@@ -34,13 +34,13 @@ const SERVICES = [
 
 export function WhyPropGroup() {
   return (
-    <section className="py-12 sm:py-16 bg-slate-50 border-t border-slate-100">
+    <section className="py-12 sm:py-16 bg-zinc-50 border-t border-zinc-100">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center max-w-xl mx-auto mb-10">
-          <h2 className="text-2xl sm:text-3xl font-bold text-slate-900 mb-2">
+          <h2 className="text-2xl sm:text-3xl font-bold text-zinc-900 mb-2">
             How We Help
           </h2>
-          <p className="text-slate-500 text-sm">
+          <p className="text-zinc-500 text-sm">
             Full-service real estate brokerage — whatever your goal.
           </p>
         </div>
@@ -52,18 +52,18 @@ export function WhyPropGroup() {
               <Link
                 key={service.title}
                 href="/get-started"
-                className="group bg-slate-50 border border-slate-200 rounded-xl p-5 hover:shadow-md hover:border-slate-300 transition-all"
+                className="group bg-zinc-50 border border-zinc-200 rounded-xl p-5 hover:shadow-md hover:border-zinc-300 transition-all"
               >
-                <div className="inline-flex items-center justify-center w-10 h-10 rounded-lg bg-slate-200 mb-3 group-hover:bg-slate-300 transition-colors">
-                  <Icon className="w-5 h-5 text-slate-700" />
+                <div className="inline-flex items-center justify-center w-10 h-10 rounded-lg bg-zinc-200 mb-3 group-hover:bg-zinc-300 transition-colors">
+                  <Icon className="w-5 h-5 text-zinc-700" />
                 </div>
-                <div className="text-xs font-bold uppercase tracking-widest text-slate-400 mb-1">
+                <div className="text-xs font-bold uppercase tracking-widest text-zinc-400 mb-1">
                   {service.title}
                 </div>
-                <h3 className="text-sm font-bold text-slate-900 mb-1">
+                <h3 className="text-sm font-bold text-zinc-900 mb-1">
                   {service.heading}
                 </h3>
-                <p className="text-xs text-slate-500 leading-relaxed">
+                <p className="text-xs text-zinc-500 leading-relaxed">
                   {service.description}
                 </p>
               </Link>

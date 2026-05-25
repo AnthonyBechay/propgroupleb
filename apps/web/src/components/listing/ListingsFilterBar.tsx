@@ -68,7 +68,7 @@ export function ListingsFilterBar() {
   return (
     <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
       {/* Intent tabs */}
-      <div className="flex gap-1 mb-4 bg-slate-100 rounded-lg p-1 w-fit">
+      <div className="flex gap-1 mb-4 bg-zinc-100 rounded-lg p-1 w-fit">
         <button
           onClick={() => updateParam('intent', '')}
           className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${
@@ -111,7 +111,7 @@ export function ListingsFilterBar() {
             placeholder="Search listings…"
             value={search}
             onChange={(e) => updateParam('search', e.target.value)}
-            className="w-full pl-9 pr-3 h-9 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400"
+            className="w-full pl-9 pr-3 h-9 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-600/15 focus:border-sky-500"
           />
         </div>
 
@@ -119,7 +119,7 @@ export function ListingsFilterBar() {
         <select
           value={mohafazat}
           onChange={(e) => updateParam('mohafazat', e.target.value)}
-          className="h-9 px-3 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400 bg-white"
+          className="h-9 px-3 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-600/15 focus:border-sky-500 bg-white"
         >
           {MOHAFAZAT_OPTIONS.map((o) => (
             <option key={o.value} value={o.value}>{o.label}</option>
@@ -130,7 +130,7 @@ export function ListingsFilterBar() {
         <select
           value={unitKind}
           onChange={(e) => updateParam('unitKind', e.target.value)}
-          className="h-9 px-3 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400 bg-white"
+          className="h-9 px-3 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-600/15 focus:border-sky-500 bg-white"
         >
           {UNIT_KIND_OPTIONS.map((o) => (
             <option key={o.value} value={o.value}>{o.label}</option>
@@ -141,7 +141,7 @@ export function ListingsFilterBar() {
         <select
           value={minBedrooms}
           onChange={(e) => updateParam('minBedrooms', e.target.value)}
-          className="h-9 px-3 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400 bg-white"
+          className="h-9 px-3 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-600/15 focus:border-sky-500 bg-white"
         >
           {BEDROOMS_OPTIONS.map((o) => (
             <option key={o.value} value={o.value}>{o.label}</option>
@@ -155,7 +155,7 @@ export function ListingsFilterBar() {
             placeholder="Min $"
             value={minPrice}
             onChange={(e) => updateParam('minPrice', e.target.value)}
-            className="w-24 h-9 px-3 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400"
+            className="w-24 h-9 px-3 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-600/15 focus:border-sky-500"
           />
           <span className="text-slate-400 text-sm">–</span>
           <input
@@ -163,7 +163,7 @@ export function ListingsFilterBar() {
             placeholder="Max $"
             value={maxPrice}
             onChange={(e) => updateParam('maxPrice', e.target.value)}
-            className="w-24 h-9 px-3 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400"
+            className="w-24 h-9 px-3 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-600/15 focus:border-sky-500"
           />
         </div>
 

@@ -9,16 +9,16 @@
    COLOR PALETTE — Grey-first neutrals
    ============================================ */
 :root {
-  /* Primary Colors - Charcoal / Slate */
-  --pg-primary-900: #0B1220; /* deep charcoal */
-  --pg-primary-800: #0F172A;
-  --pg-primary-700: #111827;
-  --pg-primary-600: #1F2937;
-  --pg-primary-500: #374151;
-  --pg-primary-400: #4B5563;
-  --pg-primary-300: #6B7280;
-  --pg-primary-200: #D1D5DB;
-  --pg-primary-100: #F1F5F9;
+  /* Primary Colors - Zinc / True Neutral Grey */
+  --pg-primary-900: #09090b; /* zinc-950 */
+  --pg-primary-800: #18181b; /* zinc-900 */
+  --pg-primary-700: #27272a; /* zinc-800 */
+  --pg-primary-600: #3f3f46; /* zinc-700 */
+  --pg-primary-500: #52525b; /* zinc-600 */
+  --pg-primary-400: #71717a; /* zinc-500 */
+  --pg-primary-300: #a1a1aa; /* zinc-400 */
+  --pg-primary-200: #e4e4e7; /* zinc-200 */
+  --pg-primary-100: #f4f4f5; /* zinc-100 */
 
   /* Grey 1 - Steel (cool, professional) */
   --pg-steel-900: #111827;
@@ -75,8 +75,8 @@
   --pg-warning-light: #FEF3C7;
   --pg-error: #DC2626;
   --pg-error-light: #FEE2E2;
-  --pg-info: #1F2937;
-  --pg-info-light: #F1F5F9;
+  --pg-info: #0284c7;
+  --pg-info-light: #e0f2fe;
 
   /* Shadows — cooler tone */
   --pg-shadow-sm: 0 1px 2px 0 rgba(15, 23, 42, 0.06);

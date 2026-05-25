@@ -67,12 +67,12 @@ export function HeroSectionNew() {
   }
 
   const selectCls =
-    'w-full appearance-none bg-white border border-slate-200 rounded-lg px-3 py-2.5 pr-8 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-900/15 focus:border-slate-400 cursor-pointer'
+    'w-full appearance-none bg-white border border-zinc-200 rounded-lg px-3 py-2.5 pr-8 text-sm text-zinc-700 focus:outline-none focus:ring-2 focus:ring-sky-600/15 focus:border-sky-500 cursor-pointer'
 
   return (
     <section className="relative overflow-hidden w-full" style={{ minHeight: '380px' }}>
       {/* Background */}
-      <div className="absolute inset-0 bg-gradient-to-b from-slate-900 via-slate-800 to-slate-700" />
+      <div className="absolute inset-0 bg-gradient-to-b from-zinc-900 via-zinc-800 to-zinc-700" />
 
       {/* Subtle grid texture */}
       <div
@@ -94,22 +94,22 @@ export function HeroSectionNew() {
         {/* Headline */}
         <h1 className="text-center text-3xl sm:text-4xl md:text-5xl font-extrabold text-white leading-tight mb-8 max-w-2xl">
           Find Your Next{' '}
-          <span className="text-slate-300">Property</span>{' '}
+          <span className="text-zinc-300">Property</span>{' '}
           in Lebanon
         </h1>
 
         {/* Search card */}
         <div className="w-full max-w-4xl bg-white rounded-2xl shadow-2xl overflow-hidden">
           {/* Intent tabs — sits flush at the top of the card */}
-          <div className="flex border-b border-slate-100">
+          <div className="flex border-b border-zinc-100">
             {INTENT_OPTIONS.map((opt) => (
               <button
                 key={opt.value}
                 onClick={() => setIntent(opt.value)}
                 className={`flex-1 py-3 text-sm font-semibold transition-colors ${
                   intent === opt.value
-                    ? 'text-slate-900 border-b-2 border-slate-900 bg-white'
-                    : 'text-slate-500 hover:text-slate-700 bg-slate-50/60 hover:bg-white'
+                    ? 'text-zinc-900 border-b-2 border-sky-600 bg-white'
+                    : 'text-zinc-500 hover:text-zinc-700 bg-zinc-50/60 hover:bg-white'
                 }`}
               >
                 {opt.label}
@@ -153,7 +153,7 @@ export function HeroSectionNew() {
                   onChange={(e) => setQuery(e.target.value)}
                   onKeyDown={handleKeyDown}
                   placeholder="City, area…"
-                  className="w-full bg-white border border-slate-200 rounded-lg pl-9 pr-3 py-2.5 text-sm text-slate-700 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/15 focus:border-slate-400"
+                  className="w-full bg-white border border-zinc-200 rounded-lg pl-9 pr-3 py-2.5 text-sm text-zinc-700 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-sky-600/15 focus:border-sky-500"
                 />
               </div>
             </div>
@@ -161,7 +161,7 @@ export function HeroSectionNew() {
             {/* Search button */}
             <button
               onClick={handleSearch}
-              className="w-full h-11 flex items-center justify-center gap-2 bg-slate-900 hover:bg-slate-800 active:bg-slate-950 text-white text-sm font-bold rounded-xl transition-colors"
+              className="w-full h-11 flex items-center justify-center gap-2 bg-sky-600 hover:bg-sky-700 active:bg-sky-800 text-white text-sm font-bold rounded-xl transition-colors"
             >
               <Search className="w-4 h-4" />
               Search Properties

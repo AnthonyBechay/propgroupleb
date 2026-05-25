@@ -20,10 +20,10 @@ export async function FeaturedProjects() {
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
         {/* Section header — intentionally understated; listings ARE the content */}
         <div className="flex items-center justify-between mb-8">
-          <h2 className="text-xl font-bold text-slate-800">Latest Properties</h2>
+          <h2 className="text-xl font-bold text-zinc-800">Latest Properties</h2>
           <Link
             href="/listings"
-            className="inline-flex items-center gap-1.5 text-sm font-medium text-slate-600 hover:text-slate-900 transition-colors"
+            className="inline-flex items-center gap-1.5 text-sm font-medium text-zinc-600 hover:text-zinc-900 transition-colors"
           >
             View all listings
             <ArrowRight className="w-4 h-4" />
@@ -45,7 +45,7 @@ export async function FeaturedProjects() {
         <div className="text-center mt-10">
           <Link
             href="/listings"
-            className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 text-sm font-semibold text-slate-700 transition-colors"
+            className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl border border-zinc-200 bg-zinc-50 hover:bg-zinc-100 text-sm font-semibold text-zinc-700 transition-colors"
           >
             View all listings
             <ArrowRight className="w-4 h-4" />

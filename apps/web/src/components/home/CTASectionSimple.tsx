@@ -4,18 +4,18 @@ import Link from 'next/link'
 
 export function CTASectionSimple() {
   return (
-    <section className="relative py-16 sm:py-20 bg-slate-900 overflow-hidden">
+    <section className="relative py-16 sm:py-20 bg-zinc-900 overflow-hidden">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
         <div className="max-w-4xl mx-auto text-center">
           <h2 className="text-3xl sm:text-4xl lg:text-5xl font-black text-white mb-6">
             Ready to Find Your Property?
           </h2>
 
-          <p className="text-lg sm:text-xl text-slate-300 mb-8 max-w-2xl mx-auto">
+          <p className="text-lg sm:text-xl text-zinc-300 mb-8 max-w-2xl mx-auto">
             Lebanon's trusted brokerage for buying, renting, selling, and managing real estate.
           </p>
 
-          <div className="flex flex-wrap justify-center gap-x-6 gap-y-3 mb-10 text-sm text-slate-300">
+          <div className="flex flex-wrap justify-center gap-x-6 gap-y-3 mb-10 text-sm text-zinc-300">
             <div className="flex items-center gap-2">
               <CheckCircle2 className="w-4 h-4 text-green-400" />
               <span>No hidden fees</span>
@@ -34,7 +34,7 @@ export function CTASectionSimple() {
             <Link href="/listings">
               <Button
                 size="lg"
-                className="w-full sm:w-auto h-14 px-10 text-base font-bold bg-white hover:bg-slate-100 text-slate-900 rounded-xl shadow-xl transition-all"
+                className="w-full sm:w-auto h-14 px-10 text-base font-bold bg-white hover:bg-zinc-100 text-zinc-900 rounded-xl shadow-xl transition-all"
               >
                 <span className="flex items-center gap-2">
                   Browse All Properties

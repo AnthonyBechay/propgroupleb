@@ -58,7 +58,7 @@ export function Sidebar() {
 
   return (
     <div className="hidden lg:fixed lg:inset-y-0 lg:z-50 lg:flex lg:w-64 lg:flex-col">
-      <div className="flex grow flex-col gap-y-5 overflow-y-auto bg-slate-900 px-6 pb-4 border-r border-slate-800">
+      <div className="flex grow flex-col gap-y-5 overflow-y-auto bg-zinc-900 px-6 pb-4 border-r border-zinc-800">
         <div className="flex h-16 shrink-0 items-center">
           <div className="flex items-center space-x-3">
             <Image
@@ -78,7 +78,7 @@ export function Sidebar() {
                 </span>
               )}
               {user?.role === 'ADMIN' && (
-                <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-semibold bg-slate-600 text-white mt-0.5">
+                <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-semibold bg-zinc-600 text-white mt-0.5">
                   Admin
                 </span>
               )}
@@ -98,13 +98,13 @@ export function Sidebar() {
                         href={item.href}
                         className={`group flex gap-x-3 rounded-lg p-2.5 text-sm font-medium leading-6 transition-all ${
                           isActive
-                            ? 'bg-slate-700 text-white'
-                            : 'text-slate-400 hover:text-white hover:bg-slate-800'
+                            ? 'bg-zinc-700 text-white'
+                            : 'text-zinc-400 hover:text-white hover:bg-zinc-800'
                         }`}
                       >
                         <item.icon
                           className={`h-5 w-5 shrink-0 ${
-                            isActive ? 'text-white' : 'text-slate-500 group-hover:text-white'
+                            isActive ? 'text-white' : 'text-zinc-500 group-hover:text-white'
                           }`}
                           aria-hidden="true"
                         />
@@ -118,7 +118,7 @@ export function Sidebar() {
 
             {/* Property Management section */}
             <li>
-              <div className="text-xs font-semibold text-slate-500 uppercase tracking-wider px-2 mb-2 flex items-center gap-1">
+              <div className="text-xs font-semibold text-zinc-500 uppercase tracking-wider px-2 mb-2 flex items-center gap-1">
                 <Wrench className="h-3 w-3" /> Property Management
               </div>
               <ul role="list" className="-mx-2 space-y-1">
@@ -131,13 +131,13 @@ export function Sidebar() {
                         href={item.href}
                         className={`group flex gap-x-3 rounded-lg p-2.5 text-sm font-medium leading-6 transition-all ${
                           isActive
-                            ? 'bg-slate-700 text-white'
-                            : 'text-slate-400 hover:text-white hover:bg-slate-800'
+                            ? 'bg-zinc-700 text-white'
+                            : 'text-zinc-400 hover:text-white hover:bg-zinc-800'
                         }`}
                       >
                         <item.icon
                           className={`h-5 w-5 shrink-0 ${
-                            isActive ? 'text-white' : 'text-slate-500 group-hover:text-white'
+                            isActive ? 'text-white' : 'text-zinc-500 group-hover:text-white'
                           }`}
                           aria-hidden="true"
                         />
@@ -152,20 +152,20 @@ export function Sidebar() {
               <Link
                 href="/"
                 target="_blank"
-                className="group flex w-full gap-x-3 rounded-lg p-2.5 text-sm font-medium leading-6 text-slate-400 hover:bg-slate-800 hover:text-white transition-all"
+                className="group flex w-full gap-x-3 rounded-lg p-2.5 text-sm font-medium leading-6 text-zinc-400 hover:bg-zinc-800 hover:text-white transition-all"
               >
                 <ArrowLeft
-                  className="h-5 w-5 shrink-0 text-slate-500 group-hover:text-white"
+                  className="h-5 w-5 shrink-0 text-zinc-500 group-hover:text-white"
                   aria-hidden="true"
                 />
                 Back to Website
               </Link>
               <button
                 onClick={signOut}
-                className="group flex w-full gap-x-3 rounded-lg p-2.5 text-sm font-medium leading-6 text-slate-400 hover:bg-red-900/30 hover:text-red-400 transition-all"
+                className="group flex w-full gap-x-3 rounded-lg p-2.5 text-sm font-medium leading-6 text-zinc-400 hover:bg-red-900/30 hover:text-red-400 transition-all"
               >
                 <LogOut
-                  className="h-5 w-5 shrink-0 text-slate-500 group-hover:text-red-400"
+                  className="h-5 w-5 shrink-0 text-zinc-500 group-hover:text-red-400"
                   aria-hidden="true"
                 />
                 Sign out
