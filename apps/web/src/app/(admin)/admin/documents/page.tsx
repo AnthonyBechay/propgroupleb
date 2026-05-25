@@ -19,7 +19,7 @@ import {
   Save,
 } from 'lucide-react'
 import { apiClient } from '@/lib/api/client'
-import { normalizeApiUrl } from '@/lib/utils/api-url'
+import { normalizeApiUrl, normalizeFileUrl } from '@/lib/utils/api-url'
 
 interface PropertyDocument {
   id: string
@@ -538,7 +538,7 @@ export default function DocumentsPage() {
                         <Pencil className="w-4 h-4" />
                       </button>
                       <a
-                        href={doc.fileUrl}
+                        href={normalizeFileUrl(doc.fileUrl)}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="p-1.5 rounded-lg text-slate-400 hover:text-[rgb(30 41 59)] hover:bg-[rgb(241 245 249)] transition-colors"
@@ -547,7 +547,7 @@ export default function DocumentsPage() {
                         <ExternalLink className="w-4 h-4" />
                       </a>
                       <a
-                        href={doc.fileUrl}
+                        href={normalizeFileUrl(doc.fileUrl)}
                         download={`${doc.title}${doc.mimeType ? '.' + doc.mimeType.split('/').pop()?.replace('vnd.openxmlformats-officedocument.wordprocessingml.document', 'docx').replace('vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'xlsx').replace('vnd.ms-excel', 'xls').replace('msword', 'doc').replace('jpeg', 'jpg') : ''}`}
                         className="p-1.5 rounded-lg text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 transition-colors"
                         title="Download"
@@ -656,7 +656,7 @@ export default function DocumentsPage() {
                         </div>
                       </div>
                       <a
-                        href={editingDoc.fileUrl}
+                        href={normalizeFileUrl(editingDoc.fileUrl)}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="text-xs text-[rgb(30 41 59)] hover:underline flex-shrink-0"

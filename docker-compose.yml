@@ -24,8 +24,20 @@ services:
       R2_ACCESS_KEY_ID: ${R2_ACCESS_KEY_ID:-}
       R2_SECRET_ACCESS_KEY: ${R2_SECRET_ACCESS_KEY:-}
       R2_BUCKET_NAME: ${R2_BUCKET_NAME:-}
+      # R2_PUBLIC_URL — the public base URL for the R2 bucket.
+      # Set to the custom domain: https://assets.propgrouplb.com
+      # When set, new uploads are stored with the custom domain URL in the DB
+      # instead of a backend proxy URL. Also used as fallback by NEXT_PUBLIC_R2_PUBLIC_URL
+      # in the web build if that var is not set explicitly.
       R2_PUBLIC_URL: ${R2_PUBLIC_URL:-}
-      # Used by upload service to build proxied file URLs
+      # API_URL — public URL of this backend (e.g. https://api.propgrp.com).
+      # Used by upload.service.ts as the base for /api/files/* proxy URLs that
+      # are stored in the database for uploaded files.
+      # NOTE: Do NOT use NEXT_PUBLIC_API_URL here — that NEXT_PUBLIC_ prefix is a
+      # Next.js build-time convention and is undefined in a plain Node/Express process.
+      API_URL: ${API_URL:-${BACKEND_URL:-}}
+      # NEXT_PUBLIC_API_URL is still forwarded to the backend for backwards
+      # compatibility with any code that reads it, and for validate-env warnings.
       NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
       # Resend transactional email — optional, disables email if absent
       RESEND_API_KEY: ${RESEND_API_KEY:-}
@@ -53,16 +65,21 @@ services:
       context: .
       dockerfile: apps/web/Dockerfile
       args:
+        # NEXT_PUBLIC_* build args are inlined into the JS bundle at build time.
+        # They must be set here (as build args) AND below (as runtime env vars)
+        # because Next.js inlines them for client components at build time but
+        # server components read them from process.env at request time.
         NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
-        # NEXT_PUBLIC_* env vars are inlined into the client bundle at
-        # build time. Falls back to R2_PUBLIC_URL so a single Coolify env
-        # var keeps backend + frontend in sync. **Important:** the value
-        # must be the actual public URL of the bucket (the `r2.dev`
-        # subdomain shown on the bucket's Settings → Public Access page,
-        # NOT a leftover URL from a previous bucket). An incorrect value
-        # produces site-wide 401s — verify with
-        # `curl -I https://pub-<id>.r2.dev/<some-key>` returns 200 first.
+        # Custom R2 domain — falls back to R2_PUBLIC_URL if not set explicitly,
+        # so a single env var (R2_PUBLIC_URL=https://assets.propgrouplb.com) keeps
+        # backend + frontend in sync. IMPORTANT: value must be the actual public URL
+        # of the bucket. An incorrect value produces site-wide 400 errors on images.
+        # Verify first: curl -I https://assets.propgrouplb.com/<some-known-key>
         NEXT_PUBLIC_R2_PUBLIC_URL: ${NEXT_PUBLIC_R2_PUBLIC_URL:-${R2_PUBLIC_URL:-}}
+        # NEXT_PUBLIC_SITE_URL is used in robots.ts, sitemap.ts, and layout.tsx
+        # metadataBase. Baking it in at build time ensures static pages (OG tags,
+        # canonical URLs) get the real domain instead of localhost.
+        NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL}
     restart: unless-stopped
     environment:
       NODE_ENV: production
@@ -74,24 +91,14 @@ services:
       # with ~1 GB headroom for sharp's native libvips buffers (which live
       # outside the V8 heap).
       NODE_OPTIONS: "--max-old-space-size=2048"
-      # Tell Next.js to run on the public URL so server-generated absolute
-      # links (sitemap, RSS, og:url) emit correct hosts instead of
-      # `http://localhost:3000`.
-      NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL}
-      # NEXT_PUBLIC_API_URL is also passed as a build arg above for the
-      # client bundle. It must additionally be set at runtime so server
-      # components (e.g. sitemap.ts fetching properties + location guides)
-      # can resolve it. Without this, sitemap.xml ships with zero property
-      # entries — confirmed in production by `curl propgrp.com/sitemap.xml`
-      # returning only the static marketing routes.
+      # Runtime values for NEXT_PUBLIC_* vars — mirror the build args above.
+      # Needed at runtime so server components (sitemap.ts, robots.ts, layout.tsx)
+      # read the real domain from process.env instead of falling back to localhost.
       NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
-      # Public R2 bucket URL — when set, the frontend rewrites
-      # `/api/files/<key>` URLs into direct R2 URLs in normalizeFileUrl,
-      # so the browser fetches images directly from R2 (Cloudflare CDN
-      # in front) instead of hopping through our backend container.
-      # Falls back to R2_PUBLIC_URL so a single env var sets both. Must
-      # be the bucket's actual public r2.dev subdomain — see build-arg
-      # comment above for the failure mode if it's wrong.
+      NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL}
+      # normalizeFileUrl() rewrites /api/files/* proxy URLs to this CDN domain,
+      # offloading ~80% of image traffic away from the backend container.
+      # Falls back to R2_PUBLIC_URL — one env var covers both services.
       NEXT_PUBLIC_R2_PUBLIC_URL: ${NEXT_PUBLIC_R2_PUBLIC_URL:-${R2_PUBLIC_URL:-}}
     depends_on:
       backend:

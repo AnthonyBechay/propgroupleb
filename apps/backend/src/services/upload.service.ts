@@ -21,10 +21,14 @@ const PUBLIC_URL = process.env.R2_PUBLIC_URL || '';
  * The /api/files/ proxy endpoint ensures files are always accessible.
  */
 function getFileBaseUrl(): string {
-  // Prefer explicit API URL (e.g., https://api.propgrp.com)
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL || process.env.API_URL;
+  // Prefer explicit API URL (e.g., https://api.propgrp.com).
+  // Use API_URL (backend env var), NOT NEXT_PUBLIC_API_URL — that prefix is a
+  // Next.js build-time convention and will be undefined in a plain Node/Express process.
+  const apiUrl = process.env.API_URL || process.env.NEXT_PUBLIC_API_URL;
   if (apiUrl) {
-    return `${apiUrl}/api/files`;
+    // Strip trailing /api if present so we don't double-up
+    const base = apiUrl.replace(/\/api\/?$/, '');
+    return `${base}/api/files`;
   }
   // Fall back to R2 public URL (only works if R2.dev public access is enabled)
   if (PUBLIC_URL) {
@@ -56,10 +60,12 @@ function sanitizeForPath(str: string): string {
  * Upload a file buffer to Cloudflare R2 with organized path structure
  *
  * Path strategy:
- *   properties/{property-slug}/images/{timestamp}-{name}.ext     — property photos
- *   properties/{property-slug}/documents/{doc-type}/{timestamp}-{name}.ext — property documents
- *   videos/{property-slug}/{timestamp}-{name}.ext                 — property videos
- *   general/{folder}/{uuid}.ext                                   — fallback
+ *   buildings/{slug}/images/{timestamp}-{name}.ext                — building photos
+ *   buildings/{slug}/documents/{doc-type}/{timestamp}-{name}.ext  — building documents
+ *   properties/{slug}/images/{timestamp}-{name}.ext               — legacy property photos
+ *   properties/{slug}/documents/{doc-type}/{timestamp}-{name}.ext — legacy property documents
+ *   videos/{slug}/{timestamp}-{name}.ext                          — videos
+ *   {folder}/{timestamp}-{name}.ext                               — fallback (documents, general, etc.)
  */
 export async function uploadFile(
   buffer: Buffer,
@@ -167,12 +173,16 @@ export async function getSignedFileUrl(key: string, expiresIn = 3600): Promise<s
 }
 
 /**
- * Get the file stream from R2 for proxying
+ * Get the file stream from R2 for proxying.
+ * Accepts an optional Range header (e.g. "bytes=0-1023") so the proxy
+ * can forward byte-range requests — required for video seeking and
+ * PDF byte-range loading in the browser.
  */
-export async function getFileStream(key: string) {
+export async function getFileStream(key: string, range?: string) {
   const command = new GetObjectCommand({
     Bucket: BUCKET_NAME,
     Key: key,
+    ...(range ? { Range: range } : {}),
   });
   return s3Client.send(command);
 }
@@ -194,14 +204,21 @@ export async function fileExists(key: string): Promise<boolean> {
  * Returns null for external URLs (e.g. unsplash) that are not stored in R2.
  */
 export function extractKeyFromUrl(url: string): string | null {
-  // Handle R2 public URL format
+  // Handle R2 public URL / custom domain (e.g. https://assets.propgrouplb.com/<key>)
   if (PUBLIC_URL && url.startsWith(PUBLIC_URL)) {
-    return url.replace(`${PUBLIC_URL}/`, '');
+    return url.slice(PUBLIC_URL.length).replace(/^\//, '');
   }
-  // Handle proxy URL format: /api/files/properties/slug/images/file.jpg
+  // Also handle custom domain if R2_PUBLIC_URL wasn't set at delete time
+  // but the URL was stored with the custom domain
+  const customDomainMatch = url.match(/^https:\/\/assets\.propgrouplb\.com\/(.+)$/);
+  if (customDomainMatch) return customDomainMatch[1];
+  // Handle legacy r2.dev public URL
+  const legacyR2Match = url.match(/^https:\/\/pub-[a-f0-9]+\.r2\.dev\/(.+)$/);
+  if (legacyR2Match) return legacyR2Match[1];
+  // Handle proxy URL format: …/api/files/<key>
   const proxyMatch = url.match(/\/api\/files\/(.+)$/);
   if (proxyMatch) return proxyMatch[1];
-  // Handle raw R2 key format (no URL prefix, just path like "properties/...")
+  // Handle raw R2 key format (no URL prefix, just path like "buildings/...")
   if (!url.startsWith('http') && !url.startsWith('/')) {
     return url;
   }

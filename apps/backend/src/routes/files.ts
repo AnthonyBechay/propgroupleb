@@ -36,16 +36,23 @@ router.get(
     }
 
     try {
-      const result = await getFileStream(key);
+      // Forward Range header so byte-range requests work (video seeking,
+      // PDF page-by-page loading in browser, resumable downloads).
+      const range = req.headers['range'] as string | undefined;
+      const result = await getFileStream(key, range);
 
       if (!result.Body) {
         res.status(404).json({ error: 'File not found' });
         return;
       }
 
-      // Set response headers
+      // --- Response headers ---
       if (result.ContentType) {
         res.setHeader('Content-Type', result.ContentType);
+      }
+      // For range responses R2 returns ContentRange, not ContentLength
+      if (result.ContentRange) {
+        res.setHeader('Content-Range', result.ContentRange);
       }
       if (result.ContentLength) {
         res.setHeader('Content-Length', result.ContentLength.toString());
@@ -53,10 +60,19 @@ router.get(
       if (result.ContentDisposition) {
         res.setHeader('Content-Disposition', result.ContentDisposition);
       }
-
-      // Cache headers - files are immutable (key contains timestamp + UUID)
+      // Forward ETag so browsers can do conditional GET (If-None-Match)
+      if (result.ETag) {
+        res.setHeader('ETag', result.ETag);
+      }
+      // Tell clients we accept range requests
+      res.setHeader('Accept-Ranges', 'bytes');
+      // Files are immutable — key contains timestamp + UUID
       res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
       res.setHeader('Access-Control-Allow-Origin', '*');
+
+      // 206 Partial Content for range requests, 200 otherwise
+      const statusCode = range && result.ContentRange ? 206 : 200;
+      res.status(statusCode);
 
       // Stream the file body to the response
       const body = result.Body;

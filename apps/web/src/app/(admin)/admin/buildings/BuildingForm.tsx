@@ -18,9 +18,12 @@ const MOHAFAZAT_LABELS: Record<string, string> = {
 interface Props {
   initialData?: any
   buildingId?: string
+  /** When true, hides the self-contained page header (back button + title).
+   *  Use this when the form is rendered inside a parent that supplies its own header. */
+  embedded?: boolean
 }
 
-export function BuildingForm({ initialData, buildingId }: Props) {
+export function BuildingForm({ initialData, buildingId, embedded }: Props) {
   const router = useRouter()
   const isEdit = !!buildingId
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -70,8 +73,10 @@ export function BuildingForm({ initialData, buildingId }: Props) {
 
   async function uploadImages(files: FileList) {
     setUploadingImages(true)
+    setError(null)
     const apiUrl = normalizeApiUrl(process.env.NEXT_PUBLIC_API_URL || '')
     const urls: string[] = []
+    const failed: string[] = []
     for (const file of Array.from(files)) {
       try {
         const fd = new FormData()
@@ -85,10 +90,16 @@ export function BuildingForm({ initialData, buildingId }: Props) {
         if (res.ok) {
           const data = await res.json()
           if (data.url) urls.push(data.url)
+        } else {
+          const err = await res.json().catch(() => ({}))
+          failed.push(`${file.name}: ${err.error || res.statusText}`)
         }
-      } catch { /* skip failed uploads */ }
+      } catch (e: any) {
+        failed.push(`${file.name}: ${e.message || 'Network error'}`)
+      }
     }
-    setField('images', [...form.images, ...urls])
+    if (urls.length) setField('images', [...form.images, ...urls])
+    if (failed.length) setError(`Some images failed to upload:\n${failed.join('\n')}`)
     setUploadingImages(false)
   }
 
@@ -189,21 +200,23 @@ export function BuildingForm({ initialData, buildingId }: Props) {
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">
-      {/* Header */}
-      <div className="flex items-center gap-4">
-        <Link href="/admin/buildings" className="p-2 rounded-lg hover:bg-slate-100 text-slate-600 transition-colors">
-          <ArrowLeft className="h-4 w-4" />
-        </Link>
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
-            <Building2 className="h-6 w-6" />
-            {isEdit ? 'Edit Building' : 'Add Building'}
-          </h1>
-          {isEdit && initialData?.title && (
-            <p className="text-sm text-slate-500 mt-0.5">{initialData.title}</p>
-          )}
+      {/* Header — hidden when embedded inside a parent with its own header */}
+      {!embedded && (
+        <div className="flex items-center gap-4">
+          <Link href="/admin/buildings" className="p-2 rounded-lg hover:bg-slate-100 text-slate-600 transition-colors">
+            <ArrowLeft className="h-4 w-4" />
+          </Link>
+          <div>
+            <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
+              <Building2 className="h-6 w-6" />
+              {isEdit ? 'Edit Building' : 'Add Building'}
+            </h1>
+            {isEdit && initialData?.title && (
+              <p className="text-sm text-slate-500 mt-0.5">{initialData.title}</p>
+            )}
+          </div>
         </div>
-      </div>
+      )}
 
       <form onSubmit={handleSubmit} className="space-y-6">
         {error && (

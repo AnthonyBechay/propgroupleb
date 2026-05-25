@@ -16,6 +16,7 @@ export const BUILDING_LIST_INCLUDE = {
   _count: {
     select: {
       units: true,
+      listings: true,
       inquiries: true,
       favorites: true,
     },

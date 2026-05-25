@@ -11,11 +11,18 @@ const imageUpload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 10 * 1024 * 1024 }, // 10MB per image
   fileFilter: (_req, file, cb) => {
-    const allowed = ['image/jpeg', 'image/png', 'image/webp', 'image/avif'];
-    if (allowed.includes(file.mimetype)) {
+    const imageTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/avif'];
+    const docTypes = [
+      'application/pdf',
+      'application/msword',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'application/vnd.ms-excel',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    ];
+    if ([...imageTypes, ...docTypes].includes(file.mimetype)) {
       cb(null, true);
     } else {
-      cb(new Error(`Invalid image type: ${file.mimetype}. Allowed: jpeg, png, webp, avif`));
+      cb(new Error(`Invalid file type: ${file.mimetype}. Allowed: jpeg, png, webp, avif, pdf, doc, docx, xls, xlsx`));
     }
   },
 });
@@ -50,7 +57,7 @@ router.post(
     const propertySlug = req.body.propertySlug || req.query.propertySlug;
     const folder = (req.body.folder || req.query.folder || 'properties') as string;
     // Whitelist allowed folders
-    const allowedFolders = ['properties', 'branding', 'general', 'users'];
+    const allowedFolders = ['properties', 'buildings', 'branding', 'general', 'users', 'documents'];
     const safeFolder = allowedFolders.includes(folder) ? folder : 'properties';
     const result = await uploadFile(file.buffer, file.originalname, file.mimetype, safeFolder, {
       propertySlug: propertySlug as string | undefined,

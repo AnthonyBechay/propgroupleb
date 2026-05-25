@@ -2,7 +2,12 @@ import { ListingForm } from '../ListingForm'
 import { normalizeApiUrl } from '@/lib/utils/api-url'
 import { cookies } from 'next/headers'
 
-export default async function NewListingPage() {
+interface Props {
+  searchParams: Promise<Record<string, string>>
+}
+
+export default async function NewListingPage({ searchParams }: Props) {
+  const sp = await searchParams
   const apiUrl = normalizeApiUrl(process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001')
   const cookieStore = await cookies()
   const token = cookieStore.get('token')?.value
@@ -18,5 +23,11 @@ export default async function NewListingPage() {
     }
   } catch { /* leave empty */ }
 
-  return <ListingForm buildings={buildings} />
+  const preselect = {
+    buildingId: sp.buildingId ?? '',
+    unitId: sp.unitId ?? '',
+    subjectType: (sp.subjectType === 'UNIT' ? 'UNIT' : sp.subjectType === 'BUILDING' ? 'BUILDING' : '') as 'UNIT' | 'BUILDING' | '',
+  }
+
+  return <ListingForm buildings={buildings} preselect={preselect} />
 }

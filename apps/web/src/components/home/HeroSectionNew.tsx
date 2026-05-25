@@ -72,7 +72,7 @@ export function HeroSectionNew() {
   return (
     <section className="relative overflow-hidden w-full" style={{ minHeight: '380px' }}>
       {/* Background */}
-      <div className="absolute inset-0 bg-gradient-to-b from-zinc-900 via-zinc-800 to-zinc-700" />
+      <div className="absolute inset-0 bg-gradient-to-br from-zinc-900 via-sky-950 to-zinc-800" />
 
       {/* Subtle grid texture */}
       <div

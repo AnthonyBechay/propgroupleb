@@ -30,6 +30,13 @@ const nextConfig: NextConfig = {
         protocol: 'https',
         hostname: 'pub-*.r2.dev',
       },
+      // Custom R2 domain — set NEXT_PUBLIC_R2_PUBLIC_URL=https://assets.propgrouplb.com
+      // in production and normalizeFileUrl() rewrites all proxy/legacy URLs to this
+      // Cloudflare edge domain, bypassing the backend proxy entirely.
+      {
+        protocol: 'https',
+        hostname: 'assets.propgrouplb.com',
+      },
     ],
     // Default is 60s. That causes every optimized variant to regenerate
     // within a minute under normal traffic, which is the main driver of
@@ -45,7 +52,9 @@ const nextConfig: NextConfig = {
   productionBrowserSourceMaps: true,
   experimental: {
     serverActions: {
-      bodySizeLimit: '2mb',
+      // 10mb to match the backend multer limit — needed for document/PDF uploads
+      // (2mb default silently rejected large floor plans and legal documents).
+      bodySizeLimit: '10mb',
     },
     // Tree-shake icon/UI packages even behind grouped imports
     // `import { A, B, C } from 'lucide-react'`. Cuts ~30-50KB first-load JS

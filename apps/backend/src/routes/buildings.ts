@@ -227,8 +227,15 @@ router.get(
 
     const units = await prisma.unit.findMany({
       where,
-      include: { options: true },
-      orderBy: { floor: 'asc' },
+      include: {
+        options: true,
+        // Include active listings so the admin UI can show listing status per unit
+        listings: {
+          where: { status: { notIn: ['ARCHIVED', 'CLOSED'] } },
+          select: { id: true, intent: true, status: true, price: true, currency: true, slug: true },
+        },
+      },
+      orderBy: [{ floor: 'asc' }, { unitNumber: 'asc' }],
     });
 
     sendSuccess(res, units);

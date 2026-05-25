@@ -47,15 +47,13 @@ interface Inquiry {
   adminNotes: string | null
   repliedAt: string | null
   repliedBy: string | null
-  propertyTitle: string | null
+  buildingTitle: string | null
   createdAt: string
   updatedAt: string
-  property: {
+  building: {
     id: string
     title: string
-    country: string
-    price?: number
-    currency?: string
+    city?: string | null
   } | null
   user?: {
     id: string
@@ -205,7 +203,7 @@ export default function AdminInquiriesPage() {
     }
   }
 
-  const getPropertyName = (inq: Inquiry) => inq.property?.title || inq.propertyTitle || 'Deleted Property'
+  const getPropertyName = (inq: Inquiry) => inq.building?.title || inq.buildingTitle || 'General Inquiry'
 
   const filtered = searchQuery
     ? inquiries.filter(inq => {
@@ -397,18 +395,18 @@ export default function AdminInquiriesPage() {
                       {statusCfg.label}
                     </div>
 
-                    {/* Property */}
+                    {/* Building */}
                     <div className="hidden md:block text-right flex-shrink-0 max-w-[180px]">
-                      <p className={`text-sm font-medium truncate ${inq.property ? 'text-[rgb(30 41 59)]' : 'text-slate-400 italic'}`}>
+                      <p className={`text-sm font-medium truncate ${inq.building ? 'text-[rgb(30 41 59)]' : 'text-slate-400 italic'}`}>
                         {getPropertyName(inq)}
                       </p>
-                      {inq.property ? (
+                      {inq.building?.city ? (
                         <p className="text-xs text-slate-400 flex items-center justify-end gap-1">
-                          <MapPin className="w-3 h-3" /> {inq.property.country}
+                          <MapPin className="w-3 h-3" /> {inq.building.city}
                         </p>
-                      ) : (
-                        <p className="text-xs text-red-400">Property deleted</p>
-                      )}
+                      ) : !inq.building && !inq.buildingTitle ? (
+                        <p className="text-xs text-slate-400">General inquiry</p>
+                      ) : null}
                     </div>
 
                     {/* Time */}
@@ -454,30 +452,23 @@ export default function AdminInquiriesPage() {
                           </div>
                         </div>
 
-                        {/* Property Info */}
+                        {/* Building Info */}
                         <div className="space-y-2">
-                          <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider">Property</h4>
+                          <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider">Building</h4>
                           <div className="flex items-center gap-2 text-sm text-slate-700">
                             <Building2 className="w-4 h-4 text-slate-400" />
-                            <span className={`font-medium ${!inq.property ? 'text-slate-400 italic' : ''}`}>
+                            <span className={`font-medium ${!inq.building && !inq.buildingTitle ? 'text-slate-400 italic' : ''}`}>
                               {getPropertyName(inq)}
                             </span>
-                            {!inq.property && (
-                              <span className="text-xs px-1.5 py-0.5 bg-red-100 text-red-600 rounded font-medium">Deleted</span>
+                            {!inq.building && inq.buildingTitle && (
+                              <span className="text-xs px-1.5 py-0.5 bg-amber-100 text-amber-600 rounded font-medium">Deleted</span>
                             )}
                           </div>
-                          {inq.property && (
-                            <>
-                              <div className="flex items-center gap-2 text-sm text-slate-500">
-                                <MapPin className="w-4 h-4 text-slate-400" />
-                                {inq.property.country}
-                              </div>
-                              {inq.property.price && (
-                                <p className="text-sm text-slate-500">
-                                  Price: {inq.property.currency || '$'}{inq.property.price.toLocaleString()}
-                                </p>
-                              )}
-                            </>
+                          {inq.building?.city && (
+                            <div className="flex items-center gap-2 text-sm text-slate-500">
+                              <MapPin className="w-4 h-4 text-slate-400" />
+                              {inq.building.city}
+                            </div>
                           )}
                         </div>
                       </div>
@@ -588,15 +579,13 @@ export default function AdminInquiriesPage() {
                           <Mail className="w-3.5 h-3.5" />
                           Reply via Email
                         </a>
-                        {inq.property && (
+                        {inq.building && (
                           <a
-                            href={`/property/${inq.property.id}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
+                            href={`/admin/buildings/${inq.building.id}`}
                             className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-slate-700 bg-slate-100 rounded-lg hover:bg-slate-200 transition-colors"
                           >
                             <ExternalLink className="w-3.5 h-3.5" />
-                            View Property
+                            View Building
                           </a>
                         )}
                         <button

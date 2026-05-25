@@ -23,8 +23,12 @@ const RECOMMENDED_GROUPS: Array<{ feature: string; vars: string[] }> = [
     vars: ['R2_ACCOUNT_ID', 'R2_ACCESS_KEY_ID', 'R2_SECRET_ACCESS_KEY', 'R2_BUCKET_NAME'],
   },
   {
-    feature: 'File URL generation',
-    vars: ['NEXT_PUBLIC_API_URL'],
+    // API_URL is the preferred var — upload.service.ts uses it to build
+    // the /api/files/* proxy URLs stored in the DB. NEXT_PUBLIC_API_URL
+    // is accepted as a fallback but is a Next.js build-time convention
+    // and may be undefined in plain Node/Express deployments.
+    feature: 'File URL generation (set API_URL=https://your-backend-domain)',
+    vars: ['API_URL'],
   },
   {
     feature: 'Google OAuth',

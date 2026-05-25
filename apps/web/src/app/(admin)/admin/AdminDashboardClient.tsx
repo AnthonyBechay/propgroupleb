@@ -111,7 +111,7 @@ export function AdminDashboardClient() {
   const { overview, trends, recent, statistics } = data
 
   const statCards = [
-    { label: 'Buildings', value: overview.totalBuildings ?? 0,        icon: Building2,    color: 'bg-slate-800', href: '/admin/properties' },
+    { label: 'Buildings', value: overview.totalBuildings ?? 0,        icon: Building2,    color: 'bg-slate-800', href: '/admin/buildings' },
     { label: 'Users',     value: overview.totalUsers ?? 0,            icon: Users,        color: 'bg-emerald-600', href: '/admin/users',    trend: trends.newUsersThisWeek,    trendLabel: 'this week' },
     { label: 'Inquiries', value: overview.totalInquiries ?? 0,        icon: MessageSquare,color: 'bg-slate-600', href: '/admin/inquiries', trend: trends.newInquiriesThisWeek, trendLabel: 'this week' },
     { label: 'Favorites', value: overview.totalFavorites ?? 0,        icon: Heart,        color: 'bg-rose-500' },
@@ -285,7 +285,7 @@ export function AdminDashboardClient() {
                 <Building2 className="h-4 w-4 text-slate-500" />
                 Recent Buildings
               </h3>
-              <Link href="/admin/properties" className="text-xs text-slate-500 hover:text-slate-900 font-medium">View all</Link>
+              <Link href="/admin/buildings" className="text-xs text-slate-500 hover:text-slate-900 font-medium">View all</Link>
             </div>
             <div className="divide-y divide-slate-50">
               {(recent.buildings ?? []).length === 0 ? (

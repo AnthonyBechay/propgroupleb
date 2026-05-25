@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Plus, Search, ExternalLink, Edit, Trash2, Tag } from 'lucide-react'
+import { Plus, Search, ExternalLink, Edit, Trash2, Tag, Building2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
@@ -22,18 +22,19 @@ import {
 } from '@/components/ui/table'
 import Link from 'next/link'
 import { apiClient } from '@/lib/api/client'
+import { normalizeApiUrl } from '@/lib/utils/api-url'
 
 const INTENT_COLORS: Record<string, string> = {
   FOR_SALE: 'bg-emerald-100 text-emerald-800',
-  FOR_RENT: 'bg-blue-100 text-blue-800',
+  FOR_RENT: 'bg-sky-100 text-sky-800',
 }
 
 const STATUS_COLORS: Record<string, string> = {
-  DRAFT: 'bg-slate-100 text-slate-600',
+  DRAFT: 'bg-zinc-100 text-zinc-600',
   ACTIVE: 'bg-green-100 text-green-700',
   UNDER_OFFER: 'bg-amber-100 text-amber-700',
   CLOSED: 'bg-red-100 text-red-700',
-  ARCHIVED: 'bg-slate-200 text-slate-500',
+  ARCHIVED: 'bg-zinc-200 text-zinc-500',
 }
 
 function formatPrice(price: number, currency: string) {
@@ -50,6 +51,17 @@ export default function AdminListingsPage() {
   const [search, setSearch] = useState('')
   const [intentFilter, setIntentFilter] = useState('all')
   const [statusFilter, setStatusFilter] = useState('all')
+  const [buildingFilter, setBuildingFilter] = useState('all')
+  const [buildings, setBuildings] = useState<any[]>([])
+
+  // Load building list once for the filter dropdown
+  useEffect(() => {
+    const apiUrl = normalizeApiUrl(process.env.NEXT_PUBLIC_API_URL || '')
+    fetch(`${apiUrl}/api/buildings?limit=200&visibility=all`, { credentials: 'include' })
+      .then(r => r.json())
+      .then(d => setBuildings(d.data ?? []))
+      .catch(() => {})
+  }, [])
 
   useEffect(() => {
     setLoading(true)
@@ -68,6 +80,10 @@ export default function AdminListingsPage() {
   }, [intentFilter, statusFilter])
 
   const filtered = listings.filter(l => {
+    if (buildingFilter !== 'all') {
+      const listingBuildingId = l.building?.id ?? l.unit?.buildingId ?? null
+      if (listingBuildingId !== buildingFilter) return false
+    }
     if (!search) return true
     const title = l.building?.title ?? l.unit?.name ?? l.headline ?? ''
     return title.toLowerCase().includes(search.toLowerCase())
@@ -88,7 +104,9 @@ export default function AdminListingsPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Listings</h1>
-          <p className="text-slate-500 text-sm mt-0.5">{total} total listings</p>
+          <p className="text-slate-500 text-sm mt-0.5">
+            {buildingFilter !== 'all' ? `${filtered.length} of ` : ''}{total} total listings
+          </p>
         </div>
         <Link href="/admin/listings/new">
           <Button className="bg-slate-800 hover:bg-slate-700">
@@ -109,6 +127,20 @@ export default function AdminListingsPage() {
             className="pl-9"
           />
         </div>
+        <Select value={buildingFilter} onValueChange={setBuildingFilter}>
+          <SelectTrigger className="w-[180px]">
+            <Building2 className="h-3.5 w-3.5 mr-1.5 text-slate-400 shrink-0" />
+            <SelectValue placeholder="All buildings" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All buildings</SelectItem>
+            {buildings.map(b => (
+              <SelectItem key={b.id} value={b.id}>
+                {b.title}{b.city ? ` — ${b.city}` : ''}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
         <Select value={intentFilter} onValueChange={setIntentFilter}>
           <SelectTrigger className="w-[140px]">
             <SelectValue placeholder="Intent" />

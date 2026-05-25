@@ -37,17 +37,16 @@ const STATUS_LABELS: Record<string, string> = {
 }
 
 const STATUS_COLORS: Record<string, string> = {
-  OFF_PLAN: 'bg-purple-100 text-purple-800',
-  NEW_BUILD: 'bg-blue-100 text-blue-800',
-  RESALE: 'bg-slate-100 text-slate-700',
+  OFF_PLAN: 'bg-violet-100 text-violet-700',
+  NEW_BUILD: 'bg-sky-100 text-sky-700',
+  RESALE:   'bg-zinc-100 text-zinc-600',
 }
 
 interface Props {
   initialBuildings: any[]
-  developers: any[]
 }
 
-export function BuildingsAdminClient({ initialBuildings, developers }: Props) {
+export function BuildingsAdminClient({ initialBuildings }: Props) {
   const [buildings, setBuildings] = useState(initialBuildings)
   const [search, setSearch] = useState('')
   const [kindFilter, setKindFilter] = useState<string>('all')
@@ -118,12 +117,12 @@ export function BuildingsAdminClient({ initialBuildings, developers }: Props) {
       <div className="border rounded-lg overflow-hidden">
         <Table>
           <TableHeader>
-            <TableRow className="bg-slate-50">
+            <TableRow className="bg-zinc-50">
               <TableHead>Building</TableHead>
               <TableHead>Kind</TableHead>
               <TableHead>Location</TableHead>
               <TableHead>Status</TableHead>
-              <TableHead className="text-center">Units</TableHead>
+              <TableHead className="text-center">Units / Listings</TableHead>
               <TableHead className="text-center">Views</TableHead>
               <TableHead className="text-right">Actions</TableHead>
             </TableRow>
@@ -169,8 +168,11 @@ export function BuildingsAdminClient({ initialBuildings, developers }: Props) {
                       {STATUS_LABELS[b.status] ?? b.status}
                     </span>
                   </TableCell>
-                  <TableCell className="text-center text-sm text-slate-600">
-                    {b._count?.units ?? b.units?.length ?? 0}
+                  <TableCell className="text-center">
+                    <div className="text-sm font-medium text-zinc-900">{b._count?.units ?? b.units?.length ?? 0}</div>
+                    {(b._count?.listings ?? 0) > 0 && (
+                      <div className="text-xs text-emerald-600 font-medium">{b._count.listings} listed</div>
+                    )}
                   </TableCell>
                   <TableCell className="text-center text-sm text-slate-600">
                     {b.views?.toLocaleString() ?? 0}

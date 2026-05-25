@@ -1,4 +1,4 @@
-import { BuildingForm } from '../BuildingForm'
+import { BuildingDetailTabs } from '../BuildingDetailTabs'
 import { normalizeApiUrl } from '@/lib/utils/api-url'
 import { cookies } from 'next/headers'
 
@@ -26,5 +26,5 @@ export default async function EditBuildingPage({ params }: Props) {
     // show empty form if fetch fails
   }
 
-  return <BuildingForm initialData={building} buildingId={id} />
+  return <BuildingDetailTabs building={building} buildingId={id} />
 }

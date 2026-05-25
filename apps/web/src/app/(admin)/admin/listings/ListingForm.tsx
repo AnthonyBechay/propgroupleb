@@ -6,13 +6,20 @@ import { ArrowLeft, Loader2, Tag, Plus, X } from 'lucide-react'
 import Link from 'next/link'
 import { normalizeApiUrl } from '@/lib/utils/api-url'
 
+interface Preselect {
+  buildingId?: string
+  unitId?: string
+  subjectType?: 'UNIT' | 'BUILDING' | ''
+}
+
 interface Props {
   initialData?: any
   listingId?: string
   buildings: any[]
+  preselect?: Preselect
 }
 
-export function ListingForm({ initialData, listingId, buildings }: Props) {
+export function ListingForm({ initialData, listingId, buildings, preselect }: Props) {
   const router = useRouter()
   const isEdit = !!listingId
 
@@ -23,9 +30,9 @@ export function ListingForm({ initialData, listingId, buildings }: Props) {
   const [highlightInput, setHighlightInput] = useState('')
 
   const [form, setForm] = useState({
-    subjectType: initialData?.subjectType ?? 'BUILDING',
-    buildingId: initialData?.buildingId ?? initialData?.building?.id ?? '',
-    unitId: initialData?.unitId ?? initialData?.unit?.id ?? '',
+    subjectType: initialData?.subjectType ?? (preselect?.subjectType || 'BUILDING'),
+    buildingId: initialData?.buildingId ?? initialData?.building?.id ?? preselect?.buildingId ?? '',
+    unitId: initialData?.unitId ?? initialData?.unit?.id ?? preselect?.unitId ?? '',
     intent: initialData?.intent ?? 'FOR_SALE',
     status: initialData?.status ?? 'DRAFT',
     visibility: initialData?.visibility ?? 'PUBLIC',
@@ -208,7 +215,12 @@ export function ListingForm({ initialData, listingId, buildings }: Props) {
                     <Loader2 className="h-4 w-4 animate-spin" /> Loading units...
                   </div>
                 ) : units.length === 0 ? (
-                  <p className="text-sm text-slate-400 py-2">No units found for this building. Add units from the building edit page.</p>
+                  <p className="text-sm text-slate-400 py-2">
+                    No units found for this building.{' '}
+                    <Link href={`/admin/buildings/${form.buildingId}`} className="text-sky-600 hover:underline">
+                      Add units from the building edit page.
+                    </Link>
+                  </p>
                 ) : (
                   <select value={form.unitId} onChange={e => setField('unitId', e.target.value)} className={inputCls} required>
                     <option value="">— Select a unit —</option>

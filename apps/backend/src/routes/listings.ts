@@ -277,16 +277,35 @@ router.post(
       return;
     }
 
+    // Validate referenced entities exist and auto-fill buildingId for unit listings
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let resolvedData: typeof data & { buildingId?: string | null } = data;
+    if (data.subjectType === 'UNIT' && data.unitId) {
+      const unit = await prisma.unit.findUnique({
+        where: { id: data.unitId },
+        select: { id: true, buildingId: true },
+      });
+      if (!unit) { sendError(res, 400, 'Unit not found'); return; }
+      // Always link buildingId on unit listings so building-level queries work
+      resolvedData = { ...data, buildingId: unit.buildingId };
+    } else if (data.subjectType === 'BUILDING' && data.buildingId) {
+      const building = await prisma.building.findUnique({
+        where: { id: data.buildingId },
+        select: { id: true },
+      });
+      if (!building) { sendError(res, 400, 'Building not found'); return; }
+    }
+
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const result = await prisma.$transaction(async (tx: any) => {
-      const slugSource = data.slug || data.headline || `listing-${Date.now()}`;
-      const slug = data.slug || (await generateListingSlug(slugSource, tx));
+      const slugSource = resolvedData.slug || resolvedData.headline || `listing-${Date.now()}`;
+      const slug = resolvedData.slug || (await generateListingSlug(slugSource, tx));
       return tx.listing.create({
         data: {
-          ...data,
+          ...resolvedData,
           slug,
-          highlights: data.highlights ?? [],
-          publishedAt: data.status === 'ACTIVE' ? new Date() : undefined,
+          highlights: resolvedData.highlights ?? [],
+          publishedAt: resolvedData.status === 'ACTIVE' ? new Date() : undefined,
         },
       });
     });
