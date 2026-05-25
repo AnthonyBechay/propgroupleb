@@ -11,7 +11,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { MOHAFAZAT } from '@propgroup/config'
+const MOHAFAZAT = [
+  { id: 'BEIRUT', name: 'Beirut' },
+  { id: 'MOUNT_LEBANON', name: 'Mount Lebanon' },
+  { id: 'NORTH', name: 'North Lebanon' },
+  { id: 'SOUTH', name: 'South Lebanon' },
+  { id: 'BEKAA', name: 'Bekaa' },
+  { id: 'AKKAR', name: 'Akkar' },
+  { id: 'BAALBEK_HERMEL', name: 'Baalbek-Hermel' },
+  { id: 'NABATIEH', name: 'Nabatieh' },
+] as const
 
 const UNIT_KINDS = [
   { value: 'APARTMENT', label: 'Apartment' },
@@ -79,8 +88,8 @@ export function ListingFilters({ currentParams }: Props) {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All governorates</SelectItem>
-            {MOHAFAZAT.map(m => (
-              <SelectItem key={m.id} value={m.name}>{m.name}</SelectItem>
+            {MOHAFAZAT.map((m: { id: string; name: string }) => (
+              <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>
             ))}
           </SelectContent>
         </Select>

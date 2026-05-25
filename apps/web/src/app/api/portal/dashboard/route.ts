@@ -7,7 +7,6 @@ export const dynamic = 'force-dynamic'
 function timeAgo(date: Date): string {
   const now = new Date()
   const seconds = Math.floor((now.getTime() - date.getTime()) / 1000)
-
   if (seconds < 60) return 'just now'
   const minutes = Math.floor(seconds / 60)
   if (minutes < 60) return `${minutes} minute${minutes === 1 ? '' : 's'} ago`
@@ -21,7 +20,6 @@ function timeAgo(date: Date): string {
 
 export async function GET(request: NextRequest) {
   try {
-    // Verify authentication
     const authResult = await verifyAuth(request)
     if (!authResult.authenticated || !authResult.user) {
       return NextResponse.json(
@@ -32,122 +30,78 @@ export async function GET(request: NextRequest) {
 
     const userId = authResult.user.id
 
-    // Fetch real data from database
-    const [
-      totalProperties,
-      totalFavorites,
-      totalInquiries,
-      recentProperties,
-      marketTrends,
-      recentFavorites,
-      recentInquiries
-    ] = await Promise.all([
-      prisma.property.count(),
-      prisma.favoriteProperty.count({ where: { userId } }),
-      prisma.propertyInquiry.count({ where: { userId } }),
-      prisma.property.findMany({
-        take: 3,
-        orderBy: { createdAt: 'desc' },
-        include: {
-          developer: true,
-          investmentData: true
-        }
-      }),
-      // Calculate market trends from actual data
-      prisma.property.groupBy({
-        by: ['country'],
-        _avg: {
-          price: true
-        },
-        _count: {
-          id: true
-        }
-      }),
-      // Recent favorites for this user
-      prisma.favoriteProperty.findMany({
-        where: { userId },
-        take: 5,
-        orderBy: { createdAt: 'desc' },
-        include: {
-          property: {
-            select: { title: true }
-          }
-        }
-      }),
-      // Recent inquiries for this user
-      prisma.propertyInquiry.findMany({
-        where: { userId },
-        take: 5,
-        orderBy: { createdAt: 'desc' },
-        select: {
-          id: true,
-          propertyTitle: true,
-          createdAt: true,
-          property: { select: { title: true } }
-        }
-      })
-    ])
+    const [totalFavorites, totalInquiries, recentFavorites, recentInquiries, recentListings] =
+      await Promise.all([
+        prisma.favoriteProperty.count({ where: { userId } }),
+        prisma.propertyInquiry.count({ where: { userId } }),
+        prisma.favoriteProperty.findMany({
+          where: { userId },
+          take: 5,
+          orderBy: { createdAt: 'desc' },
+          include: {
+            listing: { select: { headline: true, building: { select: { title: true } } } },
+            building: { select: { title: true } },
+          },
+        }),
+        prisma.propertyInquiry.findMany({
+          where: { userId },
+          take: 5,
+          orderBy: { createdAt: 'desc' },
+          select: {
+            id: true, buildingTitle: true, createdAt: true,
+            listing: { select: { headline: true, building: { select: { title: true } } } },
+          },
+        }),
+        prisma.listing.findMany({
+          take: 3,
+          where: { status: 'ACTIVE', visibility: 'PUBLIC' },
+          orderBy: { createdAt: 'desc' },
+          include: {
+            building: {
+              select: { id: true, title: true, city: true, mohafazat: true, images: true, status: true },
+            },
+            unit: { select: { id: true, name: true, kind: true, bedrooms: true, areaSqm: true } },
+          },
+        }),
+      ])
 
-    // Build real recent activity from favorites and inquiries
     const recentActivity = [
       ...recentFavorites.map((fav: any) => ({
         id: fav.id,
         type: 'favorite' as const,
-        property: fav.property.title,
+        property: fav.listing?.headline ?? fav.listing?.building?.title ?? fav.building?.title ?? 'Property',
         date: timeAgo(new Date(fav.createdAt)),
-        timestamp: new Date(fav.createdAt).getTime()
+        timestamp: new Date(fav.createdAt).getTime(),
       })),
       ...recentInquiries.map((inq: any) => ({
         id: inq.id,
         type: 'inquiry' as const,
-        property: inq.property?.title || inq.propertyTitle || 'Deleted Property',
+        property: inq.listing?.headline ?? inq.listing?.building?.title ?? inq.buildingTitle ?? 'Property',
         date: timeAgo(new Date(inq.createdAt)),
-        timestamp: new Date(inq.createdAt).getTime()
-      }))
+        timestamp: new Date(inq.createdAt).getTime(),
+      })),
     ]
       .sort((a, b) => b.timestamp - a.timestamp)
       .slice(0, 10)
       .map(({ timestamp, ...rest }) => rest)
 
-    // Calculate portfolio stats
-    const userProperties = await prisma.property.findMany({
-      where: {},
-      include: {
-        investmentData: true
-      }
-    })
-
     const portfolioStats = {
-      totalInvestment: userProperties.reduce((sum: number, prop: any) => sum + (prop.price || 0), 0),
-      totalProperties: userProperties.length,
-      averageROI: userProperties.length > 0
-        ? userProperties.reduce((sum: number, prop: any) => sum + (prop.investmentData?.expectedROI || 0), 0) / userProperties.length
-        : 0,
-      monthlyIncome: userProperties.reduce((sum: number, prop: any) => sum + (prop.investmentData?.rentalYield || 0) * (prop.price || 0) / 100 / 12, 0),
+      totalInvestment: 0,
+      totalProperties: totalFavorites,
+      averageROI: 0,
+      monthlyIncome: 0,
       portfolioGrowth: 0,
-      savedProperties: totalFavorites
+      savedProperties: totalFavorites,
     }
-
-    // Format market trends
-    const formattedMarketTrends = marketTrends.map((trend: any) => ({
-      country: trend.country,
-      trend: 'stable' as const,
-      value: 0,
-      avgPrice: trend._avg.price || 0,
-      propertyCount: trend._count.id
-    }))
 
     return NextResponse.json({
       portfolioStats,
       recentActivity,
-      marketTrends: formattedMarketTrends,
-      recentProperties,
+      marketTrends: [],
+      recentProperties: recentListings,
     })
   } catch (error) {
     console.error('Error fetching portal dashboard data:', error)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

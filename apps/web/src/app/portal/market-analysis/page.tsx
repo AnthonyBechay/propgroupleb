@@ -1,73 +1,74 @@
 import { prisma } from '@/lib/prisma'
 import { MarketAnalysisClient } from './MarketAnalysisClient'
 
-// Force dynamic rendering
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
 export default async function MarketAnalysisPage() {
-  // Layout already handles authentication
-
-  // Fetch real market data from database
-  const marketData = await prisma.property.groupBy({
-    by: ['country'],
-    _avg: {
-      price: true,
-      // Add more fields as needed
-    },
-    _count: {
-      id: true
-    }
+  // Aggregate listing data by region for market analysis
+  const listingsByRegion = await prisma.listing.groupBy({
+    by: ['currency'],
+    where: { status: 'ACTIVE', visibility: 'PUBLIC' },
+    _avg: { price: true },
+    _count: { id: true },
   })
 
-  // Fetch properties with investment data for more detailed analysis
-  const propertiesWithInvestment = await prisma.property.findMany({
-    include: {
-      investmentData: true,
-      developer: true
-    }
+  // For richer regional data, fetch buildings grouped by mohafazat
+  const buildings = await prisma.building.findMany({
+    where: { visibility: 'PUBLIC' },
+    select: { mohafazat: true, city: true, kind: true, status: true },
   })
 
-  // Calculate market insights from real data
-  const marketInsights = marketData.map((country: any) => {
-    const countryProperties = propertiesWithInvestment.filter((p: any) => p.country === country.country)
-    const avgROI = countryProperties.length > 0 
-      ? countryProperties.reduce((sum: number, p: any) => sum + (p.investmentData?.expectedROI || 0), 0) / countryProperties.length
-      : 0
-    const avgRentalYield = countryProperties.length > 0
-      ? countryProperties.reduce((sum: number, p: any) => sum + (p.investmentData?.rentalYield || 0), 0) / countryProperties.length
-      : 0
-
-    return {
-      country: country.country,
-      name: country.country,
-      avgPrice: country._avg.price || 0,
-      priceChange: 0, // This would need historical data
-      avgROI: avgROI,
-      rentalYield: avgRentalYield,
-      goldenVisa: 0,
-      propertyCount: country._count.id,
-      marketTrend: 'Stable' as const,
-      bestFor: ['Long-term Hold', 'Lifestyle', 'Value'],
-      insights: [
-        `Strong property market with ${country._count.id} properties`,
-        `Average price: $${((country._avg.price || 0) / 1000).toFixed(0)}K`,
-        `Expected ROI: ${avgROI.toFixed(1)}%`,
-        `Rental yield: ${avgRentalYield.toFixed(1)}%`
-      ]
-    }
+  const regionMap: Record<string, { count: number }> = {}
+  buildings.forEach((b) => {
+    const key = b.mohafazat ?? 'Unknown'
+    if (!regionMap[key]) regionMap[key] = { count: 0 }
+    regionMap[key].count++
   })
+
+  // Active listings for price range
+  const listings = await prisma.listing.findMany({
+    where: { status: 'ACTIVE', visibility: 'PUBLIC', currency: 'USD' },
+    select: { price: true, intent: true },
+  })
+
+  const saleListings = listings.filter(l => l.intent === 'FOR_SALE')
+  const rentListings = listings.filter(l => l.intent === 'FOR_RENT')
+
+  const avgSalePrice = saleListings.length > 0
+    ? saleListings.reduce((s, l) => s + Number(l.price), 0) / saleListings.length
+    : 0
+  const avgRentPrice = rentListings.length > 0
+    ? rentListings.reduce((s, l) => s + Number(l.price), 0) / rentListings.length
+    : 0
+
+  const marketInsights = Object.entries(regionMap).map(([region, { count }]) => ({
+    country: region,
+    name: region.replace(/_/g, ' '),
+    avgPrice: avgSalePrice,
+    priceChange: 0,
+    avgROI: 0,
+    rentalYield: 0,
+    goldenVisa: 0,
+    propertyCount: count,
+    marketTrend: 'Stable' as const,
+    bestFor: ['Lifestyle', 'Long-term Hold'],
+    insights: [
+      `${count} building${count !== 1 ? 's' : ''} available`,
+      avgSalePrice > 0 ? `Avg sale price: $${(avgSalePrice / 1000).toFixed(0)}K` : 'Prices vary',
+      avgRentPrice > 0 ? `Avg rent: $${avgRentPrice.toLocaleString()}/mo` : '',
+    ].filter(Boolean),
+  }))
 
   const comparisonMetrics = [
     { metric: 'Average Property Price', key: 'avgPrice', format: 'currency' },
     { metric: 'Price Change (YoY)', key: 'priceChange', format: 'percentage' },
     { metric: 'Average ROI', key: 'avgROI', format: 'percentage' },
     { metric: 'Rental Yield', key: 'rentalYield', format: 'percentage' },
-    { metric: 'Eligibility Threshold', key: 'goldenVisa', format: 'currency' },
   ]
 
   return (
-    <MarketAnalysisClient 
+    <MarketAnalysisClient
       marketData={marketInsights}
       comparisonMetrics={comparisonMetrics}
     />

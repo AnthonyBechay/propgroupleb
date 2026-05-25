@@ -528,6 +528,9 @@ export interface Vendor {
   phone?: string | null;
   whatsapp?: string | null;
   email?: string | null;
+  notes?: string | null;
+  rating?: number | null;
+  specialty?: string | null;
   isActive: boolean;
   createdAt: Date;
   updatedAt: Date;
@@ -543,7 +546,9 @@ export interface MaintenanceTicket {
   status: TicketStatus;
   title: string;
   description?: string | null;
+  reportedBy?: string | null;
   reporterName?: string | null;
+  reporterPhone?: string | null;
   vendorId?: string | null;
   assignedToUserId?: string | null;
   costEstimate?: number | null;
@@ -564,7 +569,10 @@ export interface UtilityMeter {
   unitId?: string | null;
   kind: UtilityKind;
   identifier?: string | null;
+  meterNumber?: string | null; // alias for identifier used in some UI code
+  unitOfMeasure?: string;
   isActive: boolean;
+  notes?: string | null;
   building?: Building;
   unit?: Unit | null;
   readings?: UtilityReading[];
@@ -600,11 +608,16 @@ export interface UtilityBill {
   id: string;
   buildingId: string;
   kind: UtilityKind;
+  utilityKind?: UtilityKind; // alias used in some UI form code
   periodStart: Date | string;
   periodEnd: Date | string;
   totalAmount: number;
   currency: Currency;
+  totalConsumed?: number | null;
+  invoiceFileKey?: string | null;
   status: BillStatus;
+  allocationMethod?: AllocationMethod; // used in UI form state
+  notes?: string | null;
   allocations?: BillAllocation[];
   building?: Building;
   createdAt: Date;
@@ -615,11 +628,14 @@ export interface ServiceCharge {
   id: string;
   buildingId: string;
   name: string;
+  description?: string | null;
   amount: number;
   currency: Currency;
   cadence: ChargeCadence;
   splitMethod: AllocationMethod;
   isActive: boolean;
+  status?: string | null;
+  nextDueDate?: string | null;
   building?: Building;
   createdAt: Date;
   updatedAt: Date;

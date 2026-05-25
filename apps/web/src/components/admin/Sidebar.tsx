@@ -77,9 +77,9 @@ export function Sidebar() {
                   Super Admin
                 </span>
               )}
-              {user?.role === 'PROPERTY_MANAGER' && (
+              {user?.role === 'ADMIN' && (
                 <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-semibold bg-slate-600 text-white mt-0.5">
-                  PM
+                  Admin
                 </span>
               )}
             </div>

@@ -178,7 +178,7 @@ export default function ServiceChargesPage() {
                         : '—'}
                     </td>
                     <td className="px-4 py-3">
-                      <span className={`inline-flex px-2 py-0.5 rounded text-xs font-medium ${STATUS_COLORS[c.status] ?? ''}`}>
+                      <span className={`inline-flex px-2 py-0.5 rounded text-xs font-medium ${STATUS_COLORS[c.status ?? ''] ?? ''}`}>
                         {c.status}
                       </span>
                     </td>

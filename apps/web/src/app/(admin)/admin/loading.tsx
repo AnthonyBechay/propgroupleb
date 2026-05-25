@@ -16,7 +16,7 @@ export default function AdminLoading() {
           <div className="h-7 w-44 bg-slate-100 rounded animate-pulse" />
           <div className="h-4 w-72 bg-slate-100 rounded animate-pulse" />
         </div>
-        <div className="h-10 w-32 bg-[#1B3A5C]/30 rounded-lg animate-pulse shrink-0" />
+        <div className="h-10 w-32 bg-[rgb(30 41 59)]/30 rounded-lg animate-pulse shrink-0" />
       </div>
 
       {/* Filter / search row */}

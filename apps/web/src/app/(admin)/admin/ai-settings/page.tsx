@@ -19,7 +19,7 @@ export default function AISettingsPage() {
     <div>
       <div className="mb-8">
         <h1 className="text-3xl font-black text-gray-900 flex items-center gap-3">
-          <div className="w-10 h-10 bg-[#1B3A5C] rounded-xl flex items-center justify-center shadow-md">
+          <div className="w-10 h-10 bg-[rgb(30 41 59)] rounded-xl flex items-center justify-center shadow-md">
             <Bot className="h-6 w-6 text-white" />
           </div>
           AI Search Settings
@@ -31,7 +31,7 @@ export default function AISettingsPage() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
         <div className="bg-white border-2 border-slate-100 rounded-2xl shadow-lg p-6 hover:shadow-xl transition-all">
           <div className="flex items-center justify-between mb-4">
-            <div className="w-12 h-12 bg-[#1B3A5C] rounded-xl flex items-center justify-center shadow-md">
+            <div className="w-12 h-12 bg-[rgb(30 41 59)] rounded-xl flex items-center justify-center shadow-md">
               <MessageSquare className="w-6 h-6 text-white" />
             </div>
             <span className="text-3xl font-black text-gray-900">1,234</span>

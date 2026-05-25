@@ -180,9 +180,9 @@ export default function SettingsPage() {
   }
 
   const navItems = [
-    { id: 'profile' as TabType, label: 'Profile', icon: User, color: 'bg-[#1B3A5C]' },
+    { id: 'profile' as TabType, label: 'Profile', icon: User, color: 'bg-[rgb(30 41 59)]' },
     { id: 'security' as TabType, label: 'Security', icon: Lock, color: 'bg-emerald-600' },
-    { id: 'notifications' as TabType, label: 'Notifications', icon: Bell, color: 'bg-[#C49A2E]' },
+    { id: 'notifications' as TabType, label: 'Notifications', icon: Bell, color: 'bg-[rgb(161 98 7)]' },
     { id: 'email' as TabType, label: 'Email Templates', icon: Mail, color: 'bg-slate-600' },
     ...(isSuperAdmin ? [
       { id: 'database' as TabType, label: 'Database', icon: Database, color: 'bg-amber-500' },
@@ -197,7 +197,7 @@ export default function SettingsPage() {
       {/* Header */}
       <div>
         <h1 className="text-3xl font-black text-slate-900 flex items-center gap-3">
-          <div className="w-10 h-10 bg-[#1B3A5C] rounded-xl flex items-center justify-center shadow-md">
+          <div className="w-10 h-10 bg-[rgb(30 41 59)] rounded-xl flex items-center justify-center shadow-md">
             <SettingsIcon className="h-6 w-6 text-white" />
           </div>
           Settings
@@ -253,7 +253,7 @@ export default function SettingsPage() {
             <div className="bg-white border-2 border-slate-100 shadow-lg rounded-2xl overflow-hidden">
               <div className="px-6 py-5 border-b-2 border-slate-100 bg-gradient-to-r from-slate-50 to-white">
                 <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-                  <div className="w-8 h-8 bg-[#1B3A5C] rounded-lg flex items-center justify-center">
+                  <div className="w-8 h-8 bg-[rgb(30 41 59)] rounded-lg flex items-center justify-center">
                     <User className="h-5 w-5 text-white" />
                   </div>
                   Profile Settings
@@ -272,7 +272,7 @@ export default function SettingsPage() {
                       id="firstName"
                       value={firstName}
                       onChange={(e) => setFirstName(e.target.value)}
-                      className="mt-2 border-2 border-slate-200 rounded-xl focus:border-[#1B3A5C] focus:ring-[#1B3A5C]"
+                      className="mt-2 border-2 border-slate-200 rounded-xl focus:border-[rgb(30 41 59)] focus:ring-[rgb(30 41 59)]"
                       placeholder="Enter first name"
                     />
                   </div>
@@ -284,7 +284,7 @@ export default function SettingsPage() {
                       id="lastName"
                       value={lastName}
                       onChange={(e) => setLastName(e.target.value)}
-                      className="mt-2 border-2 border-slate-200 rounded-xl focus:border-[#1B3A5C] focus:ring-[#1B3A5C]"
+                      className="mt-2 border-2 border-slate-200 rounded-xl focus:border-[rgb(30 41 59)] focus:ring-[rgb(30 41 59)]"
                       placeholder="Enter last name"
                     />
                   </div>
@@ -311,7 +311,7 @@ export default function SettingsPage() {
                       id="phone"
                       value={phone}
                       onChange={(e) => setPhone(e.target.value)}
-                      className="mt-2 border-2 border-slate-200 rounded-xl focus:border-[#1B3A5C] focus:ring-[#1B3A5C]"
+                      className="mt-2 border-2 border-slate-200 rounded-xl focus:border-[rgb(30 41 59)] focus:ring-[rgb(30 41 59)]"
                       placeholder="+961 71 000 000"
                     />
                   </div>
@@ -323,7 +323,7 @@ export default function SettingsPage() {
                       id="country"
                       value={country}
                       onChange={(e) => setCountry(e.target.value)}
-                      className="mt-2 border-2 border-slate-200 rounded-xl focus:border-[#1B3A5C] focus:ring-[#1B3A5C]"
+                      className="mt-2 border-2 border-slate-200 rounded-xl focus:border-[rgb(30 41 59)] focus:ring-[rgb(30 41 59)]"
                       placeholder="United States"
                     />
                   </div>
@@ -333,8 +333,8 @@ export default function SettingsPage() {
                     <div className="mt-2 flex items-center gap-3 p-4 bg-slate-50 rounded-xl border-2 border-slate-100">
                       <span className={`inline-flex items-center px-4 py-2 rounded-xl text-sm font-bold shadow-md
                         ${user?.role === 'SUPER_ADMIN'
-                          ? 'bg-[#C49A2E] text-white'
-                          : 'bg-[#1B3A5C] text-white'}`}>
+                          ? 'bg-[rgb(161 98 7)] text-white'
+                          : 'bg-[rgb(30 41 59)] text-white'}`}>
                         <Shield className="h-4 w-4 mr-2" />
                         {user?.role?.replace('_', ' ') || 'USER'}
                       </span>
@@ -353,7 +353,7 @@ export default function SettingsPage() {
                           type="checkbox"
                           checked={emailNotifications}
                           onChange={(e) => setEmailNotifications(e.target.checked)}
-                          className="focus:ring-[#1B3A5C] h-5 w-5 text-[#1B3A5C] border-slate-300 rounded"
+                          className="focus:ring-[rgb(30 41 59)] h-5 w-5 text-[rgb(30 41 59)] border-slate-300 rounded"
                         />
                       </div>
                       <div className="ml-3 text-sm">
@@ -385,7 +385,7 @@ export default function SettingsPage() {
                   <Button
                     type="submit"
                     disabled={loading}
-                    className="bg-[#1B3A5C] hover:bg-[#152D4A] text-white rounded-xl font-bold shadow-md"
+                    className="bg-[rgb(30 41 59)] hover:bg-[#152D4A] text-white rounded-xl font-bold shadow-md"
                   >
                     <Save className="h-4 w-4 mr-2" />
                     {loading ? 'Saving...' : 'Save Changes'}

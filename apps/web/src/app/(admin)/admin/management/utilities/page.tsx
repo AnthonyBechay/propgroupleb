@@ -202,9 +202,9 @@ export default function UtilitiesPage() {
                           {building?.title ?? b.buildingId}
                         </td>
                         <td className="px-4 py-3">
-                          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium ${UTILITY_COLORS[b.utilityKind] ?? ''}`}>
+                          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium ${UTILITY_COLORS[b.utilityKind ?? b.kind] ?? ''}`}>
                             <Zap className="h-3 w-3" />
-                            {UTILITY_LABELS[b.utilityKind] ?? b.utilityKind}
+                            {UTILITY_LABELS[b.utilityKind ?? b.kind] ?? (b.utilityKind ?? b.kind)}
                           </span>
                         </td>
                         <td className="px-4 py-3 text-xs text-slate-500">
@@ -223,10 +223,10 @@ export default function UtilitiesPage() {
                         </td>
                         <td className="px-4 py-3">
                           <div className="flex items-center justify-end gap-1">
-                            {b.status === 'PENDING' && (
+                            {b.status === 'RECORDED' && (
                               <Button variant="outline" size="sm" className="h-7 text-xs"
                                 disabled={allocating === b.id}
-                                onClick={() => handleAllocate(b.id, b.allocationMethod)}>
+                                onClick={() => handleAllocate(b.id, b.allocationMethod ?? 'EQUAL_SHARE')}>
                                 {allocating === b.id
                                   ? <RefreshCw className="h-3 w-3 animate-spin" />
                                   : 'Allocate'}

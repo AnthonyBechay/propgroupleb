@@ -8,42 +8,32 @@ export async function GET(request: NextRequest) {
   try {
     const authResult = await verifyAuth(request)
     if (!authResult.authenticated || !authResult.user) {
-      return NextResponse.json(
-        { success: false, error: 'Unauthorized' },
-        { status: 401 }
-      )
+      return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
     }
 
     const favorites = await prisma.favoriteProperty.findMany({
       where: { userId: authResult.user.id },
       include: {
-        property: {
+        listing: {
           include: {
-            investmentData: true,
+            building: {
+              select: { id: true, title: true, city: true, mohafazat: true, images: true, status: true, kind: true },
+            },
+            unit: {
+              select: { id: true, name: true, kind: true, bedrooms: true, areaSqm: true },
+            },
           },
+        },
+        building: {
+          select: { id: true, title: true, city: true, mohafazat: true, images: true, status: true, kind: true },
         },
       },
       orderBy: { createdAt: 'desc' },
     })
 
-    const properties = favorites.map((fav: any) => ({
-      ...fav.property,
-      images: fav.property.images || [],
-      investmentData: fav.property.investmentData
-        ? {
-            expectedROI: fav.property.investmentData.expectedROI,
-            rentalYield: fav.property.investmentData.rentalYield,
-            capitalGrowth: fav.property.investmentData.capitalGrowth,
-          }
-        : undefined,
-    }))
-
-    return NextResponse.json({ success: true, data: properties })
+    return NextResponse.json({ success: true, data: favorites })
   } catch (error) {
-    console.error('Error fetching favorite properties:', error)
-    return NextResponse.json(
-      { success: false, error: 'Internal server error' },
-      { status: 500 }
-    )
+    console.error('Error fetching favorites:', error)
+    return NextResponse.json({ success: false, error: 'Internal server error' }, { status: 500 })
   }
 }

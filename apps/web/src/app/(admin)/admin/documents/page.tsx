@@ -37,7 +37,7 @@ interface PropertyDocument {
   property: {
     id: string
     title: string
-    country: string
+    city?: string | null
   }
   unit?: { id: string; name: string } | null
   unitOption?: { id: string; name: string } | null
@@ -46,7 +46,7 @@ interface PropertyDocument {
 interface PropertyOption {
   id: string
   title: string
-  country: string
+  city: string | null
 }
 
 interface UnitOption {
@@ -144,7 +144,7 @@ export default function DocumentsPage() {
     const load = async () => {
       try {
         const apiUrl = normalizeApiUrl(process.env.NEXT_PUBLIC_API_URL || '')
-        const res = await fetch(`${apiUrl}/api/properties/${uploadPropertyId}/units`, {
+        const res = await fetch(`${apiUrl}/api/buildings/${uploadPropertyId}/units`, {
           credentials: 'include',
         })
         if (res.ok) {
@@ -182,7 +182,7 @@ export default function DocumentsPage() {
   async function fetchProperties() {
     try {
       const apiUrl = normalizeApiUrl(process.env.NEXT_PUBLIC_API_URL || '')
-      const response = await fetch(`${apiUrl}/api/properties?limit=1000`, {
+      const response = await fetch(`${apiUrl}/api/buildings?limit=1000`, {
         credentials: 'include',
       })
       if (response.ok) {
@@ -191,12 +191,12 @@ export default function DocumentsPage() {
           (data.data || []).map((p: any) => ({
             id: p.id,
             title: p.title,
-            country: p.country,
+            city: p.city ?? null,
           }))
         )
       }
     } catch (error) {
-      console.error('Failed to fetch properties:', error)
+      console.error('Failed to fetch buildings:', error)
     }
   }
 
@@ -375,7 +375,7 @@ export default function DocumentsPage() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
-            <div className="w-10 h-10 bg-[#1B3A5C] rounded-xl flex items-center justify-center shadow-md">
+            <div className="w-10 h-10 bg-[rgb(30 41 59)] rounded-xl flex items-center justify-center shadow-md">
               <FileText className="h-5 w-5 text-white" />
             </div>
             Document Management
@@ -386,7 +386,7 @@ export default function DocumentsPage() {
         </div>
         <button
           onClick={() => setUploadModalOpen(true)}
-          className="inline-flex items-center gap-2 px-4 py-2.5 bg-[#1B3A5C] text-white rounded-xl font-medium hover:bg-[#24507D] transition-colors shadow-md"
+          className="inline-flex items-center gap-2 px-4 py-2.5 bg-[rgb(30 41 59)] text-white rounded-xl font-medium hover:bg-[rgb(51 65 85)] transition-colors shadow-md"
         >
           <Upload className="w-4 h-4" />
           Upload Document
@@ -452,7 +452,7 @@ export default function DocumentsPage() {
       {/* Document Table */}
       {loading ? (
         <div className="text-center py-12">
-          <Loader2 className="w-8 h-8 animate-spin text-[#1B3A5C] mx-auto mb-2" />
+          <Loader2 className="w-8 h-8 animate-spin text-[rgb(30 41 59)] mx-auto mb-2" />
           <p className="text-slate-500">Loading documents...</p>
         </div>
       ) : filtered.length === 0 ? (
@@ -469,7 +469,7 @@ export default function DocumentsPage() {
           {documents.length === 0 && (
             <button
               onClick={() => setUploadModalOpen(true)}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-[#1B3A5C] text-white rounded-lg font-medium hover:bg-[#24507D] transition-colors"
+              className="inline-flex items-center gap-2 px-4 py-2 bg-[rgb(30 41 59)] text-white rounded-lg font-medium hover:bg-[rgb(51 65 85)] transition-colors"
             >
               <Upload className="w-4 h-4" />
               Upload Document
@@ -532,7 +532,7 @@ export default function DocumentsPage() {
                     <div className="flex items-center justify-end gap-1">
                       <button
                         onClick={() => startEditing(doc)}
-                        className="p-1.5 rounded-lg text-slate-400 hover:text-[#C49A2E] hover:bg-orange-50 transition-colors"
+                        className="p-1.5 rounded-lg text-slate-400 hover:text-[rgb(161 98 7)] hover:bg-orange-50 transition-colors"
                         title="Edit"
                       >
                         <Pencil className="w-4 h-4" />
@@ -541,7 +541,7 @@ export default function DocumentsPage() {
                         href={doc.fileUrl}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="p-1.5 rounded-lg text-slate-400 hover:text-[#1B3A5C] hover:bg-[#E0EDF7] transition-colors"
+                        className="p-1.5 rounded-lg text-slate-400 hover:text-[rgb(30 41 59)] hover:bg-[rgb(241 245 249)] transition-colors"
                         title="View"
                       >
                         <ExternalLink className="w-4 h-4" />
@@ -594,7 +594,7 @@ export default function DocumentsPage() {
                 <div className="flex items-center gap-2 px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm">
                   <Building2 className="w-4 h-4 text-slate-400 flex-shrink-0" />
                   <span className="text-slate-700 truncate">
-                    {editingDoc.property.title} ({editingDoc.property.country})
+                    {editingDoc.property.title}
                   </span>
                 </div>
               </div>
@@ -659,13 +659,13 @@ export default function DocumentsPage() {
                         href={editingDoc.fileUrl}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-xs text-[#1B3A5C] hover:underline flex-shrink-0"
+                        className="text-xs text-[rgb(30 41 59)] hover:underline flex-shrink-0"
                       >
                         View
                       </a>
                     </div>
                     <label className="mt-2 block cursor-pointer">
-                      <span className="text-xs text-slate-500 hover:text-[#1B3A5C] transition-colors flex items-center gap-1">
+                      <span className="text-xs text-slate-500 hover:text-[rgb(30 41 59)] transition-colors flex items-center gap-1">
                         <Upload className="w-3 h-3" /> Replace with a new file
                       </span>
                       <input
@@ -677,7 +677,7 @@ export default function DocumentsPage() {
                     </label>
                   </div>
                 ) : (
-                  <div className="border-2 border-dashed border-[#1B3A5C] rounded-lg p-3 bg-[#E0EDF7]/40">
+                  <div className="border-2 border-dashed border-[rgb(30 41 59)] rounded-lg p-3 bg-[rgb(241 245 249)]/40">
                     <div className="flex items-center justify-between gap-2">
                       <div className="flex items-center gap-2 min-w-0">
                         {getFileIcon(editReplaceFile.type)}
@@ -724,7 +724,7 @@ export default function DocumentsPage() {
               <button
                 onClick={handleSaveEdit}
                 disabled={saving || !editTitle.trim()}
-                className="px-4 py-2 text-sm font-medium text-white bg-[#1B3A5C] rounded-lg hover:bg-[#24507D] transition-colors disabled:opacity-50 flex items-center gap-2"
+                className="px-4 py-2 text-sm font-medium text-white bg-[rgb(30 41 59)] rounded-lg hover:bg-[rgb(51 65 85)] transition-colors disabled:opacity-50 flex items-center gap-2"
               >
                 {saving ? (
                   <>
@@ -756,7 +756,7 @@ export default function DocumentsPage() {
             </button>
 
             <h3 className="text-lg font-bold text-slate-900 mb-6 flex items-center gap-2">
-              <Upload className="w-5 h-5 text-[#1B3A5C]" />
+              <Upload className="w-5 h-5 text-[rgb(30 41 59)]" />
               Upload Document
             </h3>
 
@@ -773,7 +773,7 @@ export default function DocumentsPage() {
                 >
                   <option value="">Select a property...</option>
                   {properties.map(p => (
-                    <option key={p.id} value={p.id}>{p.title} ({p.country})</option>
+                    <option key={p.id} value={p.id}>{p.title}{p.city ? ` — ${p.city}` : ''}</option>
                   ))}
                 </select>
               </div>
@@ -824,7 +824,7 @@ export default function DocumentsPage() {
 
               {/* Scope indicator */}
               {uploadPropertyId && (
-                <div className="flex items-center gap-2 px-3 py-2 bg-[#E0EDF7]/60 rounded-lg text-xs text-[#1B3A5C]">
+                <div className="flex items-center gap-2 px-3 py-2 bg-[rgb(241 245 249)]/60 rounded-lg text-xs text-[rgb(30 41 59)]">
                   <Building2 className="w-3.5 h-3.5 flex-shrink-0" />
                   <span>
                     Scope: {uploadUnitOptionId
@@ -881,7 +881,7 @@ export default function DocumentsPage() {
                 <label className="block text-sm font-medium text-slate-700 mb-1">
                   File <span className="text-red-500">*</span>
                 </label>
-                <div className="border-2 border-dashed rounded-xl p-4 text-center hover:border-[#1B3A5C] transition-colors">
+                <div className="border-2 border-dashed rounded-xl p-4 text-center hover:border-[rgb(30 41 59)] transition-colors">
                   {uploadFile ? (
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
@@ -937,7 +937,7 @@ export default function DocumentsPage() {
               <button
                 onClick={handleUpload}
                 disabled={uploading || !uploadFile || !uploadPropertyId || !uploadTitle}
-                className="px-4 py-2 text-sm font-medium text-white bg-[#1B3A5C] rounded-lg hover:bg-[#24507D] transition-colors disabled:opacity-50 flex items-center gap-2"
+                className="px-4 py-2 text-sm font-medium text-white bg-[rgb(30 41 59)] rounded-lg hover:bg-[rgb(51 65 85)] transition-colors disabled:opacity-50 flex items-center gap-2"
               >
                 {uploading ? (
                   <>

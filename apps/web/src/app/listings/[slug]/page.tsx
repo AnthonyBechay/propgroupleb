@@ -324,11 +324,11 @@ export default async function ListingDetailPage({ params }: PageProps) {
             )}
 
             {/* Unit features */}
-            {unit?.features?.length > 0 && (
+            {unit?.features && unit.features.length > 0 && (
               <div className="bg-white rounded-2xl border border-slate-200 p-6">
                 <h2 className="text-lg font-semibold text-slate-900 mb-3">Features</h2>
                 <ul className="grid grid-cols-2 gap-2">
-                  {unit.features.map((f, i) => (
+                  {unit.features.map((f: string, i: number) => (
                     <li key={i} className="flex items-center gap-2 text-sm text-slate-700">
                       <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
                       {f}

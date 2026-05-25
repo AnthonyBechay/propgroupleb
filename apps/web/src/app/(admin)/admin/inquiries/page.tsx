@@ -245,7 +245,7 @@ export default function AdminInquiriesPage() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
-            <div className="w-10 h-10 bg-[#C49A2E] rounded-xl flex items-center justify-center shadow-md">
+            <div className="w-10 h-10 bg-[rgb(161 98 7)] rounded-xl flex items-center justify-center shadow-md">
               <MessageSquare className="h-5 w-5 text-white" />
             </div>
             Inquiries
@@ -322,7 +322,7 @@ export default function AdminInquiriesPage() {
 
       {loading ? (
         <div className="text-center py-12">
-          <Loader2 className="w-8 h-8 animate-spin text-[#1B3A5C] mx-auto mb-2" />
+          <Loader2 className="w-8 h-8 animate-spin text-[rgb(30 41 59)] mx-auto mb-2" />
           <p className="text-slate-500">Loading inquiries...</p>
         </div>
       ) : filtered.length === 0 ? (
@@ -341,7 +341,7 @@ export default function AdminInquiriesPage() {
           <div className="flex items-center gap-2 px-1">
             <button onClick={toggleSelectAll} className="text-slate-400 hover:text-slate-600 transition-colors">
               {selectedIds.size === filtered.length && filtered.length > 0 ? (
-                <CheckSquare className="w-5 h-5 text-[#1B3A5C]" />
+                <CheckSquare className="w-5 h-5 text-[rgb(30 41 59)]" />
               ) : (
                 <Square className="w-5 h-5" />
               )}
@@ -367,14 +367,14 @@ export default function AdminInquiriesPage() {
                       className="text-slate-400 hover:text-slate-600 flex-shrink-0"
                     >
                       {selectedIds.has(inq.id) ? (
-                        <CheckSquare className="w-5 h-5 text-[#1B3A5C]" />
+                        <CheckSquare className="w-5 h-5 text-[rgb(30 41 59)]" />
                       ) : (
                         <Square className="w-5 h-5" />
                       )}
                     </button>
 
                     {/* Avatar */}
-                    <div className="w-10 h-10 bg-[#1B3A5C] rounded-full flex items-center justify-center text-white text-sm font-bold flex-shrink-0">
+                    <div className="w-10 h-10 bg-[rgb(30 41 59)] rounded-full flex items-center justify-center text-white text-sm font-bold flex-shrink-0">
                       {inq.name.charAt(0).toUpperCase()}
                     </div>
 
@@ -399,7 +399,7 @@ export default function AdminInquiriesPage() {
 
                     {/* Property */}
                     <div className="hidden md:block text-right flex-shrink-0 max-w-[180px]">
-                      <p className={`text-sm font-medium truncate ${inq.property ? 'text-[#1B3A5C]' : 'text-slate-400 italic'}`}>
+                      <p className={`text-sm font-medium truncate ${inq.property ? 'text-[rgb(30 41 59)]' : 'text-slate-400 italic'}`}>
                         {getPropertyName(inq)}
                       </p>
                       {inq.property ? (
@@ -431,12 +431,12 @@ export default function AdminInquiriesPage() {
                           <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider">Contact Details</h4>
                           <div className="flex items-center gap-2 text-sm text-slate-700">
                             <Mail className="w-4 h-4 text-slate-400" />
-                            <a href={`mailto:${inq.email}`} className="text-[#1B3A5C] hover:underline">{inq.email}</a>
+                            <a href={`mailto:${inq.email}`} className="text-[rgb(30 41 59)] hover:underline">{inq.email}</a>
                           </div>
                           {inq.phone && (
                             <div className="flex items-center gap-2 text-sm text-slate-700">
                               <Phone className="w-4 h-4 text-slate-400" />
-                              <a href={`tel:${inq.phone}`} className="text-[#1B3A5C] hover:underline">{inq.phone}</a>
+                              <a href={`tel:${inq.phone}`} className="text-[rgb(30 41 59)] hover:underline">{inq.phone}</a>
                             </div>
                           )}
                           {inq.user && (
@@ -533,7 +533,7 @@ export default function AdminInquiriesPage() {
                           {editingNotesId !== inq.id && (
                             <button
                               onClick={() => { setEditingNotesId(inq.id); setNotesText(inq.adminNotes || '') }}
-                              className="text-xs text-[#1B3A5C] hover:underline"
+                              className="text-xs text-[rgb(30 41 59)] hover:underline"
                             >
                               {inq.adminNotes ? 'Edit' : 'Add note'}
                             </button>
@@ -542,7 +542,7 @@ export default function AdminInquiriesPage() {
                         {editingNotesId === inq.id ? (
                           <div className="space-y-2">
                             <textarea
-                              className="w-full border rounded-lg p-2.5 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-[#1B3A5C]/20"
+                              className="w-full border rounded-lg p-2.5 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-[rgb(30 41 59)]/20"
                               rows={3}
                               value={notesText}
                               onChange={(e) => setNotesText(e.target.value)}
@@ -552,7 +552,7 @@ export default function AdminInquiriesPage() {
                               <button
                                 onClick={() => handleSaveNotes(inq.id)}
                                 disabled={updatingId === inq.id}
-                                className="px-3 py-1.5 text-xs font-medium text-white bg-[#1B3A5C] rounded-lg hover:bg-[#24507D] disabled:opacity-50"
+                                className="px-3 py-1.5 text-xs font-medium text-white bg-[rgb(30 41 59)] rounded-lg hover:bg-[rgb(51 65 85)] disabled:opacity-50"
                               >
                                 {updatingId === inq.id ? 'Saving...' : 'Save'}
                               </button>
@@ -583,7 +583,7 @@ export default function AdminInquiriesPage() {
                               handleStatusChange(inq.id, 'REPLIED')
                             }
                           }}
-                          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white bg-[#1B3A5C] rounded-lg hover:bg-[#24507D] transition-colors"
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white bg-[rgb(30 41 59)] rounded-lg hover:bg-[rgb(51 65 85)] transition-colors"
                         >
                           <Mail className="w-3.5 h-3.5" />
                           Reply via Email

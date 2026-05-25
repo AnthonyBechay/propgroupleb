@@ -143,7 +143,7 @@ export default function AdminContactsPage() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
-            <div className="w-10 h-10 bg-[#1B3A5C] rounded-xl flex items-center justify-center shadow-md">
+            <div className="w-10 h-10 bg-[rgb(30 41 59)] rounded-xl flex items-center justify-center shadow-md">
               <Inbox className="h-5 w-5 text-white" />
             </div>
             Contact Messages
@@ -151,7 +151,7 @@ export default function AdminContactsPage() {
           <p className="text-slate-600 mt-1">
             {totalCount} total message{totalCount !== 1 ? 's' : ''}
             {unreadCount > 0 && (
-              <span className="ml-2 text-[#C49A2E] font-medium">({unreadCount} unread)</span>
+              <span className="ml-2 text-[rgb(161 98 7)] font-medium">({unreadCount} unread)</span>
             )}
           </p>
         </div>
@@ -171,7 +171,7 @@ export default function AdminContactsPage() {
 
       {loading ? (
         <div className="text-center py-12">
-          <Loader2 className="w-8 h-8 animate-spin text-[#1B3A5C] mx-auto mb-2" />
+          <Loader2 className="w-8 h-8 animate-spin text-[rgb(30 41 59)] mx-auto mb-2" />
           <p className="text-slate-500">Loading messages...</p>
         </div>
       ) : filtered.length === 0 ? (
@@ -193,7 +193,7 @@ export default function AdminContactsPage() {
                 <div
                   key={msg.id}
                   className={`bg-white rounded-xl border transition-all hover:shadow-md ${
-                    !msg.isRead ? 'border-l-4 border-l-[#C49A2E]' : ''
+                    !msg.isRead ? 'border-l-4 border-l-[rgb(161 98 7)]' : ''
                   }`}
                 >
                   <div
@@ -205,7 +205,7 @@ export default function AdminContactsPage() {
                   >
                     {/* Avatar */}
                     <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white text-sm font-bold flex-shrink-0 ${
-                      msg.isRead ? 'bg-slate-400' : 'bg-[#C49A2E]'
+                      msg.isRead ? 'bg-slate-400' : 'bg-[rgb(161 98 7)]'
                     }`}>
                       {msg.name.charAt(0).toUpperCase()}
                     </div>
@@ -217,7 +217,7 @@ export default function AdminContactsPage() {
                           {msg.name}
                         </p>
                         {!msg.isRead && (
-                          <span className="w-2 h-2 bg-[#C49A2E] rounded-full flex-shrink-0" />
+                          <span className="w-2 h-2 bg-[rgb(161 98 7)] rounded-full flex-shrink-0" />
                         )}
                       </div>
                       <p className="text-sm text-slate-500 truncate">
@@ -248,12 +248,12 @@ export default function AdminContactsPage() {
                           </div>
                           <div className="flex items-center gap-2 text-sm text-slate-700">
                             <Mail className="w-4 h-4 text-slate-400" />
-                            <a href={`mailto:${msg.email}`} className="text-[#1B3A5C] hover:underline">{msg.email}</a>
+                            <a href={`mailto:${msg.email}`} className="text-[rgb(30 41 59)] hover:underline">{msg.email}</a>
                           </div>
                           {msg.phone && (
                             <div className="flex items-center gap-2 text-sm text-slate-700">
                               <Phone className="w-4 h-4 text-slate-400" />
-                              <a href={`tel:${msg.phone}`} className="text-[#1B3A5C] hover:underline">{msg.phone}</a>
+                              <a href={`tel:${msg.phone}`} className="text-[rgb(30 41 59)] hover:underline">{msg.phone}</a>
                             </div>
                           )}
                           <div className="flex items-center gap-2 text-sm text-slate-500">
@@ -283,7 +283,7 @@ export default function AdminContactsPage() {
                       <div className="flex items-center gap-2 mt-4 pt-3 border-t">
                         <a
                           href={`mailto:${msg.email}?subject=Re: ${encodeURIComponent(msg.subject || 'Your inquiry to PropGroup')}`}
-                          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white bg-[#1B3A5C] rounded-lg hover:bg-[#24507D] transition-colors"
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white bg-[rgb(30 41 59)] rounded-lg hover:bg-[rgb(51 65 85)] transition-colors"
                         >
                           <Mail className="w-3.5 h-3.5" />
                           Reply via Email
