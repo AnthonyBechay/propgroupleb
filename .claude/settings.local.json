@@ -363,7 +363,8 @@
       "Bash(mkdir -p \"/Users/anthonybechay/development/propgroupleb/apps/web/src/app/\\(admin\\)/admin/buildings/[id]\")",
       "Bash(mkdir -p \"/Users/anthonybechay/development/propgroupleb/apps/web/src/app/\\(admin\\)/admin/listings/[id]\")",
       "Bash(awk -F: '{print $1}')",
-      "Bash(xargs perl -i -pe ' *)"
+      "Bash(xargs perl -i -pe ' *)",
+      "Bash(node -e ' *)"
     ],
     "deny": [],
     "ask": []

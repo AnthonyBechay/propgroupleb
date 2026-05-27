@@ -48,17 +48,28 @@ export function normalizeApiUrl(url?: string): string {
  *
  * Either way, "already-correct" URLs pass through untouched.
  */
+/** Ensure a URL/host has an https:// scheme and no trailing slash. */
+function ensureHttps(value: string): string {
+  let v = value.trim().replace(/\/+$/, '');
+  if (v.startsWith('//')) v = `https:${v}`;
+  else if (!/^https?:\/\//i.test(v)) v = `https://${v}`;
+  return v;
+}
+
 export function normalizeFileUrl(url: string): string {
   if (!url) return url;
 
-  const r2Public = process.env.NEXT_PUBLIC_R2_PUBLIC_URL?.replace(/\/$/, '');
+  // r2Public MUST be a fully-qualified https URL. The env var is frequently set without
+  // a scheme (e.g. "assets.propgrouplb.com"), and concatenating that with a key produces
+  // a protocol-less src that the browser resolves as a relative path → 404s like
+  // `/admin/buildings/assets.propgrouplb.com/...`. Always force https.
+  const r2PublicRaw = process.env.NEXT_PUBLIC_R2_PUBLIC_URL;
+  const r2Public = r2PublicRaw ? ensureHttps(r2PublicRaw) : undefined;
 
-  // ── Step 1: prepend https:// to protocol-less URLs ─────────────────────────
+  // ── Step 1: prepend https:// to protocol-less input URLs ───────────────────
   // Old DB rows stored URLs without a scheme (e.g. "assets.propgrouplb.com/buildings/123.jpg"
   // or "pub-abc.r2.dev/foo.jpg"). Without a scheme the browser treats them as a relative
-  // path and tries to load them from the current page's directory, producing 404s like
-  // `/admin/buildings/assets.propgrouplb.com/...`. Detect "looks-like-a-hostname/path" and
-  // upgrade to https. Skip values that are already absolute or rooted paths.
+  // path. Detect "looks-like-a-hostname/path" and upgrade. Skip already-absolute / rooted.
   let working = url;
   const isAbsolute = /^https?:\/\//i.test(working);
   const isProtocolRelative = working.startsWith('//');
@@ -67,27 +78,20 @@ export function normalizeFileUrl(url: string): string {
     if (isProtocolRelative) {
       working = `https:${working}`;
     } else if (/^[a-z0-9-]+(\.[a-z0-9-]+)+\//i.test(working)) {
-      // Looks like "host.tld/path…" — promote to https
       working = `https://${working}`;
     }
   }
 
   // ── Step 2: standard rewriting against R2 / proxy patterns ────────────────
-  // Match the legacy R2 public URL form: https://pub-<hex>.r2.dev/<key>
   const directR2Match = working.match(/^https:\/\/pub-[a-f0-9]+\.r2\.dev\/(.+)$/);
-
-  // Match our backend proxy form: <whatever>/api/files/<key>
   const proxyMatch = working.match(/^(?:https?:\/\/[^/]+)?\/api\/files\/(.+)$/);
 
-  // Re-bind for downstream use
-  // eslint-disable-next-line no-param-reassign
-  url = working;
-
   if (r2Public) {
-    // Mode A: prefer direct R2.
+    // Mode A: rewrite proxy / legacy-R2 URLs to the custom CDN domain.
     if (proxyMatch) return `${r2Public}/${proxyMatch[1]}`;
     if (directR2Match) return `${r2Public}/${directR2Match[1]}`;
-    return url;
+    // Already on the CDN or some other absolute URL — return as-is (now https).
+    return working;
   }
 
   // Mode B: route everything through backend proxy.
@@ -96,15 +100,11 @@ export function normalizeFileUrl(url: string): string {
     const apiBase = normalizeApiUrl(process.env.NEXT_PUBLIC_API_URL);
     return `${apiBase}/api/files/${key}`;
   }
-  // Also rewrite stale proxy URLs with a different host (e.g. api.bechays.com
-  // → api.propgrp.com). These come from DB rows written before the domain
-  // migration. The proxyMatch regex captures any host, so we just swap in the
-  // current API base and keep the key path intact.
   if (proxyMatch) {
     const key = proxyMatch[1];
     const apiBase = normalizeApiUrl(process.env.NEXT_PUBLIC_API_URL);
     return `${apiBase}/api/files/${key}`;
   }
-  return url;
+  return working;
 }
 
