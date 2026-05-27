@@ -104,8 +104,35 @@ export function BuildingForm({ initialData, buildingId, embedded }: Props) {
     setUploadingImages(false)
   }
 
-  function removeImage(idx: number) {
-    setField('images', form.images.filter((_: string, i: number) => i !== idx))
+  const [deletingIdx, setDeletingIdx] = useState<number | null>(null)
+
+  async function removeImage(idx: number) {
+    const url = form.images[idx]
+    if (!url) return
+    // Confirm because this immediately deletes the file from R2 — no undo
+    if (!confirm('Delete this image? This will remove the file from storage permanently.')) return
+
+    setDeletingIdx(idx)
+    try {
+      const apiUrl = normalizeApiUrl(process.env.NEXT_PUBLIC_API_URL || '')
+      // Best-effort delete the R2 asset. If it fails (e.g., already gone), continue removing from
+      // the form so the user can still save without the broken reference.
+      const res = await fetch(`${apiUrl}/api/upload`, {
+        method: 'DELETE',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url }),
+      })
+      if (!res.ok && res.status !== 404) {
+        const err = await res.json().catch(() => ({}))
+        console.warn('R2 delete failed:', err)
+      }
+    } catch (e) {
+      console.warn('R2 delete network error:', e)
+    } finally {
+      setField('images', form.images.filter((_: string, i: number) => i !== idx))
+      setDeletingIdx(null)
+    }
   }
 
   function addHighlight() {
@@ -410,10 +437,16 @@ export function BuildingForm({ initialData, buildingId, embedded }: Props) {
                   {i === 0 && (
                     <span className="absolute top-1 left-1 text-[10px] bg-slate-800 text-white px-1.5 py-0.5 rounded font-medium">Cover</span>
                   )}
+                  {deletingIdx === i && (
+                    <div className="absolute inset-0 bg-black/50 rounded-lg flex items-center justify-center">
+                      <Loader2 className="h-5 w-5 text-white animate-spin" />
+                    </div>
+                  )}
                   <button
                     type="button"
                     onClick={() => removeImage(i)}
-                    className="absolute top-1 right-1 p-0.5 bg-red-500 text-white rounded-md opacity-0 group-hover:opacity-100 transition-opacity"
+                    disabled={deletingIdx !== null}
+                    className="absolute top-1 right-1 p-0.5 bg-red-500 text-white rounded-md opacity-0 group-hover:opacity-100 transition-opacity disabled:opacity-50"
                   >
                     <X className="h-3 w-3" />
                   </button>

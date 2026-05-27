@@ -53,20 +53,35 @@ export function normalizeFileUrl(url: string): string {
 
   const r2Public = process.env.NEXT_PUBLIC_R2_PUBLIC_URL?.replace(/\/$/, '');
 
-  // Fix protocol-less CDN URLs stored in old uploads (e.g. "assets.propgrouplb.com/buildings/...")
-  // Next.js image optimiser requires absolute URLs — prepend https:// when missing.
-  if (/^assets\.propgrouplb\.com\//.test(url)) {
-    // If we have a custom R2 public domain configured, use it; otherwise just fix the protocol.
-    const fixed = r2Public ?? 'https://assets.propgrouplb.com';
-    const key = url.replace(/^assets\.propgrouplb\.com\//, '');
-    return `${fixed}/${key}`;
+  // ── Step 1: prepend https:// to protocol-less URLs ─────────────────────────
+  // Old DB rows stored URLs without a scheme (e.g. "assets.propgrouplb.com/buildings/123.jpg"
+  // or "pub-abc.r2.dev/foo.jpg"). Without a scheme the browser treats them as a relative
+  // path and tries to load them from the current page's directory, producing 404s like
+  // `/admin/buildings/assets.propgrouplb.com/...`. Detect "looks-like-a-hostname/path" and
+  // upgrade to https. Skip values that are already absolute or rooted paths.
+  let working = url;
+  const isAbsolute = /^https?:\/\//i.test(working);
+  const isProtocolRelative = working.startsWith('//');
+  const isRooted = working.startsWith('/');
+  if (!isAbsolute && !isRooted) {
+    if (isProtocolRelative) {
+      working = `https:${working}`;
+    } else if (/^[a-z0-9-]+(\.[a-z0-9-]+)+\//i.test(working)) {
+      // Looks like "host.tld/path…" — promote to https
+      working = `https://${working}`;
+    }
   }
 
+  // ── Step 2: standard rewriting against R2 / proxy patterns ────────────────
   // Match the legacy R2 public URL form: https://pub-<hex>.r2.dev/<key>
-  const directR2Match = url.match(/^https:\/\/pub-[a-f0-9]+\.r2\.dev\/(.+)$/);
+  const directR2Match = working.match(/^https:\/\/pub-[a-f0-9]+\.r2\.dev\/(.+)$/);
 
   // Match our backend proxy form: <whatever>/api/files/<key>
-  const proxyMatch = url.match(/^(?:https?:\/\/[^/]+)?\/api\/files\/(.+)$/);
+  const proxyMatch = working.match(/^(?:https?:\/\/[^/]+)?\/api\/files\/(.+)$/);
+
+  // Re-bind for downstream use
+  // eslint-disable-next-line no-param-reassign
+  url = working;
 
   if (r2Public) {
     // Mode A: prefer direct R2.

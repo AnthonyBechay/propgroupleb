@@ -7,7 +7,22 @@ import { logger } from '../utils/logger.js';
 import { sendSuccess, sendCreated, sendPaginated, sendNotFound } from '../utils/response.js';
 import { parsePagination, buildPaginationResponse } from '../utils/pagination.js';
 import { BUILDING_LIST_INCLUDE, BUILDING_DETAIL_INCLUDE } from '../utils/prisma-includes.js';
+import { deleteFile, extractKeyFromUrl } from '../services/upload.service.js';
 import type { AuthenticatedRequest } from '../types/index.js';
+
+/** Best-effort delete a batch of file URLs from R2. Failures are logged but do not throw. */
+async function purgeFileUrls(urls: string[]): Promise<void> {
+  await Promise.all(
+    urls.map(async (url) => {
+      try {
+        const key = extractKeyFromUrl(url);
+        if (key) await deleteFile(key);
+      } catch (err) {
+        logger.error(`Failed to purge R2 file ${url}`, err);
+      }
+    })
+  );
+}
 
 const router: Router = express.Router();
 
@@ -351,13 +366,33 @@ router.delete(
   asyncHandler(async (req: Request, res: Response) => {
     const authReq = req as AuthenticatedRequest;
 
+    // Pull image arrays so we can clean up R2 after the DB delete cascades.
     const existing = await prisma.building.findUnique({
       where: { id: req.params.id },
-      select: { id: true, title: true },
+      select: {
+        id: true,
+        title: true,
+        images: true,
+        units: { select: { images: true } },
+        documents: { select: { fileUrl: true } },
+      },
     });
     if (!existing) { sendNotFound(res, 'Building'); return; }
 
     await prisma.building.delete({ where: { id: req.params.id } });
+
+    // Best-effort R2 cleanup — never block the response on it.
+    const fileUrls = [
+      ...(existing.images ?? []),
+      ...existing.units.flatMap((u: { images: string[] }) => u.images ?? []),
+      ...existing.documents.map((d: { fileUrl: string }) => d.fileUrl),
+    ];
+    if (fileUrls.length > 0) {
+      // Fire-and-forget — the API responds immediately.
+      purgeFileUrls(fileUrls).catch((err) =>
+        logger.error(`R2 purge after building ${req.params.id} delete failed`, err)
+      );
+    }
 
     await logAdminAction('DELETE_BUILDING', 'building', req.params.id, { title: existing.title }, authReq);
     sendSuccess(res, null, 'Building deleted successfully');

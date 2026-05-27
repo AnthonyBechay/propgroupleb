@@ -3,9 +3,11 @@ import { z } from 'zod';
 import { prisma } from '@propgroup/db';
 import { authenticateToken, requireAdmin, requireRole, logAdminAction } from '../middleware/auth.js';
 import { asyncHandler } from '../utils/errors.js';
+import { logger } from '../utils/logger.js';
 import { sendSuccess, sendCreated, sendPaginated, sendNotFound, sendError } from '../utils/response.js';
 import { parsePagination, buildPaginationResponse } from '../utils/pagination.js';
 import { UNIT_LIST_INCLUDE, UNIT_DETAIL_INCLUDE } from '../utils/prisma-includes.js';
+import { deleteFile, extractKeyFromUrl } from '../services/upload.service.js';
 import type { AuthenticatedRequest } from '../types/index.js';
 
 const router: Router = express.Router();
@@ -240,11 +242,26 @@ router.delete(
 
     const existing = await prisma.unit.findUnique({
       where: { id: req.params.id },
-      select: { id: true, buildingId: true },
+      select: { id: true, buildingId: true, images: true },
     });
     if (!existing) { sendNotFound(res, 'Unit'); return; }
 
     await prisma.unit.delete({ where: { id: req.params.id } });
+
+    // Best-effort R2 cleanup for the unit's images — fire-and-forget.
+    if (existing.images && existing.images.length > 0) {
+      Promise.all(
+        existing.images.map(async (url: string) => {
+          try {
+            const key = extractKeyFromUrl(url);
+            if (key) await deleteFile(key);
+          } catch (err) {
+            logger.error(`Failed to purge R2 file ${url}`, err);
+          }
+        })
+      ).catch((err) => logger.error(`R2 purge after unit ${req.params.id} delete failed`, err));
+    }
+
     await logAdminAction('DELETE_UNIT', 'unit', req.params.id, { buildingId: existing.buildingId }, authReq);
     sendSuccess(res, null, 'Unit deleted successfully');
   })
