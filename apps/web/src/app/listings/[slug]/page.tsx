@@ -18,6 +18,8 @@ import {
   Waves,
   Dumbbell,
   TreePine,
+  FileText,
+  Download,
 } from 'lucide-react'
 import { normalizeApiUrl, normalizeFileUrl } from '@/lib/utils/api-url'
 import { InquiryFormModal } from '@/components/listing/InquiryFormModal'
@@ -431,6 +433,76 @@ export default async function ListingDetailPage({ params }: PageProps) {
                 )}
               </div>
             )}
+
+            {/* Public documents (floor plans, brochures, certificates, …) */}
+            {(() => {
+              type ListingDoc = {
+                id: string
+                title: string
+                description?: string | null
+                fileUrl: string
+                fileSize?: number | null
+                mimeType?: string | null
+                type: string
+                unitId?: string | null
+              }
+              const buildingDocs = (building as { documents?: ListingDoc[] } | null | undefined)?.documents
+              const unitBuildingDocs = (unit as { building?: { documents?: ListingDoc[] } } | null | undefined)?.building?.documents
+              const allDocs: ListingDoc[] = buildingDocs ?? unitBuildingDocs ?? []
+              // Show docs scoped to this listing: building-level docs (unitId null) +
+              // docs explicitly tied to this listing's unit.
+              const docs = allDocs.filter(
+                (d) => !d.unitId || (unit?.id && d.unitId === unit.id)
+              )
+              if (docs.length === 0) return null
+
+              const TYPE_LABELS: Record<string, string> = {
+                FLOOR_PLAN: 'Floor Plan',
+                BROCHURE: 'Brochure',
+                CONTRACT: 'Contract',
+                LEGAL_DOCUMENT: 'Legal Document',
+                CERTIFICATE: 'Certificate',
+                OTHER: 'Document',
+              }
+              const formatSize = (bytes?: number | null) => {
+                if (!bytes) return ''
+                if (bytes < 1024) return `${bytes} B`
+                if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+                return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+              }
+
+              return (
+                <div className="bg-white rounded-2xl border border-slate-200 p-6">
+                  <h2 className="text-lg font-semibold text-slate-900 mb-4 flex items-center gap-2">
+                    <FileText className="w-5 h-5 text-slate-500" />
+                    Documents
+                  </h2>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {docs.map((d) => (
+                      <a
+                        key={d.id}
+                        href={normalizeFileUrl(d.fileUrl)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="group flex items-center gap-3 p-3 border border-slate-200 rounded-xl hover:border-slate-400 hover:bg-slate-50 transition-colors"
+                      >
+                        <div className="w-10 h-10 rounded-lg bg-slate-100 group-hover:bg-white flex items-center justify-center shrink-0">
+                          <FileText className="w-5 h-5 text-slate-500" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-slate-900 truncate">{d.title}</p>
+                          <p className="text-xs text-slate-500">
+                            {TYPE_LABELS[d.type] ?? d.type.replace(/_/g, ' ')}
+                            {d.fileSize ? ` · ${formatSize(d.fileSize)}` : ''}
+                          </p>
+                        </div>
+                        <Download className="w-4 h-4 text-slate-400 group-hover:text-slate-700 shrink-0" />
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              )
+            })()}
           </div>
 
           {/* Sidebar */}

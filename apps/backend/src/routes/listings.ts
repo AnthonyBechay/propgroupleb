@@ -47,6 +47,27 @@ const listingUpdateSchema = z.object({
   closingReason: z.string().optional().nullable(),
 });
 
+// ── Building-with-public-documents include ────────────────────────────────────
+// Reused by the slug + id detail endpoints so the public listing page can show
+// downloadable docs (floor plans, brochures, …) the admin marked as `isPublic`.
+const BUILDING_PUBLIC_INCLUDE = {
+  documents: {
+    where: { isPublic: true },
+    select: {
+      id: true,
+      title: true,
+      description: true,
+      fileUrl: true,
+      fileSize: true,
+      mimeType: true,
+      type: true,
+      unitId: true,
+      createdAt: true,
+    },
+    orderBy: { createdAt: 'desc' as const },
+  },
+} as const;
+
 // ── Shared listing detail include ─────────────────────────────────────────────
 
 const LISTING_DETAIL_INCLUDE = {
@@ -204,10 +225,10 @@ router.get(
       where: { slug: req.params.slug },
       include: {
         ...LISTING_DETAIL_INCLUDE,
-        building: true,
+        building: { include: BUILDING_PUBLIC_INCLUDE },
         unit: {
           include: {
-            building: true,
+            building: { include: BUILDING_PUBLIC_INCLUDE },
             options: true,
           },
         },
@@ -236,10 +257,10 @@ router.get(
       where: { id: req.params.id },
       include: {
         ...LISTING_DETAIL_INCLUDE,
-        building: true,
+        building: { include: BUILDING_PUBLIC_INCLUDE },
         unit: {
           include: {
-            building: true,
+            building: { include: BUILDING_PUBLIC_INCLUDE },
             options: true,
           },
         },

@@ -15,10 +15,22 @@ const s3Client = new S3Client({
 const BUCKET_NAME = process.env.R2_BUCKET_NAME || '';
 const PUBLIC_URL = process.env.R2_PUBLIC_URL || '';
 
+/** Ensure a URL/host has an https:// scheme and no trailing slash. */
+function ensureAbsoluteHttps(value: string): string {
+  let v = value.trim().replace(/\/$/, '');
+  if (!/^https?:\/\//i.test(v)) v = `https://${v}`;
+  return v;
+}
+
 /**
  * Get the base URL for file access.
  * Uses NEXT_PUBLIC_API_URL env var if set, otherwise falls back to R2 public URL.
  * The /api/files/ proxy endpoint ensures files are always accessible.
+ *
+ * The result is **always** a fully-qualified https URL — never protocol-less,
+ * never trailing-slashed. Stored values were silently broken before because
+ * a misconfigured R2_PUBLIC_URL (e.g. just "assets.propgrouplb.com") flowed
+ * straight through; browsers then treated those URLs as relative paths.
  */
 function getFileBaseUrl(): string {
   // Prefer explicit API URL (e.g., https://api.propgrp.com).
@@ -27,12 +39,12 @@ function getFileBaseUrl(): string {
   const apiUrl = process.env.API_URL || process.env.NEXT_PUBLIC_API_URL;
   if (apiUrl) {
     // Strip trailing /api if present so we don't double-up
-    const base = apiUrl.replace(/\/api\/?$/, '');
+    const base = ensureAbsoluteHttps(apiUrl.replace(/\/api\/?$/, ''));
     return `${base}/api/files`;
   }
   // Fall back to R2 public URL (only works if R2.dev public access is enabled)
   if (PUBLIC_URL) {
-    return PUBLIC_URL;
+    return ensureAbsoluteHttps(PUBLIC_URL);
   }
   // Dev fallback only — in production, silently returning a localhost URL
   // produces broken image links for every uploaded file. Fail loudly so the
