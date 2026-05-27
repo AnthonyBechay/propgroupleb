@@ -6,12 +6,7 @@ import { normalizeApiUrl } from '@/lib/utils/api-url'
 import {
   Settings as SettingsIcon,
   User,
-  Bell,
   Shield,
-  Database,
-  Globe,
-  Mail,
-  Key,
   Palette,
   Save,
   Lock,
@@ -25,9 +20,8 @@ import {
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Textarea } from '@/components/ui/textarea'
 
-type TabType = 'profile' | 'security' | 'notifications' | 'email' | 'database' | 'api' | 'localization' | 'appearance'
+type TabType = 'profile' | 'security' | 'appearance'
 
 export default function SettingsPage() {
   const { user, updateProfile, changePassword } = useAuth()
@@ -40,8 +34,6 @@ export default function SettingsPage() {
   const [lastName, setLastName] = useState(user?.lastName || '')
   const [phone, setPhone] = useState(user?.phone || '')
   const [country, setCountry] = useState(user?.country || '')
-  const [bio, setBio] = useState('')
-  const [emailNotifications, setEmailNotifications] = useState(true)
 
   // Password form state
   const [currentPassword, setCurrentPassword] = useState('')
@@ -53,8 +45,6 @@ export default function SettingsPage() {
   const [logoUploading, setLogoUploading] = useState(false)
   const [logoSaving, setLogoSaving] = useState(false)
   const logoInputRef = useRef<HTMLInputElement>(null)
-
-  const isSuperAdmin = user?.role === 'SUPER_ADMIN'
 
   // Load branding settings on mount
   useEffect(() => {
@@ -182,13 +172,6 @@ export default function SettingsPage() {
   const navItems = [
     { id: 'profile' as TabType, label: 'Profile', icon: User, color: 'bg-[rgb(30 41 59)]' },
     { id: 'security' as TabType, label: 'Security', icon: Lock, color: 'bg-emerald-600' },
-    { id: 'notifications' as TabType, label: 'Notifications', icon: Bell, color: 'bg-[rgb(161 98 7)]' },
-    { id: 'email' as TabType, label: 'Email Templates', icon: Mail, color: 'bg-slate-600' },
-    ...(isSuperAdmin ? [
-      { id: 'database' as TabType, label: 'Database', icon: Database, color: 'bg-amber-500' },
-      { id: 'api' as TabType, label: 'API Keys', icon: Key, color: 'bg-rose-500' },
-    ] : []),
-    { id: 'localization' as TabType, label: 'Localization', icon: Globe, color: 'bg-indigo-600' },
     { id: 'appearance' as TabType, label: 'Appearance', icon: Palette, color: 'bg-teal-600' },
   ]
 
@@ -344,28 +327,6 @@ export default function SettingsPage() {
                     </div>
                   </div>
 
-                  <div className="sm:col-span-2">
-                    <div className="flex items-start p-4 bg-slate-50 rounded-xl border-2 border-slate-100">
-                      <div className="flex items-center h-5">
-                        <input
-                          id="notifications"
-                          name="notifications"
-                          type="checkbox"
-                          checked={emailNotifications}
-                          onChange={(e) => setEmailNotifications(e.target.checked)}
-                          className="focus:ring-[rgb(30 41 59)] h-5 w-5 text-[rgb(30 41 59)] border-slate-300 rounded"
-                        />
-                      </div>
-                      <div className="ml-3 text-sm">
-                        <label htmlFor="notifications" className="font-bold text-slate-900">
-                          Email Notifications
-                        </label>
-                        <p className="text-slate-600 mt-1">
-                          Get notified about new inquiries, user registrations, and system updates.
-                        </p>
-                      </div>
-                    </div>
-                  </div>
                 </div>
 
                 <div className="flex justify-end gap-3 pt-4 border-t-2 border-slate-100">
@@ -598,31 +559,6 @@ export default function SettingsPage() {
             </div>
           )}
 
-          {/* Other tabs */}
-          {activeTab !== 'profile' && activeTab !== 'security' && activeTab !== 'appearance' && (
-            <div className="bg-white border-2 border-slate-100 shadow-lg rounded-2xl p-8 text-center">
-              <div className="w-16 h-16 bg-slate-200 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                <SettingsIcon className="h-8 w-8 text-slate-500" />
-              </div>
-              <h3 className="text-xl font-bold text-slate-900 mb-2">In Development</h3>
-              <p className="text-slate-600">
-                This settings section will be available in a future update.
-              </p>
-            </div>
-          )}
-
-          {isSuperAdmin && (
-            <div className="mt-6 bg-gradient-to-r from-yellow-50 to-orange-50 border-2 border-yellow-200 rounded-2xl p-6 shadow-md">
-              <h3 className="text-sm font-bold text-yellow-900 mb-2 flex items-center gap-2">
-                <Shield className="h-5 w-5" />
-                Super Admin Access
-              </h3>
-              <p className="text-sm text-yellow-800">
-                You have full system access. Additional settings for database management,
-                API keys, and security configurations are available in the sidebar.
-              </p>
-            </div>
-          )}
         </div>
       </div>
     </div>

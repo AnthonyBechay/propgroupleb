@@ -22,6 +22,7 @@ import {
 } from '@/components/ui/table'
 import Link from 'next/link'
 import { apiClient } from '@/lib/api/client'
+import { normalizeFileUrl } from '@/lib/utils/api-url'
 
 const KIND_LABELS: Record<string, string> = {
   STANDALONE: 'Standalone',
@@ -141,7 +142,7 @@ export function BuildingsAdminClient({ initialBuildings }: Props) {
                   <TableCell>
                     <div className="flex items-center gap-3">
                       {b.images?.[0] ? (
-                        <img src={b.images[0]} alt="" className="h-10 w-14 object-cover rounded-md" />
+                        <img src={normalizeFileUrl(b.images[0])} alt="" className="h-10 w-14 object-cover rounded-md" />
                       ) : (
                         <div className="h-10 w-14 bg-slate-100 rounded-md flex items-center justify-center">
                           <Building2 className="h-4 w-4 text-slate-400" />

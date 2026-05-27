@@ -23,7 +23,7 @@ import { normalizeApiUrl, normalizeFileUrl } from '@/lib/utils/api-url'
 
 interface PropertyDocument {
   id: string
-  propertyId: string
+  buildingId: string
   unitId?: string | null
   unitOptionId?: string | null
   title: string
@@ -34,7 +34,7 @@ interface PropertyDocument {
   mimeType: string | null
   isPublic: boolean
   createdAt: string
-  property: {
+  building: {
     id: string
     title: string
     city?: string | null
@@ -43,7 +43,7 @@ interface PropertyDocument {
   unitOption?: { id: string; name: string } | null
 }
 
-interface PropertyOption {
+interface BuildingOption {
   id: string
   title: string
   city: string | null
@@ -98,7 +98,7 @@ function formatFileSize(bytes: number | null) {
 
 export default function DocumentsPage() {
   const [documents, setDocuments] = useState<PropertyDocument[]>([])
-  const [properties, setProperties] = useState<PropertyOption[]>([])
+  const [properties, setProperties] = useState<BuildingOption[]>([])
   const [loading, setLoading] = useState(true)
   const [uploading, setUploading] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
@@ -348,24 +348,24 @@ export default function DocumentsPage() {
 
   const filtered = documents.filter(doc => {
     if (filterType && doc.type !== filterType) return false
-    if (filterProperty && doc.propertyId !== filterProperty) return false
+    if (filterProperty && doc.buildingId !== filterProperty) return false
     if (searchQuery) {
       const q = searchQuery.toLowerCase()
       return (
         doc.title.toLowerCase().includes(q) ||
-        doc.property.title.toLowerCase().includes(q) ||
+        doc.building.title.toLowerCase().includes(q) ||
         doc.type.toLowerCase().includes(q)
       )
     }
     return true
   })
 
-  // Group by property for summary
-  const docsByProperty = documents.reduce((acc, doc) => {
-    if (!acc[doc.propertyId]) {
-      acc[doc.propertyId] = { title: doc.property.title, count: 0 }
+  // Group by building for summary
+  const docsByBuilding = documents.reduce((acc, doc) => {
+    if (!acc[doc.buildingId]) {
+      acc[doc.buildingId] = { title: doc.building.title, count: 0 }
     }
-    acc[doc.propertyId].count++
+    acc[doc.buildingId].count++
     return acc
   }, {} as Record<string, { title: string; count: number }>)
 
@@ -381,7 +381,7 @@ export default function DocumentsPage() {
             Document Management
           </h1>
           <p className="mt-2 text-sm text-slate-600">
-            Upload and manage documents linked to property listings.
+            Upload and manage documents linked to buildings and units.
           </p>
         </div>
         <button
@@ -400,8 +400,8 @@ export default function DocumentsPage() {
           <p className="text-2xl font-bold text-slate-900">{documents.length}</p>
         </div>
         <div className="bg-white border rounded-xl p-4">
-          <p className="text-sm text-slate-500">Properties with Docs</p>
-          <p className="text-2xl font-bold text-slate-900">{Object.keys(docsByProperty).length}</p>
+          <p className="text-sm text-slate-500">Buildings with Docs</p>
+          <p className="text-2xl font-bold text-slate-900">{Object.keys(docsByBuilding).length}</p>
         </div>
         <div className="bg-white border rounded-xl p-4">
           <p className="text-sm text-slate-500">Public Documents</p>
@@ -442,7 +442,7 @@ export default function DocumentsPage() {
           onChange={(e) => setFilterProperty(e.target.value)}
           className="px-3 py-2 border rounded-lg text-sm bg-white max-w-xs"
         >
-          <option value="">All Properties</option>
+          <option value="">All Buildings</option>
           {properties.map(p => (
             <option key={p.id} value={p.id}>{p.title}</option>
           ))}
@@ -463,7 +463,7 @@ export default function DocumentsPage() {
           </h3>
           <p className="text-slate-500 mb-4">
             {documents.length === 0
-              ? 'Upload your first document to link it to a property listing.'
+              ? 'Upload your first document to link it to a building or unit.'
               : 'Try adjusting your search or filters.'}
           </p>
           {documents.length === 0 && (
@@ -508,7 +508,7 @@ export default function DocumentsPage() {
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-1.5 text-slate-700">
                       <Building2 className="w-3.5 h-3.5 text-slate-400" />
-                      <span className="max-w-[140px] truncate">{doc.property.title}</span>
+                      <span className="max-w-[140px] truncate">{doc.building.title}</span>
                     </div>
                     {doc.unit && (
                       <p className="text-xs text-slate-400 mt-0.5 pl-5 truncate max-w-[140px]">
@@ -594,7 +594,7 @@ export default function DocumentsPage() {
                 <div className="flex items-center gap-2 px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm">
                   <Building2 className="w-4 h-4 text-slate-400 flex-shrink-0" />
                   <span className="text-slate-700 truncate">
-                    {editingDoc.property.title}
+                    {editingDoc.building.title}
                   </span>
                 </div>
               </div>
@@ -764,14 +764,14 @@ export default function DocumentsPage() {
               {/* Property Selection */}
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">
-                  Link to Property <span className="text-red-500">*</span>
+                  Link to Building <span className="text-red-500">*</span>
                 </label>
                 <select
                   value={uploadPropertyId}
                   onChange={(e) => setUploadPropertyId(e.target.value)}
                   className="w-full px-3 py-2 border rounded-lg text-sm bg-white"
                 >
-                  <option value="">Select a property...</option>
+                  <option value="">Select a building...</option>
                   {properties.map(p => (
                     <option key={p.id} value={p.id}>{p.title}{p.city ? ` — ${p.city}` : ''}</option>
                   ))}

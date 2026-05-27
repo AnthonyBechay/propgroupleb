@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { Plus, Search, ExternalLink, Edit, Trash2, Tag, Building2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -45,13 +46,16 @@ function formatPrice(price: number, currency: string) {
 }
 
 export default function AdminListingsPage() {
+  const searchParams = useSearchParams()
+  const initialBuildingId = searchParams.get('buildingId') ?? 'all'
+
   const [listings, setListings] = useState<any[]>([])
   const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [intentFilter, setIntentFilter] = useState('all')
   const [statusFilter, setStatusFilter] = useState('all')
-  const [buildingFilter, setBuildingFilter] = useState('all')
+  const [buildingFilter, setBuildingFilter] = useState(initialBuildingId)
   const [buildings, setBuildings] = useState<any[]>([])
 
   // Load building list once for the filter dropdown
@@ -68,7 +72,7 @@ export default function AdminListingsPage() {
     const params: Record<string, string> = { limit: '200' }
     if (intentFilter !== 'all') params.intent = intentFilter
     if (statusFilter !== 'all') params.status = statusFilter
-    else params.status = 'all'
+    // When 'all', don't pass status — the backend admin branch returns everything
 
     apiClient.getListings(params as any)
       .then((res: any) => {

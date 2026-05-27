@@ -13,7 +13,6 @@ import {
   LogOut,
   Bot,
   MessageSquare,
-  PenTool,
   ArrowLeft,
   Inbox,
   MapPin,
@@ -22,7 +21,6 @@ import {
   ListFilter,
   DollarSign,
   HardHat,
-  ChevronDown,
 } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 
@@ -38,7 +36,6 @@ export function Sidebar() {
     { name: 'Inquiries', href: '/admin/inquiries', icon: MessageSquare },
     { name: 'Contact Messages', href: '/admin/contacts', icon: Inbox },
     { name: 'User Management', href: '/admin/users', icon: Users },
-    { name: 'Site Content', href: '/admin/content', icon: PenTool },
     { name: 'Analytics', href: '/admin/analytics', icon: BarChart3 },
     { name: 'AI Settings', href: '/admin/ai-settings', icon: Bot },
     { name: 'Documents', href: '/admin/documents', icon: FileText },

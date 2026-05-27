@@ -53,6 +53,15 @@ export function normalizeFileUrl(url: string): string {
 
   const r2Public = process.env.NEXT_PUBLIC_R2_PUBLIC_URL?.replace(/\/$/, '');
 
+  // Fix protocol-less CDN URLs stored in old uploads (e.g. "assets.propgrouplb.com/buildings/...")
+  // Next.js image optimiser requires absolute URLs — prepend https:// when missing.
+  if (/^assets\.propgrouplb\.com\//.test(url)) {
+    // If we have a custom R2 public domain configured, use it; otherwise just fix the protocol.
+    const fixed = r2Public ?? 'https://assets.propgrouplb.com';
+    const key = url.replace(/^assets\.propgrouplb\.com\//, '');
+    return `${fixed}/${key}`;
+  }
+
   // Match the legacy R2 public URL form: https://pub-<hex>.r2.dev/<key>
   const directR2Match = url.match(/^https:\/\/pub-[a-f0-9]+\.r2\.dev\/(.+)$/);
 

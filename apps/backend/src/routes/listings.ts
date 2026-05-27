@@ -113,7 +113,7 @@ router.get(
       where.visibility = 'PUBLIC';
       where.status = q.status ?? 'ACTIVE';
     } else {
-      if (q.status) where.status = q.status;
+      if (q.status && q.status !== 'all') where.status = q.status;
     }
 
     if (q.intent) where.intent = q.intent;
