@@ -362,7 +362,8 @@
       "Bash(cat /Users/anthroponybechay/development/propgroupleb/apps/web/src/app/\\\\\\(admin\\\\\\)/admin/analytics/page.tsx 2>/dev/null | head -40)",
       "Bash(mkdir -p \"/Users/anthonybechay/development/propgroupleb/apps/web/src/app/\\(admin\\)/admin/buildings/[id]\")",
       "Bash(mkdir -p \"/Users/anthonybechay/development/propgroupleb/apps/web/src/app/\\(admin\\)/admin/listings/[id]\")",
-      "Bash(awk -F: '{print $1}')"
+      "Bash(awk -F: '{print $1}')",
+      "Bash(xargs perl -i -pe ' *)"
     ],
     "deny": [],
     "ask": []

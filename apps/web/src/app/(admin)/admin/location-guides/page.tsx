@@ -183,7 +183,7 @@ export default function LocationGuidesPage() {
         </div>
         <button
           onClick={openCreate}
-          className="mt-4 sm:mt-0 inline-flex items-center gap-2 px-4 py-2 bg-[rgb(30 41 59)] text-white rounded-lg hover:bg-[rgb(51 65 85)] transition-colors text-sm font-semibold"
+          className="mt-4 sm:mt-0 inline-flex items-center gap-2 px-4 py-2 bg-slate-800 text-white rounded-lg hover:bg-slate-700 transition-colors text-sm font-semibold"
         >
           <Plus className="h-4 w-4" />
           New Guide
@@ -226,7 +226,7 @@ export default function LocationGuidesPage() {
           </p>
           <button
             onClick={openCreate}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-[rgb(30 41 59)] text-white rounded-lg hover:bg-[rgb(51 65 85)] transition-colors text-sm font-semibold"
+            className="inline-flex items-center gap-2 px-4 py-2 bg-slate-800 text-white rounded-lg hover:bg-slate-700 transition-colors text-sm font-semibold"
           >
             <Plus className="h-4 w-4" />
             Create First Guide
@@ -237,7 +237,7 @@ export default function LocationGuidesPage() {
           {filtered.map((guide) => (
             <div
               key={guide.id}
-              className="bg-white rounded-xl border border-slate-200 overflow-hidden hover:border-[rgb(30 41 59)] transition-colors"
+              className="bg-white rounded-xl border border-slate-200 overflow-hidden hover:border-slate-800 transition-colors"
             >
               {guide.imageUrl && (
                 // eslint-disable-next-line @next/next/no-img-element
@@ -319,7 +319,7 @@ export default function LocationGuidesPage() {
                 <select
                   value={form.country}
                   onChange={(e) => setForm({ ...form, country: e.target.value })}
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[rgb(30 41 59)]"
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-slate-800"
                 >
                   {COUNTRIES.map((c) => (
                     <option key={c.value} value={c.value}>
@@ -338,7 +338,7 @@ export default function LocationGuidesPage() {
                   value={form.title}
                   onChange={(e) => setForm({ ...form, title: e.target.value })}
                   placeholder="e.g. Beirut — Neighborhood Guide"
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[rgb(30 41 59)]"
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-800"
                 />
               </div>
 
@@ -351,7 +351,7 @@ export default function LocationGuidesPage() {
                   onChange={(e) => setForm({ ...form, content: e.target.value })}
                   rows={8}
                   placeholder="Describe the region, lifestyle, investment outlook, key neighborhoods, etc."
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[rgb(30 41 59)]"
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-800"
                 />
               </div>
 
@@ -364,7 +364,7 @@ export default function LocationGuidesPage() {
                   value={form.imageUrl}
                   onChange={(e) => setForm({ ...form, imageUrl: e.target.value })}
                   placeholder="https://..."
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[rgb(30 41 59)]"
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-800"
                 />
               </div>
             </div>
@@ -380,7 +380,7 @@ export default function LocationGuidesPage() {
               <button
                 onClick={handleSave}
                 disabled={saving}
-                className="inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white bg-[rgb(30 41 59)] rounded-lg hover:bg-[rgb(51 65 85)] disabled:opacity-50"
+                className="inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white bg-slate-800 rounded-lg hover:bg-slate-700 disabled:opacity-50"
               >
                 {saving ? (
                   <Loader2 className="h-4 w-4 animate-spin" />

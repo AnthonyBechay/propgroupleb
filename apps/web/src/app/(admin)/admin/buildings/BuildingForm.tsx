@@ -2,9 +2,9 @@
 
 import { useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, Upload, X, Loader2, Building2, Image as ImageIcon, Plus, Trash2 } from 'lucide-react'
+import { ArrowLeft, Upload, X, Loader2, Building2, Image as ImageIcon, Plus, CheckCircle } from 'lucide-react'
 import Link from 'next/link'
-import { normalizeApiUrl } from '@/lib/utils/api-url'
+import { normalizeApiUrl, normalizeFileUrl } from '@/lib/utils/api-url'
 
 const MOHAFAZAT = [
   'BEIRUT', 'MOUNT_LEBANON', 'NORTH', 'SOUTH', 'BEKAA', 'NABATIEH', 'AKKAR', 'BAALBEK_HERMEL',
@@ -29,6 +29,7 @@ export function BuildingForm({ initialData, buildingId, embedded }: Props) {
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const [saving, setSaving] = useState(false)
+  const [saved, setSaved] = useState(false)
   const [uploadingImages, setUploadingImages] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [highlightInput, setHighlightInput] = useState('')
@@ -175,8 +176,14 @@ export function BuildingForm({ initialData, buildingId, embedded }: Props) {
         setSaving(false)
         return
       }
-      router.push('/admin/buildings')
-      router.refresh()
+      if (embedded) {
+        // Stay on the tab — just show success confirmation
+        setSaved(true)
+        setTimeout(() => setSaved(false), 3000)
+      } else {
+        router.push('/admin/buildings')
+        router.refresh()
+      }
     } catch (err: any) {
       setError(err.message || 'Network error')
       setSaving(false)
@@ -222,6 +229,12 @@ export function BuildingForm({ initialData, buildingId, embedded }: Props) {
         {error && (
           <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-xl px-4 py-3">
             {error}
+          </div>
+        )}
+        {saved && (
+          <div className="bg-emerald-50 border border-emerald-200 text-emerald-700 text-sm rounded-xl px-4 py-3 flex items-center gap-2">
+            <CheckCircle className="h-4 w-4 shrink-0" />
+            Building saved successfully.
           </div>
         )}
 
@@ -393,7 +406,7 @@ export function BuildingForm({ initialData, buildingId, embedded }: Props) {
             <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-3">
               {form.images.map((url: string, i: number) => (
                 <div key={i} className="relative group aspect-square">
-                  <img src={url} alt="" className="w-full h-full object-cover rounded-lg" />
+                  <img src={normalizeFileUrl(url)} alt="" className="w-full h-full object-cover rounded-lg" />
                   {i === 0 && (
                     <span className="absolute top-1 left-1 text-[10px] bg-slate-800 text-white px-1.5 py-0.5 rounded font-medium">Cover</span>
                   )}
@@ -450,9 +463,11 @@ export function BuildingForm({ initialData, buildingId, embedded }: Props) {
 
         {/* Actions */}
         <div className="flex gap-3 justify-end pb-8">
-          <Link href="/admin/buildings" className="px-4 py-2 text-sm font-medium text-slate-700 bg-slate-100 rounded-lg hover:bg-slate-200 transition-colors">
-            Cancel
-          </Link>
+          {!embedded && (
+            <Link href="/admin/buildings" className="px-4 py-2 text-sm font-medium text-slate-700 bg-slate-100 rounded-lg hover:bg-slate-200 transition-colors">
+              Cancel
+            </Link>
+          )}
           <button
             type="submit"
             disabled={saving || uploadingImages}
@@ -460,6 +475,8 @@ export function BuildingForm({ initialData, buildingId, embedded }: Props) {
           >
             {saving ? (
               <><Loader2 className="h-4 w-4 animate-spin" /> Saving...</>
+            ) : saved ? (
+              <><CheckCircle className="h-4 w-4" /> Saved</>
             ) : (
               isEdit ? 'Save Changes' : 'Create Building'
             )}
