@@ -59,6 +59,19 @@ export function validateEnv(): void {
     }
   }
 
+  // JWT secret strength — a short/guessable secret lets an attacker forge
+  // session tokens (full account takeover, including admins). 32 chars is the
+  // practical floor for an HS256 signing key. Enforce in production, warn in dev.
+  const jwtSecret = process.env.JWT_SECRET;
+  if (jwtSecret && jwtSecret.length < 32) {
+    const msg = `JWT_SECRET is weak (${jwtSecret.length} chars). Use at least 32 random characters.`;
+    if (isProduction) {
+      throw new Error(msg);
+    } else {
+      logger.warn(msg);
+    }
+  }
+
   // Soft recommendations — warn once per feature group at boot
   for (const group of RECOMMENDED_GROUPS) {
     const missing = group.vars.filter((name) => !process.env[name]);

@@ -2,6 +2,68 @@ import { S3Client, PutObjectCommand, DeleteObjectCommand, GetObjectCommand, Head
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { randomUUID } from 'crypto';
 import path from 'path';
+import sharp from 'sharp';
+
+/**
+ * Largest dimension (px) we keep for uploaded photos. Anything bigger is
+ * downscaled (aspect-ratio preserved, never upscaled). 2560px comfortably
+ * covers full-bleed hero images on 2x retina displays while cutting the
+ * multi-MB phone-camera originals down to a few hundred KB.
+ */
+const MAX_IMAGE_DIMENSION = 2560;
+
+/** MIME types we run through sharp. PDFs/Office docs are passed through untouched. */
+const RESIZABLE_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/avif']);
+
+/**
+ * Resize + recompress an image buffer in-place, preserving its format.
+ *
+ * Why format-preserving (not "convert everything to webp"): some images are
+ * embedded into client-side PDF exports (jsPDF/html2canvas) which choke on
+ * webp/avif. Keeping jpeg→jpeg / png→png is the zero-surprise choice ahead of
+ * launch. We still get the bulk of the win — downscaling to MAX_IMAGE_DIMENSION
+ * and stripping EXIF/camera metadata typically shrinks originals by 70–90%.
+ *
+ * Returns the original buffer untouched if the type isn't a resizable image or
+ * if processing fails for any reason (corrupt upload, unexpected format) — an
+ * upload should never hard-fail just because optimization didn't apply.
+ */
+async function processImageBuffer(buffer: Buffer, contentType: string): Promise<Buffer> {
+  if (!RESIZABLE_IMAGE_TYPES.has(contentType)) return buffer;
+  try {
+    const pipeline = sharp(buffer, { failOn: 'none' })
+      .rotate() // bake in EXIF orientation before we strip metadata
+      .resize({
+        width: MAX_IMAGE_DIMENSION,
+        height: MAX_IMAGE_DIMENSION,
+        fit: 'inside',
+        withoutEnlargement: true,
+      });
+
+    let out: Buffer;
+    switch (contentType) {
+      case 'image/jpeg':
+        out = await pipeline.jpeg({ quality: 82, mozjpeg: true }).toBuffer();
+        break;
+      case 'image/png':
+        out = await pipeline.png({ compressionLevel: 9, palette: true }).toBuffer();
+        break;
+      case 'image/webp':
+        out = await pipeline.webp({ quality: 82 }).toBuffer();
+        break;
+      case 'image/avif':
+        out = await pipeline.avif({ quality: 60 }).toBuffer();
+        break;
+      default:
+        return buffer;
+    }
+    // Never return a *larger* buffer than we started with (can happen for tiny
+    // already-optimized images or simple PNGs).
+    return out.length < buffer.length ? out : buffer;
+  } catch {
+    return buffer;
+  }
+}
 
 const s3Client = new S3Client({
   region: 'auto',
@@ -100,30 +162,38 @@ export async function uploadFile(
   let key: string;
 
   if (options?.propertySlug) {
-    const propSlug = sanitizeForPath(options.propertySlug);
+    const entitySlug = sanitizeForPath(options.propertySlug);
+    // Top-level prefix follows the entity type. Building photos land under
+    // buildings/<slug>/…, legacy property photos under properties/<slug>/….
+    // Anything else (videos use folder 'videos') defaults to 'properties' so
+    // existing behaviour is preserved.
+    const prefix = folder === 'buildings' ? 'buildings' : 'properties';
 
     if (folder === 'documents' && options?.documentType) {
       const docType = sanitizeForPath(options.documentType);
-      key = `properties/${propSlug}/documents/${docType}/${timestamp}-${baseName}-${shortId}${ext}`;
+      key = `${prefix}/${entitySlug}/documents/${docType}/${timestamp}-${baseName}-${shortId}${ext}`;
     } else if (folder === 'videos') {
-      key = `properties/${propSlug}/videos/${timestamp}-${baseName}-${shortId}${ext}`;
+      key = `${prefix}/${entitySlug}/videos/${timestamp}-${baseName}-${shortId}${ext}`;
     } else {
-      // images / other property files
-      key = `properties/${propSlug}/images/${timestamp}-${baseName}-${shortId}${ext}`;
+      // images / other entity files
+      key = `${prefix}/${entitySlug}/images/${timestamp}-${baseName}-${shortId}${ext}`;
     }
   } else {
-    // Fallback for non-property uploads
+    // Fallback for uploads without an entity slug (branding, general, etc.)
     key = `${folder}/${timestamp}-${baseName}-${shortId}${ext}`;
   }
 
   // Sanitize filename for Content-Disposition to avoid R2 signature issues with special chars
   const safeFilename = path.basename(originalName).replace(/[^\w.\-]/g, '_');
 
+  // Downscale + recompress images before they ever hit R2 (no-op for PDFs/docs).
+  const body = await processImageBuffer(buffer, contentType);
+
   await s3Client.send(
     new PutObjectCommand({
       Bucket: BUCKET_NAME,
       Key: key,
-      Body: buffer,
+      Body: body,
       ContentType: contentType,
       ContentDisposition: `inline; filename="${safeFilename}"`,
       CacheControl: 'public, max-age=31536000, immutable',

@@ -83,6 +83,11 @@ export function BuildingForm({ initialData, buildingId, embedded }: Props) {
         const fd = new FormData()
         fd.append('file', file)
         fd.append('folder', 'buildings')
+        // Group uploads under buildings/<slug>/images/… in R2. Prefer the title
+        // (human-readable folders); fall back to the id for brand-new untitled
+        // buildings so files still get a stable per-building home.
+        const slug = (form.title?.trim() || buildingId || '').trim()
+        if (slug) fd.append('propertySlug', slug)
         const res = await fetch(`${apiUrl}/api/upload`, {
           method: 'POST',
           credentials: 'include',
@@ -204,9 +209,15 @@ export function BuildingForm({ initialData, buildingId, embedded }: Props) {
         return
       }
       if (embedded) {
-        // Stay on the tab — just show success confirmation
+        // Stay on the tab — just show success confirmation.
+        // CRITICAL: reset `saving` here, otherwise the Save button stays stuck
+        // on "Saving..." forever even though the API returned 200. (We don't
+        // navigate away in embedded mode, so nothing else clears it.)
+        setSaving(false)
         setSaved(true)
         setTimeout(() => setSaved(false), 3000)
+        // Refresh server data so the header title / cached building reflect edits.
+        router.refresh()
       } else {
         router.push('/admin/buildings')
         router.refresh()

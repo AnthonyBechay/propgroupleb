@@ -364,7 +364,12 @@
       "Bash(mkdir -p \"/Users/anthonybechay/development/propgroupleb/apps/web/src/app/\\(admin\\)/admin/listings/[id]\")",
       "Bash(awk -F: '{print $1}')",
       "Bash(xargs perl -i -pe ' *)",
-      "Bash(node -e ' *)"
+      "Bash(node -e ' *)",
+      "Bash(pnpm --filter propgroup-backend install)",
+      "Bash(node -e \"const s=require\\('sharp'\\); console.log\\('sharp ok', s.versions.sharp\\)\")",
+      "Bash(pnpm run *)",
+      "Bash(node -e \"const s=require\\('./apps/backend/node_modules/sharp'\\); s\\('apps/web/public/newlogo.png'\\).metadata\\(\\).then\\(m=>console.log\\('newlogo:',m.width+'x'+m.height,m.format,'hasAlpha:',m.hasAlpha\\)\\).catch\\(e=>console.log\\('err',e.message\\)\\)\")",
+      "Bash(node -e \"const s=require\\('./apps/backend/node_modules/sharp'\\); s\\('apps/web/public/newlogo.png.jpeg'\\).metadata\\(\\).then\\(m=>console.log\\('dims:',m.width+'x'+m.height,'format:',m.format,'hasAlpha:',m.hasAlpha\\)\\)\")"
     ],
     "deny": [],
     "ask": []
