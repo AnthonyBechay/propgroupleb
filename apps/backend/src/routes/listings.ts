@@ -6,8 +6,16 @@ import { asyncHandler } from '../utils/errors.js';
 import { sendSuccess, sendCreated, sendPaginated, sendNotFound, sendError } from '../utils/response.js';
 import { parsePagination, buildPaginationResponse } from '../utils/pagination.js';
 import { listingSchema } from '../schemas/index.js';
+import { LISTING_CARD_INCLUDE } from '../utils/prisma-includes.js';
 import type { AuthenticatedRequest } from '../types/index.js';
 import { logger } from '../utils/logger.js';
+import {
+  syncUnitLifecycleFromListing,
+  MARKETABLE_LIFECYCLES,
+  type ListingIntent,
+  type ListingStatus,
+  type UnitLifecycle,
+} from '../utils/listing-status-sync.js';
 
 const router: Router = express.Router();
 
@@ -193,6 +201,22 @@ router.get(
       where.unit = unitFilter;
     }
 
+    // Public safety guard: never surface a unit-listing whose unit is no longer
+    // on the market (SOLD/RENTED/OWNER_OCCUPIED/OFF_MARKET, or still DRAFT/VACANT).
+    // The write-side sync normally CLOSEs such listings, but this guarantees the
+    // public catalog can't show a sold apartment as available even if a listing
+    // status drifted out of sync. BUILDING-subject listings have no unit and
+    // always pass. Admins see everything.
+    if (!isAdmin) {
+      const lifecycleGuard = {
+        OR: [
+          { subjectType: 'BUILDING' },
+          { unit: { lifecycle: { in: MARKETABLE_LIFECYCLES } } },
+        ],
+      };
+      where.AND = [...(Array.isArray(where.AND) ? where.AND : []), lifecycleGuard];
+    }
+
     // Sort
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let orderBy: Record<string, any>[] = [{ createdAt: 'desc' }];
@@ -204,7 +228,10 @@ router.get(
     const [listings, total] = await Promise.all([
       prisma.listing.findMany({
         where,
-        include: LISTING_DETAIL_INCLUDE,
+        // Catalog cards only need a narrow projection — using the full detail
+        // include here over-fetched lat/long, amenity flags and unit feature
+        // arrays on every row (per CLAUDE.md: never use detail include for lists).
+        include: LISTING_CARD_INCLUDE,
         orderBy,
         skip,
         take: limit,
@@ -220,7 +247,11 @@ router.get(
 
 router.get(
   '/slug/:slug',
+  optionalAuthenticateToken,
   asyncHandler(async (req: Request, res: Response) => {
+    const authReq = req as AuthenticatedRequest;
+    const isAdmin = authReq.user && ['ADMIN', 'SUPER_ADMIN'].includes(authReq.user.role);
+
     const listing = await prisma.listing.findUnique({
       where: { slug: req.params.slug },
       include: {
@@ -236,6 +267,18 @@ router.get(
     });
 
     if (!listing) { sendNotFound(res, 'Listing'); return; }
+
+    // Non-admins must not be able to reach DRAFT/ARCHIVED or non-PUBLIC listings
+    // by guessing/sharing a slug. ACTIVE / UNDER_OFFER / CLOSED stay reachable so
+    // previously-shared links to sold units still resolve. Treat as not-found
+    // (don't leak existence of hidden/draft records).
+    if (!isAdmin) {
+      const viewableStatus = ['ACTIVE', 'UNDER_OFFER', 'CLOSED'].includes(listing.status);
+      if (listing.visibility !== 'PUBLIC' || !viewableStatus) {
+        sendNotFound(res, 'Listing');
+        return;
+      }
+    }
 
     const buildingId = listing.buildingId ?? (listing.unit as { buildingId?: string } | null)?.buildingId;
     if (buildingId) {
@@ -354,7 +397,15 @@ router.put(
 
     const existing = await prisma.listing.findUnique({
       where: { id: req.params.id },
-      select: { id: true, status: true, publishedAt: true },
+      select: {
+        id: true,
+        status: true,
+        publishedAt: true,
+        intent: true,
+        subjectType: true,
+        unitId: true,
+        unit: { select: { lifecycle: true } },
+      },
     });
     if (!existing) { sendNotFound(res, 'Listing'); return; }
 
@@ -367,13 +418,38 @@ router.put(
       updateData.closedAt = new Date();
     }
 
-    const result = await prisma.listing.update({
-      where: { id: req.params.id },
-      data: updateData,
+    // When a unit-listing's status changes, nudge the parent unit's lifecycle so
+    // the asset state stays consistent (e.g. CLOSED sale → unit SOLD). Run both
+    // writes in one transaction. See utils/listing-status-sync.ts.
+    const statusChanged = data.status != null && data.status !== existing.status;
+    const shouldSyncUnit =
+      statusChanged &&
+      existing.subjectType === 'UNIT' &&
+      !!existing.unitId &&
+      !!existing.unit;
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { result, unitLifecycle } = await prisma.$transaction(async (tx: any) => {
+      const updated = await tx.listing.update({ where: { id: req.params.id }, data: updateData });
+      let newLifecycle: UnitLifecycle | null = null;
+      if (shouldSyncUnit) {
+        newLifecycle = await syncUnitLifecycleFromListing(
+          tx,
+          existing.unitId as string,
+          existing.intent as ListingIntent,
+          data.status as ListingStatus,
+          existing.unit!.lifecycle as UnitLifecycle,
+        );
+      }
+      return { result: updated, unitLifecycle: newLifecycle };
     });
 
-    await logAdminAction('UPDATE_LISTING', 'listing', req.params.id, { status: result.status }, authReq);
-    sendSuccess(res, result, 'Listing updated successfully');
+    await logAdminAction('UPDATE_LISTING', 'listing', req.params.id, { status: result.status, unitLifecycle }, authReq);
+    sendSuccess(
+      res,
+      result,
+      unitLifecycle ? `Listing updated — unit marked ${unitLifecycle}` : 'Listing updated successfully',
+    );
   })
 );
 

@@ -8,6 +8,7 @@ import { sendSuccess, sendCreated, sendPaginated, sendNotFound, sendError } from
 import { parsePagination, buildPaginationResponse } from '../utils/pagination.js';
 import { UNIT_LIST_INCLUDE, UNIT_DETAIL_INCLUDE } from '../utils/prisma-includes.js';
 import { deleteFile, extractKeyFromUrl } from '../services/upload.service.js';
+import { syncListingsFromUnitLifecycle, type UnitLifecycle } from '../utils/listing-status-sync.js';
 import type { AuthenticatedRequest } from '../types/index.js';
 
 const router: Router = express.Router();
@@ -211,7 +212,7 @@ router.put(
 
     const existing = await prisma.unit.findUnique({
       where: { id: req.params.id },
-      select: { id: true },
+      select: { id: true, lifecycle: true },
     });
     if (!existing) { sendNotFound(res, 'Unit'); return; }
 
@@ -220,14 +221,33 @@ router.put(
     if (data.managementStartedAt) updateData.managementStartedAt = new Date(data.managementStartedAt);
     if (data.soldAt) updateData.soldAt = new Date(data.soldAt);
 
-    const unit = await prisma.unit.update({
-      where: { id: req.params.id },
-      data: updateData,
-      include: { options: true },
+    // If the lifecycle is changing, propagate it to this unit's listings in the
+    // same transaction (e.g. SOLD closes the active listing so the apartment
+    // stops showing as available). See utils/listing-status-sync.ts.
+    const lifecycleChanged = data.lifecycle != null && data.lifecycle !== existing.lifecycle;
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { unit, listingsAffected } = await prisma.$transaction(async (tx: any) => {
+      const updated = await tx.unit.update({
+        where: { id: req.params.id },
+        data: updateData,
+        include: { options: true },
+      });
+      let affected = 0;
+      if (lifecycleChanged) {
+        affected = await syncListingsFromUnitLifecycle(tx, updated.id, data.lifecycle as UnitLifecycle);
+      }
+      return { unit: updated, listingsAffected: affected };
     });
 
-    await logAdminAction('UPDATE_UNIT', 'unit', unit.id, { lifecycle: unit.lifecycle }, authReq);
-    sendSuccess(res, unit, 'Unit updated successfully');
+    await logAdminAction('UPDATE_UNIT', 'unit', unit.id, { lifecycle: unit.lifecycle, listingsAffected }, authReq);
+    sendSuccess(
+      res,
+      unit,
+      listingsAffected > 0
+        ? `Unit updated — ${listingsAffected} listing${listingsAffected === 1 ? '' : 's'} updated to match`
+        : 'Unit updated successfully',
+    );
   })
 );
 

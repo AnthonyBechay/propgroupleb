@@ -591,6 +591,7 @@ export function UnitsManager({ buildingId }: { buildingId: string }) {
   const [showAddUnit, setShowAddUnit]     = useState(false)
   const [saving, setSaving]               = useState(false)
   const [deletingId, setDeletingId]       = useState<string | null>(null)
+  const [notice, setNotice]               = useState<string | null>(null)
 
   const fetchUnits = useCallback(async () => {
     setLoading(true)
@@ -646,6 +647,7 @@ export function UnitsManager({ buildingId }: { buildingId: string }) {
 
   async function handleUpdateUnit(unitId: string, f: UnitFormState) {
     setSaving(true)
+    setNotice(null)
     try {
       const res = await fetch(`${apiUrl}/api/units/${unitId}`, {
         method: 'PUT',
@@ -653,10 +655,16 @@ export function UnitsManager({ buildingId }: { buildingId: string }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(buildUnitPayload(f)),
       })
+      const d = await res.json().catch(() => ({}))
       if (!res.ok) {
-        const d = await res.json().catch(() => ({}))
         setError(d.message || 'Failed to update unit')
         return
+      }
+      // Surface the cascade (e.g. "Unit updated — 1 listing updated to match")
+      // so the admin sees that changing lifecycle also closed/updated listings.
+      if (d.message && /listing/i.test(d.message)) {
+        setNotice(d.message)
+        setTimeout(() => setNotice(null), 5000)
       }
       setExpanded(null)
       await fetchUnits()
@@ -733,6 +741,14 @@ export function UnitsManager({ buildingId }: { buildingId: string }) {
         <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-xl px-4 py-3 flex items-start justify-between gap-2">
           {error}
           <button onClick={() => setError(null)}><X className="h-4 w-4 flex-shrink-0" /></button>
+        </div>
+      )}
+
+      {/* Cascade notice (e.g. listings auto-closed when a unit was marked sold) */}
+      {notice && (
+        <div className="bg-emerald-50 border border-emerald-200 text-emerald-700 text-sm rounded-xl px-4 py-3 flex items-start justify-between gap-2">
+          {notice}
+          <button onClick={() => setNotice(null)}><X className="h-4 w-4 flex-shrink-0" /></button>
         </div>
       )}
 

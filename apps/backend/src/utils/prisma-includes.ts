@@ -150,9 +150,11 @@ export const LISTING_CARD_INCLUDE = {
       slug: true,
       city: true,
       caza: true,
+      mohafazat: true, // card location fallback when city/caza are empty
       images: true,
       kind: true,
       status: true,
+      _count: { select: { units: true } }, // unit count shown on BUILDING-subject cards
     },
   },
   unit: {
