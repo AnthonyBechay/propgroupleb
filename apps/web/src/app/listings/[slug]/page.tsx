@@ -1,5 +1,4 @@
 import { notFound } from 'next/navigation'
-import Image from 'next/image'
 import Link from 'next/link'
 import {
   MapPin,
@@ -7,7 +6,6 @@ import {
   Bath,
   Square,
   Building2,
-  Home,
   ChevronRight,
   Tag,
   Zap,
@@ -23,6 +21,7 @@ import {
 } from 'lucide-react'
 import { normalizeApiUrl, normalizeFileUrl } from '@/lib/utils/api-url'
 import { InquiryFormModal } from '@/components/listing/InquiryFormModal'
+import { ListingGallery } from '@/components/listing/ListingGallery'
 import type { Listing } from '@/types'
 import {
   ListingIntent,
@@ -152,49 +151,8 @@ export default async function ListingDetailPage({ params }: PageProps) {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Main content */}
           <div className="lg:col-span-2 space-y-6">
-            {/* Image gallery */}
-            <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
-              {images.length > 0 ? (
-                <div className="grid grid-cols-2 gap-1 aspect-[16/9]">
-                  <div className="relative col-span-2 row-span-2 h-full">
-                    <Image
-                      src={normalizeFileUrl(images[0])}
-                      alt={title}
-                      fill
-                      className="object-cover"
-                      sizes="(max-width: 1024px) 100vw, 66vw"
-                      quality={80}
-                      priority
-                    />
-                  </div>
-                </div>
-              ) : (
-                <div className="aspect-[16/9] flex items-center justify-center bg-slate-100">
-                  <Home className="w-16 h-16 text-slate-300" />
-                </div>
-              )}
-              {images.length > 1 && (
-                <div className="flex gap-2 p-3 overflow-x-auto">
-                  {images.slice(1, 6).map((img, i) => (
-                    <div key={i} className="relative w-20 h-14 shrink-0 rounded-lg overflow-hidden">
-                      <Image
-                        src={normalizeFileUrl(img)}
-                        alt={`Photo ${i + 2}`}
-                        fill
-                        className="object-cover"
-                        sizes="80px"
-                        quality={60}
-                      />
-                    </div>
-                  ))}
-                  {images.length > 6 && (
-                    <div className="flex items-center justify-center w-20 h-14 shrink-0 rounded-lg bg-slate-100 text-slate-500 text-xs font-medium">
-                      +{images.length - 6} more
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
+            {/* Image gallery (click any photo to open the full-screen viewer) */}
+            <ListingGallery images={images} title={title} />
 
             {/* Title & badges */}
             <div className="bg-white rounded-2xl border border-slate-200 p-6 space-y-4">

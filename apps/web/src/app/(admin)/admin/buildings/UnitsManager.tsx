@@ -1,14 +1,14 @@
 'use client'
 
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import {
   Plus, Pencil, Trash2, Tag, Loader2, X,
   Building2, Bed, Square, Layers, ChevronDown, ChevronUp,
-  DollarSign, BadgePlus, ExternalLink, Archive,
+  DollarSign, BadgePlus, ExternalLink, Archive, ImageIcon,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { normalizeApiUrl } from '@/lib/utils/api-url'
+import { normalizeApiUrl, normalizeFileUrl } from '@/lib/utils/api-url'
 
 // ── constants ─────────────────────────────────────────────────────────────────
 
@@ -75,6 +75,7 @@ function formatPrice(price: number, currency: string) {
 const EMPTY_UNIT = {
   kind: 'APARTMENT', name: '', unitNumber: '', floor: '',
   bedrooms: '', bathrooms: '', areaSqm: '', lifecycle: 'VACANT',
+  images: [] as string[],
 }
 type UnitFormState = typeof EMPTY_UNIT
 
@@ -88,13 +89,15 @@ function buildUnitPayload(f: UnitFormState) {
     bathrooms: f.bathrooms !== '' ? Number(f.bathrooms) : null,
     areaSqm:   f.areaSqm   !== '' ? Number(f.areaSqm)   : null,
     lifecycle: f.lifecycle || undefined,
+    images:    f.images,
   }
 }
 
 function UnitFormPanel({
-  initial, onSave, onCancel, saving,
+  initial, buildingId, onSave, onCancel, saving,
 }: {
   initial: UnitFormState
+  buildingId: string
   onSave: (f: UnitFormState) => void
   onCancel: () => void
   saving: boolean
@@ -103,6 +106,66 @@ function UnitFormPanel({
   const set = (k: keyof UnitFormState, v: string) => setF(p => ({ ...p, [k]: v }))
   const inp = 'w-full px-3 py-2 border border-zinc-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-sky-600/15 focus:border-sky-500 bg-white'
   const lbl = 'block text-xs font-medium text-zinc-600 mb-1'
+
+  // ── Image upload state ───────────────────────────────────────────────────────
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const [uploading, setUploading] = useState(false)
+  const [deletingIdx, setDeletingIdx] = useState<number | null>(null)
+  const [imgError, setImgError] = useState<string | null>(null)
+  const apiUrl = normalizeApiUrl(process.env.NEXT_PUBLIC_API_URL || '')
+
+  async function uploadImages(files: FileList) {
+    setUploading(true)
+    setImgError(null)
+    const urls: string[] = []
+    const failed: string[] = []
+    for (const file of Array.from(files)) {
+      try {
+        const fd = new FormData()
+        fd.append('file', file)
+        fd.append('folder', 'units')
+        // Group unit photos under units/<buildingId>/images/… in R2.
+        if (buildingId) fd.append('propertySlug', buildingId)
+        const res = await fetch(`${apiUrl}/api/upload`, { method: 'POST', credentials: 'include', body: fd })
+        if (res.ok) {
+          const data = await res.json()
+          if (data.url) urls.push(data.url)
+        } else {
+          const err = await res.json().catch(() => ({}))
+          failed.push(`${file.name}: ${err.error || res.statusText}`)
+        }
+      } catch (e: unknown) {
+        failed.push(`${file.name}: ${e instanceof Error ? e.message : 'Network error'}`)
+      }
+    }
+    if (urls.length) setF(p => ({ ...p, images: [...p.images, ...urls] }))
+    if (failed.length) setImgError(`Some images failed:\n${failed.join('\n')}`)
+    setUploading(false)
+  }
+
+  async function removeImage(idx: number) {
+    const url = f.images[idx]
+    if (!url) return
+    if (!confirm('Delete this image? This removes the file from storage permanently.')) return
+    setDeletingIdx(idx)
+    try {
+      const res = await fetch(`${apiUrl}/api/upload`, {
+        method: 'DELETE',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url }),
+      })
+      if (!res.ok && res.status !== 404) {
+        const err = await res.json().catch(() => ({}))
+        console.warn('R2 delete failed:', err)
+      }
+    } catch (e) {
+      console.warn('R2 delete network error:', e)
+    } finally {
+      setF(p => ({ ...p, images: p.images.filter((_, i) => i !== idx) }))
+      setDeletingIdx(null)
+    }
+  }
 
   return (
     <div className="bg-zinc-50 border border-zinc-200 rounded-xl p-5 space-y-4">
@@ -147,6 +210,64 @@ function UnitFormPanel({
           </select>
         </div>
       </div>
+
+      {/* Photos */}
+      <div>
+        <label className={lbl}>Photos</label>
+        {imgError && (
+          <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2 mb-2 whitespace-pre-line">{imgError}</p>
+        )}
+        {f.images.length > 0 && (
+          <div className="grid grid-cols-4 sm:grid-cols-6 gap-2 mb-2">
+            {f.images.map((url, i) => (
+              <div key={i} className="relative group aspect-square">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={normalizeFileUrl(url)} alt="" className="w-full h-full object-cover rounded-lg border border-zinc-200" />
+                {i === 0 && (
+                  <span className="absolute top-1 left-1 text-[9px] bg-zinc-800 text-white px-1.5 py-0.5 rounded font-medium">Cover</span>
+                )}
+                {deletingIdx === i && (
+                  <div className="absolute inset-0 bg-black/50 rounded-lg flex items-center justify-center">
+                    <Loader2 className="h-4 w-4 text-white animate-spin" />
+                  </div>
+                )}
+                <button
+                  type="button"
+                  onClick={() => removeImage(i)}
+                  disabled={deletingIdx !== null}
+                  className="absolute top-1 right-1 p-0.5 bg-red-500 text-white rounded-md opacity-0 group-hover:opacity-100 transition-opacity disabled:opacity-50"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+        <div
+          className="border-2 border-dashed border-zinc-200 rounded-lg p-4 text-center hover:border-zinc-400 transition-colors cursor-pointer"
+          onClick={() => fileInputRef.current?.click()}
+        >
+          {uploading ? (
+            <div className="flex items-center justify-center gap-2 text-zinc-500 text-sm">
+              <Loader2 className="h-4 w-4 animate-spin" /> Uploading…
+            </div>
+          ) : (
+            <div className="flex items-center justify-center gap-2 text-zinc-500 text-sm">
+              <ImageIcon className="h-4 w-4 text-zinc-400" /> Click to upload photos
+              <span className="text-xs text-zinc-400">— first is the cover</span>
+            </div>
+          )}
+        </div>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/jpeg,image/png,image/webp"
+          multiple
+          className="hidden"
+          onChange={e => { if (e.target.files?.length) uploadImages(e.target.files); e.target.value = '' }}
+        />
+      </div>
+
       <div className="flex items-center justify-end gap-2 pt-1">
         <button type="button" onClick={onCancel} className="px-4 py-1.5 text-sm text-zinc-600 hover:text-zinc-900 transition-colors">
           Cancel
@@ -154,7 +275,7 @@ function UnitFormPanel({
         <button
           type="button"
           onClick={() => onSave(f)}
-          disabled={saving}
+          disabled={saving || uploading}
           className="px-5 py-1.5 text-sm font-medium text-white bg-zinc-800 hover:bg-zinc-700 rounded-lg transition-colors disabled:opacity-50 flex items-center gap-2"
         >
           {saving && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
@@ -756,6 +877,7 @@ export function UnitsManager({ buildingId }: { buildingId: string }) {
       {showAddUnit && (
         <UnitFormPanel
           initial={EMPTY_UNIT}
+          buildingId={buildingId}
           onSave={handleCreateUnit}
           onCancel={() => setShowAddUnit(false)}
           saving={saving}
@@ -800,6 +922,18 @@ export function UnitsManager({ buildingId }: { buildingId: string }) {
               >
                 {/* Unit row */}
                 <div className="flex flex-col sm:flex-row sm:items-center gap-3 px-5 py-4">
+                  {/* Cover thumbnail */}
+                  {unit.images?.length > 0 && (
+                    <div className="relative w-12 h-12 shrink-0 rounded-lg overflow-hidden border border-zinc-200">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={normalizeFileUrl(unit.images[0])} alt="" className="w-full h-full object-cover" />
+                      {unit.images.length > 1 && (
+                        <span className="absolute bottom-0 right-0 text-[9px] bg-black/60 text-white px-1 rounded-tl">
+                          {unit.images.length}
+                        </span>
+                      )}
+                    </div>
+                  )}
                   {/* Identity */}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
@@ -907,7 +1041,9 @@ export function UnitsManager({ buildingId }: { buildingId: string }) {
                         bathrooms:  unit.bathrooms != null ? String(unit.bathrooms) : '',
                         areaSqm:    unit.areaSqm != null ? String(unit.areaSqm) : '',
                         lifecycle:  unit.lifecycle ?? 'VACANT',
+                        images:     unit.images ?? [],
                       }}
+                      buildingId={buildingId}
                       onSave={f => handleUpdateUnit(unit.id, f)}
                       onCancel={() => setExpanded(null)}
                       saving={saving}

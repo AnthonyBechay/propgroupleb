@@ -164,10 +164,11 @@ export async function uploadFile(
   if (options?.propertySlug) {
     const entitySlug = sanitizeForPath(options.propertySlug);
     // Top-level prefix follows the entity type. Building photos land under
-    // buildings/<slug>/…, legacy property photos under properties/<slug>/….
-    // Anything else (videos use folder 'videos') defaults to 'properties' so
-    // existing behaviour is preserved.
-    const prefix = folder === 'buildings' ? 'buildings' : 'properties';
+    // buildings/<slug>/…, unit photos under units/<slug>/…, legacy property
+    // photos under properties/<slug>/…. Anything else (videos use folder
+    // 'videos') defaults to 'properties' so existing behaviour is preserved.
+    const prefix =
+      folder === 'buildings' ? 'buildings' : folder === 'units' ? 'units' : 'properties';
 
     if (folder === 'documents' && options?.documentType) {
       const docType = sanitizeForPath(options.documentType);

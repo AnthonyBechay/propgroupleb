@@ -369,7 +369,8 @@
       "Bash(node -e \"const s=require\\('sharp'\\); console.log\\('sharp ok', s.versions.sharp\\)\")",
       "Bash(pnpm run *)",
       "Bash(node -e \"const s=require\\('./apps/backend/node_modules/sharp'\\); s\\('apps/web/public/newlogo.png'\\).metadata\\(\\).then\\(m=>console.log\\('newlogo:',m.width+'x'+m.height,m.format,'hasAlpha:',m.hasAlpha\\)\\).catch\\(e=>console.log\\('err',e.message\\)\\)\")",
-      "Bash(node -e \"const s=require\\('./apps/backend/node_modules/sharp'\\); s\\('apps/web/public/newlogo.png.jpeg'\\).metadata\\(\\).then\\(m=>console.log\\('dims:',m.width+'x'+m.height,'format:',m.format,'hasAlpha:',m.hasAlpha\\)\\)\")"
+      "Bash(node -e \"const s=require\\('./apps/backend/node_modules/sharp'\\); s\\('apps/web/public/newlogo.png.jpeg'\\).metadata\\(\\).then\\(m=>console.log\\('dims:',m.width+'x'+m.height,'format:',m.format,'hasAlpha:',m.hasAlpha\\)\\)\")",
+      "Bash(wait)"
     ],
     "deny": [],
     "ask": []
