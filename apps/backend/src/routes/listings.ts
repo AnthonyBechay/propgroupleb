@@ -11,7 +11,7 @@ import type { AuthenticatedRequest } from '../types/index.js';
 import { logger } from '../utils/logger.js';
 import {
   syncUnitLifecycleFromListing,
-  MARKETABLE_LIFECYCLES,
+  TERMINAL_LIFECYCLES,
   type ListingIntent,
   type ListingStatus,
   type UnitLifecycle,
@@ -201,17 +201,19 @@ router.get(
       where.unit = unitFilter;
     }
 
-    // Public safety guard: never surface a unit-listing whose unit is no longer
-    // on the market (SOLD/RENTED/OWNER_OCCUPIED/OFF_MARKET, or still DRAFT/VACANT).
-    // The write-side sync normally CLOSEs such listings, but this guarantees the
-    // public catalog can't show a sold apartment as available even if a listing
-    // status drifted out of sync. BUILDING-subject listings have no unit and
-    // always pass. Admins see everything.
+    // Public safety guard: never surface a unit-listing whose unit is explicitly
+    // off the market (SOLD / RENTED / OWNER_OCCUPIED / OFF_MARKET). An ACTIVE
+    // listing is the source of truth for visibility, so units left at their
+    // default lifecycle (DRAFT / VACANT) MUST still show — we only exclude the
+    // terminal states. This guarantees a sold apartment can't show as available
+    // even if a listing status drifted out of sync, without hiding normal
+    // listings. BUILDING-subject listings have no unit and always pass. Admins
+    // see everything.
     if (!isAdmin) {
       const lifecycleGuard = {
         OR: [
           { subjectType: 'BUILDING' },
-          { unit: { lifecycle: { in: MARKETABLE_LIFECYCLES } } },
+          { unit: { lifecycle: { notIn: TERMINAL_LIFECYCLES } } },
         ],
       };
       where.AND = [...(Array.isArray(where.AND) ? where.AND : []), lifecycleGuard];
