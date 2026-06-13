@@ -1700,3 +1700,31 @@ model ShareToken {
   @@index([unitOptionId])
   @@map("share_tokens")
 }
+
+// ============================================
+// ANALYTICS — first-party behavioural events
+// ============================================
+// Lightweight append-only event log powering the admin analytics dashboard.
+// IDs (listingId/buildingId/unitId) are intentionally loose references (no FK)
+// so events survive entity deletion and inserts stay cheap. No PII beyond an
+// anonymous client session id + user agent.
+model AnalyticsEvent {
+  id         String   @id @default(cuid())
+  type       String   // page_view | listing_view | listing_click | inquiry_click | phone_click | whatsapp_click | search | favorite
+  path       String?
+  listingId  String?
+  buildingId String?
+  unitId     String?
+  sessionId  String?  // anonymous visitor session (client-generated uuid)
+  userId     String?  // set when the visitor is authenticated
+  referrer   String?
+  userAgent  String?
+  meta       Json?
+  createdAt  DateTime @default(now())
+
+  @@index([type])
+  @@index([createdAt])
+  @@index([listingId])
+  @@index([sessionId])
+  @@map("analytics_events")
+}

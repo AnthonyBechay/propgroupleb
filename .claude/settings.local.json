@@ -370,7 +370,12 @@
       "Bash(pnpm run *)",
       "Bash(node -e \"const s=require\\('./apps/backend/node_modules/sharp'\\); s\\('apps/web/public/newlogo.png'\\).metadata\\(\\).then\\(m=>console.log\\('newlogo:',m.width+'x'+m.height,m.format,'hasAlpha:',m.hasAlpha\\)\\).catch\\(e=>console.log\\('err',e.message\\)\\)\")",
       "Bash(node -e \"const s=require\\('./apps/backend/node_modules/sharp'\\); s\\('apps/web/public/newlogo.png.jpeg'\\).metadata\\(\\).then\\(m=>console.log\\('dims:',m.width+'x'+m.height,'format:',m.format,'hasAlpha:',m.hasAlpha\\)\\)\")",
-      "Bash(wait)"
+      "Bash(wait)",
+      "Bash(sed -n '1,40p' apps/web/src/app/properties/page.tsx)",
+      "Bash(sed -n '1,40p' apps/web/src/app/property/\\\\[slug\\\\]/page.tsx)",
+      "Bash(sed -n '1,60p' \"apps/web/src/app/\\(admin\\)/admin/analytics/page.tsx\")",
+      "Bash(sed -n '1,70p' \"apps/web/src/app/\\(admin\\)/admin/AdminDashboardClient.tsx\")",
+      "Bash(echo \"=== settings route? ===\"; ls apps/web/../backend/src/routes/ 2>/dev/null | grep -i setting; find apps/backend/src -name \"*setting*\"; echo \"=== SystemSetting usage ===\"; grep -rln \"systemSetting\\\\|SystemSetting\\\\|system_settings\" apps/backend/src | head; echo \"=== content route system-setting endpoints ===\"; grep -n \"router\\\\.\\\\\\(get\\\\|put\\\\|post\\\\\\)\\\\|systemSetting\\\\|setting\" apps/backend/src/routes/content.ts | head -20; echo \"=== ConditionalAIAssistantFab ===\"; cat apps/web/src/components/ai/ConditionalAIAssistantFab.tsx 2>/dev/null | head -40)"
     ],
     "deny": [],
     "ask": []

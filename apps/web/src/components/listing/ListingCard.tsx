@@ -4,6 +4,7 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { MapPin, Bed, Bath, Square, Building2, Home } from 'lucide-react'
 import { normalizeFileUrl } from '@/lib/utils/api-url'
+import { track } from '@/lib/analytics'
 import type { Listing } from '@/types'
 import { ListingIntent, UnitKind, BuildingKind, Currency } from '@/types'
 
@@ -87,6 +88,7 @@ export function ListingCard({ listing, priority = false }: ListingCardProps) {
   return (
     <Link
       href={`/listings/${listing.slug}`}
+      onClick={() => track('listing_click', { listingId: listing.id, buildingId: building?.id, unitId: unit?.id })}
       className="group block bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm hover:shadow-lg transition-all duration-300 hover:-translate-y-1"
     >
       {/* Image */}

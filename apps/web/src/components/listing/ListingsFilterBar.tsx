@@ -42,12 +42,15 @@ export function ListingsFilterBar() {
   const pathname = usePathname()
   const searchParams = useSearchParams()
 
+  // NOTE: param names must match the backend listings query (kind, minBeds) —
+  // previously these were 'unitKind'/'minBedrooms', which the API ignored, so
+  // the type and bedroom filters silently did nothing.
   const intent = searchParams.get('intent') ?? ''
   const mohafazat = searchParams.get('mohafazat') ?? ''
-  const unitKind = searchParams.get('unitKind') ?? ''
+  const unitKind = searchParams.get('kind') ?? ''
   const minPrice = searchParams.get('minPrice') ?? ''
   const maxPrice = searchParams.get('maxPrice') ?? ''
-  const minBedrooms = searchParams.get('minBedrooms') ?? ''
+  const minBedrooms = searchParams.get('minBeds') ?? ''
   const search = searchParams.get('search') ?? ''
 
   const updateParam = useCallback(
@@ -129,7 +132,7 @@ export function ListingsFilterBar() {
         {/* Unit kind */}
         <select
           value={unitKind}
-          onChange={(e) => updateParam('unitKind', e.target.value)}
+          onChange={(e) => updateParam('kind', e.target.value)}
           className="h-9 px-3 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-600/15 focus:border-sky-500 bg-white"
         >
           {UNIT_KIND_OPTIONS.map((o) => (
@@ -140,7 +143,7 @@ export function ListingsFilterBar() {
         {/* Bedrooms */}
         <select
           value={minBedrooms}
-          onChange={(e) => updateParam('minBedrooms', e.target.value)}
+          onChange={(e) => updateParam('minBeds', e.target.value)}
           className="h-9 px-3 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-600/15 focus:border-sky-500 bg-white"
         >
           {BEDROOMS_OPTIONS.map((o) => (

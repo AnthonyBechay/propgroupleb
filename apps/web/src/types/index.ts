@@ -377,6 +377,8 @@ export interface Building {
   title: string;
   description?: string | null;
   shortDescription?: string | null;
+  metaTitle?: string | null;
+  metaDescription?: string | null;
   mohafazat?: string | null;
   caza?: string | null;
   city?: string | null;

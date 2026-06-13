@@ -20,6 +20,7 @@ import {
   ChevronUp,
 } from 'lucide-react'
 import { normalizeApiUrl } from '@/lib/utils/api-url'
+import { track } from '@/lib/analytics'
 
 interface Message {
   id: string
@@ -149,6 +150,9 @@ export function AIPropertySearch({
   const handleSearch = async (searchText?: string) => {
     const q = (searchText || query).trim()
     if (!q) return
+
+    // Record the search for the admin AI dashboard (powers search count + top queries).
+    track('search', { meta: { query: q } })
 
     const userMessage: Message = {
       id: Date.now().toString(),

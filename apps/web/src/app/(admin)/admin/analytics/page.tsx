@@ -13,6 +13,7 @@ import {
 } from 'lucide-react'
 import { normalizeApiUrl } from '@/lib/utils/api-url'
 import { cookies } from 'next/headers'
+import { BehaviorAnalytics } from './BehaviorAnalytics'
 
 async function fetchAdminStats() {
   const apiUrl = normalizeApiUrl(process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001')
@@ -139,6 +140,9 @@ export default async function AnalyticsPage() {
         </h1>
         <p className="mt-2 text-slate-600">Platform performance and engagement metrics.</p>
       </div>
+
+      {/* User behaviour (first-party event tracking) */}
+      <BehaviorAnalytics />
 
       {/* Key Metrics */}
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">

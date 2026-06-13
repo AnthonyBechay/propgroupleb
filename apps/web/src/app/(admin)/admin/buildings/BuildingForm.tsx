@@ -2,7 +2,7 @@
 
 import { useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, Upload, X, Loader2, Building2, Image as ImageIcon, Plus, CheckCircle } from 'lucide-react'
+import { ArrowLeft, Upload, X, Loader2, Building2, Image as ImageIcon, Plus, CheckCircle, Sparkles } from 'lucide-react'
 import Link from 'next/link'
 import { normalizeApiUrl, normalizeFileUrl } from '@/lib/utils/api-url'
 
@@ -33,6 +33,8 @@ export function BuildingForm({ initialData, buildingId, embedded }: Props) {
   const [uploadingImages, setUploadingImages] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [highlightInput, setHighlightInput] = useState('')
+  const [aiLoading, setAiLoading] = useState(false)
+  const [aiError, setAiError] = useState<string | null>(null)
 
   const [form, setForm] = useState({
     title: initialData?.title ?? '',
@@ -225,6 +227,38 @@ export function BuildingForm({ initialData, buildingId, embedded }: Props) {
     } catch (err: any) {
       setError(err.message || 'Network error')
       setSaving(false)
+    }
+  }
+
+  async function generateSeo() {
+    if (!buildingId) return
+    setAiLoading(true)
+    setAiError(null)
+    try {
+      const apiUrl = normalizeApiUrl(process.env.NEXT_PUBLIC_API_URL || '')
+      const res = await fetch(`${apiUrl}/api/ai-seo/generate`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: 'building', id: buildingId }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        setAiError(data.message || 'AI generation failed')
+        return
+      }
+      const s = data.data ?? data
+      setForm(prev => ({
+        ...prev,
+        metaTitle: s.metaTitle ?? prev.metaTitle,
+        metaDescription: s.metaDescription ?? prev.metaDescription,
+        // Only fill the short description if the admin hasn't written one.
+        shortDescription: prev.shortDescription || s.shortDescription || prev.shortDescription,
+      }))
+    } catch {
+      setAiError('Network error')
+    } finally {
+      setAiLoading(false)
     }
   }
 
@@ -494,7 +528,25 @@ export function BuildingForm({ initialData, buildingId, embedded }: Props) {
 
         {/* SEO */}
         <div className="bg-white border rounded-xl p-6 space-y-4">
-          <h2 className="font-semibold text-slate-900">SEO (optional)</h2>
+          <div className="flex items-center justify-between gap-3">
+            <h2 className="font-semibold text-slate-900">SEO (optional)</h2>
+            <button
+              type="button"
+              onClick={generateSeo}
+              disabled={aiLoading || !isEdit}
+              title={isEdit ? 'Auto-write SEO from this building’s details' : 'Save the building first, then generate'}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-violet-700 bg-violet-50 border border-violet-200 rounded-lg hover:bg-violet-100 transition-colors disabled:opacity-50"
+            >
+              {aiLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+              {aiLoading ? 'Generating…' : 'Generate with AI'}
+            </button>
+          </div>
+          {aiError && (
+            <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{aiError}</p>
+          )}
+          {!isEdit && (
+            <p className="text-xs text-slate-400">Save the building first — the AI uses its saved details to write SEO.</p>
+          )}
           <div>
             <label className={labelCls}>Meta Title</label>
             <input type="text" value={form.metaTitle} onChange={e => setField('metaTitle', e.target.value)} className={inputCls} placeholder="Custom page title for search engines" />

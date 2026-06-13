@@ -20,34 +20,38 @@ export const revalidate = 3600
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'
 
 // Static marketing routes we always want indexed.
+// The homepage ('') is now the property catalog, so it's the top-priority page.
+// '/listings' is intentionally omitted — it 301-redirects to '/'.
 const STATIC_ROUTES: Array<{ path: string; priority: number; changeFrequency: MetadataRoute.Sitemap[number]['changeFrequency'] }> = [
-  { path: '', priority: 1.0, changeFrequency: 'weekly' },
-  { path: 'properties', priority: 0.95, changeFrequency: 'daily' },
-  { path: 'invest-in-lebanon', priority: 0.95, changeFrequency: 'weekly' },
+  { path: '', priority: 1.0, changeFrequency: 'daily' },
+  { path: 'invest-in-lebanon', priority: 0.9, changeFrequency: 'weekly' },
+  { path: 'ai-search', priority: 0.7, changeFrequency: 'monthly' },
   { path: 'contact', priority: 0.6, changeFrequency: 'monthly' },
-  { path: 'get-started', priority: 0.7, changeFrequency: 'monthly' },
+  { path: 'get-started', priority: 0.6, changeFrequency: 'monthly' },
   { path: 'about', priority: 0.5, changeFrequency: 'monthly' },
+  { path: 'privacy', priority: 0.2, changeFrequency: 'yearly' },
+  { path: 'terms', priority: 0.2, changeFrequency: 'yearly' },
 ]
 
-type ApiProperty = {
+type ApiListing = {
   slug?: string
   id?: string
   updatedAt?: string
 }
 
-async function fetchProperties(): Promise<ApiProperty[]> {
+async function fetchListings(): Promise<ApiListing[]> {
   try {
     const apiUrl = normalizeApiUrl(process.env.NEXT_PUBLIC_API_URL || '')
     if (!apiUrl) return []
-    // Generous limit — sitemap can hold 50k URLs, we just need all public projects.
-    const res = await fetch(`${apiUrl}/api/properties?limit=5000&page=1`, {
-      // Revalidate hourly — property inventory doesn't change multiple times per minute
+    // Only ACTIVE + public listings belong in the sitemap. Generous limit —
+    // a sitemap can hold up to 50k URLs.
+    const res = await fetch(`${apiUrl}/api/listings?limit=5000&page=1&status=ACTIVE`, {
+      // Inventory doesn't change multiple times per minute — hourly is plenty.
       next: { revalidate: 3600 },
     })
     if (!res.ok) return []
     const json = await res.json()
-    const list = Array.isArray(json?.data) ? json.data : []
-    return list
+    return Array.isArray(json?.data) ? json.data : []
   } catch {
     return []
   }
@@ -80,13 +84,13 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     priority: r.priority,
   }))
 
-  const [properties, guides] = await Promise.all([fetchProperties(), fetchLocationGuides()])
+  const [listings, guides] = await Promise.all([fetchListings(), fetchLocationGuides()])
 
-  const propertyEntries: MetadataRoute.Sitemap = properties
-    .filter(p => p.slug)
-    .map(p => ({
-      url: `${SITE_URL}/property/${p.slug}`,
-      lastModified: p.updatedAt ? new Date(p.updatedAt) : now,
+  const listingEntries: MetadataRoute.Sitemap = listings
+    .filter(l => l.slug)
+    .map(l => ({
+      url: `${SITE_URL}/listings/${l.slug}`,
+      lastModified: l.updatedAt ? new Date(l.updatedAt) : now,
       changeFrequency: 'weekly' as const,
       priority: 0.85,
     }))
@@ -100,5 +104,5 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       priority: 0.7,
     }))
 
-  return [...staticEntries, ...propertyEntries, ...guideEntries]
+  return [...staticEntries, ...listingEntries, ...guideEntries]
 }

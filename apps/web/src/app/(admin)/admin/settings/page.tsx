@@ -46,6 +46,18 @@ export default function SettingsPage() {
   const [logoSaving, setLogoSaving] = useState(false)
   const logoInputRef = useRef<HTMLInputElement>(null)
 
+  // Sync profile fields when the authenticated user resolves. AuthContext loads
+  // the user asynchronously, so the initial useState values can be empty on first
+  // render; without this the profile form would show blank fields until reload.
+  useEffect(() => {
+    if (user) {
+      setFirstName(user.firstName || '')
+      setLastName(user.lastName || '')
+      setPhone(user.phone || '')
+      setCountry(user.country || '')
+    }
+  }, [user])
+
   // Load branding settings on mount
   useEffect(() => {
     const loadBranding = async () => {

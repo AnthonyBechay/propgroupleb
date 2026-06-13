@@ -77,7 +77,7 @@ export function Navbar() {
 
           {/* Desktop Navigation */}
           <div className="hidden lg:flex items-center space-x-1 flex-1 overflow-x-auto overflow-y-hidden px-4 mx-4 scrollbar-hide" style={{scrollbarWidth: 'none', msOverflowStyle: 'none'}}>
-            <NavLink href="/listings" icon={<Home className="w-4 h-4" />} isActive={isActive('/listings')}>
+            <NavLink href="/" icon={<Home className="w-4 h-4" />} isActive={isActive('/')}>
               Properties
             </NavLink>
 
@@ -225,9 +225,9 @@ export function Navbar() {
         >
           <div className="py-4 space-y-1 border-t border-slate-200">
             <MobileNavLink
-              href="/listings"
+              href="/"
               icon={<Home className="w-4 h-4" />}
-              isActive={isActive('/listings')}
+              isActive={isActive('/')}
               onClick={() => setIsMenuOpen(false)}
             >
               Properties

@@ -7,6 +7,7 @@ import { ConditionalNavbar } from "@/components/layout/ConditionalNavbar";
 import { ConditionalFooter } from "@/components/layout/ConditionalFooter";
 import { Toaster } from "@/components/ui/toast";
 import { ConditionalScrollToTop } from "@/components/layout/ConditionalScrollToTop";
+import { AnalyticsTracker } from "@/components/analytics/AnalyticsTracker";
 import { ConditionalAIAssistantFab } from "@/components/ai/ConditionalAIAssistantFab";
 import { ComparatorBar } from "@/components/ComparatorBar";
 
@@ -167,6 +168,7 @@ export default function RootLayout({
             <ConditionalAIAssistantFab />
             <ComparatorBar />
             <Toaster />
+            <AnalyticsTracker />
           </ComparatorProvider>
         </AuthProvider>
       </body>

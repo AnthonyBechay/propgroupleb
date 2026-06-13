@@ -491,6 +491,22 @@ router.post(
   asyncHandler(async (req: Request, res: Response) => {
     const { query, conversationHistory, previousFilters } = aiSearchSchema.parse(req.body);
 
+    // Respect admin AI settings (persisted in system_settings; defaults if unset).
+    const settingRows = await prisma.systemSetting.findMany({
+      where: { key: { in: ['aiSearchEnabled', 'aiMaxResults'] } },
+      select: { key: true, value: true },
+    });
+    const settingVal = (k: string, def: unknown) =>
+      settingRows.find((s) => s.key === k)?.value ?? def;
+    if (settingVal('aiSearchEnabled', true) === false) {
+      sendSuccess(res, {
+        query, filters: {}, summary: 'AI search is currently unavailable.',
+        properties: [], count: 0, aiPowered: false,
+      });
+      return;
+    }
+    const maxResults = Math.min(Math.max(Number(settingVal('aiMaxResults', 50)) || 50, 1), 200);
+
     let filters = await parseQueryWithClaude(query, conversationHistory, previousFilters as Record<string, unknown> | undefined);
     const aiPowered = filters !== null;
     if (!filters) filters = parseNaturalLanguageQuery(query);
@@ -502,7 +518,7 @@ router.post(
       where,
       include: PROPERTY_LIST_INCLUDE,
       orderBy,
-      take: 50,
+      take: maxResults,
     });
 
     const summary = await generateAISummary(query, filters, properties.length, properties, conversationHistory);

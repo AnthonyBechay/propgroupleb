@@ -15,6 +15,7 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { MessageSquare, Send, CheckCircle2, AlertCircle } from 'lucide-react'
 import { normalizeApiUrl } from '@/lib/utils/api-url'
+import { track } from '@/lib/analytics'
 
 interface InquiryFormModalProps {
   listingId: string
@@ -77,6 +78,10 @@ export function InquiryFormModal({ listingId, listingTitle, buildingId }: Inquir
 
   function handleOpenChange(next: boolean) {
     setOpen(next)
+    if (next) {
+      // Opening the contact form is the key conversion-intent signal.
+      track('inquiry_click', { listingId, buildingId })
+    }
     if (!next) {
       // Reset state when closing
       setTimeout(() => {

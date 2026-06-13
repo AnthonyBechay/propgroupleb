@@ -22,6 +22,7 @@ import {
 import { normalizeApiUrl, normalizeFileUrl } from '@/lib/utils/api-url'
 import { InquiryFormModal } from '@/components/listing/InquiryFormModal'
 import { ListingGallery } from '@/components/listing/ListingGallery'
+import { TrackListingView } from '@/components/analytics/TrackListingView'
 import type { Listing } from '@/types'
 import {
   ListingIntent,
@@ -53,14 +54,69 @@ async function fetchListing(slug: string): Promise<Listing | null> {
   }
 }
 
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'
+
+const MOHAFAZAT_LABEL: Record<string, string> = {
+  BEIRUT: 'Beirut', MOUNT_LEBANON: 'Mount Lebanon', NORTH: 'North Lebanon',
+  SOUTH: 'South Lebanon', BEKAA: 'Bekaa', NABATIEH: 'Nabatieh',
+  AKKAR: 'Akkar', BAALBEK_HERMEL: 'Baalbek-Hermel',
+}
+
+/** Human "Neighborhood, City, Region" string from a building. */
+function locationString(b: { neighborhood?: string | null; city?: string | null; caza?: string | null; mohafazat?: string | null } | null | undefined): string {
+  if (!b) return 'Lebanon'
+  const parts = [b.neighborhood, b.city, b.caza, b.mohafazat ? (MOHAFAZAT_LABEL[b.mohafazat] ?? b.mohafazat) : null]
+    .filter(Boolean)
+  return parts.length ? `${parts.join(', ')}, Lebanon` : 'Lebanon'
+}
+
 export async function generateMetadata({ params }: PageProps) {
   const { slug } = await params
   const listing = await fetchListing(slug)
-  if (!listing) return { title: 'Listing Not Found' }
-  const title = listing.headline ?? listing.building?.title ?? 'Listing'
+  if (!listing) return { title: 'Listing Not Found', robots: { index: false, follow: false } }
+
+  const building = listing.building ?? listing.unit?.building
+  const loc = locationString(building)
+  const baseTitle = listing.headline ?? building?.title ?? 'Property'
+  // Prefer the (AI-generated) building meta, then fall back to derived copy.
+  const title = building?.metaTitle ?? `${baseTitle} — ${loc}`
+  const description =
+    building?.metaDescription ??
+    listing.description ??
+    building?.shortDescription ??
+    `${baseTitle} for ${listing.intent === ListingIntent.FOR_RENT ? 'rent' : 'sale'} in ${loc}. Explore details, photos and pricing on PropGroup.`
+
+  const canonical = `${SITE_URL}/listings/${slug}`
+  const rawImage = listing.unit?.images?.[0] ?? building?.images?.[0]
+  const ogImage = rawImage ? normalizeFileUrl(rawImage) : `${SITE_URL}/og-image.png`
+
+  const kindLabel = listing.unit ? UNIT_KIND_LABELS[listing.unit.kind] : building ? BUILDING_KIND_LABELS[building.kind] : 'Property'
+  const keywords = [
+    `${kindLabel} for ${listing.intent === ListingIntent.FOR_RENT ? 'rent' : 'sale'}`,
+    building?.city ? `${kindLabel} ${building.city}` : null,
+    loc,
+    'Lebanon real estate',
+  ].filter(Boolean) as string[]
+
   return {
-    title: `${title} | PropGroup Lebanon`,
-    description: listing.description ?? listing.building?.shortDescription ?? undefined,
+    title,
+    description,
+    keywords,
+    alternates: { canonical },
+    openGraph: {
+      type: 'website',
+      url: canonical,
+      title,
+      description,
+      siteName: 'PropGroup',
+      images: [{ url: ogImage, width: 1200, height: 630, alt: baseTitle }],
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title,
+      description,
+      images: [ogImage],
+    },
   }
 }
 
@@ -130,13 +186,64 @@ export default async function ListingDetailPage({ params }: PageProps) {
 
   const title = listing.headline ?? building?.title ?? 'Listing'
 
+  // ── Structured data (JSON-LD) for rich results ──────────────────────────────
+  const canonical = `${SITE_URL}/listings/${listing.slug}`
+  const loc = locationString(building)
+  const kindLabel = unit ? UNIT_KIND_LABELS[unit.kind] : building ? BUILDING_KIND_LABELS[building.kind] : 'Property'
+  const absImages = images.map((i) => normalizeFileUrl(i)).filter(Boolean).slice(0, 6)
+  const ldDescription = listing.description ?? building?.shortDescription ?? `${kindLabel} in ${loc}`
+  const jsonLd = {
+    '@context': 'https://schema.org',
+    '@graph': [
+      {
+        '@type': ['Product', 'Accommodation'],
+        '@id': `${canonical}#listing`,
+        name: title,
+        description: ldDescription,
+        url: canonical,
+        category: kindLabel,
+        ...(absImages.length ? { image: absImages } : { image: [`${SITE_URL}/og-image.png`] }),
+        ...(unit?.bedrooms != null ? { numberOfRooms: unit.bedrooms } : {}),
+        ...(unit?.areaSqm != null
+          ? { floorSize: { '@type': 'QuantitativeValue', value: unit.areaSqm, unitCode: 'MTK' } }
+          : {}),
+        address: {
+          '@type': 'PostalAddress',
+          ...(building?.city ? { addressLocality: building.city } : {}),
+          ...(building?.mohafazat ? { addressRegion: MOHAFAZAT_LABEL[building.mohafazat] ?? building.mohafazat } : {}),
+          addressCountry: 'LB',
+        },
+        offers: {
+          '@type': 'Offer',
+          price: String(listing.price),
+          priceCurrency: listing.currency,
+          availability: listing.status === 'ACTIVE' ? 'https://schema.org/InStock' : 'https://schema.org/SoldOut',
+          url: canonical,
+        },
+      },
+      {
+        '@type': 'BreadcrumbList',
+        itemListElement: [
+          { '@type': 'ListItem', position: 1, name: 'Properties', item: SITE_URL },
+          { '@type': 'ListItem', position: 2, name: title, item: canonical },
+        ],
+      },
+    ],
+  }
+
   return (
     <div className="min-h-screen bg-slate-50">
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
+      <TrackListingView
+        listingId={listing.id}
+        buildingId={building?.id}
+        unitId={unit?.id}
+      />
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         {/* Breadcrumb */}
         <nav className="flex items-center gap-1.5 text-sm text-slate-500 mb-6">
-          <Link href="/listings" className="hover:text-slate-800 transition-colors">
-            Listings
+          <Link href="/" className="hover:text-slate-800 transition-colors">
+            Properties
           </Link>
           {building && listing.subjectType === 'UNIT' && (
             <>

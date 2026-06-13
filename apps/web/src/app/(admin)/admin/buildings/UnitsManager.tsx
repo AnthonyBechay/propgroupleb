@@ -5,7 +5,7 @@ import Link from 'next/link'
 import {
   Plus, Pencil, Trash2, Tag, Loader2, X,
   Building2, Bed, Square, Layers, ChevronDown, ChevronUp,
-  DollarSign, BadgePlus, ExternalLink, Archive, ImageIcon,
+  DollarSign, BadgePlus, ExternalLink, Archive, ImageIcon, Sparkles,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { normalizeApiUrl, normalizeFileUrl } from '@/lib/utils/api-url'
@@ -311,7 +311,30 @@ function ListingQuickForm({
   const [f, setF] = useState<ListingFormState>(EMPTY_LISTING)
   const [saving, setSaving] = useState(false)
   const [err, setErr] = useState<string | null>(null)
+  const [aiLoading, setAiLoading] = useState(false)
   const set = (k: keyof ListingFormState, v: string) => setF(p => ({ ...p, [k]: v }))
+
+  async function generateSeo() {
+    setAiLoading(true)
+    setErr(null)
+    try {
+      const apiUrl = normalizeApiUrl(process.env.NEXT_PUBLIC_API_URL || '')
+      const res = await fetch(`${apiUrl}/api/ai-seo/generate`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: 'unit', id: unitId }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) { setErr(data.message || 'AI generation failed'); return }
+      const s = data.data ?? data
+      if (s.headline) set('headline', s.headline)
+    } catch {
+      setErr('Network error')
+    } finally {
+      setAiLoading(false)
+    }
+  }
 
   const inp = 'w-full px-3 py-2 border border-zinc-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-sky-600/15 focus:border-sky-500 bg-white'
   const lbl = 'block text-xs font-medium text-zinc-600 mb-1'
@@ -441,7 +464,19 @@ function ListingQuickForm({
 
       {/* Headline */}
       <div>
-        <label className={lbl}>Headline <span className="text-zinc-400">(optional)</span></label>
+        <div className="flex items-center justify-between mb-1">
+          <label className={lbl + ' mb-0'}>Headline <span className="text-zinc-400">(optional)</span></label>
+          <button
+            type="button"
+            onClick={generateSeo}
+            disabled={aiLoading}
+            title="Auto-write a headline from this unit’s details"
+            className="inline-flex items-center gap-1 text-xs font-medium text-violet-700 hover:text-violet-900 disabled:opacity-50"
+          >
+            {aiLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
+            {aiLoading ? 'Generating…' : 'Generate with AI'}
+          </button>
+        </div>
         <input
           type="text"
           value={f.headline}
@@ -472,11 +507,12 @@ function ListingQuickForm({
 // ── Listing edit panel ────────────────────────────────────────────────────────
 
 function ListingEditPanel({
-  listingId, listingLabel,
+  listingId, listingLabel, unitId,
   onSuccess, onCancel,
 }: {
   listingId: string
   listingLabel: string
+  unitId: string
   onSuccess: () => void
   onCancel: () => void
 }) {
@@ -484,6 +520,32 @@ function ListingEditPanel({
   const [loading, setLoading] = useState(true)
   const [saving,  setSaving]  = useState(false)
   const [err,     setErr]     = useState<string | null>(null)
+  const [aiLoading, setAiLoading] = useState(false)
+
+  async function generateSeo() {
+    setAiLoading(true)
+    setErr(null)
+    try {
+      const res = await fetch(`${apiUrl}/api/ai-seo/generate`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: 'unit', id: unitId }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) { setErr(data.message || 'AI generation failed'); return }
+      const s = data.data ?? data
+      setForm(p => ({
+        ...p,
+        headline: s.headline ?? p.headline,
+        description: s.description ?? p.description,
+      }))
+    } catch {
+      setErr('Network error')
+    } finally {
+      setAiLoading(false)
+    }
+  }
   const [form, setForm] = useState({
     status:      '',
     visibility:  '',
@@ -648,7 +710,19 @@ function ListingEditPanel({
       </div>
 
       <div>
-        <label className={lbl}>Headline</label>
+        <div className="flex items-center justify-between mb-1">
+          <label className={lbl + ' mb-0'}>Headline</label>
+          <button
+            type="button"
+            onClick={generateSeo}
+            disabled={aiLoading}
+            title="Auto-write headline & description from this unit’s details"
+            className="inline-flex items-center gap-1 text-xs font-medium text-violet-700 hover:text-violet-900 disabled:opacity-50"
+          >
+            {aiLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
+            {aiLoading ? 'Generating…' : 'Generate with AI'}
+          </button>
+        </div>
         <input
           type="text" value={form.headline}
           onChange={e => set('headline', e.target.value)}
@@ -1068,6 +1142,7 @@ export function UnitsManager({ buildingId }: { buildingId: string }) {
                     <ListingEditPanel
                       listingId={editListingId}
                       listingLabel={label}
+                      unitId={unit.id}
                       onSuccess={async () => { setExpanded(null); await fetchUnits() }}
                       onCancel={() => setExpanded(null)}
                     />
