@@ -81,15 +81,6 @@ export function Navbar() {
               Properties
             </NavLink>
 
-            <NavLink href="/ai-search" icon={<Sparkles className="w-4 h-4" />} isActive={isActive('/ai-search')}>
-              <span className="flex items-center gap-1.5">
-                AI Search
-                <span className="inline-flex items-center px-2 py-0.5 text-xs font-semibold bg-sky-600 text-white rounded-full">
-                  NEW
-                </span>
-              </span>
-            </NavLink>
-
             <NavLink href="/about" icon={<Info className="w-4 h-4" />} isActive={isActive('/about')}>
               About
             </NavLink>
