@@ -2,7 +2,8 @@
 
 import { useRouter, useSearchParams, usePathname } from 'next/navigation'
 import { useCallback } from 'react'
-import { Search, SlidersHorizontal } from 'lucide-react'
+import Link from 'next/link'
+import { Search, SlidersHorizontal, Sparkles } from 'lucide-react'
 import { UnitKind, ListingIntent } from '@/types'
 
 const MOHAFAZAT_OPTIONS = [
@@ -69,39 +70,43 @@ export function ListingsFilterBar() {
   )
 
   return (
-    <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
-      {/* Intent tabs */}
-      <div className="flex gap-1 mb-4 bg-zinc-100 rounded-lg p-1 w-fit">
-        <button
-          onClick={() => updateParam('intent', '')}
-          className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${
-            !intent
-              ? 'bg-white text-slate-900 shadow-sm'
-              : 'text-slate-600 hover:text-slate-900'
-          }`}
+    <div className="bg-white border border-slate-200 rounded-2xl p-4 sm:p-5 shadow-lg">
+      {/* Top row: intent tabs + "Try AI search" shortcut */}
+      <div className="flex items-center justify-between gap-3 mb-4 flex-wrap">
+        <div className="flex gap-1 bg-zinc-100 rounded-lg p-1 w-fit">
+          <button
+            onClick={() => updateParam('intent', '')}
+            className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${
+              !intent ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            All
+          </button>
+          <button
+            onClick={() => updateParam('intent', ListingIntent.FOR_SALE)}
+            className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${
+              intent === ListingIntent.FOR_SALE ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            For Sale
+          </button>
+          <button
+            onClick={() => updateParam('intent', ListingIntent.FOR_RENT)}
+            className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${
+              intent === ListingIntent.FOR_RENT ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            For Rent
+          </button>
+        </div>
+
+        <Link
+          href="/ai-search"
+          className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-sm font-medium text-white bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 shadow-sm transition-colors"
         >
-          All
-        </button>
-        <button
-          onClick={() => updateParam('intent', ListingIntent.FOR_SALE)}
-          className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${
-            intent === ListingIntent.FOR_SALE
-              ? 'bg-white text-slate-900 shadow-sm'
-              : 'text-slate-600 hover:text-slate-900'
-          }`}
-        >
-          For Sale
-        </button>
-        <button
-          onClick={() => updateParam('intent', ListingIntent.FOR_RENT)}
-          className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${
-            intent === ListingIntent.FOR_RENT
-              ? 'bg-white text-slate-900 shadow-sm'
-              : 'text-slate-600 hover:text-slate-900'
-          }`}
-        >
-          For Rent
-        </button>
+          <Sparkles className="w-4 h-4" />
+          Try AI search
+        </Link>
       </div>
 
       {/* Filter row */}

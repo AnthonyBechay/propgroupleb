@@ -55,21 +55,24 @@ export async function ListingsCatalog({
 
   return (
     <div className="min-h-screen bg-slate-50">
-      {/* Page header */}
-      <div className="bg-white border-b border-slate-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <h1 className="text-3xl font-bold text-slate-900">{heading}</h1>
-          <p className="mt-2 text-slate-500">
+      {/* Landing hero — greyish-blue band with the title centered */}
+      <div className="bg-gradient-to-b from-slate-700 to-slate-800">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-14 sm:py-20 text-center">
+          <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-white tracking-tight">
+            {heading}
+          </h1>
+          <p className="mt-4 text-slate-300 text-base sm:text-lg">
             {total > 0
-              ? `${total.toLocaleString()} listing${total !== 1 ? 's' : ''} available`
-              : 'Explore our curated listings across Lebanon'}
+              ? `Browse ${total.toLocaleString()} live listing${total !== 1 ? 's' : ''} across Lebanon — invest smart.`
+              : 'Explore curated listings across Lebanon — invest smart.'}
           </p>
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+      {/* Filter bar overlaps the hero for a landing feel; listings show directly below */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 -mt-8 relative z-10 space-y-6 pb-6">
         {/* Filters */}
-        <Suspense fallback={<div className="h-20 bg-white rounded-xl border border-slate-200 animate-pulse" />}>
+        <Suspense fallback={<div className="h-24 bg-white rounded-xl border border-slate-200 shadow-lg animate-pulse" />}>
           <ListingsFilterBar />
         </Suspense>
 
