@@ -549,4 +549,68 @@ router.get(
   })
 );
 
+// POST /api/ai-search/catalog
+// Lightweight natural-language → catalog-filter parser for the inline AI box on
+// the homepage. Returns a friendly summary plus filters that map directly to the
+// listings catalog query params, so results render in the normal grid.
+const CATALOG_SYSTEM = `You convert a natural-language property request into JSON filters for a Lebanon real-estate LISTINGS catalog.
+Return ONLY a JSON object with these exact keys (use null when not specified):
+{
+  "summary": "one friendly sentence describing what you searched for",
+  "filters": {
+    "intent": "FOR_SALE" | "FOR_RENT" | null,
+    "kind": "APARTMENT" | "VILLA" | "PENTHOUSE" | "DUPLEX" | "STUDIO" | "OFFICE" | "SHOP" | "LAND_PARCEL" | null,
+    "mohafazat": "BEIRUT" | "MOUNT_LEBANON" | "NORTH" | "SOUTH" | "BEKAA" | "NABATIEH" | "AKKAR" | "BAALBEK_HERMEL" | null,
+    "city": string | null,
+    "minPrice": number | null,
+    "maxPrice": number | null,
+    "minBeds": number | null,
+    "sortBy": "price" | "createdAt" | null,
+    "sortOrder": "asc" | "desc" | null
+  }
+}
+Rules: prices are USD numbers (e.g. "under 200k" → maxPrice 200000). "cheapest" → sortBy price, sortOrder asc. "newest" → sortBy createdAt desc. "rent" → intent FOR_RENT, "buy/sale" → FOR_SALE. Map neighborhoods to their city. Never invent constraints not implied by the request.`;
+
+router.post(
+  '/catalog',
+  asyncHandler(async (req: Request, res: Response) => {
+    const query = typeof req.body?.query === 'string' ? req.body.query.trim() : '';
+    if (!query) { sendSuccess(res, { summary: '', filters: {} }); return; }
+
+    // Respect the admin AI toggle.
+    const enabledRow = await prisma.systemSetting.findUnique({ where: { key: 'aiSearchEnabled' }, select: { value: true } });
+    if (enabledRow?.value === false) {
+      sendSuccess(res, { summary: 'AI search is currently unavailable.', filters: {}, disabled: true });
+      return;
+    }
+
+    const client = getAnthropic();
+    if (!client) {
+      sendSuccess(res, { summary: '', filters: {}, unavailable: true });
+      return;
+    }
+
+    try {
+      const message = await client.messages.create({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 400,
+        system: CATALOG_SYSTEM,
+        messages: [{ role: 'user', content: `Request: "${query}"\n\nReturn ONLY the JSON object.` }],
+      });
+      const text = message.content
+        .map((c) => ((c as { type: string; text?: string }).type === 'text' ? (c as { text: string }).text : ''))
+        .join('');
+      const cleaned = text.replace(/```json\s*|\s*```/g, '').trim();
+      const start = cleaned.indexOf('{');
+      const end = cleaned.lastIndexOf('}');
+      const parsed = start !== -1 && end !== -1 ? JSON.parse(cleaned.slice(start, end + 1)) : null;
+      if (!parsed) { sendSuccess(res, { summary: 'Sorry, I could not understand that — try rephrasing.', filters: {} }); return; }
+      sendSuccess(res, { summary: parsed.summary ?? '', filters: parsed.filters ?? {} });
+    } catch (err) {
+      logger.error('AI catalog parse failed', err);
+      sendSuccess(res, { summary: 'AI search is busy right now — please try again.', filters: {} });
+    }
+  })
+);
+
 export default router;

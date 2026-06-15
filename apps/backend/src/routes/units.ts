@@ -287,4 +287,56 @@ router.delete(
   })
 );
 
+// ── GET /mine — units assigned to the current user (their portfolio) ──────────
+router.get(
+  '/mine',
+  authenticateToken,
+  asyncHandler(async (req: Request, res: Response) => {
+    const authReq = req as AuthenticatedRequest;
+    const units = await prisma.unit.findMany({
+      where: { ownerUserId: authReq.user.id },
+      include: {
+        building: { select: { id: true, title: true, city: true, caza: true, mohafazat: true, images: true, slug: true } },
+        listings: { where: { status: { notIn: ['ARCHIVED'] } }, select: { id: true, slug: true, intent: true, status: true, price: true, currency: true } },
+      },
+      orderBy: { updatedAt: 'desc' },
+    });
+    sendSuccess(res, units);
+  })
+);
+
+// ── PUT /:id/assign-owner — admin assigns (or clears) a unit's owner by email ──
+// Works for any registered user (Google or email signup). Pass { email: null }
+// or omit to unassign.
+router.put(
+  '/:id/assign-owner',
+  authenticateToken,
+  requireAdmin,
+  asyncHandler(async (req: Request, res: Response) => {
+    const authReq = req as AuthenticatedRequest;
+    const email = typeof req.body?.email === 'string' ? req.body.email.trim().toLowerCase() : null;
+
+    const unit = await prisma.unit.findUnique({ where: { id: req.params.id }, select: { id: true } });
+    if (!unit) { sendNotFound(res, 'Unit'); return; }
+
+    let ownerUserId: string | null = null;
+    let ownerLabel: string | null = null;
+    if (email) {
+      const user = await prisma.user.findUnique({ where: { email }, select: { id: true, email: true } });
+      if (!user) { sendError(res, 404, 'No registered user with that email'); return; }
+      ownerUserId = user.id;
+      ownerLabel = user.email;
+    }
+
+    const updated = await prisma.unit.update({
+      where: { id: req.params.id },
+      data: { ownerUserId, ownershipSource: ownerUserId ? 'PLATFORM_SOLD' : undefined },
+      select: { id: true, ownerUserId: true },
+    });
+
+    await logAdminAction('ASSIGN_UNIT_OWNER', 'unit', req.params.id, { ownerUserId, email: ownerLabel }, authReq);
+    sendSuccess(res, updated, ownerUserId ? `Unit assigned to ${ownerLabel}` : 'Unit owner cleared');
+  })
+);
+
 export default router;

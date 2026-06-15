@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { ArrowLeft, Upload, X, Loader2, Building2, Image as ImageIcon, Plus, CheckCircle, Sparkles } from 'lucide-react'
 import Link from 'next/link'
@@ -69,7 +69,18 @@ export function BuildingForm({ initialData, buildingId, embedded }: Props) {
     highlightedFeatures: (initialData?.highlightedFeatures ?? []) as string[],
     metaTitle: initialData?.metaTitle ?? '',
     metaDescription: initialData?.metaDescription ?? '',
+    organizationId: initialData?.organizationId ?? '',
   })
+
+  // Organizations (for assigning a building to a PM company / agency)
+  const [orgs, setOrgs] = useState<{ id: string; name: string }[]>([])
+  useEffect(() => {
+    const apiUrl = normalizeApiUrl(process.env.NEXT_PUBLIC_API_URL || '')
+    fetch(`${apiUrl}/api/organizations`, { credentials: 'include' })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => { const d = j?.data ?? j; if (Array.isArray(d)) setOrgs(d.map((o: { id: string; name: string }) => ({ id: o.id, name: o.name }))) })
+      .catch(() => {})
+  }, [])
 
   const setField = (key: keyof typeof form, value: any) =>
     setForm(prev => ({ ...prev, [key]: value }))
@@ -192,6 +203,7 @@ export function BuildingForm({ initialData, buildingId, embedded }: Props) {
       highlightedFeatures: form.highlightedFeatures,
       metaTitle: form.metaTitle || null,
       metaDescription: form.metaDescription || null,
+      organizationId: form.organizationId || null,
     }
 
     try {
@@ -347,6 +359,15 @@ export function BuildingForm({ initialData, buildingId, embedded }: Props) {
               <input type="checkbox" id="featured" checked={form.featured} onChange={e => setField('featured', e.target.checked)} className="rounded border-slate-300" />
               <label htmlFor="featured" className="text-sm text-slate-700 cursor-pointer">Featured listing</label>
             </div>
+            {orgs.length > 0 && (
+              <div className="sm:col-span-2">
+                <label className={labelCls}>Managed by (organization)</label>
+                <select value={form.organizationId} onChange={e => setField('organizationId', e.target.value)} className={inputCls}>
+                  <option value="">PropGroup (platform-managed)</option>
+                  {orgs.map(o => <option key={o.id} value={o.id}>{o.name}</option>)}
+                </select>
+              </div>
+            )}
           </div>
           <div>
             <label className={labelCls}>Short Description</label>

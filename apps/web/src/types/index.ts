@@ -338,7 +338,13 @@ export interface UnitOption {
   unitId: string;
   name: string;
   description?: string | null;
-  images: string[];
+  // Current schema fields (Turnkey / White-frame style options):
+  pricePerSqm?: number | null;
+  currency?: Currency | null;
+  initialPayment?: number | null;
+  paymentPlanDetails?: Record<string, unknown> | null;
+  // Legacy fields kept optional for backward compatibility:
+  images?: string[];
   askingPrice?: number | null;
   askingCurrency?: Currency | null;
   createdAt: Date;

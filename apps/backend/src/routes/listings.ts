@@ -74,6 +74,12 @@ const BUILDING_PUBLIC_INCLUDE = {
     },
     orderBy: { createdAt: 'desc' as const },
   },
+  // Agent card + investment metrics are rendered on the public detail page —
+  // they only appear if loaded here.
+  agent: {
+    select: { id: true, firstName: true, lastName: true, email: true, agentCompany: true },
+  },
+  investmentData: true,
 } as const;
 
 // ── Shared listing detail include ─────────────────────────────────────────────
@@ -242,6 +248,56 @@ router.get(
     ]);
 
     sendPaginated(res, listings, buildPaginationResponse(page, limit, total));
+  })
+);
+
+// ── GET /facets — filter options derived from live data ───────────────────────
+// Powers the catalog filter bar so the dropdowns only ever offer values that
+// actually exist in ACTIVE listings (regions, cities, unit types, price range).
+router.get(
+  '/facets',
+  asyncHandler(async (_req: Request, res: Response) => {
+    const rows = await prisma.listing.findMany({
+      where: { status: 'ACTIVE', visibility: 'PUBLIC' },
+      select: {
+        intent: true,
+        price: true,
+        building: { select: { mohafazat: true, city: true, caza: true } },
+        unit: { select: { kind: true, bedrooms: true, building: { select: { mohafazat: true, city: true, caza: true } } } },
+      },
+      take: 5000,
+    });
+
+    const mohafazat = new Set<string>();
+    const cities = new Set<string>();
+    const kinds = new Set<string>();
+    const intents = new Set<string>();
+    let priceMin = Infinity;
+    let priceMax = 0;
+    let bedroomsMax = 0;
+
+    for (const r of rows) {
+      const b = r.building ?? r.unit?.building;
+      if (b?.mohafazat) mohafazat.add(b.mohafazat);
+      if (b?.city) cities.add(b.city);
+      if (r.unit?.kind) kinds.add(r.unit.kind);
+      if (r.intent) intents.add(r.intent);
+      const p = Number(r.price);
+      if (Number.isFinite(p) && p > 0) { priceMin = Math.min(priceMin, p); priceMax = Math.max(priceMax, p); }
+      if (r.unit?.bedrooms != null) bedroomsMax = Math.max(bedroomsMax, r.unit.bedrooms);
+    }
+
+    res.set('Cache-Control', 'public, max-age=60');
+    sendSuccess(res, {
+      mohafazat: [...mohafazat].sort(),
+      cities: [...cities].sort(),
+      kinds: [...kinds].sort(),
+      intents: [...intents],
+      priceMin: priceMin === Infinity ? 0 : priceMin,
+      priceMax,
+      bedroomsMax,
+      total: rows.length,
+    });
   })
 );
 

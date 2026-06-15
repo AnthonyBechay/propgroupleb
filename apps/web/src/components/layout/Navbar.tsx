@@ -18,7 +18,9 @@ import {
   Settings,
   Sparkles,
   Shield,
-  LayoutDashboard
+  LayoutDashboard,
+  Calculator,
+  TrendingUp
 } from 'lucide-react'
 
 export function Navbar() {
@@ -81,6 +83,12 @@ export function Navbar() {
               Properties
             </NavLink>
 
+            <NavLink href="/roi-calculator" icon={<Calculator className="w-4 h-4" />} isActive={isActive('/roi-calculator')}>
+              ROI Calculator
+            </NavLink>
+            <NavLink href="/market-analysis" icon={<TrendingUp className="w-4 h-4" />} isActive={isActive('/market-analysis')}>
+              Market
+            </NavLink>
             <NavLink href="/about" icon={<Info className="w-4 h-4" />} isActive={isActive('/about')}>
               About
             </NavLink>
@@ -224,6 +232,22 @@ export function Navbar() {
               Properties
             </MobileNavLink>
 
+            <MobileNavLink
+              href="/roi-calculator"
+              icon={<Calculator className="w-4 h-4" />}
+              isActive={isActive('/roi-calculator')}
+              onClick={() => setIsMenuOpen(false)}
+            >
+              ROI Calculator
+            </MobileNavLink>
+            <MobileNavLink
+              href="/market-analysis"
+              icon={<TrendingUp className="w-4 h-4" />}
+              isActive={isActive('/market-analysis')}
+              onClick={() => setIsMenuOpen(false)}
+            >
+              Market Analysis
+            </MobileNavLink>
             <MobileNavLink
               href="/about"
               icon={<Info className="w-4 h-4" />}

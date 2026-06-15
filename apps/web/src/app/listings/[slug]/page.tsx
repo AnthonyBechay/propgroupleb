@@ -18,11 +18,14 @@ import {
   TreePine,
   FileText,
   Download,
+  TrendingUp,
 } from 'lucide-react'
 import { normalizeApiUrl, normalizeFileUrl } from '@/lib/utils/api-url'
 import { InquiryFormModal } from '@/components/listing/InquiryFormModal'
 import { ListingGallery } from '@/components/listing/ListingGallery'
 import { TrackListingView } from '@/components/analytics/TrackListingView'
+import { ProposalExport } from '@/components/listing/ProposalExport'
+import { FavoriteButton } from '@/components/listing/FavoriteButton'
 import type { Listing } from '@/types'
 import {
   ListingIntent,
@@ -601,19 +604,28 @@ export default async function ListingDetailPage({ params }: PageProps) {
               {unit?.options && unit.options.length > 0 && (
                 <div className="mb-4 space-y-2">
                   <p className="text-sm font-semibold text-slate-700">Available Options</p>
-                  {unit.options.map((opt) => (
-                    <div
-                      key={opt.id}
-                      className="flex items-center justify-between p-2.5 bg-slate-50 rounded-lg"
-                    >
-                      <span className="text-sm text-slate-700">{opt.name}</span>
-                      {opt.askingPrice && (
-                        <span className="text-sm font-semibold text-slate-900">
-                          {formatPrice(opt.askingPrice, opt.askingCurrency ?? Currency.USD)}
-                        </span>
-                      )}
-                    </div>
-                  ))}
+                  {unit.options.map((opt) => {
+                    // Option price = price/m² × area, falling back to a legacy
+                    // asking price; UnitOption has no flat price field.
+                    const optTotal =
+                      opt.pricePerSqm != null && unit.areaSqm
+                        ? opt.pricePerSqm * unit.areaSqm
+                        : opt.askingPrice ?? null
+                    const optCurrency = opt.currency ?? opt.askingCurrency ?? Currency.USD
+                    return (
+                      <div
+                        key={opt.id}
+                        className="flex items-center justify-between p-2.5 bg-slate-50 rounded-lg"
+                      >
+                        <span className="text-sm text-slate-700">{opt.name}</span>
+                        {optTotal != null && (
+                          <span className="text-sm font-semibold text-slate-900">
+                            {formatPrice(optTotal, optCurrency)}
+                          </span>
+                        )}
+                      </div>
+                    )
+                  })}
                 </div>
               )}
 
@@ -622,7 +634,45 @@ export default async function ListingDetailPage({ params }: PageProps) {
                 listingTitle={title}
                 buildingId={building?.id}
               />
+
+              <div className="mt-3 space-y-2">
+                <FavoriteButton listingId={listing.id} className="w-full" />
+                <ProposalExport listing={listing} />
+              </div>
             </div>
+
+            {/* Investment snapshot — appeals to investor clients, ties to the proposal */}
+            {building?.investmentData && (() => {
+              const inv = building.investmentData
+              const metrics = [
+                inv.expectedROI != null ? { label: 'Expected ROI', value: `${inv.expectedROI}%` } : null,
+                inv.rentalYield != null ? { label: 'Rental Yield', value: `${inv.rentalYield}%` } : null,
+                inv.capitalGrowth != null ? { label: 'Capital Growth', value: `${inv.capitalGrowth}%` } : null,
+                inv.annualAppreciation != null ? { label: 'Annual Appreciation', value: `${inv.annualAppreciation}%` } : null,
+              ].filter(Boolean) as { label: string; value: string }[]
+              if (metrics.length === 0) return null
+              return (
+                <div className="bg-white rounded-2xl border border-slate-200 p-5">
+                  <p className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-1.5">
+                    <TrendingUp className="w-4 h-4 text-violet-600" /> Investment snapshot
+                  </p>
+                  <div className="grid grid-cols-2 gap-3">
+                    {metrics.map((m) => (
+                      <div key={m.label} className="rounded-xl bg-slate-50 p-3">
+                        <p className="text-xl font-bold text-slate-900">{m.value}</p>
+                        <p className="text-xs text-slate-500 mt-0.5">{m.label}</p>
+                      </div>
+                    ))}
+                  </div>
+                  {inv.installmentYears != null && (
+                    <p className="text-xs text-slate-500 mt-3">
+                      Payment plan available — up to {inv.installmentYears} year{inv.installmentYears !== 1 ? 's' : ''}
+                      {inv.downPaymentPercentage != null ? `, ${inv.downPaymentPercentage}% down` : ''}.
+                    </p>
+                  )}
+                </div>
+              )
+            })()}
 
             {/* Agent card */}
             {building?.agent && (

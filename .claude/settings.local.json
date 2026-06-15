@@ -375,7 +375,16 @@
       "Bash(sed -n '1,40p' apps/web/src/app/property/\\\\[slug\\\\]/page.tsx)",
       "Bash(sed -n '1,60p' \"apps/web/src/app/\\(admin\\)/admin/analytics/page.tsx\")",
       "Bash(sed -n '1,70p' \"apps/web/src/app/\\(admin\\)/admin/AdminDashboardClient.tsx\")",
-      "Bash(echo \"=== settings route? ===\"; ls apps/web/../backend/src/routes/ 2>/dev/null | grep -i setting; find apps/backend/src -name \"*setting*\"; echo \"=== SystemSetting usage ===\"; grep -rln \"systemSetting\\\\|SystemSetting\\\\|system_settings\" apps/backend/src | head; echo \"=== content route system-setting endpoints ===\"; grep -n \"router\\\\.\\\\\\(get\\\\|put\\\\|post\\\\\\)\\\\|systemSetting\\\\|setting\" apps/backend/src/routes/content.ts | head -20; echo \"=== ConditionalAIAssistantFab ===\"; cat apps/web/src/components/ai/ConditionalAIAssistantFab.tsx 2>/dev/null | head -40)"
+      "Bash(echo \"=== settings route? ===\"; ls apps/web/../backend/src/routes/ 2>/dev/null | grep -i setting; find apps/backend/src -name \"*setting*\"; echo \"=== SystemSetting usage ===\"; grep -rln \"systemSetting\\\\|SystemSetting\\\\|system_settings\" apps/backend/src | head; echo \"=== content route system-setting endpoints ===\"; grep -n \"router\\\\.\\\\\\(get\\\\|put\\\\|post\\\\\\)\\\\|systemSetting\\\\|setting\" apps/backend/src/routes/content.ts | head -20; echo \"=== ConditionalAIAssistantFab ===\"; cat apps/web/src/components/ai/ConditionalAIAssistantFab.tsx 2>/dev/null | head -40)",
+      "Bash(sed -n \"/export interface UnitOption/,/^}/p\" apps/web/src/types/index.ts)",
+      "Bash(sed -n \"/export interface BuildingInvestmentData/,/^}/p\" apps/web/src/types/index.ts)",
+      "Bash(sed -n '1,90p' apps/backend/src/routes/favorites.ts)",
+      "Bash(sed -n '60,140p' apps/web/src/app/portal/favorites/page.tsx)",
+      "Bash(sed -n '1,30p' apps/web/src/app/portal/calculator/page.tsx)",
+      "Bash(sed -n '1,20p' apps/web/src/components/RoiCalculator.tsx)",
+      "Bash(sed -n '1,30p' apps/web/src/app/portal/market-analysis/page.tsx)",
+      "Bash(awk '/^model User /{f=1} f{print NR\": \"$0} /^}/{if\\(f\\)exit}' packages/db/prisma/schema.prisma)",
+      "Bash(awk '/^model Building /{f=1} f{print NR\": \"$0} /^}/{if\\(f\\)exit}' packages/db/prisma/schema.prisma)"
     ],
     "deny": [],
     "ask": []

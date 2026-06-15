@@ -99,6 +99,7 @@ const buildingSchema = z.object({
   developerId: z.string().optional().nullable(),
   locationGuideId: z.string().optional().nullable(),
   agentId: z.string().optional().nullable(),
+  organizationId: z.string().optional().nullable(), // owning PM company / agency
 });
 
 const unitCreateSchema = z.object({

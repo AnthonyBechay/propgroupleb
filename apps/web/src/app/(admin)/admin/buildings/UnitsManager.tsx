@@ -94,10 +94,12 @@ function buildUnitPayload(f: UnitFormState) {
 }
 
 function UnitFormPanel({
-  initial, buildingId, onSave, onCancel, saving,
+  initial, buildingId, unitId, ownerAssigned, onSave, onCancel, saving,
 }: {
   initial: UnitFormState
   buildingId: string
+  unitId?: string
+  ownerAssigned?: boolean
   onSave: (f: UnitFormState) => void
   onCancel: () => void
   saving: boolean
@@ -106,6 +108,36 @@ function UnitFormPanel({
   const set = (k: keyof UnitFormState, v: string) => setF(p => ({ ...p, [k]: v }))
   const inp = 'w-full px-3 py-2 border border-zinc-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-sky-600/15 focus:border-sky-500 bg-white'
   const lbl = 'block text-xs font-medium text-zinc-600 mb-1'
+
+  // Admin: assign this unit to a registered user (by email) — shows in their portal.
+  // (apiUrl is already declared above for image uploads.)
+  const [assignEmail, setAssignEmail] = useState('')
+  const [assignBusy, setAssignBusy] = useState(false)
+  const [assignMsg, setAssignMsg] = useState<{ ok: boolean; text: string } | null>(null)
+  const [assigned, setAssigned] = useState(!!ownerAssigned)
+
+  async function assignOwner(clear = false) {
+    if (!unitId) return
+    setAssignBusy(true)
+    setAssignMsg(null)
+    try {
+      const res = await fetch(`${apiUrl}/api/units/${unitId}/assign-owner`, {
+        method: 'PUT',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: clear ? null : assignEmail.trim() }),
+      })
+      const d = await res.json().catch(() => ({}))
+      if (!res.ok) { setAssignMsg({ ok: false, text: d.message || 'Failed' }); return }
+      setAssigned(!clear)
+      if (clear) setAssignEmail('')
+      setAssignMsg({ ok: true, text: d.message || (clear ? 'Owner cleared' : 'Assigned') })
+    } catch {
+      setAssignMsg({ ok: false, text: 'Network error' })
+    } finally {
+      setAssignBusy(false)
+    }
+  }
 
   // ── Image upload state ───────────────────────────────────────────────────────
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -267,6 +299,41 @@ function UnitFormPanel({
           onChange={e => { if (e.target.files?.length) uploadImages(e.target.files); e.target.value = '' }}
         />
       </div>
+
+      {/* Assign to a user (admin) — only for existing units */}
+      {unitId && (
+        <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-3">
+          <p className="text-xs font-semibold text-zinc-600 mb-1.5">
+            Assign to user {assigned && <span className="text-emerald-600">· currently assigned</span>}
+          </p>
+          <div className="flex items-center gap-2">
+            <input
+              type="email"
+              value={assignEmail}
+              onChange={(e) => setAssignEmail(e.target.value)}
+              placeholder="owner@email.com"
+              className={inp + ' flex-1'}
+            />
+            <button
+              type="button"
+              onClick={() => assignOwner(false)}
+              disabled={assignBusy || !assignEmail.trim()}
+              className="px-3 py-2 text-sm font-medium text-white bg-sky-600 hover:bg-sky-700 rounded-lg disabled:opacity-50 flex items-center gap-1.5"
+            >
+              {assignBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null} Assign
+            </button>
+            {assigned && (
+              <button type="button" onClick={() => assignOwner(true)} disabled={assignBusy} className="px-3 py-2 text-sm text-zinc-600 hover:text-red-600 disabled:opacity-50">
+                Clear
+              </button>
+            )}
+          </div>
+          {assignMsg && (
+            <p className={`text-xs mt-1.5 ${assignMsg.ok ? 'text-emerald-600' : 'text-red-600'}`}>{assignMsg.text}</p>
+          )}
+          <p className="text-[11px] text-zinc-400 mt-1">The unit will appear in that user’s portal. Works for any registered user (Google or email).</p>
+        </div>
+      )}
 
       <div className="flex items-center justify-end gap-2 pt-1">
         <button type="button" onClick={onCancel} className="px-4 py-1.5 text-sm text-zinc-600 hover:text-zinc-900 transition-colors">
@@ -1118,6 +1185,8 @@ export function UnitsManager({ buildingId }: { buildingId: string }) {
                         images:     unit.images ?? [],
                       }}
                       buildingId={buildingId}
+                      unitId={unit.id}
+                      ownerAssigned={!!unit.ownerUserId}
                       onSave={f => handleUpdateUnit(unit.id, f)}
                       onCancel={() => setExpanded(null)}
                       saving={saving}

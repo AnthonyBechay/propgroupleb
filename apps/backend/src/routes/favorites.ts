@@ -3,10 +3,12 @@ import { prisma } from '@propgroup/db';
 import { authenticateToken } from '../middleware/auth.js';
 import { asyncHandler } from '../utils/errors.js';
 import { sendSuccess, sendCreated, sendNotFound } from '../utils/response.js';
+import { LISTING_CARD_INCLUDE } from '../utils/prisma-includes.js';
 import type { AuthenticatedRequest } from '../types/index.js';
 
 const router: Router = express.Router();
 
+// Narrow shape kept for the add/toggle responses (no need for full card data there).
 const LISTING_SELECT = {
   id: true,
   headline: true,
@@ -16,7 +18,8 @@ const LISTING_SELECT = {
   slug: true,
 } as const;
 
-// Get user's favorite listings
+// Get user's favorite listings — full card shape so the saved-properties page
+// can render the same ListingCard as the catalog (images, location, specs).
 router.get(
   '/',
   authenticateToken,
@@ -24,14 +27,16 @@ router.get(
     const authReq = req as AuthenticatedRequest;
 
     const favorites = await prisma.favoriteProperty.findMany({
-      where: { userId: authReq.user.id },
+      where: { userId: authReq.user.id, listingId: { not: null } },
       include: {
-        listing: { select: LISTING_SELECT },
+        listing: { include: LISTING_CARD_INCLUDE },
       },
       orderBy: { createdAt: 'desc' },
     });
 
-    sendSuccess(res, favorites);
+    // Return the listings directly (filter out any whose listing was deleted).
+    const listings = favorites.map((f) => f.listing).filter(Boolean);
+    sendSuccess(res, listings);
   })
 );
 

@@ -413,6 +413,8 @@ model User {
   invitedUsers         User[]                @relation("InvitedByAdmin")
   invitedByAdmin       User?                 @relation("InvitedByAdmin", fields: [invitedBy], references: [id])
   managedBuildings     Building[]            @relation("BuildingAgent")
+  orgMemberships       OrganizationMember[]
+  assignedTickets      MaintenanceTicket[]   @relation("TicketTechnician")
 
   @@index([role])
   @@index([isActive])
@@ -537,11 +539,13 @@ model Building {
   developerId     String?
   locationGuideId String?
   agentId         String?
+  organizationId  String? // owning org (PM company / agency) — null = managed by the platform directly
 
   // Relations
   developer     Developer?     @relation(fields: [developerId], references: [id])
   locationGuide LocationGuide? @relation(fields: [locationGuideId], references: [id])
   agent         User?          @relation("BuildingAgent", fields: [agentId], references: [id])
+  organization  Organization?  @relation(fields: [organizationId], references: [id])
 
   units            Unit[]
   listings         Listing[]
@@ -570,6 +574,7 @@ model Building {
   @@index([featured])
   @@index([slug])
   @@index([agentId])
+  @@index([organizationId])
   @@index([createdAt])
   @@map("buildings")
 }
@@ -1332,17 +1337,19 @@ model MaintenanceTicket {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  building Building            @relation(fields: [buildingId], references: [id], onDelete: Cascade)
-  unit     Unit?               @relation(fields: [unitId], references: [id], onDelete: SetNull)
-  vendor   Vendor?             @relation(fields: [vendorId], references: [id], onDelete: SetNull)
-  photos   TicketPhoto[]
-  updates  TicketUpdate[]
+  building   Building          @relation(fields: [buildingId], references: [id], onDelete: Cascade)
+  unit       Unit?             @relation(fields: [unitId], references: [id], onDelete: SetNull)
+  vendor     Vendor?           @relation(fields: [vendorId], references: [id], onDelete: SetNull)
+  assignedTo User?             @relation("TicketTechnician", fields: [assignedToUserId], references: [id], onDelete: SetNull)
+  photos     TicketPhoto[]
+  updates    TicketUpdate[]
 
   @@index([buildingId])
   @@index([unitId])
   @@index([status])
   @@index([priority])
   @@index([category])
+  @@index([assignedToUserId])
   @@index([createdAt])
   @@map("maintenance_tickets")
 }
@@ -1699,6 +1706,74 @@ model ShareToken {
   @@index([unitId])
   @@index([unitOptionId])
   @@map("share_tokens")
+}
+
+// ============================================
+// ORGANIZATIONS — multi-tenant property management
+// ============================================
+// PropGroup itself is an AGENCY org; property-management companies are PM_COMPANY
+// orgs created by a super admin. Buildings belong to an org (Building.organizationId);
+// org members only see their org's data. Members carry an org-scoped role.
+
+enum OrgType {
+  AGENCY     // the platform operator (real-estate sell/rent side)
+  PM_COMPANY // a property-management company operating under PropGroup
+}
+
+enum OrgRole {
+  OWNER      // full control of the org
+  ADMIN      // manage members, buildings, tickets
+  MANAGER    // day-to-day property management
+  TECHNICIAN // assigned maintenance work only
+}
+
+model Organization {
+  id          String   @id @default(cuid())
+  name        String
+  slug        String   @unique
+  type        OrgType  @default(PM_COMPANY)
+  isActive    Boolean  @default(true)
+
+  // Contact / branding
+  email       String?
+  phone       String?
+  logoUrl     String?
+  description String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  createdBy String? // super admin who created it
+
+  members   OrganizationMember[]
+  buildings Building[]
+
+  @@index([type])
+  @@index([isActive])
+  @@map("organizations")
+}
+
+model OrganizationMember {
+  id             String   @id @default(cuid())
+  organizationId String
+  userId         String
+  role           OrgRole  @default(MANAGER)
+
+  // Technician profile fields (used when role = TECHNICIAN)
+  title       String? // e.g. "Plumber", "Electrician"
+  phone       String?
+  isActive    Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, userId])
+  @@index([organizationId])
+  @@index([userId])
+  @@index([role])
+  @@map("organization_members")
 }
 
 // ============================================

@@ -6,6 +6,7 @@ import { asyncHandler } from '../utils/errors.js';
 import { sendSuccess, sendCreated, sendPaginated, sendNotFound } from '../utils/response.js';
 import { parsePagination, buildPaginationResponse } from '../utils/pagination.js';
 import { ticketSchema, ticketUpdateSchema } from '../schemas/index.js';
+import { getOrgScope } from '../utils/org-scope.js';
 import type { AuthenticatedRequest } from '../types/index.js';
 
 const router: Router = express.Router();
@@ -39,10 +40,13 @@ router.get(
   asyncHandler(async (req: Request, res: Response) => {
     const { page, limit, skip } = parsePagination(req.query as Record<string, string>);
     const { buildingId, unitId, status, priority, category, scope } = req.query as Record<string, string>;
+    const orgScope = await getOrgScope((req as AuthenticatedRequest).user);
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const where: Record<string, any> = {};
-    if (buildingId) where.buildingId = buildingId;
+    // Org isolation: scoped users only see tickets on their org's buildings.
+    if (!orgScope.all) where.buildingId = { in: orgScope.buildingIds };
+    if (buildingId && (orgScope.all || orgScope.buildingIds.includes(buildingId))) where.buildingId = buildingId;
     if (unitId) where.unitId = unitId;
     if (status) where.status = status;
     if (priority) where.priority = priority;
@@ -73,6 +77,33 @@ router.get(
       prisma.maintenanceTicket.count({ where }),
     ]);
 
+    sendPaginated(res, tickets, buildPaginationResponse(page, limit, total));
+  })
+);
+
+// ── GET /assigned-to-me — a technician's own assigned jobs ────────────────────
+// Any authenticated user (technicians may be plain users) — only ever returns
+// tickets assigned to them, so no org guard is needed.
+router.get(
+  '/assigned-to-me',
+  authenticateToken,
+  asyncHandler(async (req: Request, res: Response) => {
+    const authReq = req as AuthenticatedRequest;
+    const { page, limit, skip } = parsePagination(req.query as Record<string, string>);
+    const where = { assignedToUserId: authReq.user.id };
+    const [tickets, total] = await Promise.all([
+      prisma.maintenanceTicket.findMany({
+        where,
+        include: {
+          building: { select: { id: true, title: true, slug: true } },
+          unit: { select: { id: true, unitNumber: true, kind: true, name: true } },
+        },
+        orderBy: [{ priority: 'desc' as const }, { createdAt: 'desc' as const }],
+        skip,
+        take: limit,
+      }),
+      prisma.maintenanceTicket.count({ where }),
+    ]);
     sendPaginated(res, tickets, buildPaginationResponse(page, limit, total));
   })
 );

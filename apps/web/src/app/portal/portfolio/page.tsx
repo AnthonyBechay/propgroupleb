@@ -11,6 +11,7 @@ export default async function PortfolioPage() {
   // Note: auth is handled by the portal layout, but we still try to get the user
   // for the portfolio display. Return an empty portfolio if unauthenticated.
   let favorites: any[] = []
+  let ownedUnits: any[] = []
   try {
     const cookieStore = await cookies()
     // Build a minimal NextRequest-like object to reuse verifyAuth
@@ -34,11 +35,39 @@ export default async function PortfolioPage() {
           },
           orderBy: { createdAt: 'desc' },
         })
+
+        // Units an admin has assigned to this user (real owned properties).
+        ownedUnits = await prisma.unit.findMany({
+          where: { ownerUserId: authResult.user.id },
+          include: {
+            building: { select: { id: true, title: true, city: true, mohafazat: true, status: true } },
+          },
+          orderBy: { updatedAt: 'desc' },
+        })
       }
     }
   } catch { /* layout handles auth redirect */ }
 
-  const portfolio = favorites.map((fav: any) => {
+  const ownedEntries = ownedUnits.map((u: any) => {
+    const price = u.soldPrice != null ? Number(u.soldPrice) : u.askingPrice != null ? Number(u.askingPrice) : 0
+    return {
+      id: `unit-${u.id}`,
+      customName: u.name || (u.unitNumber ? `Unit ${u.unitNumber}` : u.building?.title) || 'My Property',
+      propertyId: u.id,
+      purchasePrice: price,
+      currentValue: price,
+      purchaseDate: (u.soldAt ? new Date(u.soldAt) : new Date(u.updatedAt)).toISOString().split('T')[0],
+      location: [u.building?.city, u.building?.mohafazat].filter(Boolean).join(', ') || 'Lebanon',
+      currentRent: u.rentAmount != null ? Number(u.rentAmount) : 0,
+      monthlyExpenses: 0,
+      roi: 0,
+      appreciation: 0,
+      type: 'Owned Unit',
+      status: u.lifecycle === 'RENTED' ? 'Rented' : u.lifecycle === 'SOLD' ? 'Owned' : 'Available',
+    }
+  })
+
+  const favEntries = favorites.map((fav: any) => {
     const listing = fav.listing
     const building = listing?.building ?? fav.building
     const title = listing?.headline ?? building?.title ?? 'Saved Property'
@@ -59,6 +88,8 @@ export default async function PortfolioPage() {
       status: building?.status === 'OFF_PLAN' ? 'Under Construction' : 'Available',
     }
   })
+
+  const portfolio = [...ownedEntries, ...favEntries]
 
   return <PortfolioClient initialPortfolio={portfolio} />
 }

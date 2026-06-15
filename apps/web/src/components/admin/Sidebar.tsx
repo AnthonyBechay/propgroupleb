@@ -21,6 +21,7 @@ import {
   ListFilter,
   DollarSign,
   HardHat,
+  Briefcase,
 } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 
@@ -36,6 +37,9 @@ export function Sidebar() {
     { name: 'Inquiries', href: '/admin/inquiries', icon: MessageSquare },
     { name: 'Contact Messages', href: '/admin/contacts', icon: Inbox },
     { name: 'User Management', href: '/admin/users', icon: Users },
+    ...(user?.role === 'SUPER_ADMIN'
+      ? [{ name: 'Organizations', href: '/admin/organizations', icon: Briefcase }]
+      : []),
     { name: 'Analytics', href: '/admin/analytics', icon: BarChart3 },
     { name: 'AI Settings', href: '/admin/ai-settings', icon: Bot },
     { name: 'Documents', href: '/admin/documents', icon: FileText },
