@@ -7,6 +7,7 @@ import { sendSuccess, sendCreated, sendPaginated, sendNotFound, sendError } from
 import { parsePagination, buildPaginationResponse } from '../utils/pagination.js';
 import { allocateBill } from '../services/billing/allocate.js';
 import { meterSchema, meterReadingSchema, utilityBillSchema, billAllocationSchema } from '../schemas/index.js';
+import { getOrgScope } from '../utils/org-scope.js';
 import type { AuthenticatedRequest } from '../types/index.js';
 
 const router: Router = express.Router();
@@ -23,10 +24,12 @@ router.get(
   requirePropertyManager,
   asyncHandler(async (req: Request, res: Response) => {
     const { buildingId, unitId, kind, isActive } = req.query as Record<string, string>;
+    const scope = await getOrgScope((req as AuthenticatedRequest).user);
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const where: Record<string, any> = {};
-    if (buildingId) where.buildingId = buildingId;
+    if (!scope.all) where.buildingId = { in: scope.buildingIds };
+    if (buildingId && (scope.all || scope.buildingIds.includes(buildingId))) where.buildingId = buildingId;
     if (unitId) where.unitId = unitId;
     if (kind) where.kind = kind;
     where.isActive = isActive !== undefined ? isActive === 'true' : true;

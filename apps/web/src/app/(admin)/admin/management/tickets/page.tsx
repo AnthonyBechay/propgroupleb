@@ -13,7 +13,10 @@ import {
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { apiClient } from '@/lib/api/client'
+import { normalizeApiUrl } from '@/lib/utils/api-url'
 import type { MaintenanceTicket } from '@/types'
+
+interface Technician { id: string; name: string; title?: string | null }
 
 const PRIORITY_COLORS: Record<string, string> = {
   EMERGENCY: 'bg-red-100 text-red-700',
@@ -57,6 +60,35 @@ export default function TicketsPage() {
   const [showNew, setShowNew] = useState(false)
   const [form, setForm] = useState(EMPTY_FORM)
   const [saving, setSaving] = useState(false)
+  const [technicians, setTechnicians] = useState<Technician[]>([])
+
+  // Load the caller's org technicians for the assignment dropdown.
+  useEffect(() => {
+    const apiUrl = normalizeApiUrl(process.env.NEXT_PUBLIC_API_URL || '')
+    ;(async () => {
+      try {
+        const mineRes = await fetch(`${apiUrl}/api/organizations/mine`, { credentials: 'include' })
+        if (!mineRes.ok) return
+        const mine = await mineRes.json()
+        const memberships = mine.data ?? mine ?? []
+        const orgId = memberships[0]?.organizationId || memberships[0]?.organization?.id
+        if (!orgId) return
+        const orgRes = await fetch(`${apiUrl}/api/organizations/${orgId}`, { credentials: 'include' })
+        if (!orgRes.ok) return
+        const org = await orgRes.json()
+        const members = (org.data ?? org).members ?? []
+        setTechnicians(
+          members
+            .filter((m: any) => m.role === 'TECHNICIAN' && m.isActive)
+            .map((m: any) => ({
+              id: m.user.id,
+              name: m.user.firstName || m.user.lastName ? `${m.user.firstName ?? ''} ${m.user.lastName ?? ''}`.trim() : m.user.email,
+              title: m.title,
+            }))
+        )
+      } catch { /* no org / not a PM — leave empty */ }
+    })()
+  }, [])
 
   const load = useCallback(() => {
     setLoading(true)
@@ -97,6 +129,15 @@ export default function TicketsPage() {
       load()
     } catch (e: any) {
       alert(e.message || 'Failed')
+    }
+  }
+
+  async function handleAssign(id: string, userId: string) {
+    try {
+      await apiClient.updateTicket(id, { assignedToUserId: userId === 'unassigned' ? null : userId } as any)
+      load()
+    } catch (e: any) {
+      alert(e.message || 'Failed to assign')
     }
   }
 
@@ -159,6 +200,9 @@ export default function TicketsPage() {
                 <th className="text-left px-4 py-3 font-medium text-slate-600">Category</th>
                 <th className="text-left px-4 py-3 font-medium text-slate-600">Priority</th>
                 <th className="text-left px-4 py-3 font-medium text-slate-600">Status</th>
+                {technicians.length > 0 && (
+                  <th className="text-left px-4 py-3 font-medium text-slate-600">Technician</th>
+                )}
                 <th className="text-left px-4 py-3 font-medium text-slate-600">Reported</th>
                 <th className="text-right px-4 py-3 font-medium text-slate-600">Actions</th>
               </tr>
@@ -211,6 +255,23 @@ export default function TicketsPage() {
                         </SelectContent>
                       </Select>
                     </td>
+                    {technicians.length > 0 && (
+                      <td className="px-4 py-3">
+                        <Select value={(t as any).assignedToUserId ?? 'unassigned'} onValueChange={v => handleAssign(t.id, v)}>
+                          <SelectTrigger className="h-7 w-[150px] text-xs">
+                            <SelectValue placeholder="Unassigned" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="unassigned">Unassigned</SelectItem>
+                            {technicians.map(tech => (
+                              <SelectItem key={tech.id} value={tech.id}>
+                                {tech.name}{tech.title ? ` · ${tech.title}` : ''}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </td>
+                    )}
                     <td className="px-4 py-3 text-xs text-slate-400">
                       {t.createdAt ? new Date(t.createdAt).toLocaleDateString() : '—'}
                     </td>

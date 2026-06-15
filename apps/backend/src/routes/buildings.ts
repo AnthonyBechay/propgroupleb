@@ -8,6 +8,7 @@ import { sendSuccess, sendCreated, sendPaginated, sendNotFound } from '../utils/
 import { parsePagination, buildPaginationResponse } from '../utils/pagination.js';
 import { BUILDING_LIST_INCLUDE, BUILDING_DETAIL_INCLUDE } from '../utils/prisma-includes.js';
 import { deleteFile, extractKeyFromUrl } from '../services/upload.service.js';
+import { getOrgScope } from '../utils/org-scope.js';
 import type { AuthenticatedRequest } from '../types/index.js';
 
 /** Best-effort delete a batch of file URLs from R2. Failures are logged but do not throw. */
@@ -128,10 +129,11 @@ const unitCreateSchema = z.object({
   views: z.array(z.string()).optional(),
 });
 
-// ── GET / — public list ───────────────────────────────────────────────────────
+// ── GET / — public list (org-scoped for authenticated PM members) ─────────────
 
 router.get(
   '/',
+  optionalAuthenticateToken,
   asyncHandler(async (req: Request, res: Response) => {
     const { page, limit, skip } = parsePagination(req.query as Record<string, string>);
 
@@ -139,6 +141,14 @@ router.get(
     const where: Record<string, any> = {};
 
     const { kind, mohafazat, caza, city, status, featured, search, visibility } = req.query as Record<string, string>;
+
+    // Org isolation: an authenticated PM-company member only sees their org's
+    // buildings here. Anonymous/public callers and platform staff are unaffected.
+    const authUser = (req as AuthenticatedRequest).user;
+    if (authUser) {
+      const scope = await getOrgScope(authUser);
+      if (!scope.all) where.organizationId = { in: scope.orgIds.length ? scope.orgIds : ['__none__'] };
+    }
 
     // Default to PUBLIC unless admin passes visibility=all
     if (visibility && visibility !== 'all') {
@@ -259,21 +269,35 @@ router.get(
   })
 );
 
-// ── POST / — create building (admin) ─────────────────────────────────────────
+// ── POST / — create building (admin or PM-company member) ─────────────────────
 
 router.post(
   '/',
   authenticateToken,
-  requireAdmin,
+  requirePropertyManager,
   asyncHandler(async (req: Request, res: Response) => {
     const authReq = req as AuthenticatedRequest;
     const data = buildingSchema.parse(req.body);
+
+    // Org members (PM companies) can only create buildings inside their own org;
+    // force organizationId to their org regardless of any value posted. Platform
+    // staff may set it freely (via the form's "Managed by" selector).
+    const scope = await getOrgScope(authReq.user);
+    let organizationId = data.organizationId ?? null;
+    if (!scope.all) {
+      organizationId = scope.orgIds[0] ?? null;
+      if (!organizationId) {
+        sendSuccess(res, null, 'You are not a member of any organization');
+        return;
+      }
+    }
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const result = await prisma.$transaction(async (tx: any) => {
       const slug = data.slug || (await generateUniqueSlug(data.title, undefined, tx));
       const createData = {
         ...data,
+        organizationId,
         slug,
         images: data.images ?? [],
         youtubeUrls: data.youtubeUrls ?? [],

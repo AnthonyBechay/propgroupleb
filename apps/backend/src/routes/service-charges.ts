@@ -7,6 +7,7 @@ import { asyncHandler } from '../utils/errors.js';
 import { sendSuccess, sendCreated, sendPaginated, sendNotFound, sendError } from '../utils/response.js';
 import { parsePagination, buildPaginationResponse } from '../utils/pagination.js';
 import { serviceChargeSchema } from '../schemas/index.js';
+import { getOrgScope } from '../utils/org-scope.js';
 import type { AuthenticatedRequest } from '../types/index.js';
 
 const router: Router = express.Router();
@@ -24,10 +25,12 @@ router.get(
   asyncHandler(async (req: Request, res: Response) => {
     const { page, limit, skip } = parsePagination(req.query as Record<string, string>);
     const { buildingId, isActive } = req.query as Record<string, string>;
+    const scope = await getOrgScope((req as AuthenticatedRequest).user);
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const where: Record<string, any> = {};
-    if (buildingId) where.buildingId = buildingId;
+    if (!scope.all) where.buildingId = { in: scope.buildingIds };
+    if (buildingId && (scope.all || scope.buildingIds.includes(buildingId))) where.buildingId = buildingId;
     if (isActive !== undefined) where.isActive = isActive === 'true';
 
     const [charges, total] = await Promise.all([

@@ -50,6 +50,7 @@ export function Sidebar() {
     { name: 'PM Dashboard', href: '/admin/management', icon: Home },
     { name: 'Tenancies', href: '/admin/management/tenancies', icon: DollarSign },
     { name: 'Maintenance', href: '/admin/management/tickets', icon: Wrench },
+    { name: 'My Jobs', href: '/admin/management/my-jobs', icon: Wrench },
     { name: 'Utilities', href: '/admin/management/utilities', icon: Zap },
     { name: 'Service Charges', href: '/admin/management/service-charges', icon: HardHat },
     { name: 'Vendors', href: '/admin/management/vendors', icon: HardHat },

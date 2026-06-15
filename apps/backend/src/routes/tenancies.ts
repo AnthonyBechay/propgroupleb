@@ -6,6 +6,7 @@ import { asyncHandler } from '../utils/errors.js';
 import { sendSuccess, sendCreated, sendPaginated, sendNotFound, sendError } from '../utils/response.js';
 import { parsePagination, buildPaginationResponse } from '../utils/pagination.js';
 import { tenancySchema, rentPaymentSchema } from '../schemas/index.js';
+import { getOrgScope } from '../utils/org-scope.js';
 import type { AuthenticatedRequest } from '../types/index.js';
 
 const router: Router = express.Router();
@@ -48,12 +49,15 @@ router.get(
   asyncHandler(async (req: Request, res: Response) => {
     const { page, limit, skip } = parsePagination(req.query as Record<string, string>);
     const { unitId, buildingId, status } = req.query as Record<string, string>;
+    const scope = await getOrgScope((req as AuthenticatedRequest).user);
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const where: Record<string, any> = {};
     if (unitId) where.unitId = unitId;
     if (status) where.status = status;
-    if (buildingId) where.unit = { buildingId };
+    // Org isolation: scope tenancies to the caller's org buildings (via unit→building).
+    if (!scope.all) where.unit = { buildingId: { in: scope.buildingIds } };
+    if (buildingId && (scope.all || scope.buildingIds.includes(buildingId))) where.unit = { buildingId };
 
     const [tenancies, total] = await Promise.all([
       prisma.tenancy.findMany({
