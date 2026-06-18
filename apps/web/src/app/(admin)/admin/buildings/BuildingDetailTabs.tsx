@@ -76,7 +76,7 @@ export function BuildingDetailTabs({ building, buildingId }: Props) {
           <BuildingForm initialData={building} buildingId={buildingId} embedded />
         )}
         {tab === 'units' && (
-          <UnitsManager buildingId={buildingId} />
+          <UnitsManager buildingId={buildingId} buildingImages={building?.images ?? []} />
         )}
       </div>
     </div>

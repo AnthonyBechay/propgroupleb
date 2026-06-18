@@ -94,10 +94,11 @@ function buildUnitPayload(f: UnitFormState) {
 }
 
 function UnitFormPanel({
-  initial, buildingId, unitId, ownerAssigned, onSave, onCancel, saving,
+  initial, buildingId, buildingImages = [], unitId, ownerAssigned, onSave, onCancel, saving,
 }: {
   initial: UnitFormState
   buildingId: string
+  buildingImages?: string[]
   unitId?: string
   ownerAssigned?: boolean
   onSave: (f: UnitFormState) => void
@@ -187,7 +188,26 @@ function UnitFormPanel({
         </div>
       </div>
 
-      <p className="text-xs text-zinc-400">Photos are managed on the property (building), shared across its units.</p>
+      {/* Read-only property photos preview — managed on the property, shared across units */}
+      <div>
+        <label className={lbl}>Property photos</label>
+        {buildingImages.length > 0 ? (
+          <>
+            <div className="grid grid-cols-4 sm:grid-cols-6 gap-2">
+              {buildingImages.slice(0, 12).map((url, i) => (
+                <div key={i} className="relative aspect-square">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={normalizeFileUrl(url)} alt="" className="w-full h-full object-cover rounded-lg border border-zinc-200" />
+                  {i === 0 && <span className="absolute top-1 left-1 text-[9px] bg-zinc-800 text-white px-1.5 py-0.5 rounded font-medium">Cover</span>}
+                </div>
+              ))}
+            </div>
+            <p className="text-xs text-zinc-400 mt-1.5">Managed on the property (Details tab) — shared across all its units.</p>
+          </>
+        ) : (
+          <p className="text-xs text-zinc-400">No photos yet. Add them on the property’s Details tab — they’re shared across all units.</p>
+        )}
+      </div>
 
       {/* Assign to a user (admin) — only for existing units */}
       {unitId && (
@@ -729,7 +749,7 @@ function ListingEditPanel({
 
 type PanelMode = 'unit-edit' | 'listing-create' | 'listing-edit'
 
-export function UnitsManager({ buildingId }: { buildingId: string }) {
+export function UnitsManager({ buildingId, buildingImages = [] }: { buildingId: string; buildingImages?: string[] }) {
   const apiUrl = normalizeApiUrl(process.env.NEXT_PUBLIC_API_URL || '')
 
   const [units, setUnits]     = useState<any[]>([])
@@ -908,6 +928,7 @@ export function UnitsManager({ buildingId }: { buildingId: string }) {
         <UnitFormPanel
           initial={EMPTY_UNIT}
           buildingId={buildingId}
+          buildingImages={buildingImages}
           onSave={handleCreateUnit}
           onCancel={() => setShowAddUnit(false)}
           saving={saving}
@@ -1074,6 +1095,7 @@ export function UnitsManager({ buildingId }: { buildingId: string }) {
                         images:     unit.images ?? [],
                       }}
                       buildingId={buildingId}
+                      buildingImages={buildingImages}
                       unitId={unit.id}
                       ownerAssigned={!!unit.ownerUserId}
                       onSave={f => handleUpdateUnit(unit.id, f)}
