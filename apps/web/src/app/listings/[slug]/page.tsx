@@ -585,6 +585,11 @@ export default async function ListingDetailPage({ params }: PageProps) {
                       /{listing.rentPeriod.toLowerCase()}
                     </span>
                   )}
+                  {listing.negotiable && (
+                    <span className="ml-2 align-middle text-xs font-medium text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full">
+                      Negotiable
+                    </span>
+                  )}
                 </p>
                 {listing.currency === Currency.USD &&
                   listing.subjectType === 'UNIT' &&

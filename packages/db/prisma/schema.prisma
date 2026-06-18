@@ -763,6 +763,7 @@ model Listing {
   price      Decimal
   currency   Currency @default(USD)
   rentPeriod RentPeriod? // only for FOR_RENT
+  negotiable Boolean    @default(false) // price is negotiable
 
   // Marketing
   slug        String   @unique

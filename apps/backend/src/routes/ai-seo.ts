@@ -22,7 +22,9 @@ const SEO_MODEL = 'claude-haiku-4-5-20251001';
 
 const generateSchema = z.object({
   type: z.enum(['building', 'unit']),
-  id: z.string().min(1),
+  id: z.string().min(1).optional(),
+  // For the create flow (no saved id yet): generate from posted form attributes.
+  attributes: z.record(z.unknown()).optional(),
 });
 
 const MOHAFAZAT_LABELS: Record<string, string> = {
@@ -105,7 +107,7 @@ router.post(
   requireAdmin,
   asyncHandler(async (req: Request, res: Response) => {
     const authReq = req as AuthenticatedRequest;
-    const { type, id } = generateSchema.parse(req.body);
+    const { type, id, attributes } = generateSchema.parse(req.body);
 
     const client = getAnthropic();
     if (!client) {
@@ -117,9 +119,17 @@ router.post(
     let instructions: string;
 
     if (type === 'building') {
-      const b = await prisma.building.findUnique({ where: { id } });
-      if (!b) { sendError(res, 404, 'Building not found'); return; }
-      facts = buildingFacts(b as unknown as Record<string, unknown>);
+      // Either a saved building (id) or live form attributes (create flow).
+      let b: Record<string, unknown> | null = null;
+      if (id) {
+        b = (await prisma.building.findUnique({ where: { id } })) as unknown as Record<string, unknown> | null;
+        if (!b) { sendError(res, 404, 'Building not found'); return; }
+      } else if (attributes && Object.keys(attributes).length > 0) {
+        b = attributes;
+      } else {
+        sendError(res, 400, 'Provide an id or attributes to generate from'); return;
+      }
+      facts = buildingFacts(b);
       instructions = `Write SEO metadata for this real-estate BUILDING/PROJECT page on a Lebanese property platform.
 Return ONLY JSON with exactly these keys:
 {
@@ -128,6 +138,7 @@ Return ONLY JSON with exactly these keys:
   "shortDescription": "<=120 chars, a punchy one-liner for listing cards"
 }`;
     } else {
+      if (!id) { sendError(res, 400, 'Unit id is required'); return; }
       const u = await prisma.unit.findUnique({ where: { id }, include: { building: true } });
       if (!u) { sendError(res, 404, 'Unit not found'); return; }
       if (!u.building) { sendError(res, 400, 'Unit has no building'); return; }
@@ -186,7 +197,7 @@ Rules: be accurate to the facts (never invent amenities, prices or sizes), write
         };
       }
 
-      await logAdminAction('AI_GENERATE_SEO', type, id, { type }, authReq);
+      await logAdminAction('AI_GENERATE_SEO', type, id ?? 'draft', { type }, authReq);
       sendSuccess(res, result, 'SEO suggestions generated');
     } catch (err) {
       logger.error('AI SEO generation failed', err);

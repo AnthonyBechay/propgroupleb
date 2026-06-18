@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, Upload, X, Loader2, Building2, Image as ImageIcon, Plus, CheckCircle, Sparkles } from 'lucide-react'
+import { ArrowLeft, Upload, X, Loader2, Building2, Image as ImageIcon, Plus, CheckCircle, Sparkles, Star } from 'lucide-react'
 import Link from 'next/link'
 import { normalizeApiUrl, normalizeFileUrl } from '@/lib/utils/api-url'
 
@@ -407,14 +407,6 @@ export function BuildingForm({ initialData, buildingId, embedded }: Props) {
               <label className={labelCls}>Street Address</label>
               <input type="text" value={form.address} onChange={e => setField('address', e.target.value)} className={inputCls} placeholder="Full street address" />
             </div>
-            <div>
-              <label className={labelCls}>Latitude</label>
-              <input type="number" step="any" value={form.latitude} onChange={e => setField('latitude', e.target.value)} className={inputCls} placeholder="e.g., 33.8938" />
-            </div>
-            <div>
-              <label className={labelCls}>Longitude</label>
-              <input type="number" step="any" value={form.longitude} onChange={e => setField('longitude', e.target.value)} className={inputCls} placeholder="e.g., 35.5018" />
-            </div>
             <div className="sm:col-span-2">
               <label className={labelCls}>Google Maps URL</label>
               <input type="url" value={form.locationUrl} onChange={e => setField('locationUrl', e.target.value)} className={inputCls} placeholder="https://maps.google.com/..." />
@@ -501,8 +493,17 @@ export function BuildingForm({ initialData, buildingId, embedded }: Props) {
               {form.images.map((url: string, i: number) => (
                 <div key={i} className="relative group aspect-square">
                   <img src={normalizeFileUrl(url)} alt="" className="w-full h-full object-cover rounded-lg" />
-                  {i === 0 && (
+                  {i === 0 ? (
                     <span className="absolute top-1 left-1 text-[10px] bg-slate-800 text-white px-1.5 py-0.5 rounded font-medium">Cover</span>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setField('images', [form.images[i], ...form.images.filter((_: string, idx: number) => idx !== i)])}
+                      title="Set as cover"
+                      className="absolute top-1 left-1 p-0.5 bg-white/90 text-slate-700 rounded opacity-0 group-hover:opacity-100 hover:bg-white"
+                    >
+                      <Star className="h-3 w-3" />
+                    </button>
                   )}
                   {deletingIdx === i && (
                     <div className="absolute inset-0 bg-black/50 rounded-lg flex items-center justify-center">

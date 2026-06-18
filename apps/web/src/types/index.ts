@@ -469,6 +469,7 @@ export interface Listing {
   price: number;
   currency: Currency;
   rentPeriod?: RentPeriod | null;
+  negotiable?: boolean | null;
   slug: string;
   headline?: string | null;
   description?: string | null;

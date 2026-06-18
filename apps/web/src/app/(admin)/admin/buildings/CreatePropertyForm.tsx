@@ -3,14 +3,11 @@
 import { useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, Loader2, Building2, Image as ImageIcon, X, Home, Plus } from 'lucide-react'
+import { ArrowLeft, Loader2, Building2, Image as ImageIcon, X, Home, Plus, Sparkles, Star, MapPin, FileText, Upload } from 'lucide-react'
 import { normalizeApiUrl, normalizeFileUrl } from '@/lib/utils/api-url'
+import { searchLocations, MOHAFAZAT_LABEL, type LebanonLocation } from '@/lib/lebanon-locations'
 
 const MOHAFAZAT = ['BEIRUT', 'MOUNT_LEBANON', 'NORTH', 'SOUTH', 'BEKAA', 'NABATIEH', 'AKKAR', 'BAALBEK_HERMEL']
-const MOHAFAZAT_LABELS: Record<string, string> = {
-  BEIRUT: 'Beirut', MOUNT_LEBANON: 'Mount Lebanon', NORTH: 'North Lebanon', SOUTH: 'South Lebanon',
-  BEKAA: 'Bekaa', NABATIEH: 'Nabatieh', AKKAR: 'Akkar', BAALBEK_HERMEL: 'Baalbek-Hermel',
-}
 const UNIT_KINDS = ['APARTMENT', 'STUDIO', 'DUPLEX', 'PENTHOUSE', 'VILLA', 'TOWNHOUSE', 'SHOP', 'OFFICE', 'LAND_PARCEL']
 const AMENITIES = [
   { key: 'hasGenerator', label: 'Generator' }, { key: 'hasElevator', label: 'Elevator' },
@@ -19,40 +16,59 @@ const AMENITIES = [
   { key: 'hasGarden', label: 'Garden' }, { key: 'hasRooftop', label: 'Rooftop' },
   { key: 'hasSolarPower', label: 'Solar Power' },
 ] as const
+const DOC_TYPES = ['FLOOR_PLAN', 'BROCHURE', 'CONTRACT', 'LEGAL_DOCUMENT', 'CERTIFICATE', 'OTHER']
+const DOC_TYPE_LABELS: Record<string, string> = {
+  FLOOR_PLAN: 'Floor Plan', BROCHURE: 'Brochure', CONTRACT: 'Contract',
+  LEGAL_DOCUMENT: 'Legal Document', CERTIFICATE: 'Certificate', OTHER: 'Other',
+}
 
-/**
- * One-step "Add Property" flow with the full building field set (matching the
- * Edit form), plus the first unit and an optional listing. Creates building →
- * unit → listing in a single submit, then returns to the Properties list.
- */
+interface DocEntry { file: File; title: string; type: string; isPublic: boolean }
+
 export function CreatePropertyForm() {
   const router = useRouter()
+  const apiUrl = normalizeApiUrl(process.env.NEXT_PUBLIC_API_URL || '')
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const docInputRef = useRef<HTMLInputElement>(null)
   const [saving, setSaving] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [highlightInput, setHighlightInput] = useState('')
+  const [aiLoading, setAiLoading] = useState(false)
+
+  // location typeahead
+  const [locQuery, setLocQuery] = useState('')
+  const [locResults, setLocResults] = useState<LebanonLocation[]>([])
 
   const [f, setF] = useState({
-    // Building (the property)
     title: '', kind: 'STANDALONE', status: 'NEW_BUILD', visibility: 'PUBLIC', featured: false,
     shortDescription: '', description: '',
     mohafazat: '', caza: '', city: '', neighborhood: '', address: '',
-    latitude: '', longitude: '', locationUrl: '',
-    builtYear: '', totalFloors: '', parkingSpaces: '',
+    locationUrl: '', builtYear: '', totalFloors: '', parkingSpaces: '',
     hasGenerator: false, hasElevator: false, hasPool: false, hasGym: false, hasConcierge: false,
     hasSecurity: false, hasGarden: false, hasRooftop: false, hasSolarPower: false,
     videoUrl: '', highlightedFeatures: [] as string[],
     metaTitle: '', metaDescription: '',
     images: [] as string[],
-    // First unit (the apartment)
     unitKind: 'APARTMENT', bedrooms: '', bathrooms: '', areaSqm: '', floor: '',
-    // Listing
-    enableListing: true, intent: 'FOR_SALE', price: '', currency: 'USD', listingStatus: 'ACTIVE',
+    enableListing: true, intent: 'FOR_SALE', priceMode: 'TOTAL', price: '', currency: 'USD', listingStatus: 'ACTIVE', negotiable: false,
   })
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const set = (k: keyof typeof f, v: any) => setF(p => ({ ...p, [k]: v }))
 
+  const [docs, setDocs] = useState<DocEntry[]>([])
+
+  // ── Location typeahead ──────────────────────────────────────────────────────
+  function onLocQuery(q: string) {
+    setLocQuery(q)
+    setLocResults(searchLocations(q))
+  }
+  function pickLocation(l: LebanonLocation) {
+    setF(p => ({ ...p, mohafazat: l.mohafazat, caza: l.caza, city: l.name, neighborhood: '' }))
+    setLocQuery(`${l.name} — ${l.caza}, ${MOHAFAZAT_LABEL[l.mohafazat]}`)
+    setLocResults([])
+  }
+
+  // ── Highlights ──────────────────────────────────────────────────────────────
   function addHighlight() {
     const v = highlightInput.trim()
     if (!v) return
@@ -60,15 +76,14 @@ export function CreatePropertyForm() {
     setHighlightInput('')
   }
 
+  // ── Images ──────────────────────────────────────────────────────────────────
   async function uploadImages(files: FileList) {
     setUploading(true)
-    const apiUrl = normalizeApiUrl(process.env.NEXT_PUBLIC_API_URL || '')
     const urls: string[] = []
     for (const file of Array.from(files)) {
       try {
         const fd = new FormData()
-        fd.append('file', file)
-        fd.append('folder', 'buildings')
+        fd.append('file', file); fd.append('folder', 'buildings')
         if (f.title.trim()) fd.append('propertySlug', f.title.trim())
         const res = await fetch(`${apiUrl}/api/upload`, { method: 'POST', credentials: 'include', body: fd })
         if (res.ok) { const d = await res.json(); if (d.url) urls.push(d.url) }
@@ -77,43 +92,92 @@ export function CreatePropertyForm() {
     if (urls.length) setF(p => ({ ...p, images: [...p.images, ...urls] }))
     setUploading(false)
   }
+  async function removeImage(idx: number) {
+    const url = f.images[idx]
+    if (!url) return
+    // Actually delete the just-uploaded file from R2 so it isn't orphaned.
+    try {
+      await fetch(`${apiUrl}/api/upload`, {
+        method: 'DELETE', credentials: 'include',
+        headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url }),
+      })
+    } catch { /* best effort */ }
+    setF(p => ({ ...p, images: p.images.filter((_, i) => i !== idx) }))
+  }
+  function setCover(idx: number) {
+    setF(p => { const imgs = [...p.images]; const [pick] = imgs.splice(idx, 1); imgs.unshift(pick); return { ...p, images: imgs } })
+  }
 
+  // ── Documents ───────────────────────────────────────────────────────────────
+  function addDocs(files: FileList) {
+    const next = Array.from(files).map(file => ({ file, title: file.name.replace(/\.[^.]+$/, ''), type: 'OTHER', isPublic: false }))
+    setDocs(d => [...d, ...next])
+  }
+
+  // ── AI SEO (from live form attributes) ──────────────────────────────────────
+  async function generateSeo() {
+    if (!f.title.trim()) { setError('Add a title first, then generate SEO'); return }
+    setAiLoading(true); setError(null)
+    try {
+      const attributes = {
+        title: f.title, neighborhood: f.neighborhood, city: f.city, caza: f.caza, mohafazat: f.mohafazat,
+        kind: f.kind, status: f.status, totalFloors: f.totalFloors, builtYear: f.builtYear,
+        hasGenerator: f.hasGenerator, hasElevator: f.hasElevator, hasPool: f.hasPool, hasGym: f.hasGym,
+        hasConcierge: f.hasConcierge, hasSecurity: f.hasSecurity, hasGarden: f.hasGarden, hasRooftop: f.hasRooftop, hasSolarPower: f.hasSolarPower,
+        highlightedFeatures: f.highlightedFeatures, description: f.description || f.shortDescription,
+      }
+      const res = await fetch(`${apiUrl}/api/ai-seo/generate`, {
+        method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: 'building', attributes }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) { setError(data.message || 'AI generation failed'); return }
+      const s = data.data ?? data
+      setF(p => ({
+        ...p,
+        metaTitle: s.metaTitle ?? p.metaTitle,
+        metaDescription: s.metaDescription ?? p.metaDescription,
+        shortDescription: p.shortDescription || s.shortDescription || p.shortDescription,
+      }))
+    } catch { setError('Network error') } finally { setAiLoading(false) }
+  }
+
+  // ── Submit ──────────────────────────────────────────────────────────────────
   async function submit(e: React.FormEvent) {
     e.preventDefault()
     if (!f.title.trim()) { setError('Property title is required'); return }
-    if (f.enableListing && (!f.price || Number(f.price) <= 0)) { setError('Enter a price, or turn off listing'); return }
-    setSaving(true)
-    setError(null)
-    const apiUrl = normalizeApiUrl(process.env.NEXT_PUBLIC_API_URL || '')
+    const perSqm = f.priceMode === 'PER_SQM'
+    const area = f.areaSqm !== '' ? Number(f.areaSqm) : 0
+    const totalPrice = perSqm ? (Number(f.price) || 0) * area : (Number(f.price) || 0)
+    if (f.enableListing) {
+      if (!f.price || Number(f.price) <= 0) { setError('Enter a price, or turn off listing'); return }
+      if (perSqm && area <= 0) { setError('Set the apartment area to price per m²'); return }
+    }
+    setSaving(true); setError(null)
     try {
-      // 1) Building — full field set (matches the Edit form)
+      // 1) Building
       const bRes = await fetch(`${apiUrl}/api/buildings`, {
         method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           title: f.title.trim(), kind: f.kind, status: f.status, visibility: f.visibility, featured: f.featured,
           shortDescription: f.shortDescription || null, description: f.description || null,
           mohafazat: f.mohafazat || null, caza: f.caza || null, city: f.city || null,
-          neighborhood: f.neighborhood || null, address: f.address || null,
-          latitude: f.latitude !== '' ? parseFloat(f.latitude) : null,
-          longitude: f.longitude !== '' ? parseFloat(f.longitude) : null,
-          locationUrl: f.locationUrl || null,
+          neighborhood: f.neighborhood || null, address: f.address || null, locationUrl: f.locationUrl || null,
           builtYear: f.builtYear !== '' ? parseInt(f.builtYear) : null,
           totalFloors: f.totalFloors !== '' ? parseInt(f.totalFloors) : null,
           parkingSpaces: f.parkingSpaces !== '' ? parseInt(f.parkingSpaces) : null,
           hasGenerator: f.hasGenerator, hasElevator: f.hasElevator, hasPool: f.hasPool, hasGym: f.hasGym,
-          hasConcierge: f.hasConcierge, hasSecurity: f.hasSecurity, hasGarden: f.hasGarden,
-          hasRooftop: f.hasRooftop, hasSolarPower: f.hasSolarPower,
+          hasConcierge: f.hasConcierge, hasSecurity: f.hasSecurity, hasGarden: f.hasGarden, hasRooftop: f.hasRooftop, hasSolarPower: f.hasSolarPower,
           videoUrl: f.videoUrl || null, highlightedFeatures: f.highlightedFeatures,
-          metaTitle: f.metaTitle || null, metaDescription: f.metaDescription || null,
-          images: f.images,
+          metaTitle: f.metaTitle || null, metaDescription: f.metaDescription || null, images: f.images,
         }),
       })
       const bData = await bRes.json()
       if (!bRes.ok) { setError(bData.message || bData.error || 'Failed to create property'); setSaving(false); return }
       const buildingId = (bData.data ?? bData)?.id
-      if (!buildingId) { setError(bData.message || 'Could not create the property.'); setSaving(false); return }
+      if (!buildingId) { setError('Could not create the property.'); setSaving(false); return }
 
-      // 2) First unit (apartment) — shares the photos so it shows as one property
+      // 2) First unit
       const lifecycle = f.enableListing ? (f.intent === 'FOR_RENT' ? 'FOR_RENT' : 'FOR_SALE') : 'VACANT'
       const uRes = await fetch(`${apiUrl}/api/buildings/${buildingId}/units`, {
         method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' },
@@ -121,32 +185,37 @@ export function CreatePropertyForm() {
           kind: f.unitKind,
           bedrooms: f.bedrooms !== '' ? Number(f.bedrooms) : null,
           bathrooms: f.bathrooms !== '' ? Number(f.bathrooms) : null,
-          areaSqm: f.areaSqm !== '' ? Number(f.areaSqm) : null,
-          floor: f.floor !== '' ? Number(f.floor) : null,
+          areaSqm: area || null, floor: f.floor !== '' ? Number(f.floor) : null,
           lifecycle, images: f.images,
         }),
       })
       const unit = (await uRes.json().catch(() => ({}))).data ?? {}
 
-      // 3) Listing (optional)
+      // 3) Listing
       if (f.enableListing && unit?.id) {
         await fetch(`${apiUrl}/api/listings`, {
           method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            subjectType: 'UNIT', unitId: unit.id, buildingId,
-            intent: f.intent, price: Number(f.price), currency: f.currency,
-            status: f.listingStatus, visibility: 'PUBLIC', highlights: [],
+            subjectType: 'UNIT', unitId: unit.id, buildingId, intent: f.intent,
+            price: totalPrice, currency: f.currency, status: f.listingStatus, visibility: 'PUBLIC',
+            negotiable: f.negotiable, highlights: [],
           }),
         }).catch(() => {})
       }
 
-      // Back to the Properties list (not the edit screen)
+      // 4) Documents (multipart, attached to the new building)
+      for (const d of docs) {
+        try {
+          const fd = new FormData()
+          fd.append('file', d.file); fd.append('propertyId', buildingId)
+          fd.append('title', d.title); fd.append('type', d.type); fd.append('isPublic', String(d.isPublic))
+          await fetch(`${apiUrl}/api/documents`, { method: 'POST', credentials: 'include', body: fd })
+        } catch { /* best effort */ }
+      }
+
       router.push('/admin/buildings')
       router.refresh()
-    } catch {
-      setError('Network error')
-      setSaving(false)
-    }
+    } catch { setError('Network error'); setSaving(false) }
   }
 
   const inp = 'w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400'
@@ -158,7 +227,7 @@ export function CreatePropertyForm() {
         <Link href="/admin/buildings" className="p-2 rounded-lg hover:bg-slate-100 text-slate-600"><ArrowLeft className="h-4 w-4" /></Link>
         <div>
           <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2"><Building2 className="h-6 w-6" /> Add Property</h1>
-          <p className="text-sm text-slate-500 mt-0.5">Create a property and its first unit in one step. Add more units afterwards.</p>
+          <p className="text-sm text-slate-500 mt-0.5">Create a property and its first unit in one step.</p>
         </div>
       </div>
 
@@ -177,8 +246,7 @@ export function CreatePropertyForm() {
             <div>
               <label className={lbl}>Kind</label>
               <select value={f.kind} onChange={e => set('kind', e.target.value)} className={inp}>
-                <option value="STANDALONE">Standalone</option><option value="PROJECT">Project</option>
-                <option value="COMMUNITY">Community</option><option value="MIXED_USE">Mixed Use</option>
+                <option value="STANDALONE">Standalone</option><option value="PROJECT">Project</option><option value="COMMUNITY">Community</option><option value="MIXED_USE">Mixed Use</option>
               </select>
             </div>
             <div>
@@ -205,20 +273,36 @@ export function CreatePropertyForm() {
         {/* Location */}
         <div className="bg-white border rounded-xl p-6 space-y-4">
           <h2 className="font-semibold text-slate-900">Location</h2>
+          <div className="relative">
+            <label className={lbl}>Search location</label>
+            <div className="relative">
+              <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+              <input value={locQuery} onChange={e => onLocQuery(e.target.value)} className={inp + ' pl-9'} placeholder="Type a town or region — e.g. Amchit, or Mount Lebanon" />
+            </div>
+            {locResults.length > 0 && (
+              <div className="absolute z-20 mt-1 w-full bg-white border border-slate-200 rounded-lg shadow-lg max-h-64 overflow-auto">
+                {locResults.map((l, i) => (
+                  <button key={i} type="button" onClick={() => pickLocation(l)} className="w-full text-left px-3 py-2 text-sm hover:bg-slate-50 flex items-center justify-between">
+                    <span className="font-medium text-slate-800">{l.name}</span>
+                    <span className="text-xs text-slate-400">{l.caza} · {MOHAFAZAT_LABEL[l.mohafazat]}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+            <p className="text-xs text-slate-400 mt-1">Picks fill region, district and city automatically. You can still edit the fields below.</p>
+          </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className={lbl}>Region (Mohafazat)</label>
               <select value={f.mohafazat} onChange={e => set('mohafazat', e.target.value)} className={inp}>
                 <option value="">— Select region —</option>
-                {MOHAFAZAT.map(m => <option key={m} value={m}>{MOHAFAZAT_LABELS[m]}</option>)}
+                {MOHAFAZAT.map(m => <option key={m} value={m}>{MOHAFAZAT_LABEL[m]}</option>)}
               </select>
             </div>
-            <div><label className={lbl}>Caza (District)</label><input value={f.caza} onChange={e => set('caza', e.target.value)} className={inp} placeholder="e.g., Baabda" /></div>
-            <div><label className={lbl}>City</label><input value={f.city} onChange={e => set('city', e.target.value)} className={inp} placeholder="e.g., Beirut" /></div>
-            <div><label className={lbl}>Neighborhood</label><input value={f.neighborhood} onChange={e => set('neighborhood', e.target.value)} className={inp} placeholder="e.g., Verdun" /></div>
-            <div className="sm:col-span-2"><label className={lbl}>Street Address</label><input value={f.address} onChange={e => set('address', e.target.value)} className={inp} placeholder="Full street address" /></div>
-            <div><label className={lbl}>Latitude</label><input type="number" step="any" value={f.latitude} onChange={e => set('latitude', e.target.value)} className={inp} placeholder="33.8938" /></div>
-            <div><label className={lbl}>Longitude</label><input type="number" step="any" value={f.longitude} onChange={e => set('longitude', e.target.value)} className={inp} placeholder="35.5018" /></div>
+            <div><label className={lbl}>Caza (District)</label><input value={f.caza} onChange={e => set('caza', e.target.value)} className={inp} placeholder="e.g., Jbeil" /></div>
+            <div><label className={lbl}>City / Town</label><input value={f.city} onChange={e => set('city', e.target.value)} className={inp} placeholder="e.g., Amchit" /></div>
+            <div><label className={lbl}>Neighborhood</label><input value={f.neighborhood} onChange={e => set('neighborhood', e.target.value)} className={inp} placeholder="optional" /></div>
+            <div className="sm:col-span-2"><label className={lbl}>Street Address <span className="text-slate-400">(optional)</span></label><input value={f.address} onChange={e => set('address', e.target.value)} className={inp} placeholder="Leave empty if not applicable" /></div>
             <div className="sm:col-span-2"><label className={lbl}>Google Maps URL</label><input type="url" value={f.locationUrl} onChange={e => set('locationUrl', e.target.value)} className={inp} placeholder="https://maps.google.com/..." /></div>
           </div>
         </div>
@@ -259,8 +343,7 @@ export function CreatePropertyForm() {
             <div className="flex flex-wrap gap-2">
               {f.highlightedFeatures.map((h, i) => (
                 <span key={i} className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 text-slate-700 rounded-lg text-sm">
-                  {h}
-                  <button type="button" onClick={() => setF(p => ({ ...p, highlightedFeatures: p.highlightedFeatures.filter((_, idx) => idx !== i) }))} className="text-slate-400 hover:text-red-500"><X className="h-3 w-3" /></button>
+                  {h}<button type="button" onClick={() => setF(p => ({ ...p, highlightedFeatures: p.highlightedFeatures.filter((_, idx) => idx !== i) }))} className="text-slate-400 hover:text-red-500"><X className="h-3 w-3" /></button>
                 </span>
               ))}
             </div>
@@ -282,7 +365,6 @@ export function CreatePropertyForm() {
             <div><label className={lbl}>Area m²</label><input type="number" min="0" value={f.areaSqm} onChange={e => set('areaSqm', e.target.value)} className={inp} /></div>
             <div><label className={lbl}>Floor</label><input type="number" value={f.floor} onChange={e => set('floor', e.target.value)} className={inp} /></div>
           </div>
-          <p className="text-xs text-slate-400">This first unit is created automatically. You can add more units to this property afterwards.</p>
         </div>
 
         {/* Listing */}
@@ -292,15 +374,39 @@ export function CreatePropertyForm() {
             <span className="font-semibold text-slate-900">List this property now</span>
           </label>
           {f.enableListing && (
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-              <div>
-                <label className={lbl}>For</label>
-                <select value={f.intent} onChange={e => set('intent', e.target.value)} className={inp}><option value="FOR_SALE">Sale</option><option value="FOR_RENT">Rent</option></select>
+            <>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                <div>
+                  <label className={lbl}>For</label>
+                  <select value={f.intent} onChange={e => set('intent', e.target.value)} className={inp}><option value="FOR_SALE">Sale</option><option value="FOR_RENT">Rent</option></select>
+                </div>
+                <div>
+                  <label className={lbl}>Pricing</label>
+                  <select value={f.priceMode} onChange={e => set('priceMode', e.target.value)} className={inp}>
+                    <option value="TOTAL">Total price</option>
+                    <option value="PER_SQM">Price per m²</option>
+                  </select>
+                </div>
+                <div>
+                  <label className={lbl}>{f.priceMode === 'PER_SQM' ? 'Price / m²' : 'Price'}</label>
+                  <input type="number" min="0" value={f.price} onChange={e => set('price', e.target.value)} className={inp} placeholder={f.priceMode === 'PER_SQM' ? '2500' : '250000'} />
+                </div>
+                <div><label className={lbl}>Currency</label><select value={f.currency} onChange={e => set('currency', e.target.value)} className={inp}><option value="USD">USD</option><option value="LBP">LBP</option></select></div>
               </div>
-              <div><label className={lbl}>Price</label><input type="number" min="0" value={f.price} onChange={e => set('price', e.target.value)} className={inp} placeholder="250000" /></div>
-              <div><label className={lbl}>Currency</label><select value={f.currency} onChange={e => set('currency', e.target.value)} className={inp}><option value="USD">USD</option><option value="LBP">LBP</option></select></div>
-              <div><label className={lbl}>Visibility</label><select value={f.listingStatus} onChange={e => set('listingStatus', e.target.value)} className={inp}><option value="ACTIVE">Active (public)</option><option value="DRAFT">Draft (hidden)</option></select></div>
-            </div>
+              {f.priceMode === 'PER_SQM' && f.areaSqm && f.price && (
+                <p className="text-xs text-slate-500">Total: <strong>{f.currency} {(Number(f.price) * Number(f.areaSqm)).toLocaleString()}</strong> ({f.areaSqm} m² × {f.currency} {Number(f.price).toLocaleString()})</p>
+              )}
+              <div className="flex flex-wrap items-center gap-4">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input type="checkbox" checked={f.negotiable} onChange={e => set('negotiable', e.target.checked)} className="rounded border-slate-300" />
+                  <span className="text-sm text-slate-700">Price is negotiable</span>
+                </label>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-slate-500">Visibility:</span>
+                  <select value={f.listingStatus} onChange={e => set('listingStatus', e.target.value)} className={inp + ' w-auto'}><option value="ACTIVE">Active (public)</option><option value="DRAFT">Draft (hidden)</option></select>
+                </div>
+              </div>
+            </>
           )}
         </div>
 
@@ -313,22 +419,61 @@ export function CreatePropertyForm() {
                 <div key={i} className="relative group aspect-square">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={normalizeFileUrl(url)} alt="" className="w-full h-full object-cover rounded-lg border" />
-                  {i === 0 && <span className="absolute top-1 left-1 text-[9px] bg-slate-800 text-white px-1.5 py-0.5 rounded">Cover</span>}
-                  <button type="button" onClick={() => setF(p => ({ ...p, images: p.images.filter((_, idx) => idx !== i) }))} className="absolute top-1 right-1 p-0.5 bg-red-500 text-white rounded-md opacity-0 group-hover:opacity-100"><X className="h-3 w-3" /></button>
+                  {i === 0 ? (
+                    <span className="absolute top-1 left-1 text-[9px] bg-slate-800 text-white px-1.5 py-0.5 rounded">Cover</span>
+                  ) : (
+                    <button type="button" onClick={() => setCover(i)} title="Set as cover" className="absolute top-1 left-1 p-0.5 bg-white/90 text-slate-700 rounded opacity-0 group-hover:opacity-100 hover:bg-white">
+                      <Star className="h-3 w-3" />
+                    </button>
+                  )}
+                  <button type="button" onClick={() => removeImage(i)} className="absolute top-1 right-1 p-0.5 bg-red-500 text-white rounded-md opacity-0 group-hover:opacity-100"><X className="h-3 w-3" /></button>
                 </div>
               ))}
             </div>
           )}
           <div className="border-2 border-dashed border-slate-200 rounded-xl p-5 text-center hover:border-slate-400 cursor-pointer" onClick={() => fileInputRef.current?.click()}>
             {uploading ? <span className="text-sm text-slate-500 inline-flex items-center gap-2"><Loader2 className="h-4 w-4 animate-spin" /> Uploading…</span>
-              : <span className="text-sm text-slate-500 inline-flex items-center gap-2"><ImageIcon className="h-4 w-4 text-slate-400" /> Click to upload photos — first is the cover</span>}
+              : <span className="text-sm text-slate-500 inline-flex items-center gap-2"><ImageIcon className="h-4 w-4 text-slate-400" /> Click to upload photos — hover a photo to set it as cover</span>}
           </div>
           <input ref={fileInputRef} type="file" accept="image/jpeg,image/png,image/webp" multiple className="hidden" onChange={e => { if (e.target.files?.length) uploadImages(e.target.files); e.target.value = '' }} />
         </div>
 
+        {/* Documents */}
+        <div className="bg-white border rounded-xl p-6 space-y-4">
+          <h2 className="font-semibold text-slate-900 flex items-center gap-2"><FileText className="h-4 w-4 text-slate-500" /> Documents</h2>
+          {docs.length > 0 && (
+            <div className="space-y-2">
+              {docs.map((d, i) => (
+                <div key={i} className="flex flex-col sm:flex-row sm:items-center gap-2 bg-slate-50 border border-slate-200 rounded-lg p-2.5">
+                  <input value={d.title} onChange={e => setDocs(ds => ds.map((x, idx) => idx === i ? { ...x, title: e.target.value } : x))} className={inp + ' flex-1'} placeholder="Document title" />
+                  <select value={d.type} onChange={e => setDocs(ds => ds.map((x, idx) => idx === i ? { ...x, type: e.target.value } : x))} className={inp + ' sm:w-44'}>
+                    {DOC_TYPES.map(t => <option key={t} value={t}>{DOC_TYPE_LABELS[t]}</option>)}
+                  </select>
+                  <label className="flex items-center gap-1.5 text-sm text-slate-600 whitespace-nowrap px-1">
+                    <input type="checkbox" checked={d.isPublic} onChange={e => setDocs(ds => ds.map((x, idx) => idx === i ? { ...x, isPublic: e.target.checked } : x))} className="rounded border-slate-300" /> Public
+                  </label>
+                  <button type="button" onClick={() => setDocs(ds => ds.filter((_, idx) => idx !== i))} className="p-1.5 text-slate-400 hover:text-red-600"><X className="h-4 w-4" /></button>
+                </div>
+              ))}
+            </div>
+          )}
+          <button type="button" onClick={() => docInputRef.current?.click()} className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium text-slate-700 border border-slate-200 rounded-lg hover:bg-slate-50">
+            <Upload className="h-4 w-4" /> Add documents
+          </button>
+          <p className="text-xs text-slate-400">PDF, images, Word or Excel. Public documents show on the property page; private ones are admin-only.</p>
+          <input ref={docInputRef} type="file" accept=".pdf,image/*,.doc,.docx,.xls,.xlsx" multiple className="hidden" onChange={e => { if (e.target.files?.length) addDocs(e.target.files); e.target.value = '' }} />
+        </div>
+
         {/* SEO */}
         <div className="bg-white border rounded-xl p-6 space-y-4">
-          <h2 className="font-semibold text-slate-900">SEO (optional)</h2>
+          <div className="flex items-center justify-between gap-3">
+            <h2 className="font-semibold text-slate-900">SEO (optional)</h2>
+            <button type="button" onClick={generateSeo} disabled={aiLoading || !f.title.trim()} className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-violet-700 bg-violet-50 border border-violet-200 rounded-lg hover:bg-violet-100 disabled:opacity-50">
+              {aiLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+              {aiLoading ? 'Generating…' : 'Generate with AI'}
+            </button>
+          </div>
+          <p className="text-xs text-slate-400">AI reads the title, description, location and amenities you entered above.</p>
           <div><label className={lbl}>Meta Title</label><input value={f.metaTitle} onChange={e => set('metaTitle', e.target.value)} className={inp} placeholder="Custom page title for search engines" /></div>
           <div><label className={lbl}>Meta Description</label><textarea value={f.metaDescription} onChange={e => set('metaDescription', e.target.value)} rows={2} className={inp + ' resize-none'} placeholder="Custom description for search engines" /></div>
         </div>

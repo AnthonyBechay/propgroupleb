@@ -178,6 +178,7 @@ export const listingSchema = z.object({
   price: z.number().min(0),
   currency: z.enum(['USD', 'LBP']).default('USD'),
   rentPeriod: z.enum(['MONTHLY', 'QUARTERLY', 'YEARLY']).optional().nullable(),
+  negotiable: z.boolean().optional(),
   slug: z.string().optional(),
   headline: z.string().optional().nullable(),
   description: z.string().optional().nullable(),
