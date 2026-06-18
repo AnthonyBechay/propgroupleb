@@ -19,7 +19,7 @@ async function fetchListings(params: SearchParams) {
   if (!sp.has('status')) sp.set('status', 'ACTIVE')
 
   try {
-    const res = await fetch(`${apiUrl}/api/listings?${sp.toString()}`, { next: { revalidate: 60 } })
+    const res = await fetch(`${apiUrl}/api/listings?${sp.toString()}`, { next: { revalidate: 20 } })
     if (!res.ok) throw new Error(`HTTP ${res.status}`)
     const data = await res.json()
     return {

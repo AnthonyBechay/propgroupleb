@@ -48,10 +48,11 @@ function formatPrice(amount: number, currency: Currency): string {
 export function ListingCard({ listing, priority = false }: ListingCardProps) {
   const { unit, building } = listing
 
-  // Pick the best image source
+  // Photos live on the property (building) — single source of truth. Fall back
+  // to unit images only for any legacy data that still has them.
   const images =
-    (unit?.images?.length ? unit.images : null) ??
     (building?.images?.length ? building.images : null) ??
+    (unit?.images?.length ? unit.images : null) ??
     []
 
   const firstImage = images.length > 0 ? normalizeFileUrl(images[0]) : null

@@ -36,7 +36,7 @@ import {
   UnitLifecycle,
 } from '@/types'
 
-export const revalidate = 60
+export const revalidate = 20
 
 interface PageProps {
   params: Promise<{ slug: string }>
@@ -46,7 +46,7 @@ async function fetchListing(slug: string): Promise<Listing | null> {
   const apiUrl = normalizeApiUrl(process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001')
   try {
     const res = await fetch(`${apiUrl}/api/listings/slug/${encodeURIComponent(slug)}`, {
-      next: { revalidate: 60 },
+      next: { revalidate: 20 },
     })
     if (res.status === 404) return null
     if (!res.ok) throw new Error(`HTTP ${res.status}`)
@@ -90,7 +90,7 @@ export async function generateMetadata({ params }: PageProps) {
     `${baseTitle} for ${listing.intent === ListingIntent.FOR_RENT ? 'rent' : 'sale'} in ${loc}. Explore details, photos and pricing on PropGroup.`
 
   const canonical = `${SITE_URL}/listings/${slug}`
-  const rawImage = listing.unit?.images?.[0] ?? building?.images?.[0]
+  const rawImage = building?.images?.[0] ?? listing.unit?.images?.[0]
   const ogImage = rawImage ? normalizeFileUrl(rawImage) : `${SITE_URL}/og-image.png`
 
   const kindLabel = listing.unit ? UNIT_KIND_LABELS[listing.unit.kind] : building ? BUILDING_KIND_LABELS[building.kind] : 'Property'
@@ -182,9 +182,11 @@ export default async function ListingDetailPage({ params }: PageProps) {
 
   const { building, unit } = listing
 
+  // Photos live on the property (building) — single source. Unit images are
+  // only a fallback for legacy data.
   const images =
-    (unit?.images?.length ? unit.images : null) ??
     (building?.images?.length ? building.images : null) ??
+    (unit?.images?.length ? unit.images : null) ??
     []
 
   const title = listing.headline ?? building?.title ?? 'Listing'

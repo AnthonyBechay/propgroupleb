@@ -13,7 +13,7 @@ export async function fetchHomeListings(limit = 12): Promise<Listing[]> {
   try {
     const sp = new URLSearchParams({ status: 'ACTIVE', limit: String(limit), page: '1' })
     const res = await fetch(`${apiUrl}/api/listings?${sp.toString()}`, {
-      next: { revalidate: 60 },
+      next: { revalidate: 20 },
     })
     if (!res.ok) return []
     const data = await res.json()

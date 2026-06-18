@@ -14,7 +14,7 @@ export const metadata = {
 // during build). With revalidate, Next regenerates the page in the
 // background at most every 60s, so admin CMS edits surface within a
 // minute instead of requiring a redeploy.
-export const revalidate = 60
+export const revalidate = 20
 
 export default async function AboutPage() {
   const content = await fetchSectionContent('about')

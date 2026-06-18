@@ -186,7 +186,7 @@ export function CreatePropertyForm() {
           bedrooms: f.bedrooms !== '' ? Number(f.bedrooms) : null,
           bathrooms: f.bathrooms !== '' ? Number(f.bathrooms) : null,
           areaSqm: area || null, floor: f.floor !== '' ? Number(f.floor) : null,
-          lifecycle, images: f.images,
+          lifecycle, // photos live on the property (building), not duplicated on the unit
         }),
       })
       const unit = (await uRes.json().catch(() => ({}))).data ?? {}
