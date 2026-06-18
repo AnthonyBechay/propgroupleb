@@ -2,6 +2,7 @@ import { TrendingUp, Shield, Globe, Award } from 'lucide-react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { fetchSectionContent } from '@/lib/content'
+import { ContactSection } from '@/components/contact/ContactSection'
 
 export const metadata = {
   title: 'About PropGroup - Lebanon Real Estate Brokerage',
@@ -110,7 +111,7 @@ export default async function AboutPage() {
                   Browse Properties
                 </Button>
               </Link>
-              <Link href="/contact">
+              <a href="#contact">
                 <Button
                   size="lg"
                   variant="outline"
@@ -118,11 +119,14 @@ export default async function AboutPage() {
                 >
                   Contact Us
                 </Button>
-              </Link>
+              </a>
             </div>
           </div>
         </div>
       </section>
+
+      {/* Contact (merged from the old /contact page) */}
+      <ContactSection />
     </main>
   )
 }

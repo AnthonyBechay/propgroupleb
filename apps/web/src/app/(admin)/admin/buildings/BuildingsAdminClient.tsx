@@ -78,13 +78,13 @@ export function BuildingsAdminClient({ initialBuildings }: Props) {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Buildings</h1>
-          <p className="text-slate-500 text-sm mt-0.5">{buildings.length} total buildings</p>
+          <h1 className="text-2xl font-bold text-slate-900">Properties</h1>
+          <p className="text-slate-500 text-sm mt-0.5">{buildings.length} total propert{buildings.length === 1 ? 'y' : 'ies'}</p>
         </div>
         <Link href="/admin/buildings/new">
           <Button className="bg-slate-800 hover:bg-slate-700">
             <Plus className="h-4 w-4 mr-2" />
-            Add Building
+            Add Property
           </Button>
         </Link>
       </div>

@@ -329,6 +329,7 @@ export function BuildingForm({ initialData, buildingId, embedded }: Props) {
             <div className="sm:col-span-2">
               <label className={labelCls}>Title <span className="text-red-500">*</span></label>
               <input type="text" value={form.title} onChange={e => setField('title', e.target.value)} className={inputCls} placeholder="e.g., Verdun Residences" required />
+              <p className="text-xs text-slate-400 mt-1">This is the title shown on the website.</p>
             </div>
             <div>
               <label className={labelCls}>Kind</label>

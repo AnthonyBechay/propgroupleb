@@ -31,7 +31,7 @@ export function Sidebar() {
 
   const navigation = [
     { name: 'Dashboard', href: '/admin', icon: Home },
-    { name: 'Buildings', href: '/admin/buildings', icon: Building2 },
+    { name: 'Properties', href: '/admin/buildings', icon: Building2 },
     { name: 'Listings', href: '/admin/listings', icon: ListFilter },
     { name: 'Location Guides', href: '/admin/location-guides', icon: MapPin },
     { name: 'Inquiries', href: '/admin/inquiries', icon: MessageSquare },

@@ -210,8 +210,8 @@ function UnitFormPanel({
           </select>
         </div>
         <div className="col-span-2 sm:col-span-1">
-          <label className={lbl}>Display Name</label>
-          <input value={f.name} onChange={e => set('name', e.target.value)} placeholder="e.g. Unit 3A" className={inp} />
+          <label className={lbl}>Title</label>
+          <input value={f.name} onChange={e => set('name', e.target.value)} placeholder="e.g. Unit 3A" className={inp} title="Shown on the website if this unit has no listing headline" />
         </div>
         <div>
           <label className={lbl}>Unit No.</label>

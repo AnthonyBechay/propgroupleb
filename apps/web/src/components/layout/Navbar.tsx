@@ -12,7 +12,6 @@ import {
   X,
   Home,
   Info,
-  Phone,
   ChevronDown,
   LogOut,
   Settings,
@@ -78,11 +77,10 @@ export function Navbar() {
           </Link>
 
           {/* Desktop Navigation */}
-          <div className="hidden lg:flex items-center space-x-1 flex-1 overflow-x-auto overflow-y-hidden px-4 mx-4 scrollbar-hide" style={{scrollbarWidth: 'none', msOverflowStyle: 'none'}}>
+          <div className="hidden lg:flex items-center justify-center space-x-1 flex-1 px-4 mx-4">
             <NavLink href="/" icon={<Home className="w-4 h-4" />} isActive={isActive('/')}>
               Properties
             </NavLink>
-
             <NavLink href="/roi-calculator" icon={<Calculator className="w-4 h-4" />} isActive={isActive('/roi-calculator')}>
               ROI Calculator
             </NavLink>
@@ -90,10 +88,7 @@ export function Navbar() {
               Market
             </NavLink>
             <NavLink href="/about" icon={<Info className="w-4 h-4" />} isActive={isActive('/about')}>
-              About
-            </NavLink>
-            <NavLink href="/contact" icon={<Phone className="w-4 h-4" />} isActive={isActive('/contact')}>
-              Contact
+              About &amp; Contact
             </NavLink>
           </div>
 
@@ -254,15 +249,7 @@ export function Navbar() {
               isActive={isActive('/about')}
               onClick={() => setIsMenuOpen(false)}
             >
-              About
-            </MobileNavLink>
-            <MobileNavLink
-              href="/contact"
-              icon={<Phone className="w-4 h-4" />}
-              isActive={isActive('/contact')}
-              onClick={() => setIsMenuOpen(false)}
-            >
-              Contact
+              About &amp; Contact
             </MobileNavLink>
 
             {/* Mobile Auth Section */}

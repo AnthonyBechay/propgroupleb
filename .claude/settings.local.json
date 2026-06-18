@@ -384,7 +384,9 @@
       "Bash(sed -n '1,20p' apps/web/src/components/RoiCalculator.tsx)",
       "Bash(sed -n '1,30p' apps/web/src/app/portal/market-analysis/page.tsx)",
       "Bash(awk '/^model User /{f=1} f{print NR\": \"$0} /^}/{if\\(f\\)exit}' packages/db/prisma/schema.prisma)",
-      "Bash(awk '/^model Building /{f=1} f{print NR\": \"$0} /^}/{if\\(f\\)exit}' packages/db/prisma/schema.prisma)"
+      "Bash(awk '/^model Building /{f=1} f{print NR\": \"$0} /^}/{if\\(f\\)exit}' packages/db/prisma/schema.prisma)",
+      "Bash(sed -n '1,40p' apps/web/src/app/about/page.tsx)",
+      "Bash(sed -n '1,45p' apps/web/src/app/contact/page.tsx)"
     ],
     "deny": [],
     "ask": []

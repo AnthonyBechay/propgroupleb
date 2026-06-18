@@ -1,5 +1,5 @@
-import { BuildingForm } from '../BuildingForm'
+import { CreatePropertyForm } from '../CreatePropertyForm'
 
-export default function NewBuildingPage() {
-  return <BuildingForm />
+export default function NewPropertyPage() {
+  return <CreatePropertyForm />
 }
