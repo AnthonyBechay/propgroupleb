@@ -313,20 +313,27 @@ router.post(
   })
 );
 
-// ── POST /:id/units — create unit under building (admin) ──────────────────────
+// ── POST /:id/units — create unit under building (admin or owning PM member) ──
 
 router.post(
   '/:id/units',
   authenticateToken,
-  requireAdmin,
+  requirePropertyManager,
   asyncHandler(async (req: Request, res: Response) => {
     const authReq = req as AuthenticatedRequest;
 
     const building = await prisma.building.findUnique({
       where: { id: req.params.id },
-      select: { id: true },
+      select: { id: true, organizationId: true },
     });
     if (!building) { sendNotFound(res, 'Building'); return; }
+
+    // Org isolation: a PM member can only add units to their own org's buildings.
+    const scope = await getOrgScope(authReq.user);
+    if (!scope.all && (!building.organizationId || !scope.orgIds.includes(building.organizationId))) {
+      sendNotFound(res, 'Building');
+      return;
+    }
 
     const data = unitCreateSchema.parse(req.body);
     const unit = await prisma.unit.create({

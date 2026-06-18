@@ -1,7 +1,8 @@
 import express, { type Request, type Response, type Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '@propgroup/db';
-import { authenticateToken, requireAdmin, logAdminAction, optionalAuthenticateToken } from '../middleware/auth.js';
+import { authenticateToken, requireAdmin, requireRole, logAdminAction, optionalAuthenticateToken } from '../middleware/auth.js';
+import { getOrgScope } from '../utils/org-scope.js';
 import { asyncHandler } from '../utils/errors.js';
 import { sendSuccess, sendCreated, sendPaginated, sendNotFound, sendError } from '../utils/response.js';
 import { parsePagination, buildPaginationResponse } from '../utils/pagination.js';
@@ -386,7 +387,7 @@ router.get(
 router.post(
   '/',
   authenticateToken,
-  requireAdmin,
+  requireRole('PROPERTY_MANAGER', 'ADMIN', 'SUPER_ADMIN'),
   asyncHandler(async (req: Request, res: Response) => {
     const authReq = req as AuthenticatedRequest;
     const data = listingSchema.parse(req.body);
@@ -403,6 +404,7 @@ router.post(
     // Validate referenced entities exist and auto-fill buildingId for unit listings
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let resolvedData: typeof data & { buildingId?: string | null } = data;
+    let targetBuildingId: string | null = null;
     if (data.subjectType === 'UNIT' && data.unitId) {
       const unit = await prisma.unit.findUnique({
         where: { id: data.unitId },
@@ -411,12 +413,23 @@ router.post(
       if (!unit) { sendError(res, 400, 'Unit not found'); return; }
       // Always link buildingId on unit listings so building-level queries work
       resolvedData = { ...data, buildingId: unit.buildingId };
+      targetBuildingId = unit.buildingId;
     } else if (data.subjectType === 'BUILDING' && data.buildingId) {
       const building = await prisma.building.findUnique({
         where: { id: data.buildingId },
         select: { id: true },
       });
       if (!building) { sendError(res, 400, 'Building not found'); return; }
+      targetBuildingId = data.buildingId;
+    }
+
+    // Org isolation: a PM member can only list their own org's properties.
+    const scope = await getOrgScope(authReq.user);
+    if (!scope.all) {
+      if (!targetBuildingId || !scope.buildingIds.includes(targetBuildingId)) {
+        sendError(res, 403, 'You can only create listings for your organization’s properties');
+        return;
+      }
     }
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
