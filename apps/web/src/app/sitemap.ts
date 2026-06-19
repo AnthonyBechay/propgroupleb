@@ -28,9 +28,9 @@ const STATIC_ROUTES: Array<{ path: string; priority: number; changeFrequency: Me
   { path: 'roi-calculator', priority: 0.8, changeFrequency: 'monthly' },
   { path: 'market-analysis', priority: 0.8, changeFrequency: 'weekly' },
   { path: 'ai-search', priority: 0.7, changeFrequency: 'monthly' },
-  { path: 'contact', priority: 0.6, changeFrequency: 'monthly' },
   { path: 'get-started', priority: 0.6, changeFrequency: 'monthly' },
-  { path: 'about', priority: 0.5, changeFrequency: 'monthly' },
+  // '/contact' is intentionally omitted — it redirects to /about#contact.
+  { path: 'about', priority: 0.6, changeFrequency: 'monthly' },
   { path: 'privacy', priority: 0.2, changeFrequency: 'yearly' },
   { path: 'terms', priority: 0.2, changeFrequency: 'yearly' },
 ]

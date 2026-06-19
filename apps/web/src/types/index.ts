@@ -399,6 +399,10 @@ export interface Building {
   visibility: PropertyVisibility;
   featured: boolean;
   slug?: string | null;
+  builtYear?: number | null;
+  totalFloors?: number | null;
+  parkingSpaces?: number | null;
+  highlightedFeatures?: string[] | null;
   hasGenerator: boolean;
   hasElevator: boolean;
   hasPool: boolean;

@@ -4,9 +4,12 @@ import { Button } from '@/components/ui/button'
 import { fetchSectionContent } from '@/lib/content'
 import { ContactSection } from '@/components/contact/ContactSection'
 
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'
+
 export const metadata = {
-  title: 'About PropGroup - Lebanon Real Estate Brokerage',
-  description: 'PropGroup is Lebanon\'s trusted real estate brokerage for buying, renting, selling, and managing properties.',
+  title: 'About & Contact — PropGroup Lebanon Real Estate',
+  description: 'PropGroup is Lebanon\'s trusted real estate brokerage for buying, renting, selling, and managing properties. Get in touch with our team.',
+  alternates: { canonical: `${SITE_URL}/about` },
 }
 
 // ISR: Without this, the page is built once at deploy time with whatever

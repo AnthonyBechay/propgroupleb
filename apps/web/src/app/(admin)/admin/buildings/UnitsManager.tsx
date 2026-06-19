@@ -973,16 +973,11 @@ export function UnitsManager({ buildingId, buildingImages = [] }: { buildingId: 
               >
                 {/* Unit row */}
                 <div className="flex flex-col sm:flex-row sm:items-center gap-3 px-5 py-4">
-                  {/* Cover thumbnail */}
-                  {unit.images?.length > 0 && (
+                  {/* Cover thumbnail — the property (building) photo, shared across units */}
+                  {buildingImages.length > 0 && (
                     <div className="relative w-12 h-12 shrink-0 rounded-lg overflow-hidden border border-zinc-200">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={normalizeFileUrl(unit.images[0])} alt="" className="w-full h-full object-cover" />
-                      {unit.images.length > 1 && (
-                        <span className="absolute bottom-0 right-0 text-[9px] bg-black/60 text-white px-1 rounded-tl">
-                          {unit.images.length}
-                        </span>
-                      )}
+                      <img src={normalizeFileUrl(buildingImages[0])} alt="" className="w-full h-full object-cover" />
                     </div>
                   )}
                   {/* Identity */}
