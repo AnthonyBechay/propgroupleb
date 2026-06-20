@@ -2,19 +2,12 @@
 
 import { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, Upload, X, Loader2, Building2, Image as ImageIcon, Plus, CheckCircle, Sparkles, Star } from 'lucide-react'
+import { ArrowLeft, Upload, X, Loader2, Building2, Image as ImageIcon, Plus, CheckCircle, Sparkles, Star, Video } from 'lucide-react'
 import Link from 'next/link'
 import { normalizeApiUrl, normalizeFileUrl } from '@/lib/utils/api-url'
 import { PaymentPlansEditor, type PaymentPlan } from '@/components/admin/PaymentPlansEditor'
-
-const MOHAFAZAT = [
-  'BEIRUT', 'MOUNT_LEBANON', 'NORTH', 'SOUTH', 'BEKAA', 'NABATIEH', 'AKKAR', 'BAALBEK_HERMEL',
-]
-const MOHAFAZAT_LABELS: Record<string, string> = {
-  BEIRUT: 'Beirut', MOUNT_LEBANON: 'Mount Lebanon', NORTH: 'North Lebanon',
-  SOUTH: 'South Lebanon', BEKAA: 'Bekaa', NABATIEH: 'Nabatieh',
-  AKKAR: 'Akkar', BAALBEK_HERMEL: 'Baalbek-Hermel',
-}
+import { LocationFields } from '@/components/admin/LocationFields'
+import { BuildingDocumentsManager } from '@/components/admin/BuildingDocumentsManager'
 
 interface Props {
   initialData?: any
@@ -28,10 +21,12 @@ export function BuildingForm({ initialData, buildingId, embedded }: Props) {
   const router = useRouter()
   const isEdit = !!buildingId
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const videoInputRef = useRef<HTMLInputElement>(null)
 
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [uploadingImages, setUploadingImages] = useState(false)
+  const [uploadingVideo, setUploadingVideo] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [highlightInput, setHighlightInput] = useState('')
   const [aiLoading, setAiLoading] = useState(false)
@@ -122,6 +117,21 @@ export function BuildingForm({ initialData, buildingId, embedded }: Props) {
     if (urls.length) setField('images', [...form.images, ...urls])
     if (failed.length) setError(`Some images failed to upload:\n${failed.join('\n')}`)
     setUploadingImages(false)
+  }
+
+  async function uploadVideo(file: File) {
+    setUploadingVideo(true)
+    setError(null)
+    try {
+      const apiUrl = normalizeApiUrl(process.env.NEXT_PUBLIC_API_URL || '')
+      const fd = new FormData()
+      fd.append('file', file)
+      const slug = (form.title?.trim() || buildingId || '').trim()
+      if (slug) fd.append('propertySlug', slug)
+      const res = await fetch(`${apiUrl}/api/upload/video`, { method: 'POST', credentials: 'include', body: fd })
+      if (res.ok) { const d = await res.json(); if (d.url) setField('videoUrl', d.url) }
+      else { const e = await res.json().catch(() => ({})); setError(e.message || e.error || 'Video upload failed') }
+    } catch { setError('Video upload failed') } finally { setUploadingVideo(false) }
   }
 
   const [deletingIdx, setDeletingIdx] = useState<number | null>(null)
@@ -386,26 +396,11 @@ export function BuildingForm({ initialData, buildingId, embedded }: Props) {
         {/* Location */}
         <div className="bg-white border rounded-xl p-6 space-y-4">
           <h2 className="font-semibold text-slate-900">Location</h2>
+          <LocationFields
+            value={{ mohafazat: form.mohafazat, caza: form.caza, city: form.city, neighborhood: form.neighborhood }}
+            onChange={(patch) => setForm(prev => ({ ...prev, ...patch }))}
+          />
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className={labelCls}>Mohafazat (Region)</label>
-              <select value={form.mohafazat} onChange={e => setField('mohafazat', e.target.value)} className={inputCls}>
-                <option value="">— Select region —</option>
-                {MOHAFAZAT.map(m => <option key={m} value={m}>{MOHAFAZAT_LABELS[m]}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className={labelCls}>Caza (District)</label>
-              <input type="text" value={form.caza} onChange={e => setField('caza', e.target.value)} className={inputCls} placeholder="e.g., Baabda" />
-            </div>
-            <div>
-              <label className={labelCls}>City</label>
-              <input type="text" value={form.city} onChange={e => setField('city', e.target.value)} className={inputCls} placeholder="e.g., Beirut" />
-            </div>
-            <div>
-              <label className={labelCls}>Neighborhood</label>
-              <input type="text" value={form.neighborhood} onChange={e => setField('neighborhood', e.target.value)} className={inputCls} placeholder="e.g., Verdun" />
-            </div>
             <div className="sm:col-span-2">
               <label className={labelCls}>Street Address</label>
               <input type="text" value={form.address} onChange={e => setField('address', e.target.value)} className={inputCls} placeholder="Full street address" />
@@ -435,8 +430,25 @@ export function BuildingForm({ initialData, buildingId, embedded }: Props) {
             </div>
           </div>
           <div>
-            <label className={labelCls}>Video URL</label>
-            <input type="url" value={form.videoUrl} onChange={e => setField('videoUrl', e.target.value)} className={inputCls} placeholder="https://..." />
+            <label className={labelCls}>Property video <span className="text-slate-400">(optional)</span></label>
+            {form.videoUrl ? (
+              <div className="flex items-center gap-2 text-sm text-slate-700 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2">
+                <Video className="h-4 w-4 text-slate-500" />
+                <span className="flex-1 truncate">{form.videoUrl}</span>
+                <button type="button" onClick={() => setField('videoUrl', '')} className="text-slate-400 hover:text-red-600"><X className="h-4 w-4" /></button>
+              </div>
+            ) : (
+              <>
+                <div className="flex items-center gap-2">
+                  <button type="button" onClick={() => videoInputRef.current?.click()} disabled={uploadingVideo} className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium text-slate-700 border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-50">
+                    {uploadingVideo ? <Loader2 className="h-4 w-4 animate-spin" /> : <Video className="h-4 w-4" />} Upload a short video
+                  </button>
+                  <span className="text-xs text-slate-400">or paste a YouTube link below</span>
+                </div>
+                <input type="url" value={form.videoUrl} onChange={e => setField('videoUrl', e.target.value)} className={inputCls + ' mt-2'} placeholder="https://youtube.com/…" />
+              </>
+            )}
+            <input ref={videoInputRef} type="file" accept="video/mp4,video/webm,video/quicktime" className="hidden" onChange={e => { if (e.target.files?.[0]) uploadVideo(e.target.files[0]); e.target.value = '' }} />
           </div>
         </div>
 
@@ -557,6 +569,14 @@ export function BuildingForm({ initialData, buildingId, embedded }: Props) {
           <h2 className="font-semibold text-slate-900">Payment Plans</h2>
           <PaymentPlansEditor value={form.paymentPlans} onChange={(plans) => setField('paymentPlans', plans)} />
         </div>
+
+        {/* Documents — manage the property's documents (edit only) */}
+        {isEdit && buildingId && (
+          <div className="bg-white border rounded-xl p-6 space-y-4">
+            <h2 className="font-semibold text-slate-900">Documents</h2>
+            <BuildingDocumentsManager buildingId={buildingId} />
+          </div>
+        )}
 
         {/* SEO */}
         <div className="bg-white border rounded-xl p-6 space-y-4">

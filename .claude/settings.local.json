@@ -386,7 +386,12 @@
       "Bash(awk '/^model User /{f=1} f{print NR\": \"$0} /^}/{if\\(f\\)exit}' packages/db/prisma/schema.prisma)",
       "Bash(awk '/^model Building /{f=1} f{print NR\": \"$0} /^}/{if\\(f\\)exit}' packages/db/prisma/schema.prisma)",
       "Bash(sed -n '1,40p' apps/web/src/app/about/page.tsx)",
-      "Bash(sed -n '1,45p' apps/web/src/app/contact/page.tsx)"
+      "Bash(sed -n '1,45p' apps/web/src/app/contact/page.tsx)",
+      "Bash(perl -0pi -e 's/\\\\n\\\\s*buildingImages=\\\\{buildingImages\\\\}//g' apps/web/src/app/\\\\\\(admin\\\\\\)/admin/buildings/UnitsManager.tsx)",
+      "Skill(code-review)",
+      "Skill(code-review:*)",
+      "Bash(sed -n '/async function runAiSearch/,/^  }/p' apps/web/src/components/listing/ListingsFilterBar.tsx)",
+      "Bash(sed -n '/Pick the best image\\\\|building-first\\\\|firstImage\\\\|listing.slug/p' apps/web/src/components/listing/ListingCard.tsx)"
     ],
     "deny": [],
     "ask": []

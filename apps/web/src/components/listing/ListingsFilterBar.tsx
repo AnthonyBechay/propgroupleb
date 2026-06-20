@@ -129,8 +129,14 @@ export function ListingsFilterBar() {
         const v = filters[k]
         if (v !== null && v !== undefined && v !== '') params.set(k, String(v))
       }
-      setAiSummary(data?.summary || 'Here’s what I found:')
-      router.push(params.toString() ? `${pathname}?${params.toString()}` : pathname)
+      if (params.toString()) {
+        setAiSummary(data?.summary || 'Here’s what I found:')
+        router.push(`${pathname}?${params.toString()}`)
+      } else {
+        // AI returned no usable filters (unavailable, or it couldn't parse the
+        // request). Don't wipe the user's current filters — just explain.
+        setAiSummary(data?.summary || 'Sorry, I couldn’t turn that into filters — try rephrasing, or use the filters below.')
+      }
     } catch {
       setAiSummary('AI search is unavailable right now — please try the filters below.')
     } finally {

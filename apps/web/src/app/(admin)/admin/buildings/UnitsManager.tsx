@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import {
   Plus, Pencil, Trash2, Tag, Loader2, X,
@@ -94,11 +94,10 @@ function buildUnitPayload(f: UnitFormState) {
 }
 
 function UnitFormPanel({
-  initial, buildingId, buildingImages = [], unitId, ownerAssigned, onSave, onCancel, saving,
+  initial, buildingId, unitId, ownerAssigned, onSave, onCancel, saving,
 }: {
   initial: UnitFormState
   buildingId: string
-  buildingImages?: string[]
   unitId?: string
   ownerAssigned?: boolean
   onSave: (f: UnitFormState) => void
@@ -140,9 +139,40 @@ function UnitFormPanel({
     }
   }
 
-  // Photos are managed at the property (building) level — units don't carry
-  // their own images. apiUrl is used by the owner-assignment action below.
   const apiUrl = normalizeApiUrl(process.env.NEXT_PUBLIC_API_URL || '')
+
+  // Optional unit-specific photos (most properties just use the shared property
+  // photos; this is for the rare case a unit needs its own images).
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const [uploading, setUploading] = useState(false)
+  const [deletingIdx, setDeletingIdx] = useState<number | null>(null)
+
+  async function uploadUnitImages(files: FileList) {
+    setUploading(true)
+    const urls: string[] = []
+    for (const file of Array.from(files)) {
+      try {
+        const fd = new FormData()
+        fd.append('file', file)
+        fd.append('folder', 'units')
+        if (buildingId) fd.append('propertySlug', buildingId)
+        const res = await fetch(`${apiUrl}/api/upload`, { method: 'POST', credentials: 'include', body: fd })
+        if (res.ok) { const d = await res.json(); if (d.url) urls.push(d.url) }
+      } catch { /* skip */ }
+    }
+    if (urls.length) setF(p => ({ ...p, images: [...p.images, ...urls] }))
+    setUploading(false)
+  }
+  async function removeUnitImage(idx: number) {
+    const url = f.images[idx]
+    if (!url) return
+    setDeletingIdx(idx)
+    try {
+      await fetch(`${apiUrl}/api/upload`, { method: 'DELETE', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url }) })
+    } catch { /* best effort */ }
+    setF(p => ({ ...p, images: p.images.filter((_, i) => i !== idx) }))
+    setDeletingIdx(null)
+  }
 
   return (
     <div className="bg-zinc-50 border border-zinc-200 rounded-xl p-5 space-y-4">
@@ -188,25 +218,32 @@ function UnitFormPanel({
         </div>
       </div>
 
-      {/* Read-only property photos preview — managed on the property, shared across units */}
+      {/* Unit-specific photos (optional) — overrides the shared property photos for this unit */}
       <div>
-        <label className={lbl}>Property photos</label>
-        {buildingImages.length > 0 ? (
-          <>
-            <div className="grid grid-cols-4 sm:grid-cols-6 gap-2">
-              {buildingImages.slice(0, 12).map((url, i) => (
-                <div key={i} className="relative aspect-square">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={normalizeFileUrl(url)} alt="" className="w-full h-full object-cover rounded-lg border border-zinc-200" />
-                  {i === 0 && <span className="absolute top-1 left-1 text-[9px] bg-zinc-800 text-white px-1.5 py-0.5 rounded font-medium">Cover</span>}
-                </div>
-              ))}
-            </div>
-            <p className="text-xs text-zinc-400 mt-1.5">Managed on the property (Details tab) — shared across all its units.</p>
-          </>
-        ) : (
-          <p className="text-xs text-zinc-400">No photos yet. Add them on the property’s Details tab — they’re shared across all units.</p>
+        <label className={lbl}>Unit-specific photos <span className="text-zinc-400 font-normal">(optional)</span></label>
+        {f.images.length > 0 && (
+          <div className="grid grid-cols-4 sm:grid-cols-6 gap-2 mb-2">
+            {f.images.map((url, i) => (
+              <div key={i} className="relative group aspect-square">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={normalizeFileUrl(url)} alt="" className="w-full h-full object-cover rounded-lg border border-zinc-200" />
+                {deletingIdx === i && (
+                  <div className="absolute inset-0 bg-black/50 rounded-lg flex items-center justify-center"><Loader2 className="h-4 w-4 text-white animate-spin" /></div>
+                )}
+                <button type="button" onClick={() => removeUnitImage(i)} disabled={deletingIdx !== null} className="absolute top-1 right-1 p-0.5 bg-red-500 text-white rounded-md opacity-0 group-hover:opacity-100 transition-opacity disabled:opacity-50">
+                  <X className="h-3 w-3" />
+                </button>
+              </div>
+            ))}
+          </div>
         )}
+        <div className="border-2 border-dashed border-zinc-200 rounded-lg p-3 text-center hover:border-zinc-400 cursor-pointer" onClick={() => fileInputRef.current?.click()}>
+          {uploading
+            ? <span className="text-sm text-zinc-500 inline-flex items-center gap-2"><Loader2 className="h-4 w-4 animate-spin" /> Uploading…</span>
+            : <span className="text-sm text-zinc-500">Click to add photos for this unit only</span>}
+        </div>
+        <input ref={fileInputRef} type="file" accept="image/jpeg,image/png,image/webp" multiple className="hidden" onChange={e => { if (e.target.files?.length) uploadUnitImages(e.target.files); e.target.value = '' }} />
+        <p className="text-xs text-zinc-400 mt-1">Leave empty to use the property’s shared photos. Add photos here only if this unit needs its own.</p>
       </div>
 
       {/* Assign to a user (admin) — only for existing units */}
@@ -928,7 +965,6 @@ export function UnitsManager({ buildingId, buildingImages = [] }: { buildingId: 
         <UnitFormPanel
           initial={EMPTY_UNIT}
           buildingId={buildingId}
-          buildingImages={buildingImages}
           onSave={handleCreateUnit}
           onCancel={() => setShowAddUnit(false)}
           saving={saving}
@@ -1090,7 +1126,6 @@ export function UnitsManager({ buildingId, buildingImages = [] }: { buildingId: 
                         images:     unit.images ?? [],
                       }}
                       buildingId={buildingId}
-                      buildingImages={buildingImages}
                       unitId={unit.id}
                       ownerAssigned={!!unit.ownerUserId}
                       onSave={f => handleUpdateUnit(unit.id, f)}

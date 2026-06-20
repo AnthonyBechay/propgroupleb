@@ -3,12 +3,11 @@
 import { useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, Loader2, Building2, Image as ImageIcon, X, Home, Plus, Sparkles, Star, MapPin, FileText, Upload, Video } from 'lucide-react'
+import { ArrowLeft, Loader2, Building2, Image as ImageIcon, X, Home, Plus, Sparkles, Star, FileText, Upload, Video } from 'lucide-react'
 import { normalizeApiUrl, normalizeFileUrl } from '@/lib/utils/api-url'
-import { searchLocations, MOHAFAZAT_LABEL, type LebanonLocation } from '@/lib/lebanon-locations'
 import { PaymentPlansEditor, type PaymentPlan } from '@/components/admin/PaymentPlansEditor'
+import { LocationFields } from '@/components/admin/LocationFields'
 
-const MOHAFAZAT = ['BEIRUT', 'MOUNT_LEBANON', 'NORTH', 'SOUTH', 'BEKAA', 'NABATIEH', 'AKKAR', 'BAALBEK_HERMEL']
 const UNIT_KINDS = ['APARTMENT', 'STUDIO', 'DUPLEX', 'PENTHOUSE', 'VILLA', 'TOWNHOUSE', 'SHOP', 'OFFICE', 'LAND_PARCEL']
 const AMENITIES = [
   { key: 'hasGenerator', label: 'Generator' }, { key: 'hasElevator', label: 'Elevator' },
@@ -38,10 +37,6 @@ export function CreatePropertyForm() {
   const [highlightInput, setHighlightInput] = useState('')
   const [aiLoading, setAiLoading] = useState(false)
 
-  // location typeahead
-  const [locQuery, setLocQuery] = useState('')
-  const [locResults, setLocResults] = useState<LebanonLocation[]>([])
-
   const [f, setF] = useState({
     title: '', kind: 'STANDALONE', status: 'NEW_BUILD', visibility: 'PUBLIC', featured: false,
     shortDescription: '', description: '',
@@ -60,17 +55,6 @@ export function CreatePropertyForm() {
 
   const [docs, setDocs] = useState<DocEntry[]>([])
   const [paymentPlans, setPaymentPlans] = useState<PaymentPlan[]>([])
-
-  // ── Location typeahead ──────────────────────────────────────────────────────
-  function onLocQuery(q: string) {
-    setLocQuery(q)
-    setLocResults(searchLocations(q))
-  }
-  function pickLocation(l: LebanonLocation) {
-    setF(p => ({ ...p, mohafazat: l.mohafazat, caza: l.caza, city: l.name, neighborhood: '' }))
-    setLocQuery(`${l.name} — ${l.caza}, ${MOHAFAZAT_LABEL[l.mohafazat]}`)
-    setLocResults([])
-  }
 
   // ── Highlights ──────────────────────────────────────────────────────────────
   function addHighlight() {
@@ -289,35 +273,11 @@ export function CreatePropertyForm() {
         {/* Location */}
         <div className="bg-white border rounded-xl p-6 space-y-4">
           <h2 className="font-semibold text-slate-900">Location</h2>
-          <div className="relative">
-            <label className={lbl}>Search location</label>
-            <div className="relative">
-              <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
-              <input value={locQuery} onChange={e => onLocQuery(e.target.value)} className={inp + ' pl-9'} placeholder="Type a town or region — e.g. Amchit, or Mount Lebanon" />
-            </div>
-            {locResults.length > 0 && (
-              <div className="absolute z-20 mt-1 w-full bg-white border border-slate-200 rounded-lg shadow-lg max-h-64 overflow-auto">
-                {locResults.map((l, i) => (
-                  <button key={i} type="button" onClick={() => pickLocation(l)} className="w-full text-left px-3 py-2 text-sm hover:bg-slate-50 flex items-center justify-between">
-                    <span className="font-medium text-slate-800">{l.name}</span>
-                    <span className="text-xs text-slate-400">{l.caza} · {MOHAFAZAT_LABEL[l.mohafazat]}</span>
-                  </button>
-                ))}
-              </div>
-            )}
-            <p className="text-xs text-slate-400 mt-1">Picks fill region, district and city automatically. You can still edit the fields below.</p>
-          </div>
+          <LocationFields
+            value={{ mohafazat: f.mohafazat, caza: f.caza, city: f.city, neighborhood: f.neighborhood }}
+            onChange={(patch) => setF(p => ({ ...p, ...patch }))}
+          />
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className={lbl}>Region (Mohafazat)</label>
-              <select value={f.mohafazat} onChange={e => set('mohafazat', e.target.value)} className={inp}>
-                <option value="">— Select region —</option>
-                {MOHAFAZAT.map(m => <option key={m} value={m}>{MOHAFAZAT_LABEL[m]}</option>)}
-              </select>
-            </div>
-            <div><label className={lbl}>Caza (District)</label><input value={f.caza} onChange={e => set('caza', e.target.value)} className={inp} placeholder="e.g., Jbeil" /></div>
-            <div><label className={lbl}>City / Town</label><input value={f.city} onChange={e => set('city', e.target.value)} className={inp} placeholder="e.g., Amchit" /></div>
-            <div><label className={lbl}>Neighborhood</label><input value={f.neighborhood} onChange={e => set('neighborhood', e.target.value)} className={inp} placeholder="optional" /></div>
             <div className="sm:col-span-2"><label className={lbl}>Street Address <span className="text-slate-400">(optional)</span></label><input value={f.address} onChange={e => set('address', e.target.value)} className={inp} placeholder="Leave empty if not applicable" /></div>
             <div className="sm:col-span-2"><label className={lbl}>Google Maps URL</label><input type="url" value={f.locationUrl} onChange={e => set('locationUrl', e.target.value)} className={inp} placeholder="https://maps.google.com/..." /></div>
           </div>

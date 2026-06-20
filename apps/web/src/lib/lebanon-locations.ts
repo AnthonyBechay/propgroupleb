@@ -1,11 +1,13 @@
 // Curated Lebanon locality gazetteer for the property location typeahead.
-// Each entry maps a town/area to its caza (district) and mohafazat (region).
-// Not exhaustive — covers the common localities; admins can still edit fields
-// manually. Extend freely.
+// An entry maps a town (or a sub-area/neighborhood of a town) to its parent
+// town (`city`, when applicable), caza (district) and mohafazat (region).
+// Picking a sub-area fills BOTH the city and the neighborhood fields.
+// Not exhaustive; admins can still edit fields manually. Extend freely.
 export interface LebanonLocation {
-  name: string
+  name: string       // town, OR a sub-area/neighborhood when `city` is set
   caza: string
-  mohafazat: string // enum value
+  mohafazat: string  // enum value
+  city?: string      // parent town/area when `name` is a sub-area
 }
 
 export const MOHAFAZAT_LABEL: Record<string, string> = {
@@ -14,82 +16,100 @@ export const MOHAFAZAT_LABEL: Record<string, string> = {
   AKKAR: 'Akkar', BAALBEK_HERMEL: 'Baalbek-Hermel',
 }
 
+const ML = 'MOUNT_LEBANON'
+const town = (names: string[], caza: string, mohafazat: string): LebanonLocation[] =>
+  names.map((name) => ({ name, caza, mohafazat }))
+// Sub-areas/neighborhoods of a parent town — picking one fills city + neighborhood.
+const sub = (city: string, names: string[], caza: string, mohafazat: string): LebanonLocation[] =>
+  names.map((name) => ({ name, caza, mohafazat, city }))
+
 export const LEBANON_LOCATIONS: LebanonLocation[] = [
-  // Beirut
-  ...['Beirut', 'Achrafieh', 'Hamra', 'Verdun', 'Ras Beirut', 'Mazraa', 'Badaro', 'Sodeco', 'Gemmayze', 'Mar Mikhael', 'Saifi', 'Ain El Mreisseh', 'Manara', 'Raouche', 'Tallet El Khayat', 'Mathaf']
-    .map((name) => ({ name, caza: 'Beirut', mohafazat: 'BEIRUT' })),
+  // ── Beirut ─────────────────────────────────────────────────────────────────
+  ...town([
+    'Beirut', 'Achrafieh', 'Hamra', 'Ras Beirut', 'Verdun', 'Mazraa', 'Msaytbeh', 'Badaro', 'Sodeco',
+    'Gemmayze', 'Mar Mikhael', 'Saifi', 'Downtown', 'Manara', 'Raouche', 'Ain El Mreisseh', 'Clemenceau',
+    'Qantari', 'Mathaf', 'Tallet El Khayat', 'Ras El Nabaa', 'Bachoura', 'Zqaq El Blat', 'Basta',
+    'Tariq El Jdideh', 'Ain El Tineh', 'Karantina', 'Corniche El Nahr',
+  ], 'Beirut', 'BEIRUT'),
+  // Achrafieh sub-neighborhoods → city = Achrafieh, neighborhood = the sub-area
+  ...sub('Achrafieh', ['Sassine', 'Sioufi', 'Karm El Zeitoun', 'Geitawi', 'Rmeil', 'Furn El Hayek', 'Adlieh', 'Nasra', 'Monot'], 'Beirut', 'BEIRUT'),
 
-  // Mount Lebanon — Jbeil (Byblos)
-  ...['Jbeil (Byblos)', 'Amchit', 'Halat', 'Fidar', 'Blat', 'Mastita', 'Edde', 'Aaqoura', 'Laqlouq', 'Kartaba']
-    .map((name) => ({ name, caza: 'Jbeil', mohafazat: 'MOUNT_LEBANON' })),
-  // Mount Lebanon — Keserwan
-  ...['Jounieh', 'Kaslik', 'Zouk Mosbeh', 'Zouk Mikael', 'Adma', 'Ghazir', 'Kfardebian', 'Faraya', 'Ajaltoun', 'Ballouneh', 'Jeita', 'Harissa', 'Sahel Alma', 'Daraoun', 'Bouar']
-    .map((name) => ({ name, caza: 'Keserwan', mohafazat: 'MOUNT_LEBANON' })),
-  // Mount Lebanon — Metn
-  ...['Jdeideh', 'Sin El Fil', 'Dekwaneh', 'Mansourieh', 'Beit Mery', 'Broumana', 'Antelias', 'Naccache', 'Rabieh', 'Dbayeh', 'Zalka', 'Jal El Dib', 'Bikfaya', 'Baabdat', 'Dhour Choueir', 'Bauchrieh', 'Mtayleb']
-    .map((name) => ({ name, caza: 'Metn', mohafazat: 'MOUNT_LEBANON' })),
-  // Mount Lebanon — Baabda
-  ...['Baabda', 'Hazmieh', 'Furn El Chebbak', 'Hadath', 'Chiyah', 'Yarze', 'Louaize', 'Kfarshima', 'Wadi Chahrour']
-    .map((name) => ({ name, caza: 'Baabda', mohafazat: 'MOUNT_LEBANON' })),
-  // Mount Lebanon — Aley
-  ...['Aley', 'Bhamdoun', 'Sofar', 'Bchamoun', 'Choueifat', 'Kahale', 'Souk El Gharb', 'Aaramoun']
-    .map((name) => ({ name, caza: 'Aley', mohafazat: 'MOUNT_LEBANON' })),
-  // Mount Lebanon — Chouf
-  ...['Beiteddine', 'Deir El Qamar', 'Baakline', 'Moukhtara', 'Damour', 'Barouk', 'Maaser El Chouf', 'Jdeidet El Chouf']
-    .map((name) => ({ name, caza: 'Chouf', mohafazat: 'MOUNT_LEBANON' })),
+  // ── Mount Lebanon — Metn ───────────────────────────────────────────────────
+  ...town([
+    'Jdeideh', 'Bauchrieh', 'Sed El Bauchrieh', 'Sin El Fil', 'Dekwaneh', 'Fanar', 'Sabtieh',
+    'Bourj Hammoud', 'Dora', 'Mkalles', 'Mansourieh', 'Beit Mery', 'Broumana', 'Baabdat', 'Bikfaya',
+    'Dhour Choueir', 'Antelias', 'Naccache', 'Rabieh', 'Rabweh', 'Mtayleb', 'Dbayeh', 'Zalka',
+    'Jal El Dib', 'Bsalim', 'Mazraat Yachouh', 'Aoukar', 'Roumieh', 'Ain Saadeh', 'Ain Aar',
+    'Qornet El Hamra', 'Cornet Chehwane', 'Beit El Chaar', 'Monteverde', 'Elissar', 'Mar Roukoz', 'New Rawda',
+  ], 'Metn', ML),
 
-  // North — Tripoli
-  ...['Tripoli', 'El Mina', 'Beddawi', 'Qalamoun']
-    .map((name) => ({ name, caza: 'Tripoli', mohafazat: 'NORTH' })),
-  // North — Koura
-  ...['Amioun', 'Anfeh', 'Chekka', 'Kousba', 'Kfaraakka']
-    .map((name) => ({ name, caza: 'Koura', mohafazat: 'NORTH' })),
-  // North — Batroun
-  ...['Batroun', 'Tannourine', 'Douma', 'Kfifane', 'Chatine']
-    .map((name) => ({ name, caza: 'Batroun', mohafazat: 'NORTH' })),
-  // North — Zgharta / Bcharre / Danniyeh
-  ...['Zgharta', 'Ehden'].map((name) => ({ name, caza: 'Zgharta', mohafazat: 'NORTH' })),
-  ...['Bcharre', 'Hasroun', 'The Cedars'].map((name) => ({ name, caza: 'Bcharre', mohafazat: 'NORTH' })),
-  ...['Sir El Danniyeh', 'Minieh', 'Bakhoun'].map((name) => ({ name, caza: 'Minieh-Danniyeh', mohafazat: 'NORTH' })),
+  // ── Mount Lebanon — Keserwan ───────────────────────────────────────────────
+  ...town([
+    'Jounieh', 'Zouk Mosbeh', 'Zouk Mikael', 'Adma', 'Ghazir', 'Tabarja', 'Safra', 'Bouar', 'Kfardebian',
+    'Faraya', 'Hrajel', 'Mayrouba', 'Reyfoun', 'Ajaltoun', 'Ballouneh', 'Jeita', 'Harissa', 'Daraoun',
+    'Sahel Alma', 'Kleiat',
+  ], 'Keserwan', ML),
+  // Greater Jounieh sub-areas → city = Jounieh, neighborhood = the sub-area
+  ...sub('Jounieh', ['Kaslik', 'Sarba', 'Haret Sakher', 'Ghadir', 'Maameltein'], 'Keserwan', ML),
 
-  // Akkar
-  ...['Halba', 'Qoubaiyat', 'Bebnine', 'Chadra', 'Rahbe', 'Michmich']
-    .map((name) => ({ name, caza: 'Akkar', mohafazat: 'AKKAR' })),
+  // ── Mount Lebanon — Jbeil (Byblos) ─────────────────────────────────────────
+  ...town(['Jbeil (Byblos)', 'Amchit', 'Halat', 'Fidar', 'Blat', 'Mastita', 'Edde', 'Hboub', 'Aaqoura', 'Laqlouq', 'Kartaba', 'Mechmech', 'Berbara', 'Maad'], 'Jbeil', ML),
 
-  // Bekaa
-  ...['Zahle', 'Chtaura', 'Ksara', 'Taanayel', 'Qabb Elias', 'Bar Elias']
-    .map((name) => ({ name, caza: 'Zahle', mohafazat: 'BEKAA' })),
-  ...['Jib Jannine', 'Saghbine', 'Kamed El Loz', 'Machghara']
-    .map((name) => ({ name, caza: 'Western Bekaa', mohafazat: 'BEKAA' })),
-  ...['Rachaya', 'Aiha'].map((name) => ({ name, caza: 'Rachaya', mohafazat: 'BEKAA' })),
+  // ── Mount Lebanon — Baabda ─────────────────────────────────────────────────
+  ...town(['Baabda', 'Hazmieh', 'Furn El Chebbak', 'Hadath', 'Chiyah', 'Ghobeiry', 'Haret Hreik', 'Bir Hassan', 'Jnah', 'Yarze', 'Louaize', 'Kfarshima', 'Wadi Chahrour', 'Bsaba'], 'Baabda', ML),
 
-  // Baalbek-Hermel
-  ...['Baalbek', 'Douris', 'Ras Baalbek', 'Deir El Ahmar', 'Brital', 'Chmistar']
-    .map((name) => ({ name, caza: 'Baalbek', mohafazat: 'BAALBEK_HERMEL' })),
-  ...['Hermel', 'Qasr'].map((name) => ({ name, caza: 'Hermel', mohafazat: 'BAALBEK_HERMEL' })),
+  // ── Mount Lebanon — Aley ───────────────────────────────────────────────────
+  ...town(['Aley', 'Bhamdoun', 'Sofar', 'Bchamoun', 'Choueifat', 'Aaramoun', 'Kahale', 'Souk El Gharb', 'Bsous', 'Ainab', 'Kaifoun'], 'Aley', ML),
 
-  // South
-  ...['Saida (Sidon)', 'Ghazieh', 'Haret Saida', 'Abra', 'Miye Ou Miye']
-    .map((name) => ({ name, caza: 'Saida', mohafazat: 'SOUTH' })),
-  ...['Jezzine', 'Bkassine', 'Roum'].map((name) => ({ name, caza: 'Jezzine', mohafazat: 'SOUTH' })),
-  ...['Tyre (Sour)', 'Abbassiyeh', 'Qana', 'Naqoura', 'Bourj El Chemali']
-    .map((name) => ({ name, caza: 'Tyre', mohafazat: 'SOUTH' })),
+  // ── Mount Lebanon — Chouf ──────────────────────────────────────────────────
+  ...town(['Beiteddine', 'Deir El Qamar', 'Baakline', 'Moukhtara', 'Damour', 'Barouk', 'Maaser El Chouf', 'Jdeidet El Chouf', 'Kfarhim', 'Semqanieh'], 'Chouf', ML),
 
-  // Nabatieh
-  ...['Nabatieh', 'Kfar Roummane', 'Habbouch', 'Zefta']
-    .map((name) => ({ name, caza: 'Nabatieh', mohafazat: 'NABATIEH' })),
-  ...['Marjeyoun', 'Khiam', 'Kfar Kila'].map((name) => ({ name, caza: 'Marjeyoun', mohafazat: 'NABATIEH' })),
-  ...['Hasbaya', 'Chebaa', 'Kfarchouba'].map((name) => ({ name, caza: 'Hasbaya', mohafazat: 'NABATIEH' })),
-  ...['Bint Jbeil', 'Aitaroun', 'Ainata', 'Maroun El Ras'].map((name) => ({ name, caza: 'Bint Jbeil', mohafazat: 'NABATIEH' })),
+  // ── North ──────────────────────────────────────────────────────────────────
+  ...town(['Tripoli', 'El Mina', 'Beddawi', 'Qalamoun', 'Dahr El Ain'], 'Tripoli', 'NORTH'),
+  ...town(['Amioun', 'Anfeh', 'Chekka', 'Kousba', 'Kfaraakka', 'Btouratij'], 'Koura', 'NORTH'),
+  ...town(['Batroun', 'Tannourine', 'Douma', 'Kfifane', 'Chatine', 'Kfar Abida'], 'Batroun', 'NORTH'),
+  ...town(['Zgharta', 'Ehden', 'Kfardlakos'], 'Zgharta', 'NORTH'),
+  ...town(['Bcharre', 'Hasroun', 'The Cedars', 'Hadchit'], 'Bcharre', 'NORTH'),
+  ...town(['Sir El Danniyeh', 'Minieh', 'Bakhoun', 'Bqaa Safrine'], 'Minieh-Danniyeh', 'NORTH'),
+
+  // ── Akkar ──────────────────────────────────────────────────────────────────
+  ...town(['Halba', 'Qoubaiyat', 'Bebnine', 'Chadra', 'Rahbe', 'Michmich', 'Berqayel', 'Aabde'], 'Akkar', 'AKKAR'),
+
+  // ── Bekaa ──────────────────────────────────────────────────────────────────
+  ...town(['Zahle', 'Chtaura', 'Ksara', 'Taanayel', 'Qabb Elias', 'Bar Elias', 'Ablah', 'Riyaq'], 'Zahle', 'BEKAA'),
+  ...town(['Jib Jannine', 'Saghbine', 'Kamed El Loz', 'Machghara', 'Joub Jannine'], 'Western Bekaa', 'BEKAA'),
+  ...town(['Rachaya', 'Aiha', 'Kfarmechki'], 'Rachaya', 'BEKAA'),
+
+  // ── Baalbek-Hermel ─────────────────────────────────────────────────────────
+  ...town(['Baalbek', 'Douris', 'Ras Baalbek', 'Deir El Ahmar', 'Brital', 'Chmistar', 'Iaat'], 'Baalbek', 'BAALBEK_HERMEL'),
+  ...town(['Hermel', 'Qasr', 'Fissan'], 'Hermel', 'BAALBEK_HERMEL'),
+
+  // ── South ──────────────────────────────────────────────────────────────────
+  ...town(['Saida (Sidon)', 'Ghazieh', 'Haret Saida', 'Abra', 'Miye Ou Miye', 'Hlaliyeh'], 'Saida', 'SOUTH'),
+  ...town(['Jezzine', 'Bkassine', 'Roum'], 'Jezzine', 'SOUTH'),
+  ...town(['Tyre (Sour)', 'Abbassiyeh', 'Qana', 'Naqoura', 'Bourj El Chemali', 'Maaroub'], 'Tyre', 'SOUTH'),
+
+  // ── Nabatieh ───────────────────────────────────────────────────────────────
+  ...town(['Nabatieh', 'Kfar Roummane', 'Habbouch', 'Zefta', 'Doueir'], 'Nabatieh', 'NABATIEH'),
+  ...town(['Marjeyoun', 'Khiam', 'Kfar Kila'], 'Marjeyoun', 'NABATIEH'),
+  ...town(['Hasbaya', 'Chebaa', 'Kfarchouba'], 'Hasbaya', 'NABATIEH'),
+  ...town(['Bint Jbeil', 'Aitaroun', 'Ainata', 'Maroun El Ras'], 'Bint Jbeil', 'NABATIEH'),
 ]
 
-/** Search localities by town, caza, or region label. Returns up to `limit`. */
-export function searchLocations(query: string, limit = 12): LebanonLocation[] {
+/**
+ * Search localities by town/sub-area, parent town, caza, or region label.
+ * Returns up to `limit` (kept small to nudge admins toward typing a specific
+ * place rather than scrolling a long list). Name matches rank first.
+ */
+export function searchLocations(query: string, limit = 6): LebanonLocation[] {
   const q = query.trim().toLowerCase()
   if (!q) return []
-  return LEBANON_LOCATIONS.filter((l) =>
-    l.name.toLowerCase().includes(q) ||
-    l.caza.toLowerCase().includes(q) ||
-    (MOHAFAZAT_LABEL[l.mohafazat] ?? '').toLowerCase().includes(q)
-  ).slice(0, limit)
+  const nameMatches = LEBANON_LOCATIONS.filter((l) => l.name.toLowerCase().includes(q))
+  const otherMatches = LEBANON_LOCATIONS.filter(
+    (l) => !l.name.toLowerCase().includes(q) &&
+      ((l.city ?? '').toLowerCase().includes(q) ||
+        l.caza.toLowerCase().includes(q) ||
+        (MOHAFAZAT_LABEL[l.mohafazat] ?? '').toLowerCase().includes(q))
+  )
+  return [...nameMatches, ...otherMatches].slice(0, limit)
 }
