@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { ArrowLeft, Upload, X, Loader2, Building2, Image as ImageIcon, Plus, CheckCircle, Sparkles, Star } from 'lucide-react'
 import Link from 'next/link'
 import { normalizeApiUrl, normalizeFileUrl } from '@/lib/utils/api-url'
+import { PaymentPlansEditor, type PaymentPlan } from '@/components/admin/PaymentPlansEditor'
 
 const MOHAFAZAT = [
   'BEIRUT', 'MOUNT_LEBANON', 'NORTH', 'SOUTH', 'BEKAA', 'NABATIEH', 'AKKAR', 'BAALBEK_HERMEL',
@@ -70,6 +71,7 @@ export function BuildingForm({ initialData, buildingId, embedded }: Props) {
     metaTitle: initialData?.metaTitle ?? '',
     metaDescription: initialData?.metaDescription ?? '',
     organizationId: initialData?.organizationId ?? '',
+    paymentPlans: (initialData?.paymentPlans ?? []) as PaymentPlan[],
   })
 
   // Organizations (for assigning a building to a PM company / agency)
@@ -204,6 +206,7 @@ export function BuildingForm({ initialData, buildingId, embedded }: Props) {
       metaTitle: form.metaTitle || null,
       metaDescription: form.metaDescription || null,
       organizationId: form.organizationId || null,
+      paymentPlans: form.paymentPlans?.length ? form.paymentPlans : null,
     }
 
     try {
@@ -547,6 +550,12 @@ export function BuildingForm({ initialData, buildingId, embedded }: Props) {
             className="hidden"
             onChange={e => { if (e.target.files?.length) uploadImages(e.target.files); e.target.value = '' }}
           />
+        </div>
+
+        {/* Payment plans */}
+        <div className="bg-white border rounded-xl p-6 space-y-4">
+          <h2 className="font-semibold text-slate-900">Payment Plans</h2>
+          <PaymentPlansEditor value={form.paymentPlans} onChange={(plans) => setField('paymentPlans', plans)} />
         </div>
 
         {/* SEO */}

@@ -101,6 +101,13 @@ const buildingSchema = z.object({
   locationGuideId: z.string().optional().nullable(),
   agentId: z.string().optional().nullable(),
   organizationId: z.string().optional().nullable(), // owning PM company / agency
+  paymentPlans: z.array(z.object({
+    name: z.string(),
+    kind: z.enum(['CASH', 'INSTALLMENTS', 'CUSTOM']),
+    downPaymentPct: z.number().optional().nullable(),
+    months: z.number().optional().nullable(),
+    description: z.string().optional().nullable(),
+  })).optional().nullable(),
 });
 
 const unitCreateSchema = z.object({

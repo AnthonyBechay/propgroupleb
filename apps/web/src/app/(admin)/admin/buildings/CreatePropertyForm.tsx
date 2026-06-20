@@ -3,9 +3,10 @@
 import { useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, Loader2, Building2, Image as ImageIcon, X, Home, Plus, Sparkles, Star, MapPin, FileText, Upload } from 'lucide-react'
+import { ArrowLeft, Loader2, Building2, Image as ImageIcon, X, Home, Plus, Sparkles, Star, MapPin, FileText, Upload, Video } from 'lucide-react'
 import { normalizeApiUrl, normalizeFileUrl } from '@/lib/utils/api-url'
 import { searchLocations, MOHAFAZAT_LABEL, type LebanonLocation } from '@/lib/lebanon-locations'
+import { PaymentPlansEditor, type PaymentPlan } from '@/components/admin/PaymentPlansEditor'
 
 const MOHAFAZAT = ['BEIRUT', 'MOUNT_LEBANON', 'NORTH', 'SOUTH', 'BEKAA', 'NABATIEH', 'AKKAR', 'BAALBEK_HERMEL']
 const UNIT_KINDS = ['APARTMENT', 'STUDIO', 'DUPLEX', 'PENTHOUSE', 'VILLA', 'TOWNHOUSE', 'SHOP', 'OFFICE', 'LAND_PARCEL']
@@ -29,8 +30,10 @@ export function CreatePropertyForm() {
   const apiUrl = normalizeApiUrl(process.env.NEXT_PUBLIC_API_URL || '')
   const fileInputRef = useRef<HTMLInputElement>(null)
   const docInputRef = useRef<HTMLInputElement>(null)
+  const videoInputRef = useRef<HTMLInputElement>(null)
   const [saving, setSaving] = useState(false)
   const [uploading, setUploading] = useState(false)
+  const [uploadingVideo, setUploadingVideo] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [highlightInput, setHighlightInput] = useState('')
   const [aiLoading, setAiLoading] = useState(false)
@@ -56,6 +59,7 @@ export function CreatePropertyForm() {
   const set = (k: keyof typeof f, v: any) => setF(p => ({ ...p, [k]: v }))
 
   const [docs, setDocs] = useState<DocEntry[]>([])
+  const [paymentPlans, setPaymentPlans] = useState<PaymentPlan[]>([])
 
   // ── Location typeahead ──────────────────────────────────────────────────────
   function onLocQuery(q: string) {
@@ -106,6 +110,17 @@ export function CreatePropertyForm() {
   }
   function setCover(idx: number) {
     setF(p => { const imgs = [...p.images]; const [pick] = imgs.splice(idx, 1); imgs.unshift(pick); return { ...p, images: imgs } })
+  }
+  async function uploadVideo(file: File) {
+    setUploadingVideo(true)
+    try {
+      const fd = new FormData()
+      fd.append('file', file)
+      if (f.title.trim()) fd.append('propertySlug', f.title.trim())
+      const res = await fetch(`${apiUrl}/api/upload/video`, { method: 'POST', credentials: 'include', body: fd })
+      if (res.ok) { const d = await res.json(); if (d.url) set('videoUrl', d.url) }
+      else { const e = await res.json().catch(() => ({})); setError(e.message || e.error || 'Video upload failed') }
+    } catch { setError('Video upload failed') } finally { setUploadingVideo(false) }
   }
 
   // ── Documents ───────────────────────────────────────────────────────────────
@@ -169,6 +184,7 @@ export function CreatePropertyForm() {
           hasGenerator: f.hasGenerator, hasElevator: f.hasElevator, hasPool: f.hasPool, hasGym: f.hasGym,
           hasConcierge: f.hasConcierge, hasSecurity: f.hasSecurity, hasGarden: f.hasGarden, hasRooftop: f.hasRooftop, hasSolarPower: f.hasSolarPower,
           videoUrl: f.videoUrl || null, highlightedFeatures: f.highlightedFeatures,
+          paymentPlans: paymentPlans.length ? paymentPlans : null,
           metaTitle: f.metaTitle || null, metaDescription: f.metaDescription || null, images: f.images,
         }),
       })
@@ -315,7 +331,6 @@ export function CreatePropertyForm() {
             <div><label className={lbl}>Total Floors</label><input type="number" value={f.totalFloors} onChange={e => set('totalFloors', e.target.value)} className={inp} placeholder="12" min="1" /></div>
             <div><label className={lbl}>Parking Spaces</label><input type="number" value={f.parkingSpaces} onChange={e => set('parkingSpaces', e.target.value)} className={inp} placeholder="50" min="0" /></div>
           </div>
-          <div><label className={lbl}>Video URL</label><input type="url" value={f.videoUrl} onChange={e => set('videoUrl', e.target.value)} className={inp} placeholder="https://..." /></div>
         </div>
 
         {/* Amenities */}
@@ -410,6 +425,12 @@ export function CreatePropertyForm() {
           )}
         </div>
 
+        {/* Payment plans */}
+        <div className="bg-white border rounded-xl p-6 space-y-4">
+          <h2 className="font-semibold text-slate-900">Payment Plans</h2>
+          <PaymentPlansEditor value={paymentPlans} onChange={setPaymentPlans} />
+        </div>
+
         {/* Photos */}
         <div className="bg-white border rounded-xl p-6 space-y-4">
           <h2 className="font-semibold text-slate-900">Photos</h2>
@@ -436,6 +457,29 @@ export function CreatePropertyForm() {
               : <span className="text-sm text-slate-500 inline-flex items-center gap-2"><ImageIcon className="h-4 w-4 text-slate-400" /> Click to upload photos — hover a photo to set it as cover</span>}
           </div>
           <input ref={fileInputRef} type="file" accept="image/jpeg,image/png,image/webp" multiple className="hidden" onChange={e => { if (e.target.files?.length) uploadImages(e.target.files); e.target.value = '' }} />
+
+          {/* Property video — shown as part of the gallery on the public page */}
+          <div className="pt-2 border-t border-slate-100">
+            <label className={lbl}>Property video <span className="text-slate-400">(optional)</span></label>
+            {f.videoUrl ? (
+              <div className="flex items-center gap-2 text-sm text-slate-700 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2">
+                <Video className="h-4 w-4 text-slate-500" />
+                <span className="flex-1 truncate">{f.videoUrl}</span>
+                <button type="button" onClick={() => set('videoUrl', '')} className="text-slate-400 hover:text-red-600"><X className="h-4 w-4" /></button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2">
+                <button type="button" onClick={() => videoInputRef.current?.click()} disabled={uploadingVideo} className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium text-slate-700 border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-50">
+                  {uploadingVideo ? <Loader2 className="h-4 w-4 animate-spin" /> : <Video className="h-4 w-4" />} Upload a short video
+                </button>
+                <span className="text-xs text-slate-400">or paste a YouTube link below</span>
+              </div>
+            )}
+            {!f.videoUrl && (
+              <input value={f.videoUrl} onChange={e => set('videoUrl', e.target.value)} className={inp + ' mt-2'} placeholder="https://youtube.com/…  (optional)" />
+            )}
+            <input ref={videoInputRef} type="file" accept="video/mp4,video/webm,video/quicktime" className="hidden" onChange={e => { if (e.target.files?.[0]) uploadVideo(e.target.files[0]); e.target.value = '' }} />
+          </div>
         </div>
 
         {/* Documents */}

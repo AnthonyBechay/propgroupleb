@@ -520,6 +520,10 @@ model Building {
   youtubeUrls    String[] @default([])
   virtualTourUrl String?
 
+  // Payment plans offered (full cash / installments / custom) — array of
+  // { name, kind: 'CASH'|'INSTALLMENTS'|'CUSTOM', downPaymentPct?, months?, description? }
+  paymentPlans   Json?
+
   // SEO
   slug            String?   @unique
   metaTitle       String?

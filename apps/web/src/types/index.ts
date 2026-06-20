@@ -393,6 +393,7 @@ export interface Building {
   latitude?: number | null;
   longitude?: number | null;
   images: string[];
+  videoUrl?: string | null;
   youtubeUrls: string[];
   virtualTourUrl?: string | null;
   status: PropertyStatus;
@@ -403,6 +404,7 @@ export interface Building {
   totalFloors?: number | null;
   parkingSpaces?: number | null;
   highlightedFeatures?: string[] | null;
+  paymentPlans?: Array<{ name: string; kind: 'CASH' | 'INSTALLMENTS' | 'CUSTOM'; downPaymentPct?: number | null; months?: number | null; description?: string | null }> | null;
   hasGenerator: boolean;
   hasElevator: boolean;
   hasPool: boolean;

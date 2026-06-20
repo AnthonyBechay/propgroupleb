@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { Download, Loader2, Check } from 'lucide-react'
-import { normalizeFileUrl } from '@/lib/utils/api-url'
+import { normalizeFileUrl, normalizeApiUrl } from '@/lib/utils/api-url'
 import type { Listing } from '@/types'
 
 const MOHAFAZAT_LABELS: Record<string, string> = {
@@ -38,7 +38,16 @@ export function ProposalExport({ listing }: { listing: Listing }) {
   const [exporting, setExporting] = useState(false)
   const [done, setDone] = useState(false)
   const [mounted, setMounted] = useState(false)
-  useEffect(() => setMounted(true), [])
+  // Use the brand logo configured in admin settings (falls back to /logo.png).
+  const [logoUrl, setLogoUrl] = useState('/logo.png')
+  useEffect(() => {
+    setMounted(true)
+    const apiUrl = normalizeApiUrl(process.env.NEXT_PUBLIC_API_URL || '')
+    fetch(`${apiUrl}/api/content/media/branding.logoUrl`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => { const u = j?.data?.url || j?.url; if (u) setLogoUrl(normalizeFileUrl(u)) })
+      .catch(() => {})
+  }, [])
 
   const { unit, building } = listing
   const b = building ?? unit?.building
@@ -54,9 +63,11 @@ export function ProposalExport({ listing }: { listing: Listing }) {
   ].filter(Boolean).join('  ·  ')
 
   const overview = listing.description ?? b?.description ?? b?.shortDescription ?? null
-  const cover = (b?.images?.[0] ?? unit?.images?.[0]) ? normalizeFileUrl((b?.images?.[0] ?? unit?.images?.[0]) as string) : null
+  // Up to 5 property photos (not all — a property may have many).
+  const photoUrls = ((b?.images?.length ? b.images : unit?.images ?? []) as string[]).slice(0, 5).map((u) => normalizeFileUrl(u))
   const amenities = b ? AMENITY_LABELS.filter(([k]) => (b as unknown as Record<string, unknown>)[k]).map(([, label]) => label) : []
   const highlights = (b?.highlightedFeatures ?? []).filter(Boolean)
+  const plans = b?.paymentPlans ?? []
 
   const inv = building?.investmentData ?? null
   const downPct = inv?.downPaymentPercentage ?? 40
@@ -113,7 +124,7 @@ export function ProposalExport({ listing }: { listing: Listing }) {
         <div style={{ borderBottom: `3px solid ${INK}`, paddingBottom: 12, marginBottom: 16, ...noBreak }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={normalizeFileUrl('/logo.png')} alt="PropGroup" style={{ height: 50 }} />
+            <img src={logoUrl} alt="PropGroup" style={{ height: 50, maxWidth: 180, objectFit: 'contain' }} />
             <div style={{ textAlign: 'right', fontSize: 11, color: MUTED }}>
               <div style={{ letterSpacing: 2, fontWeight: 700, color: INK }}>INVESTMENT PROPOSAL</div>
               <div>{new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' })}</div>
@@ -133,19 +144,26 @@ export function ProposalExport({ listing }: { listing: Listing }) {
           </div>
         </div>
 
-        {/* Cover + overview */}
-        {(cover || overview) && (
-          <div style={{ display: 'flex', gap: 14, marginBottom: 16, ...noBreak }}>
-            {cover && (
+        {/* Photos (up to 5) */}
+        {photoUrls.length > 0 && (
+          <div style={{ display: 'flex', gap: 6, marginBottom: 14, ...noBreak }}>
+            {photoUrls.length === 1 ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={cover} alt="" style={{ width: 200, height: 130, objectFit: 'cover', borderRadius: 8, border: `1px solid ${LINE}`, flexShrink: 0 }} />
+              <img src={photoUrls[0]} alt="" style={{ width: '100%', height: 200, objectFit: 'cover', borderRadius: 8, border: `1px solid ${LINE}` }} />
+            ) : (
+              photoUrls.map((src, i) => (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img key={i} src={src} alt="" style={{ flex: 1, height: 96, objectFit: 'cover', borderRadius: 8, border: `1px solid ${LINE}`, minWidth: 0 }} />
+              ))
             )}
-            {overview && (
-              <div>
-                {H2('Overview')}
-                <div style={{ fontSize: 11.5, color: INK_SOFT, lineHeight: 1.6 }}>{overview.slice(0, 700)}</div>
-              </div>
-            )}
+          </div>
+        )}
+
+        {/* Overview */}
+        {overview && (
+          <div style={{ marginBottom: 16, ...noBreak }}>
+            {H2('Overview')}
+            <div style={{ fontSize: 11.5, color: INK_SOFT, lineHeight: 1.6 }}>{overview.slice(0, 700)}</div>
           </div>
         )}
 
@@ -174,6 +192,38 @@ export function ProposalExport({ listing }: { listing: Listing }) {
             ))}
           </div>
         </div>
+
+        {/* Payment plans (admin-defined) */}
+        {plans.length > 0 && (
+          <div style={{ marginBottom: 16, ...noBreak }}>
+            {H2('Payment plans')}
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+              {plans.map((p, i) => {
+                let line = ''
+                if (p.kind === 'INSTALLMENTS') {
+                  const total = listing.price
+                  const down = p.downPaymentPct != null ? Math.round((total * p.downPaymentPct) / 100) : null
+                  const monthly = down != null && p.months ? Math.round((total - down) / p.months) : null
+                  line = [
+                    p.downPaymentPct != null ? `${p.downPaymentPct}% down (${money(down ?? 0, listing.currency)})` : null,
+                    monthly && p.months ? `~${money(monthly, listing.currency)}/mo over ${p.months} months` : p.months ? `over ${p.months} months` : null,
+                  ].filter(Boolean).join(' · ')
+                } else if (p.kind === 'CASH') {
+                  line = p.description || 'Full payment'
+                } else {
+                  line = p.description || ''
+                }
+                return (
+                  <div key={i} style={{ flex: '1 1 45%', minWidth: 0, border: `1px solid ${LINE}`, borderRadius: 8, padding: '9px 12px' }}>
+                    <div style={{ fontSize: 11.5, fontWeight: 700, color: INK }}>{p.name}</div>
+                    {line && <div style={{ fontSize: 10.5, color: INK_SOFT, marginTop: 2 }}>{line}</div>}
+                    {p.kind === 'INSTALLMENTS' && p.description && <div style={{ fontSize: 10, color: MUTED, marginTop: 2 }}>{p.description}</div>}
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )}
 
         {/* Features + amenities */}
         {(highlights.length > 0 || amenities.length > 0) && (
