@@ -432,6 +432,43 @@ export default async function ListingDetailPage({ params }: PageProps) {
               </div>
             )}
 
+            {/* Payment plans */}
+            {building?.paymentPlans && building.paymentPlans.length > 0 && (
+              <div className="bg-white rounded-2xl border border-slate-200 p-6">
+                <h2 className="text-lg font-semibold text-slate-900 mb-4 flex items-center gap-2">
+                  <Wallet className="w-5 h-5 text-slate-500" /> Payment plans
+                </h2>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {building.paymentPlans.map((p, i) => {
+                    let detail = ''
+                    if (p.kind === 'INSTALLMENTS') {
+                      const total = listing.price
+                      const down = p.downPaymentPct != null ? Math.round((total * p.downPaymentPct) / 100) : null
+                      const months = p.months ?? null
+                      const monthly = down != null && months ? Math.round((total - down) / months) : null
+                      detail = [
+                        p.downPaymentPct != null ? `${p.downPaymentPct}% down (${formatPrice(down ?? 0, listing.currency)})` : null,
+                        monthly && months ? `≈ ${formatPrice(monthly, listing.currency)}/mo over ${months} months` : months ? `over ${months} months` : null,
+                      ].filter(Boolean).join(' · ')
+                    } else if (p.kind === 'CASH') {
+                      detail = p.description || 'Full payment'
+                    } else {
+                      detail = p.description || ''
+                    }
+                    return (
+                      <div key={i} className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+                        <p className="text-sm font-semibold text-slate-900">{p.name}</p>
+                        {detail && <p className="text-sm text-slate-600 mt-1">{detail}</p>}
+                        {p.kind === 'INSTALLMENTS' && p.description && (
+                          <p className="text-xs text-slate-400 mt-1">{p.description}</p>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+
             {/* Unit breakdown for PROJECT buildings */}
             {listing.subjectType === 'BUILDING' &&
               building?.kind === BuildingKind.PROJECT &&
@@ -681,43 +718,6 @@ export default async function ListingDetailPage({ params }: PageProps) {
                 </div>
               )
             })()}
-
-            {/* Payment plans */}
-            {building?.paymentPlans && building.paymentPlans.length > 0 && (
-              <div className="bg-white rounded-2xl border border-slate-200 p-5">
-                <p className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-1.5">
-                  <Wallet className="w-4 h-4 text-slate-500" /> Payment plans
-                </p>
-                <div className="space-y-2.5">
-                  {building.paymentPlans.map((p, i) => {
-                    let detail = ''
-                    if (p.kind === 'INSTALLMENTS') {
-                      const total = listing.price
-                      const down = p.downPaymentPct != null ? Math.round((total * p.downPaymentPct) / 100) : null
-                      const months = p.months ?? null
-                      const monthly = down != null && months ? Math.round((total - down) / months) : null
-                      detail = [
-                        p.downPaymentPct != null ? `${p.downPaymentPct}% down` : null,
-                        monthly && months ? `≈ ${formatPrice(monthly, listing.currency)}/mo × ${months}` : months ? `over ${months} months` : null,
-                      ].filter(Boolean).join(' · ')
-                    } else if (p.kind === 'CASH') {
-                      detail = p.description || 'Full payment'
-                    } else {
-                      detail = p.description || ''
-                    }
-                    return (
-                      <div key={i} className="rounded-xl bg-slate-50 px-3 py-2.5">
-                        <p className="text-sm font-medium text-slate-900">{p.name}</p>
-                        {detail && <p className="text-xs text-slate-500 mt-0.5">{detail}</p>}
-                        {p.kind !== 'CASH' && p.description && p.kind === 'INSTALLMENTS' && (
-                          <p className="text-xs text-slate-400 mt-0.5">{p.description}</p>
-                        )}
-                      </div>
-                    )
-                  })}
-                </div>
-              </div>
-            )}
 
             {/* Agent card */}
             {building?.agent && (

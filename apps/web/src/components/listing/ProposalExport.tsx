@@ -142,6 +142,11 @@ export function ProposalExport({ listing }: { listing: Listing }) {
             {b?.totalFloors != null && <span><strong>{b.totalFloors}</strong> floors</span>}
             {b?.parkingSpaces != null && b.parkingSpaces > 0 && <span><strong>{b.parkingSpaces}</strong> parking</span>}
           </div>
+          <div style={{ marginTop: 8, fontSize: 22, fontWeight: 800, color: INK }}>
+            {money(listing.price, listing.currency)}
+            {listing.intent === 'FOR_RENT' && listing.rentPeriod ? <span style={{ fontSize: 12, fontWeight: 500, color: MUTED }}> /{listing.rentPeriod.toLowerCase()}</span> : null}
+            {listing.negotiable ? <span style={{ fontSize: 11, fontWeight: 500, color: MUTED }}> · negotiable</span> : null}
+          </div>
         </div>
 
         {/* Photos (up to 5) */}
@@ -167,31 +172,40 @@ export function ProposalExport({ listing }: { listing: Listing }) {
           </div>
         )}
 
-        {/* Acquisition options */}
-        <div style={noBreak}>
-          {H2('Acquisition options')}
-          <div style={{ display: 'flex', gap: 12, marginBottom: 16 }}>
-            {options.map((o, i) => (
-              <div key={i} style={{ flex: 1, border: `1px solid ${LINE}`, borderRadius: 10, overflow: 'hidden', ...noBreak }}>
-                <div style={{ background: INK, color: '#fff', padding: '10px 13px' }}>
-                  <div style={{ fontSize: 10, opacity: 0.75, textTransform: 'uppercase', letterSpacing: 1 }}>Option {String.fromCharCode(65 + i)}</div>
-                  <div style={{ fontSize: 14, fontWeight: 700 }}>{o.name}</div>
-                  <div style={{ fontSize: 19, fontWeight: 800, marginTop: 3 }}>{money(o.total, o.currency)}{listing.negotiable ? <span style={{ fontSize: 10, fontWeight: 500, opacity: 0.8 }}> · negotiable</span> : null}</div>
+        {/* Acquisition options — only when the unit has real finish options
+            (e.g. White Frame / Turnkey). A synthesized single "Purchase" option
+            is not shown; the price is in the header and terms in Payment plans. */}
+        {rawOptions && rawOptions.length > 0 && (
+          <div style={noBreak}>
+            {H2('Acquisition options')}
+            <div style={{ display: 'flex', gap: 12, marginBottom: 16 }}>
+              {options.map((o, i) => (
+                <div key={i} style={{ flex: 1, border: `1px solid ${LINE}`, borderRadius: 10, overflow: 'hidden', ...noBreak }}>
+                  <div style={{ background: INK, color: '#fff', padding: '10px 13px' }}>
+                    <div style={{ fontSize: 10, opacity: 0.75, textTransform: 'uppercase', letterSpacing: 1 }}>Option {String.fromCharCode(65 + i)}</div>
+                    <div style={{ fontSize: 14, fontWeight: 700 }}>{o.name}</div>
+                    <div style={{ fontSize: 19, fontWeight: 800, marginTop: 3 }}>{money(o.total, o.currency)}</div>
+                  </div>
+                  <div style={{ padding: '11px 13px' }}>
+                    {o.idealFor && <div style={{ fontSize: 10.5, color: INK_SOFT, marginBottom: plans.length === 0 ? 9 : 0 }}>{o.idealFor}</div>}
+                    {/* Show a derived plan only if no explicit payment plans are defined */}
+                    {plans.length === 0 && (
+                      <>
+                        <div style={{ fontSize: 10.5, fontWeight: 700, color: INK, marginBottom: 5, letterSpacing: 0.5 }}>PAYMENT PLAN</div>
+                        <ol style={{ margin: 0, paddingLeft: 15, fontSize: 10.5, color: '#334155', lineHeight: 1.7 }}>
+                          <li>Sales agreement on signing</li>
+                          <li><strong>Down payment:</strong> {money(o.down, o.currency)} ({o.downPct}%)</li>
+                          <li><strong>Installments:</strong> {money(o.installmentsTotal, o.currency)} (~{money(o.monthly, o.currency)}/mo over {o.months} months, interest-free)</li>
+                          <li>Full ownership transfer on completion</li>
+                        </ol>
+                      </>
+                    )}
+                  </div>
                 </div>
-                <div style={{ padding: '11px 13px' }}>
-                  {o.idealFor && <div style={{ fontSize: 10.5, color: INK_SOFT, marginBottom: 9 }}>{o.idealFor}</div>}
-                  <div style={{ fontSize: 10.5, fontWeight: 700, color: INK, marginBottom: 5, letterSpacing: 0.5 }}>PAYMENT PLAN</div>
-                  <ol style={{ margin: 0, paddingLeft: 15, fontSize: 10.5, color: '#334155', lineHeight: 1.7 }}>
-                    <li>Sales agreement on signing</li>
-                    <li><strong>Down payment:</strong> {money(o.down, o.currency)} ({o.downPct}%)</li>
-                    <li><strong>Installments:</strong> {money(o.installmentsTotal, o.currency)} (~{money(o.monthly, o.currency)}/mo over {o.months} months, interest-free)</li>
-                    <li>Full ownership transfer on completion</li>
-                  </ol>
-                </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Payment plans (admin-defined) */}
         {plans.length > 0 && (

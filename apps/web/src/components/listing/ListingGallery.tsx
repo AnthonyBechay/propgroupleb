@@ -13,9 +13,28 @@ interface ListingGalleryProps {
 
 type Slide = { type: 'image'; url: string } | { type: 'video'; url: string }
 
-function youTubeId(url: string): string | null {
-  const m = url.match(/(?:youtube\.com\/(?:watch\?v=|embed\/)|youtu\.be\/)([\w-]{11})/)
-  return m ? m[1] : null
+function youTubeId(raw: string): string | null {
+  if (!raw) return null
+  let url = raw.trim()
+  if (!/^https?:\/\//i.test(url)) url = `https://${url}`
+  try {
+    const u = new URL(url)
+    const host = u.hostname.replace(/^www\.|^m\./, '')
+    if (host !== 'youtube.com' && host !== 'youtu.be') return null
+    if (host === 'youtu.be') return u.pathname.split('/').filter(Boolean)[0] || null
+    const v = u.searchParams.get('v')
+    if (v) return v
+    const parts = u.pathname.split('/').filter(Boolean) // embed/ID, shorts/ID, live/ID
+    const idx = parts.findIndex((p) => ['embed', 'shorts', 'live', 'v'].includes(p))
+    if (idx >= 0 && parts[idx + 1]) return parts[idx + 1]
+    return null
+  } catch {
+    return null
+  }
+}
+
+function isLikelyVideoFile(url: string): boolean {
+  return /\.(mp4|webm|mov|m4v|ogg)(\?|$)/i.test(url)
 }
 
 /**
@@ -89,9 +108,19 @@ export function ListingGallery({ images, title, videoUrl }: ListingGalleryProps)
             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
             allowFullScreen
           />
-        ) : (
+        ) : isLikelyVideoFile(current.url) ? (
           // eslint-disable-next-line jsx-a11y/media-has-caption
           <video src={normalizeFileUrl(current.url)} controls playsInline className="absolute inset-0 w-full h-full object-contain bg-black" />
+        ) : (
+          <a
+            href={current.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-white bg-slate-900"
+          >
+            <Play className="w-12 h-12 fill-white" />
+            <span className="text-sm">Watch video</span>
+          </a>
         )}
 
         {total > 1 && (
