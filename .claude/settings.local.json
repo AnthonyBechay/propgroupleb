@@ -391,7 +391,10 @@
       "Skill(code-review)",
       "Skill(code-review:*)",
       "Bash(sed -n '/async function runAiSearch/,/^  }/p' apps/web/src/components/listing/ListingsFilterBar.tsx)",
-      "Bash(sed -n '/Pick the best image\\\\|building-first\\\\|firstImage\\\\|listing.slug/p' apps/web/src/components/listing/ListingCard.tsx)"
+      "Bash(sed -n '/Pick the best image\\\\|building-first\\\\|firstImage\\\\|listing.slug/p' apps/web/src/components/listing/ListingCard.tsx)",
+      "Bash(awk '/^model Building /{f=1} f{print} /^}/{if\\(f\\)exit}' packages/db/prisma/schema.prisma)",
+      "Bash(awk '/enum PropertyVisibility/{f=1} f{print} /^}/{if\\(f\\)exit}' packages/db/prisma/schema.prisma)",
+      "Bash(awk '/enum UnitKind/{f=1} f{print} /^}/{if\\(f\\)exit}' packages/db/prisma/schema.prisma)"
     ],
     "deny": [],
     "ask": []

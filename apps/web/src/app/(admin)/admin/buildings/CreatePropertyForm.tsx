@@ -7,6 +7,7 @@ import { ArrowLeft, Loader2, Building2, Image as ImageIcon, X, Home, Plus, Spark
 import { normalizeApiUrl, normalizeFileUrl } from '@/lib/utils/api-url'
 import { PaymentPlansEditor, type PaymentPlan } from '@/components/admin/PaymentPlansEditor'
 import { LocationFields } from '@/components/admin/LocationFields'
+import { isKnownLocation } from '@/lib/lebanon-locations'
 
 const UNIT_KINDS = ['APARTMENT', 'STUDIO', 'DUPLEX', 'PENTHOUSE', 'VILLA', 'TOWNHOUSE', 'SHOP', 'OFFICE', 'LAND_PARCEL']
 const AMENITIES = [
@@ -145,6 +146,7 @@ export function CreatePropertyForm() {
   async function submit(e: React.FormEvent) {
     e.preventDefault()
     if (!f.title.trim()) { setError('Property title is required'); return }
+    if (!isKnownLocation({ city: f.city, neighborhood: f.neighborhood })) { setError('Pick a valid location from the search list before saving'); return }
     const perSqm = f.priceMode === 'PER_SQM'
     const area = f.areaSqm !== '' ? Number(f.areaSqm) : 0
     const totalPrice = perSqm ? (Number(f.price) || 0) * area : (Number(f.price) || 0)
@@ -325,9 +327,9 @@ export function CreatePropertyForm() {
           )}
         </div>
 
-        {/* Apartment */}
+        {/* Unit details (land/parking/storage skip beds/baths/floor) */}
         <div className="bg-white border rounded-xl p-6 space-y-4">
-          <h2 className="font-semibold text-slate-900 flex items-center gap-2"><Home className="h-4 w-4 text-slate-500" /> The apartment (unit)</h2>
+          <h2 className="font-semibold text-slate-900 flex items-center gap-2"><Home className="h-4 w-4 text-slate-500" /> Unit details</h2>
           <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
             <div className="col-span-2 sm:col-span-1">
               <label className={lbl}>Type</label>
@@ -335,11 +337,18 @@ export function CreatePropertyForm() {
                 {UNIT_KINDS.map(k => <option key={k} value={k}>{k.charAt(0) + k.slice(1).toLowerCase().replace('_', ' ')}</option>)}
               </select>
             </div>
-            <div><label className={lbl}>Beds</label><input type="number" min="0" value={f.bedrooms} onChange={e => set('bedrooms', e.target.value)} className={inp} /></div>
-            <div><label className={lbl}>Baths</label><input type="number" min="0" value={f.bathrooms} onChange={e => set('bathrooms', e.target.value)} className={inp} /></div>
-            <div><label className={lbl}>Area m²</label><input type="number" min="0" value={f.areaSqm} onChange={e => set('areaSqm', e.target.value)} className={inp} /></div>
-            <div><label className={lbl}>Floor</label><input type="number" value={f.floor} onChange={e => set('floor', e.target.value)} className={inp} /></div>
+            {!['LAND_PARCEL', 'PARKING', 'STORAGE'].includes(f.unitKind) && (
+              <>
+                <div><label className={lbl}>Beds</label><input type="number" min="0" value={f.bedrooms} onChange={e => set('bedrooms', e.target.value)} className={inp} /></div>
+                <div><label className={lbl}>Baths</label><input type="number" min="0" value={f.bathrooms} onChange={e => set('bathrooms', e.target.value)} className={inp} /></div>
+              </>
+            )}
+            <div><label className={lbl}>{f.unitKind === 'LAND_PARCEL' ? 'Land area m²' : 'Area m²'}</label><input type="number" min="0" value={f.areaSqm} onChange={e => set('areaSqm', e.target.value)} className={inp} /></div>
+            {f.unitKind !== 'LAND_PARCEL' && (
+              <div><label className={lbl}>Floor</label><input type="number" value={f.floor} onChange={e => set('floor', e.target.value)} className={inp} /></div>
+            )}
           </div>
+          {f.unitKind === 'LAND_PARCEL' && <p className="text-xs text-slate-400">For land, set the plot area and list it for sale below — bedrooms/floor don’t apply.</p>}
         </div>
 
         {/* Listing */}

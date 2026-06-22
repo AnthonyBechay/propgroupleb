@@ -97,6 +97,26 @@ export const LEBANON_LOCATIONS: LebanonLocation[] = [
 ]
 
 /**
+ * True when the picked value corresponds to a real entry in the gazetteer.
+ * - A sub-area value (neighborhood set) must match a `sub()` entry whose parent
+ *   town === city and name === neighborhood.
+ * - A town value (no neighborhood) must match a town entry whose name === city.
+ * Region/district are auto-filled from the pick, so we match on city/neighborhood.
+ * An empty value (nothing chosen yet) is NOT considered known.
+ */
+export function isKnownLocation(value: { city?: string; neighborhood?: string }): boolean {
+  const city = (value.city ?? '').trim().toLowerCase()
+  const neighborhood = (value.neighborhood ?? '').trim().toLowerCase()
+  if (!city) return false
+  if (neighborhood) {
+    return LEBANON_LOCATIONS.some(
+      (l) => !!l.city && l.city.toLowerCase() === city && l.name.toLowerCase() === neighborhood,
+    )
+  }
+  return LEBANON_LOCATIONS.some((l) => !l.city && l.name.toLowerCase() === city)
+}
+
+/**
  * Search localities by town/sub-area, parent town, caza, or region label.
  * Returns up to `limit` (kept small to nudge admins toward typing a specific
  * place rather than scrolling a long list). Name matches rank first.

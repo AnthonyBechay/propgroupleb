@@ -7,6 +7,7 @@ import Link from 'next/link'
 import { normalizeApiUrl, normalizeFileUrl } from '@/lib/utils/api-url'
 import { PaymentPlansEditor, type PaymentPlan } from '@/components/admin/PaymentPlansEditor'
 import { LocationFields } from '@/components/admin/LocationFields'
+import { isKnownLocation } from '@/lib/lebanon-locations'
 import { BuildingDocumentsManager } from '@/components/admin/BuildingDocumentsManager'
 
 interface Props {
@@ -179,6 +180,7 @@ export function BuildingForm({ initialData, buildingId, embedded }: Props) {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!form.title.trim()) { setError('Title is required'); return }
+    if (!isKnownLocation({ city: form.city, neighborhood: form.neighborhood })) { setError('Pick a valid location from the search list before saving'); return }
     setSaving(true)
     setError(null)
 
@@ -429,27 +431,6 @@ export function BuildingForm({ initialData, buildingId, embedded }: Props) {
               <input type="number" value={form.parkingSpaces} onChange={e => setField('parkingSpaces', e.target.value)} className={inputCls} placeholder="e.g., 50" min="0" />
             </div>
           </div>
-          <div>
-            <label className={labelCls}>Property video <span className="text-slate-400">(optional)</span></label>
-            {form.videoUrl ? (
-              <div className="flex items-center gap-2 text-sm text-slate-700 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2">
-                <Video className="h-4 w-4 text-slate-500" />
-                <span className="flex-1 truncate">{form.videoUrl}</span>
-                <button type="button" onClick={() => setField('videoUrl', '')} className="text-slate-400 hover:text-red-600"><X className="h-4 w-4" /></button>
-              </div>
-            ) : (
-              <>
-                <div className="flex items-center gap-2">
-                  <button type="button" onClick={() => videoInputRef.current?.click()} disabled={uploadingVideo} className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium text-slate-700 border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-50">
-                    {uploadingVideo ? <Loader2 className="h-4 w-4 animate-spin" /> : <Video className="h-4 w-4" />} Upload a short video
-                  </button>
-                  <span className="text-xs text-slate-400">or paste a YouTube link below</span>
-                </div>
-                <input type="url" value={form.videoUrl} onChange={e => setField('videoUrl', e.target.value)} className={inputCls + ' mt-2'} placeholder="https://youtube.com/…" />
-              </>
-            )}
-            <input ref={videoInputRef} type="file" accept="video/mp4,video/webm,video/quicktime" className="hidden" onChange={e => { if (e.target.files?.[0]) uploadVideo(e.target.files[0]); e.target.value = '' }} />
-          </div>
         </div>
 
         {/* Amenities */}
@@ -562,6 +543,29 @@ export function BuildingForm({ initialData, buildingId, embedded }: Props) {
             className="hidden"
             onChange={e => { if (e.target.files?.length) uploadImages(e.target.files); e.target.value = '' }}
           />
+
+          {/* Property video — kept next to images, same as the create form */}
+          <div className="pt-2 border-t border-slate-100">
+            <label className={labelCls}>Property video <span className="text-slate-400">(optional)</span></label>
+            {form.videoUrl ? (
+              <div className="flex items-center gap-2 text-sm text-slate-700 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2">
+                <Video className="h-4 w-4 text-slate-500" />
+                <span className="flex-1 truncate">{form.videoUrl}</span>
+                <button type="button" onClick={() => setField('videoUrl', '')} className="text-slate-400 hover:text-red-600"><X className="h-4 w-4" /></button>
+              </div>
+            ) : (
+              <>
+                <div className="flex items-center gap-2">
+                  <button type="button" onClick={() => videoInputRef.current?.click()} disabled={uploadingVideo} className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium text-slate-700 border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-50">
+                    {uploadingVideo ? <Loader2 className="h-4 w-4 animate-spin" /> : <Video className="h-4 w-4" />} Upload a short video
+                  </button>
+                  <span className="text-xs text-slate-400">or paste a YouTube link</span>
+                </div>
+                <input type="url" value={form.videoUrl} onChange={e => setField('videoUrl', e.target.value)} className={inputCls + ' mt-2'} placeholder="https://youtube.com/…" />
+              </>
+            )}
+            <input ref={videoInputRef} type="file" accept="video/mp4,video/webm,video/quicktime" className="hidden" onChange={e => { if (e.target.files?.[0]) uploadVideo(e.target.files[0]); e.target.value = '' }} />
+          </div>
         </div>
 
         {/* Payment plans */}
