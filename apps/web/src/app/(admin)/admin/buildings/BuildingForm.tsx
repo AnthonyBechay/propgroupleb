@@ -21,6 +21,11 @@ interface Props {
 export function BuildingForm({ initialData, buildingId, embedded }: Props) {
   const router = useRouter()
   const isEdit = !!buildingId
+  // Hide building-specific sections (floors, parking, amenities) when every unit
+  // is a type they don't apply to — land parcels, parking spots or storage.
+  const NON_BUILDING_KINDS = ['LAND_PARCEL', 'PARKING', 'STORAGE']
+  const hideBuildingSections = Array.isArray(initialData?.units) && initialData.units.length > 0 &&
+    initialData.units.every((u: any) => NON_BUILDING_KINDS.includes(u.kind))
   const fileInputRef = useRef<HTMLInputElement>(null)
   const videoInputRef = useRef<HTMLInputElement>(null)
 
@@ -414,7 +419,8 @@ export function BuildingForm({ initialData, buildingId, embedded }: Props) {
           </div>
         </div>
 
-        {/* Building Details */}
+        {/* Building Details — not applicable to land, parking or storage */}
+        {!hideBuildingSections && (
         <div className="bg-white border rounded-xl p-6 space-y-4">
           <h2 className="font-semibold text-slate-900">Building Details</h2>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -432,8 +438,10 @@ export function BuildingForm({ initialData, buildingId, embedded }: Props) {
             </div>
           </div>
         </div>
+        )}
 
-        {/* Amenities */}
+        {/* Amenities — not applicable to land, parking or storage */}
+        {!hideBuildingSections && (
         <div className="bg-white border rounded-xl p-6">
           <h2 className="font-semibold text-slate-900 mb-4">Amenities</h2>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
@@ -450,6 +458,7 @@ export function BuildingForm({ initialData, buildingId, embedded }: Props) {
             ))}
           </div>
         </div>
+        )}
 
         {/* Highlighted Features */}
         <div className="bg-white border rounded-xl p-6 space-y-4">

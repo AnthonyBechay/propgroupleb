@@ -152,7 +152,7 @@ export function CreatePropertyForm() {
     const totalPrice = perSqm ? (Number(f.price) || 0) * area : (Number(f.price) || 0)
     if (f.enableListing) {
       if (!f.price || Number(f.price) <= 0) { setError('Enter a price, or turn off listing'); return }
-      if (perSqm && area <= 0) { setError('Set the apartment area to price per m²'); return }
+      if (perSqm && area <= 0) { setError('Set the area to price per m²'); return }
     }
     setSaving(true); setError(null)
     try {
@@ -164,11 +164,11 @@ export function CreatePropertyForm() {
           shortDescription: f.shortDescription || null, description: f.description || null,
           mohafazat: f.mohafazat || null, caza: f.caza || null, city: f.city || null,
           neighborhood: f.neighborhood || null, address: f.address || null, locationUrl: f.locationUrl || null,
-          builtYear: f.builtYear !== '' ? parseInt(f.builtYear) : null,
-          totalFloors: f.totalFloors !== '' ? parseInt(f.totalFloors) : null,
-          parkingSpaces: f.parkingSpaces !== '' ? parseInt(f.parkingSpaces) : null,
-          hasGenerator: f.hasGenerator, hasElevator: f.hasElevator, hasPool: f.hasPool, hasGym: f.hasGym,
-          hasConcierge: f.hasConcierge, hasSecurity: f.hasSecurity, hasGarden: f.hasGarden, hasRooftop: f.hasRooftop, hasSolarPower: f.hasSolarPower,
+          builtYear: showBuildingSections && f.builtYear !== '' ? parseInt(f.builtYear) : null,
+          totalFloors: showBuildingSections && f.totalFloors !== '' ? parseInt(f.totalFloors) : null,
+          parkingSpaces: showBuildingSections && f.parkingSpaces !== '' ? parseInt(f.parkingSpaces) : null,
+          hasGenerator: showBuildingSections && f.hasGenerator, hasElevator: showBuildingSections && f.hasElevator, hasPool: showBuildingSections && f.hasPool, hasGym: showBuildingSections && f.hasGym,
+          hasConcierge: showBuildingSections && f.hasConcierge, hasSecurity: showBuildingSections && f.hasSecurity, hasGarden: showBuildingSections && f.hasGarden, hasRooftop: showBuildingSections && f.hasRooftop, hasSolarPower: showBuildingSections && f.hasSolarPower,
           videoUrl: f.videoUrl || null, highlightedFeatures: f.highlightedFeatures,
           paymentPlans: paymentPlans.length ? paymentPlans : null,
           metaTitle: f.metaTitle || null, metaDescription: f.metaDescription || null, images: f.images,
@@ -185,9 +185,9 @@ export function CreatePropertyForm() {
         method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           kind: f.unitKind,
-          bedrooms: f.bedrooms !== '' ? Number(f.bedrooms) : null,
-          bathrooms: f.bathrooms !== '' ? Number(f.bathrooms) : null,
-          areaSqm: area || null, floor: f.floor !== '' ? Number(f.floor) : null,
+          bedrooms: showBeds && f.bedrooms !== '' ? Number(f.bedrooms) : null,
+          bathrooms: showBaths && f.bathrooms !== '' ? Number(f.bathrooms) : null,
+          areaSqm: area || null, floor: showFloor && f.floor !== '' ? Number(f.floor) : null,
           lifecycle, // photos live on the property (building), not duplicated on the unit
         }),
       })
@@ -222,6 +222,18 @@ export function CreatePropertyForm() {
 
   const inp = 'w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400'
   const lbl = 'block text-sm font-medium text-slate-700 mb-1'
+  // Which fields/sections make sense for the chosen unit type.
+  const isLand = f.unitKind === 'LAND_PARCEL'
+  const showBeds = ['APARTMENT', 'STUDIO', 'DUPLEX', 'PENTHOUSE', 'VILLA', 'TOWNHOUSE'].includes(f.unitKind)
+  const showBaths = showBeds || ['SHOP', 'OFFICE'].includes(f.unitKind)
+  const showFloor = !['VILLA', 'TOWNHOUSE', 'LAND_PARCEL'].includes(f.unitKind)
+  const showBuildingSections = !['LAND_PARCEL', 'PARKING', 'STORAGE'].includes(f.unitKind)
+  const detailsHint =
+    isLand ? 'For land, set the plot area and list it for sale below — bedrooms, floors and building amenities don’t apply.' :
+    f.unitKind === 'PARKING' ? 'For a parking spot, set the area and floor/level — bedrooms and building amenities don’t apply.' :
+    f.unitKind === 'STORAGE' ? 'For a storage unit, set the area and floor/level — bedrooms and building amenities don’t apply.' :
+    (f.unitKind === 'SHOP' || f.unitKind === 'OFFICE') ? 'Commercial space — bedrooms don’t apply.' :
+    ''
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">
@@ -285,7 +297,26 @@ export function CreatePropertyForm() {
           </div>
         </div>
 
-        {/* Building details */}
+        {/* What & details — Type drives which fields/sections show below */}
+        <div className="bg-white border rounded-xl p-6 space-y-4">
+          <h2 className="font-semibold text-slate-900 flex items-center gap-2"><Home className="h-4 w-4 text-slate-500" /> {isLand ? 'Land details' : 'Unit details'}</h2>
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
+            <div className="col-span-2 sm:col-span-1">
+              <label className={lbl}>Type</label>
+              <select value={f.unitKind} onChange={e => set('unitKind', e.target.value)} className={inp}>
+                {UNIT_KINDS.map(k => <option key={k} value={k}>{k.charAt(0) + k.slice(1).toLowerCase().replace('_', ' ')}</option>)}
+              </select>
+            </div>
+            {showBeds && <div><label className={lbl}>Beds</label><input type="number" min="0" value={f.bedrooms} onChange={e => set('bedrooms', e.target.value)} className={inp} /></div>}
+            {showBaths && <div><label className={lbl}>Baths</label><input type="number" min="0" value={f.bathrooms} onChange={e => set('bathrooms', e.target.value)} className={inp} /></div>}
+            <div><label className={lbl}>{isLand ? 'Land area m²' : 'Area m²'}</label><input type="number" min="0" value={f.areaSqm} onChange={e => set('areaSqm', e.target.value)} className={inp} /></div>
+            {showFloor && <div><label className={lbl}>Floor</label><input type="number" value={f.floor} onChange={e => set('floor', e.target.value)} className={inp} /></div>}
+          </div>
+          {detailsHint && <p className="text-xs text-slate-400">{detailsHint}</p>}
+        </div>
+
+        {/* Building details — not applicable to land, parking or storage */}
+        {showBuildingSections && (
         <div className="bg-white border rounded-xl p-6 space-y-4">
           <h2 className="font-semibold text-slate-900">Building Details</h2>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -294,8 +325,10 @@ export function CreatePropertyForm() {
             <div><label className={lbl}>Parking Spaces</label><input type="number" value={f.parkingSpaces} onChange={e => set('parkingSpaces', e.target.value)} className={inp} placeholder="50" min="0" /></div>
           </div>
         </div>
+        )}
 
-        {/* Amenities */}
+        {/* Amenities — not applicable to land, parking or storage */}
+        {showBuildingSections && (
         <div className="bg-white border rounded-xl p-6">
           <h2 className="font-semibold text-slate-900 mb-4">Amenities</h2>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
@@ -308,6 +341,7 @@ export function CreatePropertyForm() {
             ))}
           </div>
         </div>
+        )}
 
         {/* Highlighted features */}
         <div className="bg-white border rounded-xl p-6 space-y-4">
@@ -325,30 +359,6 @@ export function CreatePropertyForm() {
               ))}
             </div>
           )}
-        </div>
-
-        {/* Unit details (land/parking/storage skip beds/baths/floor) */}
-        <div className="bg-white border rounded-xl p-6 space-y-4">
-          <h2 className="font-semibold text-slate-900 flex items-center gap-2"><Home className="h-4 w-4 text-slate-500" /> Unit details</h2>
-          <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
-            <div className="col-span-2 sm:col-span-1">
-              <label className={lbl}>Type</label>
-              <select value={f.unitKind} onChange={e => set('unitKind', e.target.value)} className={inp}>
-                {UNIT_KINDS.map(k => <option key={k} value={k}>{k.charAt(0) + k.slice(1).toLowerCase().replace('_', ' ')}</option>)}
-              </select>
-            </div>
-            {!['LAND_PARCEL', 'PARKING', 'STORAGE'].includes(f.unitKind) && (
-              <>
-                <div><label className={lbl}>Beds</label><input type="number" min="0" value={f.bedrooms} onChange={e => set('bedrooms', e.target.value)} className={inp} /></div>
-                <div><label className={lbl}>Baths</label><input type="number" min="0" value={f.bathrooms} onChange={e => set('bathrooms', e.target.value)} className={inp} /></div>
-              </>
-            )}
-            <div><label className={lbl}>{f.unitKind === 'LAND_PARCEL' ? 'Land area m²' : 'Area m²'}</label><input type="number" min="0" value={f.areaSqm} onChange={e => set('areaSqm', e.target.value)} className={inp} /></div>
-            {f.unitKind !== 'LAND_PARCEL' && (
-              <div><label className={lbl}>Floor</label><input type="number" value={f.floor} onChange={e => set('floor', e.target.value)} className={inp} /></div>
-            )}
-          </div>
-          {f.unitKind === 'LAND_PARCEL' && <p className="text-xs text-slate-400">For land, set the plot area and list it for sale below — bedrooms/floor don’t apply.</p>}
         </div>
 
         {/* Listing */}

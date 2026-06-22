@@ -80,13 +80,17 @@ const EMPTY_UNIT = {
 type UnitFormState = typeof EMPTY_UNIT
 
 function buildUnitPayload(f: UnitFormState) {
+  // Drop fields that don't apply to the chosen type so stale values aren't saved.
+  const bedsOk = ['APARTMENT', 'STUDIO', 'DUPLEX', 'PENTHOUSE', 'VILLA', 'TOWNHOUSE'].includes(f.kind)
+  const bathsOk = bedsOk || ['SHOP', 'OFFICE'].includes(f.kind)
+  const floorOk = !['VILLA', 'TOWNHOUSE', 'LAND_PARCEL'].includes(f.kind)
   return {
     kind:      f.kind || undefined,
     name:      f.name || null,
     unitNumber:f.unitNumber || null,
-    floor:     f.floor  !== '' ? Number(f.floor)  : null,
-    bedrooms:  f.bedrooms  !== '' ? Number(f.bedrooms)  : null,
-    bathrooms: f.bathrooms !== '' ? Number(f.bathrooms) : null,
+    floor:     floorOk && f.floor  !== '' ? Number(f.floor)  : null,
+    bedrooms:  bedsOk && f.bedrooms  !== '' ? Number(f.bedrooms)  : null,
+    bathrooms: bathsOk && f.bathrooms !== '' ? Number(f.bathrooms) : null,
     areaSqm:   f.areaSqm   !== '' ? Number(f.areaSqm)   : null,
     lifecycle: f.lifecycle || undefined,
     images:    f.images,
@@ -108,6 +112,10 @@ function UnitFormPanel({
   const set = (k: keyof UnitFormState, v: string) => setF(p => ({ ...p, [k]: v }))
   const inp = 'w-full px-3 py-2 border border-zinc-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-sky-600/15 focus:border-sky-500 bg-white'
   const lbl = 'block text-xs font-medium text-zinc-600 mb-1'
+  // Only show fields that make sense for the chosen unit type.
+  const showBeds = ['APARTMENT', 'STUDIO', 'DUPLEX', 'PENTHOUSE', 'VILLA', 'TOWNHOUSE'].includes(f.kind)
+  const showBaths = showBeds || ['SHOP', 'OFFICE'].includes(f.kind)
+  const showFloor = !['VILLA', 'TOWNHOUSE', 'LAND_PARCEL'].includes(f.kind)
 
   // Admin: assign this unit to a registered user (by email) — shows in their portal.
   // (apiUrl is already declared above for image uploads.)
@@ -192,22 +200,28 @@ function UnitFormPanel({
           <label className={lbl}>Unit No.</label>
           <input value={f.unitNumber} onChange={e => set('unitNumber', e.target.value)} placeholder="301" className={inp} />
         </div>
+        {showFloor && (
         <div>
           <label className={lbl}>Floor</label>
           <input type="number" value={f.floor} onChange={e => set('floor', e.target.value)} placeholder="3" className={inp} />
         </div>
+        )}
       </div>
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        {showBeds && (
         <div>
           <label className={lbl}>Bedrooms</label>
           <input type="number" min="0" value={f.bedrooms} onChange={e => set('bedrooms', e.target.value)} placeholder="2" className={inp} />
         </div>
+        )}
+        {showBaths && (
         <div>
           <label className={lbl}>Bathrooms</label>
           <input type="number" min="0" value={f.bathrooms} onChange={e => set('bathrooms', e.target.value)} placeholder="1" className={inp} />
         </div>
+        )}
         <div>
-          <label className={lbl}>Area (m²)</label>
+          <label className={lbl}>{f.kind === 'LAND_PARCEL' ? 'Land area (m²)' : 'Area (m²)'}</label>
           <input type="number" min="0" value={f.areaSqm} onChange={e => set('areaSqm', e.target.value)} placeholder="120" className={inp} />
         </div>
         <div>
