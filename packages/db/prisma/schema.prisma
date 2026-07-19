@@ -93,6 +93,20 @@ enum PropertyStatus {
   RESALE
 }
 
+// Who created the property — lets admin separate owner submissions from house posts
+enum PropertySource {
+  ADMIN // posted by our team
+  OWNER // came in through the public "list your property" form
+}
+
+// Review cycle for public owner submissions (zero-commission campaign)
+enum SubmissionStatus {
+  PENDING   // just submitted, nobody looked yet
+  IN_REVIEW // an admin picked it up / contacting the seller
+  APPROVED  // published — a Building/Unit/Listing was created from it
+  REJECTED  // declined (spam, incomplete, out of scope)
+}
+
 enum MembershipTier {
   FREE
   ELITE
@@ -509,6 +523,7 @@ model Building {
 
   // Status / marketing
   status      PropertyStatus @default(RESALE)
+  source      PropertySource @default(ADMIN) // OWNER when created from a public submission
   visibility  PropertyVisibility @default(PUBLIC)
   featured    Boolean   @default(false)
   featuredUntil DateTime?
@@ -1807,4 +1822,58 @@ model AnalyticsEvent {
   @@index([listingId])
   @@index([sessionId])
   @@map("analytics_events")
+}
+
+// ============================================
+// OWNER SUBMISSIONS — zero-commission campaign
+// ============================================
+// A property owner fills the public "list your property" form; an admin reviews
+// it, contacts the seller, and on approval a Building (source=OWNER) + Unit +
+// Listing are created from it. Intentionally denormalized — it's an intake
+// record, not the live property.
+model PropertySubmission {
+  id     String           @id @default(cuid())
+  status SubmissionStatus @default(PENDING)
+
+  // Seller contact — how we reach them
+  sellerName       String
+  sellerPhone      String
+  sellerEmail      String?
+  preferredContact String? // phone | whatsapp | email
+
+  // What they're listing
+  title        String
+  description  String?
+  unitKind     UnitKind      @default(APARTMENT)
+  intent       ListingIntent @default(FOR_SALE)
+  bedrooms     Int?
+  bathrooms    Int?
+  areaSqm      Float?
+  floor        Int?
+  price        Float?
+  currency     String        @default("USD")
+  negotiable   Boolean       @default(false)
+
+  // Location (same Lebanon hierarchy as Building)
+  mohafazat    String?
+  caza         String?
+  city         String?
+  neighborhood String?
+  address      String?
+
+  // Photos uploaded by the seller (proxied R2 URLs)
+  images String[]
+
+  // Review trail
+  adminNotes   String?   // internal — never shown to the seller
+  reviewedById String?
+  reviewedAt   DateTime?
+  buildingId   String?   @unique // set when approved → the created property
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status])
+  @@index([createdAt])
+  @@map("property_submissions")
 }

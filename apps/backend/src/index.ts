@@ -42,6 +42,7 @@ import shareRoutes from './routes/share.js';
 import documentRoutes from './routes/documents.js';
 import fileRoutes from './routes/files.js';
 import locationGuideRoutes from './routes/location-guides.js';
+import submissionRoutes from './routes/submissions.js';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -246,6 +247,7 @@ app.use('/api/documents', documentRoutes);
 app.use('/api/files', fileRoutes);
 app.use('/api/location-guides', locationGuideRoutes);
 app.use('/api/share', shareRoutes);
+app.use('/api/submissions', submissionRoutes);
 
 // API routes — property management
 app.use('/api/tenancies', tenancyRoutes);

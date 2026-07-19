@@ -244,6 +244,11 @@ export function BuildingsAdminClient({ initialBuildings }: Props) {
                             <p className="font-medium text-slate-900 text-sm truncate">{b.title}</p>
                             {b.featured && <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400 shrink-0" />}
                             {hidden && <EyeOff className="h-3.5 w-3.5 text-slate-400 shrink-0" />}
+                            {b.source === 'OWNER' && (
+                              <span className="shrink-0 px-1.5 py-0 rounded text-[10px] font-semibold bg-teal-50 text-teal-700 border border-teal-200" title="Came in through the public owner-submission form">
+                                Owner
+                              </span>
+                            )}
                           </div>
                           <div className="flex items-center gap-2 mt-0.5">
                             <Badge variant="outline" className="text-[10px] px-1.5 py-0 font-normal">{KIND_LABELS[b.kind] ?? b.kind}</Badge>

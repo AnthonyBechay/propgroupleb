@@ -394,7 +394,8 @@
       "Bash(sed -n '/Pick the best image\\\\|building-first\\\\|firstImage\\\\|listing.slug/p' apps/web/src/components/listing/ListingCard.tsx)",
       "Bash(awk '/^model Building /{f=1} f{print} /^}/{if\\(f\\)exit}' packages/db/prisma/schema.prisma)",
       "Bash(awk '/enum PropertyVisibility/{f=1} f{print} /^}/{if\\(f\\)exit}' packages/db/prisma/schema.prisma)",
-      "Bash(awk '/enum UnitKind/{f=1} f{print} /^}/{if\\(f\\)exit}' packages/db/prisma/schema.prisma)"
+      "Bash(awk '/enum UnitKind/{f=1} f{print} /^}/{if\\(f\\)exit}' packages/db/prisma/schema.prisma)",
+      "Bash(awk '/^model Building /{f=1} f{print; c++} c>40{exit}' packages/db/prisma/schema.prisma)"
     ],
     "deny": [],
     "ask": []

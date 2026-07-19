@@ -22,6 +22,7 @@ import {
   DollarSign,
   HardHat,
   Briefcase,
+  ClipboardList,
 } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 
@@ -33,6 +34,7 @@ export function Sidebar() {
     { name: 'Dashboard', href: '/admin', icon: Home },
     { name: 'Properties', href: '/admin/buildings', icon: Building2 },
     { name: 'Listings', href: '/admin/listings', icon: ListFilter },
+    { name: 'Submissions', href: '/admin/submissions', icon: ClipboardList },
     { name: 'Location Guides', href: '/admin/location-guides', icon: MapPin },
     { name: 'Inquiries', href: '/admin/inquiries', icon: MessageSquare },
     { name: 'Contact Messages', href: '/admin/contacts', icon: Inbox },

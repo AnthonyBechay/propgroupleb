@@ -1,6 +1,6 @@
 import { Suspense } from 'react'
 import Link from 'next/link'
-import { ChevronLeft, ChevronRight } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Globe, ArrowUpRight } from 'lucide-react'
 import { normalizeApiUrl } from '@/lib/utils/api-url'
 import { ListingsFilterBar } from '@/components/listing/ListingsFilterBar'
 import { ListingCard } from '@/components/listing/ListingCard'
@@ -133,6 +133,31 @@ export async function ListingsCatalog({
             )}
           </nav>
         )}
+
+        {/* Cross-sell: foreign investment via the group's Georgia site */}
+        <a
+          href="https://propgrp.com"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="group block overflow-hidden rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-700 shadow-sm transition-shadow hover:shadow-lg"
+        >
+          <div className="flex flex-col sm:flex-row items-center gap-4 p-6 sm:p-7">
+            <div className="shrink-0 h-12 w-12 rounded-xl bg-white/15 flex items-center justify-center ring-1 ring-white/20">
+              <Globe className="h-6 w-6 text-white" />
+            </div>
+            <div className="flex-1 text-center sm:text-left">
+              <h3 className="text-white font-semibold text-lg">Looking to invest abroad?</h3>
+              <p className="text-emerald-50/90 text-sm mt-0.5">
+                Discover foreign investment opportunities in Georgia with PropGroup — explore them at{' '}
+                <span className="font-semibold text-white underline underline-offset-2">propgrp.com</span>.
+              </p>
+            </div>
+            <span className="inline-flex items-center gap-1.5 rounded-lg bg-white px-4 py-2.5 text-sm font-semibold text-emerald-700 shadow-sm transition-transform group-hover:scale-[1.03]">
+              Explore Georgia
+              <ArrowUpRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+            </span>
+          </div>
+        </a>
       </div>
     </div>
   )
