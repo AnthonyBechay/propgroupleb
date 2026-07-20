@@ -21,8 +21,8 @@ export const metadata = {
 export const revalidate = 3600
 
 const STEPS = [
-  { icon: Camera, title: 'Fill the form', text: 'Describe your property, add photos and your asking price. Takes 5 minutes.' },
-  { icon: ShieldCheck, title: 'We review it', text: 'Our team checks the details and calls you to confirm everything.' },
+  { icon: Camera, title: 'Fill the form', text: 'Describe your property, add photos or a video, and your asking price. No photos? Ask for our free photo visit.' },
+  { icon: ShieldCheck, title: 'We review it', text: 'Our team checks the details, visits if needed, and calls you to confirm everything.' },
   { icon: BadgePercent, title: 'Published — 0% commission', text: 'Your property goes live on PropGroup. No commission from you, none from the buyer.' },
 ]
 

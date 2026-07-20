@@ -55,8 +55,8 @@ export function AdminLayoutClient({ children }: { children: React.ReactNode }) {
       <Sidebar />
       <div className="lg:pl-64">
         <AdminHeader />
-        <main className="py-8">
-          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        <main className="py-4 sm:py-5">
+          <div className="mx-auto max-w-[1600px] px-3 sm:px-4 lg:px-6">
             {children}
           </div>
         </main>

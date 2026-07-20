@@ -379,12 +379,12 @@ export function BuildingForm({ initialData, buildingId, embedded }: Props) {
               </select>
             </div>
             <div>
-              <label className={labelCls}>Source</label>
+              <label className={labelCls}>Who posted this</label>
               <select value={form.source} onChange={e => setField('source', e.target.value)} className={inputCls}>
-                <option value="ADMIN">Posted by us (admin)</option>
-                <option value="OWNER">Owner submitted</option>
+                <option value="ADMIN">Our office (admin)</option>
+                <option value="OWNER">Property owner</option>
               </select>
-              <p className="text-xs text-slate-400 mt-1">Where this property came from.</p>
+              <p className="text-xs text-slate-400 mt-1">Switch freely — this only changes how the property is labelled and filtered in admin.</p>
             </div>
             <div className="flex items-center gap-2 pt-5">
               <input type="checkbox" id="featured" checked={form.featured} onChange={e => setField('featured', e.target.checked)} className="rounded border-slate-300" />

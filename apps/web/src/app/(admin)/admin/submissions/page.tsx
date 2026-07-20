@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import {
   ClipboardList, Loader2, Phone, Mail, MessageCircle, MapPin, ChevronDown, ChevronUp,
-  CheckCircle2, XCircle, Eye, Trash2, BedDouble, Bath, Ruler, Building2, ExternalLink, Save,
+  CheckCircle2, XCircle, Eye, Trash2, BedDouble, Bath, Ruler, Building2, ExternalLink, Save, Camera, Check,
 } from 'lucide-react'
 import { normalizeApiUrl, normalizeFileUrl } from '@/lib/utils/api-url'
 import { MOHAFAZAT_LABEL } from '@/lib/lebanon-locations'
@@ -35,6 +35,10 @@ interface Submission {
   neighborhood: string | null
   address: string | null
   images: string[]
+  videos: string[]
+  wantsPhotoVisit: boolean
+  visited: boolean
+  dataCollected: boolean
   adminNotes: string | null
   buildingId: string | null
   createdAt: string
@@ -60,6 +64,27 @@ const TABS: Array<{ key: string; label: string }> = [
   { key: 'APPROVED', label: 'Published' },
   { key: 'REJECTED', label: 'Rejected' },
 ]
+
+/** A single internal follow-up step the admin ticks off before publishing. */
+function StepToggle({ label, active, disabled, onClick }: { label: string; active: boolean; disabled?: boolean; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors disabled:opacity-50 ${
+        active
+          ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+          : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'
+      }`}
+    >
+      <span className={`h-4 w-4 rounded flex items-center justify-center border ${active ? 'bg-emerald-600 border-emerald-600' : 'border-slate-300'}`}>
+        {active && <Check className="h-3 w-3 text-white" />}
+      </span>
+      {label}
+    </button>
+  )
+}
 
 function relativeDate(iso: string): string {
   const days = Math.floor((Date.now() - new Date(iso).getTime()) / 86_400_000)
@@ -209,6 +234,9 @@ export default function AdminSubmissionsPage() {
                         <span>{s.sellerName} · {s.sellerPhone}</span>
                         {s.price ? <span className="font-medium text-slate-700">{s.currency} {s.price.toLocaleString()}</span> : <span className="text-amber-600">no price</span>}
                         <span className="text-slate-400">{relativeDate(s.createdAt)}</span>
+                        {s.visited && <span className="text-emerald-600 text-xs font-medium">✓ visited</span>}
+                        {s.dataCollected && <span className="text-emerald-600 text-xs font-medium">✓ data</span>}
+                        {s.wantsPhotoVisit && <span className="text-amber-600 text-xs font-medium inline-flex items-center gap-1"><Camera className="h-3 w-3" /> photo visit</span>}
                       </div>
                     </div>
                     {open ? <ChevronUp className="h-4 w-4 text-slate-400 shrink-0" /> : <ChevronDown className="h-4 w-4 text-slate-400 shrink-0" />}
@@ -258,6 +286,35 @@ export default function AdminSubmissionsPage() {
                       </a>
                     )}
 
+                    {/* Internal follow-up steps — before this goes on the website */}
+                    <div className="bg-white border border-slate-200 rounded-lg p-3">
+                      <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Internal follow-up</p>
+                      <div className="flex flex-wrap gap-2">
+                        <StepToggle
+                          label="Property visited"
+                          active={s.visited}
+                          disabled={busy === s.id}
+                          onClick={() => patch(s.id, { visited: !s.visited })}
+                        />
+                        <StepToggle
+                          label="Data collected"
+                          active={s.dataCollected}
+                          disabled={busy === s.id}
+                          onClick={() => patch(s.id, { dataCollected: !s.dataCollected })}
+                        />
+                        {s.wantsPhotoVisit && (
+                          <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium bg-amber-50 text-amber-800 border border-amber-200">
+                            <Camera className="h-3.5 w-3.5" /> Free photo visit requested
+                          </span>
+                        )}
+                      </div>
+                      {(!s.visited || !s.dataCollected) && s.status !== 'APPROVED' && (
+                        <p className="text-xs text-slate-400 mt-2">
+                          Tip: visit the property and collect the full details before publishing it on the website.
+                        </p>
+                      )}
+                    </div>
+
                     {/* Photos */}
                     {s.images.length > 0 && (
                       <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
@@ -268,6 +325,21 @@ export default function AdminSubmissionsPage() {
                           </a>
                         ))}
                       </div>
+                    )}
+
+                    {/* Videos */}
+                    {s.videos?.length > 0 && (
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                        {s.videos.map((v, i) => (
+                          <video key={i} src={normalizeFileUrl(v)} controls playsInline className="w-full aspect-video rounded-lg border border-slate-200 bg-black" />
+                        ))}
+                      </div>
+                    )}
+
+                    {s.images.length === 0 && !s.videos?.length && (
+                      <p className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                        No media uploaded{s.wantsPhotoVisit ? ' — the seller asked for a free photo visit.' : '.'}
+                      </p>
                     )}
 
                     {/* Price + notes */}

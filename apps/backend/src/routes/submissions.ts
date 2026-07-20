@@ -27,13 +27,21 @@ const submitLimiter = rateLimit({
   message: { error: 'Too many submissions. Please try again later.' },
 });
 
-// Seller photos: images only, 10MB each, max 12 per submission.
-const photoUpload = multer({
+const IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/avif'];
+const VIDEO_TYPES = ['video/mp4', 'video/webm', 'video/quicktime'];
+const MAX_IMAGE_BYTES = 10 * 1024 * 1024; // 10MB per photo
+
+// Seller media: up to 12 photos + 3 videos. The multer cap is the video limit;
+// oversized images are rejected per-file in the handler.
+const mediaUpload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 10 * 1024 * 1024, files: 12 },
+  limits: { fileSize: 100 * 1024 * 1024, files: 15 },
   fileFilter: (_req, file, cb) => {
-    const ok = ['image/jpeg', 'image/png', 'image/webp', 'image/avif'].includes(file.mimetype);
-    ok ? cb(null, true) : cb(new Error(`Invalid image type: ${file.mimetype}`));
+    if (file.fieldname === 'videos') {
+      VIDEO_TYPES.includes(file.mimetype) ? cb(null, true) : cb(new Error(`Invalid video type: ${file.mimetype}`));
+      return;
+    }
+    IMAGE_TYPES.includes(file.mimetype) ? cb(null, true) : cb(new Error(`Invalid image type: ${file.mimetype}`));
   },
 });
 
@@ -58,6 +66,7 @@ const submissionSchema = z.object({
   price: z.coerce.number().positive().max(1_000_000_000).optional(),
   currency: z.enum(['USD', 'LBP']).default('USD'),
   negotiable: z.preprocess((v) => v === 'true' || v === true, z.boolean()).default(false),
+  wantsPhotoVisit: z.preprocess((v) => v === 'true' || v === true, z.boolean()).default(false),
   mohafazat: z.string().max(50).optional(),
   caza: z.string().max(80).optional(),
   city: z.string().max(80).optional(),
@@ -70,19 +79,29 @@ const submissionSchema = z.object({
 router.post(
   '/',
   submitLimiter,
-  photoUpload.array('photos', 12),
+  mediaUpload.fields([{ name: 'photos', maxCount: 12 }, { name: 'videos', maxCount: 3 }]),
   asyncHandler(async (req: Request, res: Response) => {
     const data = submissionSchema.parse(req.body);
-    const files = (req.files as Express.Multer.File[] | undefined) ?? [];
+    const grouped = (req.files ?? {}) as Record<string, Express.Multer.File[] | undefined>;
 
-    // Upload seller photos to R2 under a dedicated prefix.
+    // Upload seller media to R2 under a dedicated prefix.
     const images: string[] = [];
-    for (const file of files) {
+    for (const file of grouped.photos ?? []) {
+      if (file.size > MAX_IMAGE_BYTES) continue; // silently skip oversized photos
       try {
         const { url } = await uploadFile(file.buffer, file.originalname, file.mimetype, 'submissions');
         images.push(url);
       } catch (err) {
         logger.error('Submission photo upload failed', err);
+      }
+    }
+    const videos: string[] = [];
+    for (const file of grouped.videos ?? []) {
+      try {
+        const { url } = await uploadFile(file.buffer, file.originalname, file.mimetype, 'submissions');
+        videos.push(url);
+      } catch (err) {
+        logger.error('Submission video upload failed', err);
       }
     }
 
@@ -111,6 +130,8 @@ router.post(
         neighborhood: data.neighborhood || null,
         address: data.address || null,
         images,
+        videos,
+        wantsPhotoVisit: data.wantsPhotoVisit,
       },
     });
 
@@ -161,6 +182,9 @@ const reviewSchema = z.object({
   // Editable after contacting the seller (e.g. agreeing the final asking price)
   price: z.coerce.number().positive().max(1_000_000_000).optional().nullable(),
   currency: z.enum(['USD', 'LBP']).optional(),
+  // Internal follow-up steps before we publish
+  visited: z.boolean().optional(),
+  dataCollected: z.boolean().optional(),
 });
 
 router.patch(
@@ -184,6 +208,8 @@ router.patch(
         ...(data.adminNotes !== undefined ? { adminNotes: data.adminNotes } : {}),
         ...(data.price !== undefined ? { price: data.price } : {}),
         ...(data.currency ? { currency: data.currency } : {}),
+        ...(data.visited !== undefined ? { visited: data.visited } : {}),
+        ...(data.dataCollected !== undefined ? { dataCollected: data.dataCollected } : {}),
       },
     });
 
@@ -245,6 +271,7 @@ router.post(
           address: submission.address,
           locationUrl: submission.locationUrl,
           images: submission.images,
+          videoUrl: submission.videos?.[0] ?? null,
           slug,
         },
       });

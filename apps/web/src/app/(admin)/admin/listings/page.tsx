@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { Plus, Search, ExternalLink, Edit, Trash2, Tag, Building2 } from 'lucide-react'
+import { Plus, Search, ExternalLink, Edit, Trash2, Tag, Building2, MapPin, ArrowUpDown, Layers } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
@@ -56,6 +56,9 @@ export default function AdminListingsPage() {
   const [intentFilter, setIntentFilter] = useState('all')
   const [statusFilter, setStatusFilter] = useState('all')
   const [buildingFilter, setBuildingFilter] = useState(initialBuildingId)
+  const [cazaFilter, setCazaFilter] = useState('all')
+  const [groupBy, setGroupBy] = useState<'none' | 'building' | 'caza'>('none')
+  const [sort, setSort] = useState<'newest' | 'priceDesc' | 'priceAsc' | 'caza'>('newest')
   const [buildings, setBuildings] = useState<any[]>([])
 
   // Load building list once for the filter dropdown
@@ -83,15 +86,45 @@ export default function AdminListingsPage() {
       .finally(() => setLoading(false))
   }, [intentFilter, statusFilter])
 
+  const cazaOf = (l: any) => l.building?.caza || '—'
+  const projectOf = (l: any) => l.building?.title || 'Unassigned'
+
+  // Cazas present in the current result set, for the location filter.
+  const cazas = Array.from(new Set(listings.map(cazaOf).filter(c => c !== '—'))).sort()
+
   const filtered = listings.filter(l => {
     if (buildingFilter !== 'all') {
       const listingBuildingId = l.building?.id ?? l.unit?.buildingId ?? null
       if (listingBuildingId !== buildingFilter) return false
     }
+    if (cazaFilter !== 'all' && cazaOf(l) !== cazaFilter) return false
     if (!search) return true
     const title = l.building?.title ?? l.unit?.name ?? l.headline ?? ''
     return title.toLowerCase().includes(search.toLowerCase())
   })
+
+  const sorted = [...filtered].sort((a, b) => {
+    switch (sort) {
+      case 'priceDesc': return (b.price ?? 0) - (a.price ?? 0)
+      case 'priceAsc': return (a.price ?? 0) - (b.price ?? 0)
+      case 'caza': return cazaOf(a).localeCompare(cazaOf(b)) || projectOf(a).localeCompare(projectOf(b))
+      default: return new Date(b.publishedAt ?? b.createdAt ?? 0).getTime() - new Date(a.publishedAt ?? a.createdAt ?? 0).getTime()
+    }
+  })
+
+  // Grouped view: one section per project (building) or per caza.
+  const groups: Array<{ key: string; items: any[] }> = (() => {
+    if (groupBy === 'none') return [{ key: '', items: sorted }]
+    const map = new Map<string, any[]>()
+    for (const l of sorted) {
+      const key = groupBy === 'building' ? projectOf(l) : cazaOf(l)
+      if (!map.has(key)) map.set(key, [])
+      map.get(key)!.push(l)
+    }
+    return Array.from(map.entries())
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      .map(([key, items]) => ({ key, items }))
+  })()
 
   async function handleArchive(id: string) {
     if (!confirm('Archive this listing?')) return
@@ -104,7 +137,7 @@ export default function AdminListingsPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Listings</h1>
@@ -121,7 +154,7 @@ export default function AdminListingsPage() {
       </div>
 
       {/* Filters */}
-      <div className="flex gap-3 flex-wrap">
+      <div className="flex gap-2 flex-wrap">
         <div className="relative flex-1 min-w-[200px]">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
           <Input
@@ -168,6 +201,39 @@ export default function AdminListingsPage() {
             <SelectItem value="ARCHIVED">Archived</SelectItem>
           </SelectContent>
         </Select>
+        <Select value={cazaFilter} onValueChange={setCazaFilter}>
+          <SelectTrigger className="w-[150px]">
+            <MapPin className="h-3.5 w-3.5 mr-1.5 text-slate-400 shrink-0" />
+            <SelectValue placeholder="All cazas" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All cazas</SelectItem>
+            {cazas.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+          </SelectContent>
+        </Select>
+        <Select value={sort} onValueChange={v => setSort(v as typeof sort)}>
+          <SelectTrigger className="w-[150px]">
+            <ArrowUpDown className="h-3.5 w-3.5 mr-1.5 text-slate-400 shrink-0" />
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="newest">Newest first</SelectItem>
+            <SelectItem value="priceDesc">Price: high → low</SelectItem>
+            <SelectItem value="priceAsc">Price: low → high</SelectItem>
+            <SelectItem value="caza">Location (caza A–Z)</SelectItem>
+          </SelectContent>
+        </Select>
+        <Select value={groupBy} onValueChange={v => setGroupBy(v as typeof groupBy)}>
+          <SelectTrigger className="w-[150px]">
+            <Layers className="h-3.5 w-3.5 mr-1.5 text-slate-400 shrink-0" />
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="none">No grouping</SelectItem>
+            <SelectItem value="building">Group by project</SelectItem>
+            <SelectItem value="caza">Group by caza</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
 
       <div className="border rounded-lg overflow-hidden">
@@ -195,7 +261,19 @@ export default function AdminListingsPage() {
                   No listings found
                 </TableCell>
               </TableRow>
-            ) : filtered.map(l => {
+            ) : groups.flatMap(group => [
+              ...(groupBy !== 'none' ? [(
+                <TableRow key={`group-${group.key}`} className="bg-slate-100/80 hover:bg-slate-100/80">
+                  <TableCell colSpan={7} className="py-1.5">
+                    <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-600 uppercase tracking-wide">
+                      {groupBy === 'building' ? <Building2 className="h-3.5 w-3.5" /> : <MapPin className="h-3.5 w-3.5" />}
+                      {group.key}
+                      <span className="text-slate-400 font-normal normal-case">({group.items.length})</span>
+                    </span>
+                  </TableCell>
+                </TableRow>
+              )] : []),
+              ...group.items.map(l => {
               const title = l.building?.title ?? l.unit?.name ?? l.headline ?? 'Untitled'
               const location = l.building
                 ? [l.building.city, l.building.caza].filter(Boolean).join(', ')
@@ -258,7 +336,8 @@ export default function AdminListingsPage() {
                   </TableCell>
                 </TableRow>
               )
-            })}
+              }),
+            ])}
           </TableBody>
         </Table>
       </div>

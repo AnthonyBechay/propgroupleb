@@ -1863,8 +1863,15 @@ model PropertySubmission {
   neighborhood String?
   address      String?
 
-  // Photos uploaded by the seller (proxied R2 URLs)
+  // Media uploaded by the seller (proxied R2 URLs)
   images String[]
+  videos String[]
+  // Seller has no photos and wants our team to visit and shoot them for free.
+  wantsPhotoVisit Boolean @default(false)
+
+  // Internal follow-up steps before the property goes on the website
+  visited       Boolean @default(false) // our team visited the property
+  dataCollected Boolean @default(false) // full details/paperwork gathered
 
   // Review trail
   adminNotes   String?   // internal — never shown to the seller

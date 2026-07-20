@@ -176,7 +176,7 @@ export function BuildingsAdminClient({ initialBuildings }: Props) {
   const selectedIds = visibleSelected.map(b => b.id)
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Properties</h1>
@@ -191,7 +191,7 @@ export function BuildingsAdminClient({ initialBuildings }: Props) {
       </div>
 
       {/* Stat cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5">
         <StatCard icon={<Building2 className="h-4 w-4" />} label="Properties" value={stats.total} />
         <StatCard icon={<ListChecks className="h-4 w-4" />} label="Listed for sale/rent" value={stats.listed} accent="text-emerald-600" />
         <StatCard icon={<Layers className="h-4 w-4" />} label="Total units" value={stats.units} />
@@ -199,7 +199,7 @@ export function BuildingsAdminClient({ initialBuildings }: Props) {
       </div>
 
       {/* Filters */}
-      <div className="flex gap-3 flex-wrap items-center">
+      <div className="flex gap-2 flex-wrap items-center">
         <div className="relative flex-1 min-w-[200px]">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
           <Input
@@ -438,9 +438,9 @@ export function BuildingsAdminClient({ initialBuildings }: Props) {
 
 function StatCard({ icon, label, value, accent }: { icon: React.ReactNode; label: string; value: React.ReactNode; accent?: string }) {
   return (
-    <div className="bg-white border border-slate-200 rounded-xl p-4">
+    <div className="bg-white border border-slate-200 rounded-xl p-3">
       <div className="flex items-center gap-1.5 text-slate-400 text-xs font-medium">{icon}{label}</div>
-      <div className={`text-2xl font-bold mt-1 ${accent ?? 'text-slate-900'}`}>{value}</div>
+      <div className={`text-xl font-bold mt-0.5 ${accent ?? 'text-slate-900'}`}>{value}</div>
     </div>
   )
 }

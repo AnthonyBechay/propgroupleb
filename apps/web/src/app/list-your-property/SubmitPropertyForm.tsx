@@ -1,7 +1,7 @@
 'use client'
 
 import { useRef, useState } from 'react'
-import { Loader2, ImagePlus, X, CheckCircle2, Send } from 'lucide-react'
+import { Loader2, ImagePlus, X, CheckCircle2, Send, Video, Camera } from 'lucide-react'
 import { LocationFields } from '@/components/admin/LocationFields'
 import { isKnownLocation } from '@/lib/lebanon-locations'
 import { normalizeApiUrl } from '@/lib/utils/api-url'
@@ -15,6 +15,8 @@ const UNIT_KINDS = [
 ]
 
 const MAX_PHOTOS = 12
+const MAX_VIDEOS = 3
+const MAX_VIDEO_BYTES = 100 * 1024 * 1024
 
 /**
  * Public owner-submission form (zero-commission campaign). Anyone with the link
@@ -24,6 +26,7 @@ const MAX_PHOTOS = 12
 export function SubmitPropertyForm() {
   const apiUrl = normalizeApiUrl(process.env.NEXT_PUBLIC_API_URL || '')
   const photoInputRef = useRef<HTMLInputElement>(null)
+  const videoInputRef = useRef<HTMLInputElement>(null)
 
   const [f, setF] = useState({
     sellerName: '', sellerPhone: '', sellerEmail: '', preferredContact: 'phone',
@@ -31,8 +34,10 @@ export function SubmitPropertyForm() {
     bedrooms: '', bathrooms: '', areaSqm: '', floor: '',
     price: '', currency: 'USD', negotiable: false,
     mohafazat: '', caza: '', city: '', neighborhood: '', address: '', locationUrl: '',
+    wantsPhotoVisit: false,
   })
   const [photos, setPhotos] = useState<{ file: File; preview: string }[]>([])
+  const [videos, setVideos] = useState<{ file: File; preview: string }[]>([])
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [done, setDone] = useState(false)
@@ -58,13 +63,33 @@ export function SubmitPropertyForm() {
     setPhotos(p => p.filter((_, i) => i !== idx))
   }
 
+  function addVideos(files: FileList) {
+    const next = [...videos]
+    let tooBig = false
+    for (const file of Array.from(files)) {
+      if (next.length >= MAX_VIDEOS) break
+      if (!file.type.startsWith('video/')) continue
+      if (file.size > MAX_VIDEO_BYTES) { tooBig = true; continue }
+      next.push({ file, preview: URL.createObjectURL(file) })
+    }
+    setVideos(next)
+    setError(tooBig ? 'Some videos were skipped — each video must be under 100MB.' : null)
+  }
+  function removeVideo(idx: number) {
+    URL.revokeObjectURL(videos[idx].preview)
+    setVideos(v => v.filter((_, i) => i !== idx))
+  }
+
   async function submit(e: React.FormEvent) {
     e.preventDefault()
     if (!f.sellerName.trim() || !f.sellerPhone.trim()) { setError('Please add your name and phone number so we can contact you.'); return }
     if (!f.title.trim()) { setError('Give your property a short title.'); return }
     if (!isKnownLocation({ city: f.city, neighborhood: f.neighborhood })) { setError('Please pick your property’s location from the search list.'); return }
     if (!f.price || Number(f.price) <= 0) { setError('Add your asking price.'); return }
-    if (photos.length === 0) { setError('Add at least one photo of your property.'); return }
+    if (photos.length === 0 && videos.length === 0 && !f.wantsPhotoVisit) {
+      setError('Add at least one photo or video — or tick the free photo visit option and we’ll shoot it for you.')
+      return
+    }
 
     setSubmitting(true); setError(null)
     try {
@@ -74,6 +99,7 @@ export function SubmitPropertyForm() {
         preferredContact: f.preferredContact,
         title: f.title.trim(), unitKind: f.unitKind, intent: f.intent,
         currency: f.currency, negotiable: String(f.negotiable),
+        wantsPhotoVisit: String(f.wantsPhotoVisit),
         price: f.price,
       }
       if (f.sellerEmail.trim()) fields.sellerEmail = f.sellerEmail.trim()
@@ -91,6 +117,7 @@ export function SubmitPropertyForm() {
       if (f.address.trim()) fields.address = f.address.trim()
       for (const [k, v] of Object.entries(fields)) fd.append(k, v)
       for (const p of photos) fd.append('photos', p.file)
+      for (const v of videos) fd.append('videos', v.file)
 
       const res = await fetch(`${apiUrl}/api/submissions`, { method: 'POST', body: fd })
       if (!res.ok) {
@@ -122,6 +149,11 @@ export function SubmitPropertyForm() {
           Our team will review the details and contact you on <strong className="text-slate-700">{f.sellerPhone}</strong> to
           confirm before publishing. Remember: zero commission, as promised.
         </p>
+        {f.wantsPhotoVisit && (
+          <p className="mt-3 inline-flex items-center gap-2 text-sm text-emerald-800 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2">
+            <Camera className="h-4 w-4 shrink-0" /> We’ll also call to book your free photo visit.
+          </p>
+        )}
       </div>
     )
   }
@@ -205,10 +237,33 @@ export function SubmitPropertyForm() {
         </div>
       </div>
 
-      {/* Photos */}
+      {/* Photos & video */}
       <div className="bg-white border border-slate-200 rounded-2xl p-5 sm:p-6 space-y-4">
-        <h2 className="font-semibold text-slate-900">Photos <span className="text-red-500">*</span></h2>
-        <p className="text-xs text-slate-400 -mt-2">Bright, clear photos rent and sell faster. Up to {MAX_PHOTOS}.</p>
+        <h2 className="font-semibold text-slate-900">Photos &amp; video</h2>
+        <p className="text-xs text-slate-400 -mt-2">
+          Bright, clear photos rent and sell faster. Up to {MAX_PHOTOS} photos and {MAX_VIDEOS} short videos.
+        </p>
+
+        {/* Free photo visit — lets the seller skip uploading entirely */}
+        <label className={`flex items-start gap-3 rounded-xl border p-3.5 cursor-pointer transition-colors ${
+          f.wantsPhotoVisit ? 'border-emerald-300 bg-emerald-50' : 'border-slate-200 hover:bg-slate-50'
+        }`}>
+          <input
+            type="checkbox"
+            checked={f.wantsPhotoVisit}
+            onChange={e => set('wantsPhotoVisit', e.target.checked)}
+            className="mt-0.5 rounded border-slate-300"
+          />
+          <span>
+            <span className="flex items-center gap-1.5 text-sm font-semibold text-slate-900">
+              <Camera className="h-4 w-4 text-emerald-600" /> I don’t have photos — send your team for a FREE photo visit
+            </span>
+            <span className="block text-xs text-slate-500 mt-0.5">
+              We’ll call you to book a time, photograph the property professionally, and publish it for you. Free, like everything else in this campaign.
+            </span>
+          </span>
+        </label>
+
         {photos.length > 0 && (
           <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
             {photos.map((p, i) => (
@@ -216,24 +271,54 @@ export function SubmitPropertyForm() {
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={p.preview} alt="" className="w-full h-full object-cover rounded-lg border border-slate-200" />
                 {i === 0 && <span className="absolute bottom-1 left-1 text-[10px] font-semibold bg-white/90 text-slate-700 rounded px-1.5 py-0.5">Cover</span>}
-                <button type="button" onClick={() => removePhoto(i)} className="absolute top-1 right-1 p-0.5 bg-red-500 text-white rounded-md opacity-0 group-hover:opacity-100">
+                <button type="button" onClick={() => removePhoto(i)} className="absolute top-1 right-1 p-1 bg-red-500 text-white rounded-md sm:opacity-0 sm:group-hover:opacity-100">
                   <X className="h-3 w-3" />
                 </button>
               </div>
             ))}
           </div>
         )}
-        {photos.length < MAX_PHOTOS && (
-          <div
-            className="border-2 border-dashed border-slate-200 rounded-xl p-6 text-center hover:border-slate-400 transition-colors cursor-pointer"
-            onClick={() => photoInputRef.current?.click()}
-          >
-            <ImagePlus className="h-8 w-8 text-slate-300 mx-auto mb-2" />
-            <p className="text-sm text-slate-500">Click to add photos</p>
-            <p className="text-xs text-slate-400 mt-1">JPG, PNG or WebP — first photo is the cover</p>
+
+        {videos.length > 0 && (
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+            {videos.map((v, i) => (
+              <div key={v.preview} className="relative group">
+                <video src={v.preview} className="w-full aspect-video object-cover rounded-lg border border-slate-200 bg-black" controls playsInline />
+                <button type="button" onClick={() => removeVideo(i)} className="absolute top-1 right-1 p-1 bg-red-500 text-white rounded-md sm:opacity-0 sm:group-hover:opacity-100">
+                  <X className="h-3 w-3" />
+                </button>
+              </div>
+            ))}
           </div>
         )}
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {photos.length < MAX_PHOTOS && (
+            <button
+              type="button"
+              className="border-2 border-dashed border-slate-200 rounded-xl p-5 text-center hover:border-slate-400 transition-colors"
+              onClick={() => photoInputRef.current?.click()}
+            >
+              <ImagePlus className="h-7 w-7 text-slate-300 mx-auto mb-1.5" />
+              <p className="text-sm text-slate-600 font-medium">Add photos</p>
+              <p className="text-xs text-slate-400 mt-0.5">JPG, PNG or WebP — first is the cover</p>
+            </button>
+          )}
+          {videos.length < MAX_VIDEOS && (
+            <button
+              type="button"
+              className="border-2 border-dashed border-slate-200 rounded-xl p-5 text-center hover:border-slate-400 transition-colors"
+              onClick={() => videoInputRef.current?.click()}
+            >
+              <Video className="h-7 w-7 text-slate-300 mx-auto mb-1.5" />
+              <p className="text-sm text-slate-600 font-medium">Add a video</p>
+              <p className="text-xs text-slate-400 mt-0.5">MP4, WebM or MOV — up to 100MB each</p>
+            </button>
+          )}
+        </div>
+
         <input ref={photoInputRef} type="file" accept="image/jpeg,image/png,image/webp" multiple className="hidden" onChange={e => { if (e.target.files?.length) addPhotos(e.target.files); e.target.value = '' }} />
+        <input ref={videoInputRef} type="file" accept="video/mp4,video/webm,video/quicktime" multiple className="hidden" onChange={e => { if (e.target.files?.length) addVideos(e.target.files); e.target.value = '' }} />
       </div>
 
       {/* Price */}
