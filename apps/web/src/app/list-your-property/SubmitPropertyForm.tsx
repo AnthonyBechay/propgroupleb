@@ -27,10 +27,10 @@ export function SubmitPropertyForm() {
 
   const [f, setF] = useState({
     sellerName: '', sellerPhone: '', sellerEmail: '', preferredContact: 'phone',
-    title: '', description: '', unitKind: 'APARTMENT', intent: 'FOR_SALE',
+    title: '', description: '', extraDetails: '', unitKind: 'APARTMENT', intent: 'FOR_SALE',
     bedrooms: '', bathrooms: '', areaSqm: '', floor: '',
     price: '', currency: 'USD', negotiable: false,
-    mohafazat: '', caza: '', city: '', neighborhood: '', address: '',
+    mohafazat: '', caza: '', city: '', neighborhood: '', address: '', locationUrl: '',
   })
   const [photos, setPhotos] = useState<{ file: File; preview: string }[]>([])
   const [submitting, setSubmitting] = useState(false)
@@ -78,6 +78,8 @@ export function SubmitPropertyForm() {
       }
       if (f.sellerEmail.trim()) fields.sellerEmail = f.sellerEmail.trim()
       if (f.description.trim()) fields.description = f.description.trim()
+      if (f.extraDetails.trim()) fields.extraDetails = f.extraDetails.trim()
+      if (f.locationUrl.trim()) fields.locationUrl = f.locationUrl.trim()
       if (showBeds && f.bedrooms !== '') fields.bedrooms = f.bedrooms
       if (showBaths && f.bathrooms !== '') fields.bathrooms = f.bathrooms
       if (f.areaSqm !== '') fields.areaSqm = f.areaSqm
@@ -105,8 +107,11 @@ export function SubmitPropertyForm() {
     }
   }
 
-  const inp = 'w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400'
+  // text-base on mobile keeps iOS from zooming the viewport on focus.
+  const inp = 'w-full px-3 py-2.5 border border-slate-200 rounded-lg text-base sm:text-sm bg-white focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400'
   const lbl = 'block text-sm font-medium text-slate-700 mb-1'
+  const priceNum = Number(f.price)
+  const showPriceNotice = f.price !== '' && priceNum > 0
 
   if (done) {
     return (
@@ -126,7 +131,7 @@ export function SubmitPropertyForm() {
       {error && <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-xl px-4 py-3">{error}</div>}
 
       {/* Contact */}
-      <div className="bg-white border border-slate-200 rounded-2xl p-6 space-y-4">
+      <div className="bg-white border border-slate-200 rounded-2xl p-5 sm:p-6 space-y-4">
         <h2 className="font-semibold text-slate-900">Your contact details</h2>
         <p className="text-xs text-slate-400 -mt-2">So our team can reach you to confirm and publish the listing.</p>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -154,7 +159,7 @@ export function SubmitPropertyForm() {
       </div>
 
       {/* Property */}
-      <div className="bg-white border border-slate-200 rounded-2xl p-6 space-y-4">
+      <div className="bg-white border border-slate-200 rounded-2xl p-5 sm:p-6 space-y-4">
         <h2 className="font-semibold text-slate-900">Your property</h2>
         <div>
           <label className={lbl}>Title <span className="text-red-500">*</span></label>
@@ -176,10 +181,14 @@ export function SubmitPropertyForm() {
           <label className={lbl}>Description <span className="text-slate-400">(optional)</span></label>
           <textarea value={f.description} onChange={e => set('description', e.target.value)} rows={4} className={inp + ' resize-y'} placeholder="Condition, view, renovations, why it's special…" />
         </div>
+        <div>
+          <label className={lbl}>Anything else you'd like to add? <span className="text-slate-400">(optional)</span></label>
+          <textarea value={f.extraDetails} onChange={e => set('extraDetails', e.target.value)} rows={3} className={inp + ' resize-y'} placeholder="Extra details — parking, title deed status, availability, best time to visit, flexibility on price…" />
+        </div>
       </div>
 
       {/* Location */}
-      <div className="bg-white border border-slate-200 rounded-2xl p-6 space-y-4">
+      <div className="bg-white border border-slate-200 rounded-2xl p-5 sm:p-6 space-y-4">
         <h2 className="font-semibold text-slate-900">Location</h2>
         <LocationFields
           value={{ mohafazat: f.mohafazat, caza: f.caza, city: f.city, neighborhood: f.neighborhood }}
@@ -189,10 +198,15 @@ export function SubmitPropertyForm() {
           <label className={lbl}>Street / building <span className="text-slate-400">(optional — never shown publicly without your OK)</span></label>
           <input value={f.address} onChange={e => set('address', e.target.value)} className={inp} placeholder="e.g., Main street, XYZ building" />
         </div>
+        <div>
+          <label className={lbl}>Google Maps link <span className="text-slate-400">(optional)</span></label>
+          <input type="url" inputMode="url" value={f.locationUrl} onChange={e => set('locationUrl', e.target.value)} className={inp} placeholder="Paste a Google Maps link to the exact spot" />
+          <p className="text-xs text-slate-400 mt-1">Open Google Maps, find your property, tap Share → Copy link, and paste it here.</p>
+        </div>
       </div>
 
       {/* Photos */}
-      <div className="bg-white border border-slate-200 rounded-2xl p-6 space-y-4">
+      <div className="bg-white border border-slate-200 rounded-2xl p-5 sm:p-6 space-y-4">
         <h2 className="font-semibold text-slate-900">Photos <span className="text-red-500">*</span></h2>
         <p className="text-xs text-slate-400 -mt-2">Bright, clear photos rent and sell faster. Up to {MAX_PHOTOS}.</p>
         {photos.length > 0 && (
@@ -223,7 +237,7 @@ export function SubmitPropertyForm() {
       </div>
 
       {/* Price */}
-      <div className="bg-white border border-slate-200 rounded-2xl p-6 space-y-4">
+      <div className="bg-white border border-slate-200 rounded-2xl p-5 sm:p-6 space-y-4">
         <h2 className="font-semibold text-slate-900">Asking price</h2>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
           <div>
@@ -244,11 +258,20 @@ export function SubmitPropertyForm() {
               <option value="LBP">LBP</option>
             </select>
           </div>
-          <label className="flex items-center gap-2 cursor-pointer pt-6">
+          <label className="flex items-center gap-2 cursor-pointer sm:pt-6">
             <input type="checkbox" checked={f.negotiable} onChange={e => set('negotiable', e.target.checked)} className="rounded border-slate-300" />
             <span className="text-sm text-slate-700">Negotiable</span>
           </label>
         </div>
+        {showPriceNotice && (
+          <div className="flex items-start gap-2 rounded-lg bg-emerald-50 border border-emerald-200 px-3 py-2.5">
+            <CheckCircle2 className="h-4 w-4 text-emerald-600 mt-0.5 shrink-0" />
+            <p className="text-sm text-emerald-800">
+              You will get <strong>exactly {f.currency} {priceNum.toLocaleString()}</strong>
+              {f.intent === 'FOR_RENT' ? ' / month' : ''} — <strong>0% commission</strong> to our office.
+            </p>
+          </div>
+        )}
       </div>
 
       <button

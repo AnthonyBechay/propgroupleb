@@ -42,6 +42,7 @@ export function BuildingForm({ initialData, buildingId, embedded }: Props) {
     title: initialData?.title ?? '',
     kind: initialData?.kind ?? 'STANDALONE',
     status: initialData?.status ?? 'NEW_BUILD',
+    source: initialData?.source ?? 'ADMIN',
     visibility: initialData?.visibility ?? 'PUBLIC',
     featured: initialData?.featured ?? false,
     description: initialData?.description ?? '',
@@ -193,6 +194,7 @@ export function BuildingForm({ initialData, buildingId, embedded }: Props) {
       title: form.title,
       kind: form.kind,
       status: form.status,
+      source: form.source,
       visibility: form.visibility,
       featured: form.featured,
       description: form.description || null,
@@ -375,6 +377,14 @@ export function BuildingForm({ initialData, buildingId, embedded }: Props) {
                 <option value="ELITE_ONLY">Elite Only</option>
                 <option value="HIDDEN">Hidden</option>
               </select>
+            </div>
+            <div>
+              <label className={labelCls}>Source</label>
+              <select value={form.source} onChange={e => setField('source', e.target.value)} className={inputCls}>
+                <option value="ADMIN">Posted by us (admin)</option>
+                <option value="OWNER">Owner submitted</option>
+              </select>
+              <p className="text-xs text-slate-400 mt-1">Where this property came from.</p>
             </div>
             <div className="flex items-center gap-2 pt-5">
               <input type="checkbox" id="featured" checked={form.featured} onChange={e => setField('featured', e.target.checked)} className="rounded border-slate-300" />

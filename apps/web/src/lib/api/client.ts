@@ -561,6 +561,14 @@ class ApiClient {
     return this.request(`/api/buildings/${id}`, { method: 'DELETE' });
   }
 
+  async archiveBuilding(id: string): Promise<ApiResponse<unknown>> {
+    return this.request(`/api/buildings/${id}/archive`, { method: 'POST' });
+  }
+
+  async markBuildingSold(id: string): Promise<ApiResponse<unknown>> {
+    return this.request(`/api/buildings/${id}/sold`, { method: 'POST' });
+  }
+
   async getBuildingUnits(buildingId: string): Promise<ApiResponse<Unit[]>> {
     return this.request(`/api/buildings/${buildingId}/units`);
   }

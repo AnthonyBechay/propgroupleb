@@ -18,6 +18,8 @@ interface Submission {
   preferredContact: string | null
   title: string
   description: string | null
+  extraDetails: string | null
+  locationUrl: string | null
   unitKind: string
   intent: 'FOR_SALE' | 'FOR_RENT'
   bedrooms: number | null
@@ -244,6 +246,17 @@ export default function AdminSubmissionsPage() {
                     </div>
 
                     {s.description && <p className="text-sm text-slate-600 whitespace-pre-wrap bg-white border border-slate-200 rounded-lg p-3">{s.description}</p>}
+                    {s.extraDetails && (
+                      <div className="text-sm text-slate-600 whitespace-pre-wrap bg-amber-50 border border-amber-200 rounded-lg p-3">
+                        <span className="block text-xs font-semibold text-amber-700 mb-1">Extra details from the seller</span>
+                        {s.extraDetails}
+                      </div>
+                    )}
+                    {s.locationUrl && (
+                      <a href={s.locationUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-sm text-sky-600 hover:text-sky-800">
+                        <MapPin className="h-3.5 w-3.5" /> Open Google Maps location <ExternalLink className="h-3 w-3" />
+                      </a>
+                    )}
 
                     {/* Photos */}
                     {s.images.length > 0 && (

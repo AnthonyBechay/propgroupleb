@@ -47,6 +47,8 @@ const submissionSchema = z.object({
   preferredContact: z.enum(['phone', 'whatsapp', 'email']).optional(),
   title: z.string().min(3).max(150),
   description: z.string().max(5000).optional(),
+  extraDetails: z.string().max(5000).optional(),
+  locationUrl: z.string().url().max(500).optional().or(z.literal('')),
   unitKind: z.enum(UNIT_KINDS).default('APARTMENT'),
   intent: z.enum(['FOR_SALE', 'FOR_RENT']).default('FOR_SALE'),
   bedrooms: z.coerce.number().int().min(0).max(30).optional(),
@@ -92,6 +94,8 @@ router.post(
         preferredContact: data.preferredContact ?? null,
         title: data.title,
         description: data.description || null,
+        extraDetails: data.extraDetails || null,
+        locationUrl: data.locationUrl || null,
         unitKind: data.unitKind,
         intent: data.intent,
         bedrooms: data.bedrooms ?? null,
@@ -224,12 +228,14 @@ router.post(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const result = await prisma.$transaction(async (tx: any) => {
       const slug = await generateUniqueBuildingSlug(submission.title, tx);
+      // Fold the seller's extra notes into the published description.
+      const description = [submission.description, submission.extraDetails].filter(Boolean).join('\n\n') || null;
       const building = await tx.building.create({
         data: {
           kind: 'STANDALONE',
           source: 'OWNER',
           title: submission.title,
-          description: submission.description,
+          description,
           status: 'RESALE',
           visibility: 'PUBLIC',
           mohafazat: submission.mohafazat,
@@ -237,6 +243,7 @@ router.post(
           city: submission.city,
           neighborhood: submission.neighborhood,
           address: submission.address,
+          locationUrl: submission.locationUrl,
           images: submission.images,
           slug,
         },

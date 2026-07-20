@@ -86,6 +86,7 @@ const buildingSchema = z.object({
   hasSecurity: z.boolean().optional(),
   hasRooftop: z.boolean().optional(),
   status: z.enum(['OFF_PLAN', 'NEW_BUILD', 'RESALE']).optional(),
+  source: z.enum(['ADMIN', 'OWNER']).optional(),
   visibility: z.enum(['PUBLIC', 'ELITE_ONLY', 'HIDDEN']).optional(),
   featured: z.boolean().optional(),
   featuredUntil: z.string().optional().nullable(),
@@ -393,6 +394,76 @@ router.put(
 
     await logAdminAction('UPDATE_BUILDING', 'building', req.params.id, { title: result.title }, authReq);
     sendSuccess(res, result, 'Building updated successfully');
+  })
+);
+
+// ── POST /:id/archive — hide the property + archive its listings (admin) ──────
+// Non-destructive alternative to delete: the building and its data stay, but it
+// disappears from the public site and its listings become ARCHIVED.
+router.post(
+  '/:id/archive',
+  authenticateToken,
+  requireAdmin,
+  asyncHandler(async (req: Request, res: Response) => {
+    const authReq = req as AuthenticatedRequest;
+    const existing = await prisma.building.findUnique({
+      where: { id: req.params.id },
+      select: { id: true, title: true },
+    });
+    if (!existing) { sendNotFound(res, 'Building'); return; }
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const result = await prisma.$transaction(async (tx: any) => {
+      const building = await tx.building.update({
+        where: { id: req.params.id },
+        data: { visibility: 'HIDDEN' },
+      });
+      const { count } = await tx.listing.updateMany({
+        where: { buildingId: req.params.id, status: { notIn: ['ARCHIVED', 'CLOSED'] } },
+        data: { status: 'ARCHIVED' },
+      });
+      return { building, archivedListings: count };
+    });
+
+    await logAdminAction('ARCHIVE_BUILDING', 'building', req.params.id, {
+      title: existing.title, archivedListings: result.archivedListings,
+    }, authReq);
+    sendSuccess(res, result, 'Property archived');
+  })
+);
+
+// ── POST /:id/sold — mark property sold: units SOLD, listings CLOSED (admin) ──
+router.post(
+  '/:id/sold',
+  authenticateToken,
+  requireAdmin,
+  asyncHandler(async (req: Request, res: Response) => {
+    const authReq = req as AuthenticatedRequest;
+    const existing = await prisma.building.findUnique({
+      where: { id: req.params.id },
+      select: { id: true, title: true, units: { select: { id: true } } },
+    });
+    if (!existing) { sendNotFound(res, 'Building'); return; }
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const result = await prisma.$transaction(async (tx: any) => {
+      // Every unit becomes SOLD…
+      await tx.unit.updateMany({
+        where: { buildingId: req.params.id },
+        data: { lifecycle: 'SOLD' },
+      });
+      // …and every still-open listing on this building closes.
+      const { count } = await tx.listing.updateMany({
+        where: { buildingId: req.params.id, status: { in: ['ACTIVE', 'UNDER_OFFER', 'DRAFT'] } },
+        data: { status: 'CLOSED', closedAt: new Date(), closingReason: 'Property marked sold' },
+      });
+      return { soldUnits: existing.units.length, closedListings: count };
+    });
+
+    await logAdminAction('MARK_BUILDING_SOLD', 'building', req.params.id, {
+      title: existing.title, closedListings: result.closedListings,
+    }, authReq);
+    sendSuccess(res, result, 'Property marked as sold');
   })
 );
 

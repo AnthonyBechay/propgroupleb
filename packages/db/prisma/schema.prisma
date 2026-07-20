@@ -1844,6 +1844,8 @@ model PropertySubmission {
   // What they're listing
   title        String
   description  String?
+  extraDetails String?       // optional free-text: extra notes the seller wants to add
+  locationUrl  String?       // optional Google Maps link the seller pastes
   unitKind     UnitKind      @default(APARTMENT)
   intent       ListingIntent @default(FOR_SALE)
   bedrooms     Int?

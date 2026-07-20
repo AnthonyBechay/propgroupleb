@@ -395,7 +395,11 @@
       "Bash(awk '/^model Building /{f=1} f{print} /^}/{if\\(f\\)exit}' packages/db/prisma/schema.prisma)",
       "Bash(awk '/enum PropertyVisibility/{f=1} f{print} /^}/{if\\(f\\)exit}' packages/db/prisma/schema.prisma)",
       "Bash(awk '/enum UnitKind/{f=1} f{print} /^}/{if\\(f\\)exit}' packages/db/prisma/schema.prisma)",
-      "Bash(awk '/^model Building /{f=1} f{print; c++} c>40{exit}' packages/db/prisma/schema.prisma)"
+      "Bash(awk '/^model Building /{f=1} f{print; c++} c>40{exit}' packages/db/prisma/schema.prisma)",
+      "Bash(awk '/^model Listing /{f=1} f{print; c++} c>60{exit}' packages/db/prisma/schema.prisma)",
+      "Bash(awk '/^model Unit /{f=1} f{print; c++} c>50{exit}' packages/db/prisma/schema.prisma)",
+      "Bash(awk '/enum ListingStatus/{f=1} f{print} /^}/{if\\(f\\)exit}' packages/db/prisma/schema.prisma)",
+      "Bash(awk '/^model Unit /{f=1} f{print} /^}/{if\\(f\\)exit}' packages/db/prisma/schema.prisma)"
     ],
     "deny": [],
     "ask": []
