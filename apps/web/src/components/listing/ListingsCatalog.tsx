@@ -1,9 +1,10 @@
 import { Suspense } from 'react'
 import Link from 'next/link'
-import { ChevronLeft, ChevronRight, Globe, ArrowUpRight } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Globe, ArrowUpRight, Home } from 'lucide-react'
 import { normalizeApiUrl } from '@/lib/utils/api-url'
 import { ListingsFilterBar } from '@/components/listing/ListingsFilterBar'
 import { ListingCard } from '@/components/listing/ListingCard'
+import { SubmissionSuccessBanner } from '@/components/listing/SubmissionSuccessBanner'
 import type { Listing } from '@/types'
 
 type SearchParams = Record<string, string | string[] | undefined>
@@ -67,22 +68,39 @@ export async function ListingsCatalog({
               : 'Explore curated listings across Lebanon — invest smart.'}
           </p>
 
-          {/* Cross-sell: foreign investment via the group's Georgia site */}
-          <a
-            href="https://propgrp.com"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="group mt-5 inline-flex items-center gap-2 rounded-full bg-emerald-500 px-4 py-2 text-sm font-semibold text-white shadow-sm ring-1 ring-emerald-400/50 transition-colors hover:bg-emerald-400"
-          >
-            <Globe className="h-4 w-4" />
-            <span>Looking to invest abroad? Georgia at propgrp.com</span>
-            <ArrowUpRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
-          </a>
+          <div className="mt-5 flex flex-col sm:flex-row items-center justify-center gap-2.5">
+            {/* Sell/rent with us — routes to the free owner-submission form */}
+            <Link
+              href="/list-your-property"
+              className="group inline-flex items-center gap-2 rounded-full bg-white px-4 py-2 text-sm font-semibold text-slate-900 shadow-sm transition-colors hover:bg-slate-100"
+            >
+              <Home className="h-4 w-4 text-slate-700" />
+              <span>Have a property? List it free — 0% commission</span>
+              <ArrowUpRight className="h-4 w-4 text-slate-500 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+            </Link>
+
+            {/* Cross-sell: foreign investment via the group's Georgia site */}
+            <a
+              href="https://propgrp.com"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="group inline-flex items-center gap-2 rounded-full bg-emerald-500 px-4 py-2 text-sm font-semibold text-white shadow-sm ring-1 ring-emerald-400/50 transition-colors hover:bg-emerald-400"
+            >
+              <Globe className="h-4 w-4" />
+              <span>Invest abroad? Georgia at propgrp.com</span>
+              <ArrowUpRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+            </a>
+          </div>
         </div>
       </div>
 
       {/* Filter bar overlaps the hero for a landing feel; listings show directly below */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 -mt-8 relative z-10 space-y-6 pb-6">
+        {/* One-time success message after an owner submits their property */}
+        <Suspense fallback={null}>
+          <SubmissionSuccessBanner />
+        </Suspense>
+
         {/* Filters */}
         <Suspense fallback={<div className="h-24 bg-white rounded-xl border border-slate-200 shadow-lg animate-pulse" />}>
           <ListingsFilterBar />

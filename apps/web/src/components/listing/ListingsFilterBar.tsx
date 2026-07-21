@@ -256,11 +256,12 @@ export function ListingsFilterBar() {
           <button
             type="button"
             onClick={() => setAiOpen((o) => !o)}
-            className={`shrink-0 inline-flex items-center gap-1.5 h-12 px-3.5 rounded-xl text-sm font-medium shadow-sm transition-colors ${
+            className={`shrink-0 inline-flex items-center gap-1.5 h-12 px-4 rounded-xl text-sm font-semibold shadow-sm transition-colors ${
               aiOpen ? 'bg-slate-900 text-white' : 'text-white bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700'
             }`}
           >
             <Sparkles className="w-4 h-4" />
+            <span className="sm:hidden">AI</span>
             <span className="hidden sm:inline">AI search</span>
           </button>
         )}

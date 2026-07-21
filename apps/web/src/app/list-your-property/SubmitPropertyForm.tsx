@@ -1,7 +1,8 @@
 'use client'
 
 import { useRef, useState } from 'react'
-import { Loader2, ImagePlus, X, CheckCircle2, Send, Video, Camera } from 'lucide-react'
+import { useRouter } from 'next/navigation'
+import { Loader2, ImagePlus, X, Send, Video, Camera, CheckCircle2 } from 'lucide-react'
 import { LocationFields } from '@/components/admin/LocationFields'
 import { isKnownLocation } from '@/lib/lebanon-locations'
 import { normalizeApiUrl } from '@/lib/utils/api-url'
@@ -24,6 +25,7 @@ const MAX_VIDEO_BYTES = 100 * 1024 * 1024
  * live until an admin approves it.
  */
 export function SubmitPropertyForm() {
+  const router = useRouter()
   const apiUrl = normalizeApiUrl(process.env.NEXT_PUBLIC_API_URL || '')
   const photoInputRef = useRef<HTMLInputElement>(null)
   const videoInputRef = useRef<HTMLInputElement>(null)
@@ -40,7 +42,6 @@ export function SubmitPropertyForm() {
   const [videos, setVideos] = useState<{ file: File; preview: string }[]>([])
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [done, setDone] = useState(false)
 
   const set = (k: keyof typeof f, v: string | boolean) => setF(p => ({ ...p, [k]: v }))
 
@@ -125,8 +126,9 @@ export function SubmitPropertyForm() {
         setError(j.message || j.error || 'Something went wrong — please try again.')
         return
       }
-      setDone(true)
-      window.scrollTo({ top: 0, behavior: 'smooth' })
+      // Success → send them back to the catalog with a confirmation message.
+      router.push('/?submitted=1')
+      return
     } catch {
       setError('Network error — please check your connection and try again.')
     } finally {
@@ -139,24 +141,6 @@ export function SubmitPropertyForm() {
   const lbl = 'block text-sm font-medium text-slate-700 mb-1'
   const priceNum = Number(f.price)
   const showPriceNotice = f.price !== '' && priceNum > 0
-
-  if (done) {
-    return (
-      <div className="bg-white rounded-2xl border border-emerald-200 p-10 text-center">
-        <CheckCircle2 className="h-12 w-12 text-emerald-500 mx-auto" />
-        <h2 className="mt-4 text-xl font-bold text-slate-900">Thank you — we received your property!</h2>
-        <p className="mt-2 text-slate-500 text-sm max-w-md mx-auto">
-          Our team will review the details and contact you on <strong className="text-slate-700">{f.sellerPhone}</strong> to
-          confirm before publishing. Remember: zero commission, as promised.
-        </p>
-        {f.wantsPhotoVisit && (
-          <p className="mt-3 inline-flex items-center gap-2 text-sm text-emerald-800 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2">
-            <Camera className="h-4 w-4 shrink-0" /> We’ll also call to book your free photo visit.
-          </p>
-        )}
-      </div>
-    )
-  }
 
   return (
     <form onSubmit={submit} className="space-y-5">
