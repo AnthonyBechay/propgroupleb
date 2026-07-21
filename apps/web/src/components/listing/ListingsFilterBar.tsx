@@ -66,6 +66,17 @@ export function ListingsFilterBar() {
   const [aiLoading, setAiLoading] = useState(false)
   const [aiSummary, setAiSummary] = useState<string | null>(null)
 
+  // Debounced text/number inputs. Typing must not navigate on every keystroke —
+  // that refetched the catalog per character and made the cursor jump. We keep a
+  // local draft and push to the URL after a short pause.
+  const [searchDraft, setSearchDraft] = useState(search)
+  const [minPriceDraft, setMinPriceDraft] = useState(minPrice)
+  const [maxPriceDraft, setMaxPriceDraft] = useState(maxPrice)
+  // Re-sync drafts when the URL changes from elsewhere (Clear all, AI search, back/forward).
+  useEffect(() => { setSearchDraft(search) }, [search])
+  useEffect(() => { setMinPriceDraft(minPrice) }, [minPrice])
+  useEffect(() => { setMaxPriceDraft(maxPrice) }, [maxPrice])
+
   useEffect(() => {
     fetch(`${apiBase}/api/settings/public`)
       .then((r) => (r.ok ? r.json() : null))
@@ -101,10 +112,30 @@ export function ListingsFilterBar() {
     [router, pathname, searchParams]
   )
 
+  // Push debounced drafts to the URL 400ms after the user stops typing.
+  useEffect(() => {
+    if (searchDraft === search) return
+    const t = setTimeout(() => updateParam('search', searchDraft), 400)
+    return () => clearTimeout(t)
+  }, [searchDraft, search, updateParam])
+  useEffect(() => {
+    if (minPriceDraft === minPrice) return
+    const t = setTimeout(() => updateParam('minPrice', minPriceDraft), 500)
+    return () => clearTimeout(t)
+  }, [minPriceDraft, minPrice, updateParam])
+  useEffect(() => {
+    if (maxPriceDraft === maxPrice) return
+    const t = setTimeout(() => updateParam('maxPrice', maxPriceDraft), 500)
+    return () => clearTimeout(t)
+  }, [maxPriceDraft, maxPrice, updateParam])
+
   function clearAll() {
     setAiSummary(null)
     setAiQuery('')
     setAiOpen(false)
+    setSearchDraft('')
+    setMinPriceDraft('')
+    setMaxPriceDraft('')
     router.push(pathname)
   }
 
@@ -224,8 +255,8 @@ export function ListingsFilterBar() {
           <input
             type="text"
             placeholder="Search by name or location…"
-            value={search}
-            onChange={(e) => updateParam('search', e.target.value)}
+            value={searchDraft}
+            onChange={(e) => setSearchDraft(e.target.value)}
             className={`${inputCls} w-full pl-9`}
           />
         </div>
@@ -255,9 +286,9 @@ export function ListingsFilterBar() {
         </select>
 
         <div className="flex items-center gap-1">
-          <input type="number" placeholder={facets?.priceMin ? `Min $${facets.priceMin.toLocaleString()}` : 'Min $'} value={minPrice} onChange={(e) => updateParam('minPrice', e.target.value)} className={`${inputCls} w-28`} />
+          <input type="number" placeholder={facets?.priceMin ? `Min $${facets.priceMin.toLocaleString()}` : 'Min $'} value={minPriceDraft} onChange={(e) => setMinPriceDraft(e.target.value)} className={`${inputCls} w-28`} />
           <span className="text-slate-400 text-sm">–</span>
-          <input type="number" placeholder={facets?.priceMax ? `Max $${facets.priceMax.toLocaleString()}` : 'Max $'} value={maxPrice} onChange={(e) => updateParam('maxPrice', e.target.value)} className={`${inputCls} w-28`} />
+          <input type="number" placeholder={facets?.priceMax ? `Max $${facets.priceMax.toLocaleString()}` : 'Max $'} value={maxPriceDraft} onChange={(e) => setMaxPriceDraft(e.target.value)} className={`${inputCls} w-28`} />
         </div>
 
         <select value={sortValue} onChange={(e) => updateSort(e.target.value)} className={inputCls}>
