@@ -270,9 +270,14 @@ router.get(
     });
 
     const mohafazat = new Set<string>();
+    const cazas = new Set<string>();
     const cities = new Set<string>();
     const kinds = new Set<string>();
     const intents = new Set<string>();
+    // Which region each caza/city belongs to, so the bar can cascade the
+    // district/city dropdowns to the chosen region.
+    const cazaRegion: Record<string, string> = {};
+    const cityRegion: Record<string, string> = {};
     let priceMin = Infinity;
     let priceMax = 0;
     let bedroomsMax = 0;
@@ -280,7 +285,8 @@ router.get(
     for (const r of rows) {
       const b = r.building ?? r.unit?.building;
       if (b?.mohafazat) mohafazat.add(b.mohafazat);
-      if (b?.city) cities.add(b.city);
+      if (b?.caza) { cazas.add(b.caza); if (b.mohafazat) cazaRegion[b.caza] = b.mohafazat; }
+      if (b?.city) { cities.add(b.city); if (b.mohafazat) cityRegion[b.city] = b.mohafazat; }
       if (r.unit?.kind) kinds.add(r.unit.kind);
       if (r.intent) intents.add(r.intent);
       const p = Number(r.price);
@@ -291,9 +297,12 @@ router.get(
     res.set('Cache-Control', 'public, max-age=60');
     sendSuccess(res, {
       mohafazat: [...mohafazat].sort(),
+      cazas: [...cazas].sort(),
       cities: [...cities].sort(),
       kinds: [...kinds].sort(),
       intents: [...intents],
+      cazaRegion,
+      cityRegion,
       priceMin: priceMin === Infinity ? 0 : priceMin,
       priceMax,
       bedroomsMax,
