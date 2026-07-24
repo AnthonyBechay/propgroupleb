@@ -12,40 +12,44 @@ function apiHostname(): string {
   }
 }
 
+// When NEXT_PUBLIC_IMAGE_CDN=cloudflare, hand all resizing to Cloudflare's edge
+// (Image Transformations) via a custom loader instead of transcoding on the
+// Next.js server. This is the single biggest image-latency win on a self-hosted
+// box — see src/lib/cf-image-loader.ts. Default (unset) keeps the built-in
+// optimizer with the remotePatterns + long cache TTL below.
+const useCloudflareLoader = process.env.NEXT_PUBLIC_IMAGE_CDN === 'cloudflare'
+
+// Cap the largest requested variant at 2048 — our stored sources are capped
+// there, so asking for 3840 (the Next default) just wastes a transcode/upscale.
+const IMAGE_SIZES = {
+  deviceSizes: [640, 750, 828, 1080, 1200, 1920, 2048],
+  imageSizes: [64, 128, 256, 384],
+}
+
+const imageConfig: NextConfig['images'] = useCloudflareLoader
+  ? {
+      loader: 'custom',
+      loaderFile: './src/lib/cf-image-loader.ts',
+      ...IMAGE_SIZES,
+    }
+  : {
+      remotePatterns: [
+        // Backend image proxy (used when NEXT_PUBLIC_R2_PUBLIC_URL is unset).
+        { protocol: 'https', hostname: apiHostname() },
+        // Cloudflare R2 public buckets.
+        { protocol: 'https', hostname: 'pub-*.r2.dev' },
+        // Custom R2 domain fronted by Cloudflare.
+        { protocol: 'https', hostname: 'assets.propgrouplb.com' },
+      ],
+      ...IMAGE_SIZES,
+      // 30 days: image keys include a content-hash suffix, so a changed image is
+      // a new URL — long TTL never serves stale bytes, and it stops the origin
+      // from re-transcoding the same variant every 60s (the Next default).
+      minimumCacheTTL: 60 * 60 * 24 * 30,
+    }
+
 const nextConfig: NextConfig = {
-  images: {
-    remotePatterns: [
-      // Backend image proxy (used when NEXT_PUBLIC_R2_PUBLIC_URL is unset).
-      // Hostname is derived from NEXT_PUBLIC_API_URL at build time.
-      {
-        protocol: 'https',
-        hostname: apiHostname(),
-      },
-      // Cloudflare R2 public buckets. When NEXT_PUBLIC_R2_PUBLIC_URL is set,
-      // normalizeFileUrl rewrites proxy URLs to direct R2 URLs so the browser
-      // fetches images straight from Cloudflare's edge without hopping through
-      // the backend container. The optimizer fetches the source from R2 once
-      // then edge-caches optimized variants per `minimumCacheTTL` below.
-      {
-        protocol: 'https',
-        hostname: 'pub-*.r2.dev',
-      },
-      // Custom R2 domain — set NEXT_PUBLIC_R2_PUBLIC_URL=https://assets.propgrouplb.com
-      // in production and normalizeFileUrl() rewrites all proxy/legacy URLs to this
-      // Cloudflare edge domain, bypassing the backend proxy entirely.
-      {
-        protocol: 'https',
-        hostname: 'assets.propgrouplb.com',
-      },
-    ],
-    // Default is 60s. That causes every optimized variant to regenerate
-    // within a minute under normal traffic, which is the main driver of
-    // steady RAM growth when Cloudflare proxy is off and every image
-    // request reaches the origin. 30 days is safe here because image keys
-    // include a content-hash suffix (-a8d864e9.jpg); cache-busting new
-    // uploads just means a different URL, not a stale cached one.
-    minimumCacheTTL: 60 * 60 * 24 * 30,
-  },
+  images: imageConfig,
   // Emit server source maps for production tracebacks. Without this, runtime
   // errors surface with minified property names like `reading 'a'` and a
   // bare digest, which is untraceable.

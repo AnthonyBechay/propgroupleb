@@ -10,10 +10,20 @@ import sharp from 'sharp';
  * covers full-bleed hero images on 2x retina displays while cutting the
  * multi-MB phone-camera originals down to a few hundred KB.
  */
-const MAX_IMAGE_DIMENSION = 2560;
+// 2048px covers a full-bleed hero at 2x retina on virtually every screen while
+// keeping the stored *source* light — which is what next/image transcodes from
+// (faster first-hit) and what any raw <img> surface downloads directly.
+const MAX_IMAGE_DIMENSION = 2048;
+
+// Recompression quality. Lowered from 82 → 74: for photos, mozjpeg at 74 is
+// visually near-indistinguishable from 82 but ~35–45% smaller. next/image still
+// re-encodes delivery variants, so the on-screen quality is governed there.
+const JPEG_QUALITY = 74;
+const WEBP_QUALITY = 74;
+const AVIF_QUALITY = 50;
 
 /** MIME types we run through sharp. PDFs/Office docs are passed through untouched. */
-const RESIZABLE_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/avif']);
+export const RESIZABLE_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/avif']);
 
 /**
  * Resize + recompress an image buffer in-place, preserving its format.
@@ -28,7 +38,7 @@ const RESIZABLE_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 
  * if processing fails for any reason (corrupt upload, unexpected format) — an
  * upload should never hard-fail just because optimization didn't apply.
  */
-async function processImageBuffer(buffer: Buffer, contentType: string): Promise<Buffer> {
+export async function processImageBuffer(buffer: Buffer, contentType: string): Promise<Buffer> {
   if (!RESIZABLE_IMAGE_TYPES.has(contentType)) return buffer;
   try {
     const pipeline = sharp(buffer, { failOn: 'none' })
@@ -43,16 +53,16 @@ async function processImageBuffer(buffer: Buffer, contentType: string): Promise<
     let out: Buffer;
     switch (contentType) {
       case 'image/jpeg':
-        out = await pipeline.jpeg({ quality: 82, mozjpeg: true }).toBuffer();
+        out = await pipeline.jpeg({ quality: JPEG_QUALITY, mozjpeg: true }).toBuffer();
         break;
       case 'image/png':
         out = await pipeline.png({ compressionLevel: 9, palette: true }).toBuffer();
         break;
       case 'image/webp':
-        out = await pipeline.webp({ quality: 82 }).toBuffer();
+        out = await pipeline.webp({ quality: WEBP_QUALITY }).toBuffer();
         break;
       case 'image/avif':
-        out = await pipeline.avif({ quality: 60 }).toBuffer();
+        out = await pipeline.avif({ quality: AVIF_QUALITY }).toBuffer();
         break;
       default:
         return buffer;
@@ -65,7 +75,7 @@ async function processImageBuffer(buffer: Buffer, contentType: string): Promise<
   }
 }
 
-const s3Client = new S3Client({
+export const s3Client = new S3Client({
   region: 'auto',
   endpoint: `https://${process.env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
   credentials: {
@@ -74,7 +84,7 @@ const s3Client = new S3Client({
   },
 });
 
-const BUCKET_NAME = process.env.R2_BUCKET_NAME || '';
+export const BUCKET_NAME = process.env.R2_BUCKET_NAME || '';
 const PUBLIC_URL = process.env.R2_PUBLIC_URL || '';
 
 /** Ensure a URL/host has an https:// scheme and no trailing slash. */

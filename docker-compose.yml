@@ -80,6 +80,11 @@ services:
         # metadataBase. Baking it in at build time ensures static pages (OG tags,
         # canonical URLs) get the real domain instead of localhost.
         NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL}
+        # Set to "cloudflare" to route every next/image through Cloudflare Image
+        # Transformations (/cdn-cgi/image/…) instead of transcoding on this box.
+        # Requires Image Transformations enabled on the zone fronting
+        # NEXT_PUBLIC_R2_PUBLIC_URL. Leave empty to use the built-in optimizer.
+        NEXT_PUBLIC_IMAGE_CDN: ${NEXT_PUBLIC_IMAGE_CDN:-}
     restart: unless-stopped
     environment:
       NODE_ENV: production
@@ -100,6 +105,7 @@ services:
       # offloading ~80% of image traffic away from the backend container.
       # Falls back to R2_PUBLIC_URL — one env var covers both services.
       NEXT_PUBLIC_R2_PUBLIC_URL: ${NEXT_PUBLIC_R2_PUBLIC_URL:-${R2_PUBLIC_URL:-}}
+      NEXT_PUBLIC_IMAGE_CDN: ${NEXT_PUBLIC_IMAGE_CDN:-}
     depends_on:
       backend:
         condition: service_healthy

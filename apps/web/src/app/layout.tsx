@@ -96,17 +96,36 @@ export const metadata: Metadata = {
   },
 };
 
+// Origin of the image CDN (if configured), used for a preconnect hint.
+function getImageCdnOrigin(): string | null {
+  const raw = process.env.NEXT_PUBLIC_R2_PUBLIC_URL
+  if (!raw) return null
+  try {
+    return new URL(/^https?:\/\//i.test(raw) ? raw : `https://${raw}`).origin
+  } catch {
+    return null
+  }
+}
+
 export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const imageCdnOrigin = getImageCdnOrigin()
   return (
     <html lang="en" className={`${inter.variable} ${plusJakarta.variable} overflow-x-hidden`}>
       <head>
         <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png?v=3" />
         <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png?v=3" />
         <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png?v=3" />
+        {/* Warm the connection to the image CDN so the first photo paints sooner. */}
+        {imageCdnOrigin && (
+          <>
+            <link rel="preconnect" href={imageCdnOrigin} crossOrigin="" />
+            <link rel="dns-prefetch" href={imageCdnOrigin} />
+          </>
+        )}
         {/* Organization + WebSite JSON-LD — helps Google surface brand panel + sitelinks search */}
         <script
           type="application/ld+json"

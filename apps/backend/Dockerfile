@@ -1,7 +1,9 @@
 FROM node:20-alpine
 
 # Install system dependencies
-RUN apk add --no-cache bash openssl wget
+# ffmpeg: used to compress uploaded property videos (H.264/AAC, 720p) so we
+# don't store multi-hundred-MB phone recordings at full bitrate.
+RUN apk add --no-cache bash openssl wget ffmpeg
 
 # Enable pnpm
 RUN corepack enable && corepack prepare pnpm@9.15.0 --activate

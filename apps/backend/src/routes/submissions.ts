@@ -8,6 +8,7 @@ import { asyncHandler } from '../utils/errors.js';
 import { sendSuccess, sendCreated, sendPaginated, sendNotFound, sendError } from '../utils/response.js';
 import { parsePagination, buildPaginationResponse } from '../utils/pagination.js';
 import { uploadFile } from '../services/upload.service.js';
+import { compressVideoBuffer } from '../services/video.service.js';
 import { logger } from '../utils/logger.js';
 import type { AuthenticatedRequest } from '../types/index.js';
 
@@ -98,7 +99,9 @@ router.post(
     const videos: string[] = [];
     for (const file of grouped.videos ?? []) {
       try {
-        const { url } = await uploadFile(file.buffer, file.originalname, file.mimetype, 'submissions');
+        const compressed = await compressVideoBuffer(file.buffer, file.originalname);
+        const name = file.originalname.replace(/\.[^.]+$/, '') + compressed.ext;
+        const { url } = await uploadFile(compressed.buffer, name, compressed.contentType, 'submissions');
         videos.push(url);
       } catch (err) {
         logger.error('Submission video upload failed', err);

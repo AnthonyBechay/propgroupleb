@@ -4,6 +4,7 @@ import { useState, useRef } from 'react'
 import Image from 'next/image'
 import { Home, ChevronLeft, ChevronRight, Play } from 'lucide-react'
 import { normalizeFileUrl } from '@/lib/utils/api-url'
+import { BLUR_DATA_URL } from '@/lib/blur'
 
 interface ListingGalleryProps {
   images: string[]
@@ -99,6 +100,8 @@ export function ListingGallery({ images, title, videoUrl }: ListingGalleryProps)
             sizes="(max-width: 1024px) 100vw, 66vw"
             quality={80}
             priority={index === 0}
+            placeholder="blur"
+            blurDataURL={BLUR_DATA_URL}
           />
         ) : youTubeId(current.url) ? (
           <iframe

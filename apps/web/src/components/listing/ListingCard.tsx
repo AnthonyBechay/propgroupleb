@@ -4,6 +4,7 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { MapPin, Bed, Bath, Square, Building2, Home } from 'lucide-react'
 import { normalizeFileUrl } from '@/lib/utils/api-url'
+import { BLUR_DATA_URL } from '@/lib/blur'
 import { track } from '@/lib/analytics'
 import type { Listing } from '@/types'
 import { ListingIntent, UnitKind, BuildingKind, Currency } from '@/types'
@@ -103,6 +104,8 @@ export function ListingCard({ listing, priority = false }: ListingCardProps) {
             sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
             quality={75}
             priority={priority}
+            placeholder="blur"
+            blurDataURL={BLUR_DATA_URL}
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center">

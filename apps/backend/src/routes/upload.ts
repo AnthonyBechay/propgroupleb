@@ -1,6 +1,7 @@
 import express, { type Router } from 'express';
 import multer from 'multer';
 import { uploadFile, deleteFile, extractKeyFromUrl } from '../services/upload.service.js';
+import { compressVideoBuffer } from '../services/video.service.js';
 import { authenticateToken, requireAdmin } from '../middleware/auth.js';
 import { asyncHandler } from '../utils/errors.js';
 
@@ -81,7 +82,10 @@ router.post(
     }
 
     const propertySlug = req.body.propertySlug || req.query.propertySlug;
-    const result = await uploadFile(file.buffer, file.originalname, file.mimetype, 'videos', {
+    // Compress before storing (H.264/720p). Falls back to the original on error.
+    const compressed = await compressVideoBuffer(file.buffer, file.originalname);
+    const baseName = file.originalname.replace(/\.[^.]+$/, '') + compressed.ext;
+    const result = await uploadFile(compressed.buffer, baseName, compressed.contentType, 'videos', {
       propertySlug: propertySlug as string | undefined,
     });
     res.status(201).json({ url: result.url, key: result.key });
