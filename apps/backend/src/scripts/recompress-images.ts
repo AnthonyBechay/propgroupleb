@@ -13,8 +13,13 @@
  * Needs the same R2_* env vars as the backend (loaded from apps/backend/.env).
  */
 import 'dotenv/config';
-import { ListObjectsV2Command, GetObjectCommand, PutObjectCommand } from '@aws-sdk/client-s3';
+import { ListObjectsV2Command, GetObjectCommand, PutObjectCommand, HeadObjectCommand, CopyObjectCommand } from '@aws-sdk/client-s3';
 import { s3Client, BUCKET_NAME, processImageBuffer } from '../services/upload.service.js';
+
+// Objects we've already recompressed get stamped with this metadata so a rerun
+// skips them (no re-download, and no generational quality loss from re-encoding
+// an already-compressed JPEG). Bump the version to force a fresh pass.
+const OPTIMIZED_TAG = 'recompress-v1';
 
 const DRY_RUN = process.argv.includes('--dry-run');
 
@@ -41,7 +46,7 @@ async function main() {
   console.log(`Recompressing images in bucket "${BUCKET_NAME}"${DRY_RUN ? ' (dry run)' : ''}…\n`);
 
   let token: string | undefined;
-  let scanned = 0, processed = 0, skipped = 0, failed = 0;
+  let scanned = 0, processed = 0, skipped = 0, failed = 0, alreadyDone = 0;
   let bytesBefore = 0, bytesAfter = 0;
 
   do {
@@ -60,31 +65,52 @@ async function main() {
       scanned++;
 
       try {
+        // Cheap HEAD first: if we already stamped this object, skip it entirely
+        // (makes a rerun after an interruption fast and lossless).
+        const head = await s3Client.send(new HeadObjectCommand({ Bucket: BUCKET_NAME, Key: key }));
+        if (head.Metadata?.optimized === OPTIMIZED_TAG) { alreadyDone++; continue; }
+
         const got = await s3Client.send(new GetObjectCommand({ Bucket: BUCKET_NAME, Key: key }));
         const original = await streamToBuffer(got.Body);
         const optimized = await processImageBuffer(original, type);
-
-        if (optimized.length >= original.length) {
-          // Already optimal — leave it alone.
-          bytesBefore += original.length; bytesAfter += original.length;
-          continue;
-        }
+        // Only rewrite when it saves at least 5%. An already-compressed image
+        // (e.g. one done in an earlier interrupted run) barely shrinks on a
+        // second pass, so we just stamp it instead of re-encoding — no quality loss.
+        const shrunk = optimized.length < original.length * 0.95;
 
         bytesBefore += original.length;
-        bytesAfter += optimized.length;
-        const saved = (100 * (1 - optimized.length / original.length)).toFixed(0);
-        console.log(`${DRY_RUN ? '[dry] ' : ''}${key}  ${(original.length / 1024).toFixed(0)}KB → ${(optimized.length / 1024).toFixed(0)}KB  (-${saved}%)`);
+        bytesAfter += shrunk ? optimized.length : original.length;
+
+        if (shrunk) {
+          const saved = (100 * (1 - optimized.length / original.length)).toFixed(0);
+          console.log(`${DRY_RUN ? '[dry] ' : ''}${key}  ${(original.length / 1024).toFixed(0)}KB → ${(optimized.length / 1024).toFixed(0)}KB  (-${saved}%)`);
+        }
 
         if (!DRY_RUN) {
-          await s3Client.send(new PutObjectCommand({
-            Bucket: BUCKET_NAME,
-            Key: key,
-            Body: optimized,
-            ContentType: type,
-            CacheControl: 'public, max-age=31536000, immutable',
-          }));
+          if (shrunk) {
+            await s3Client.send(new PutObjectCommand({
+              Bucket: BUCKET_NAME,
+              Key: key,
+              Body: optimized,
+              ContentType: type,
+              CacheControl: 'public, max-age=31536000, immutable',
+              Metadata: { optimized: OPTIMIZED_TAG },
+            }));
+          } else {
+            // Already optimal — just stamp it (copy in place, replacing metadata)
+            // so the next run HEAD-skips it without re-downloading.
+            await s3Client.send(new CopyObjectCommand({
+              Bucket: BUCKET_NAME,
+              Key: key,
+              CopySource: `${BUCKET_NAME}/${encodeURIComponent(key)}`,
+              ContentType: type,
+              CacheControl: 'public, max-age=31536000, immutable',
+              Metadata: { optimized: OPTIMIZED_TAG },
+              MetadataDirective: 'REPLACE',
+            }));
+          }
         }
-        processed++;
+        if (shrunk) processed++;
       } catch (err) {
         failed++;
         console.error(`  ✗ failed on ${key}:`, err instanceof Error ? err.message : err);
@@ -94,7 +120,7 @@ async function main() {
 
   const savedMB = ((bytesBefore - bytesAfter) / 1024 / 1024).toFixed(1);
   const pct = bytesBefore > 0 ? (100 * (1 - bytesAfter / bytesBefore)).toFixed(1) : '0';
-  console.log(`\nDone. Scanned ${scanned} images, ${DRY_RUN ? 'would rewrite' : 'rewrote'} ${processed}, skipped ${skipped} non-images, ${failed} failed.`);
+  console.log(`\nDone. Scanned ${scanned} images, ${DRY_RUN ? 'would rewrite' : 'rewrote'} ${processed}, ${alreadyDone} already optimized, skipped ${skipped} non-images, ${failed} failed.`);
   console.log(`Total: ${(bytesBefore / 1024 / 1024).toFixed(1)}MB → ${(bytesAfter / 1024 / 1024).toFixed(1)}MB  (saved ${savedMB}MB, -${pct}%).`);
   if (DRY_RUN) console.log('Dry run — nothing was written. Re-run without --dry-run to apply.');
 }
