@@ -13,6 +13,13 @@
  * Requires "Image Transformations" enabled on the Cloudflare zone that fronts
  * your asset domain (NEXT_PUBLIC_R2_PUBLIC_URL). When the env flag is unset the
  * default Next optimizer is used and this file is never loaded.
+ *
+ * Only CDN-hosted photos (R2, via NEXT_PUBLIC_R2_PUBLIC_URL) are routed through
+ * `/cdn-cgi/image/`. Local /public assets (logo, favicons) are returned as-is:
+ * they're already tiny bundled files, and the main site domain may not have
+ * Image Transformations enabled / proxied the same way as the asset zone — an
+ * unconditional rewrite there 404s (confirmed: propgrouplb.com/cdn-cgi/image/
+ * .../logo.png hit Next.js directly, not Cloudflare's edge).
  */
 interface LoaderArgs {
   src: string
@@ -31,8 +38,10 @@ export default function cloudflareImageLoader({ src, width, quality }: LoaderArg
   const cdnRaw = (process.env.NEXT_PUBLIC_R2_PUBLIC_URL || '').replace(/\/+$/, '')
   const cdnOrigin = cdnRaw ? (/^https?:\/\//i.test(cdnRaw) ? cdnRaw : `https://${cdnRaw}`) : ''
 
-  // Same-origin rooted asset (e.g. /logo.png) → transform against the site origin.
-  if (src.startsWith('/')) return `/cdn-cgi/image/${options}${src}`
+  // Local /public asset (e.g. /logo.png, /favicon.ico) — not on the CDN zone,
+  // and already small. Serve untouched rather than risk a 404 on a domain that
+  // may not have Transformations enabled.
+  if (src.startsWith('/')) return src
 
   if (cdnOrigin) {
     // Cloudflare resizes most reliably when the source is a same-zone PATH
