@@ -33,6 +33,14 @@ export interface Opportunity {
   rejectionReason: RejectionReason | null
   feedback: string | null
   updatedAt: string
+  /** Resolved by the API so ruled-out items still show their real name. */
+  subject?: {
+    kind: 'LISTING' | 'CLIENT' | 'UNKNOWN'
+    title: string
+    subtitle: string | null
+    slug?: string | null
+    id?: string
+  }
 }
 
 export const OPPORTUNITY_META: Record<OpportunityStage, { label: string; cls: string; dot: string }> = {
@@ -135,6 +143,30 @@ export const STATUS_META: Record<LeadStatus, { label: string; cls: string }> = {
 
 export const TYPE_LABELS: Record<LeadType, string> = {
   BUYER: 'Buyer', SELLER: 'Seller', RENTER: 'Renter', LANDLORD: 'Landlord', INVESTOR: 'Investor',
+}
+
+/** Clients who HAVE a property to offer (supply side). */
+export const SUPPLY_TYPES: LeadType[] = ['SELLER', 'LANDLORD']
+/** Clients who are LOOKING for a property (demand side). */
+export const DEMAND_TYPES: LeadType[] = ['BUYER', 'RENTER', 'INVESTOR']
+
+export const isSupplyType = (t: LeadType) => SUPPLY_TYPES.includes(t)
+
+/**
+ * Colour identity per client type so a glance at the board tells you which side
+ * of the deal someone is on. Demand = blue/violet family, supply = amber/orange.
+ */
+export const TYPE_META: Record<LeadType, {
+  solid: string   // selected state (form buttons)
+  chip: string    // small badge
+  accent: string  // card left border
+  bar: string     // card top strip
+}> = {
+  BUYER:    { solid: 'bg-sky-600 text-white',     chip: 'bg-sky-100 text-sky-800',         accent: 'border-l-sky-500',     bar: 'bg-sky-500' },
+  RENTER:   { solid: 'bg-cyan-600 text-white',    chip: 'bg-cyan-100 text-cyan-800',       accent: 'border-l-cyan-500',    bar: 'bg-cyan-500' },
+  INVESTOR: { solid: 'bg-indigo-600 text-white',  chip: 'bg-indigo-100 text-indigo-800',   accent: 'border-l-indigo-500',  bar: 'bg-indigo-500' },
+  SELLER:   { solid: 'bg-amber-600 text-white',   chip: 'bg-amber-100 text-amber-900',     accent: 'border-l-amber-500',   bar: 'bg-amber-500' },
+  LANDLORD: { solid: 'bg-orange-600 text-white',  chip: 'bg-orange-100 text-orange-900',   accent: 'border-l-orange-500',  bar: 'bg-orange-500' },
 }
 
 export const MARKET_META: Record<LeadMarket, { label: string; cls: string }> = {

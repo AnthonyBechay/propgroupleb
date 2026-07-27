@@ -88,6 +88,61 @@ function toLeadData(data: z.infer<typeof leadSchema>): Record<string, any> {
   };
 }
 
+
+/**
+ * Attach a display subject to each opportunity. Rejected items are excluded
+ * from the match endpoints by design, so the UI can't resolve their names from
+ * there — we resolve them here instead.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function hydrateOpportunities(opportunities: any[]): Promise<any[]> {
+  if (opportunities.length === 0) return [];
+  const listingIds = opportunities.map((o) => o.listingId).filter(Boolean) as string[];
+  const leadIds = opportunities.map((o) => o.counterpartLeadId).filter(Boolean) as string[];
+
+  const [listings, leads] = await Promise.all([
+    listingIds.length
+      ? prisma.listing.findMany({
+          where: { id: { in: listingIds } },
+          select: {
+            id: true, slug: true, headline: true, price: true, currency: true,
+            building: { select: { title: true, city: true, caza: true } },
+            unit: { select: { building: { select: { title: true, city: true, caza: true } } } },
+          },
+        })
+      : [],
+    leadIds.length
+      ? prisma.lead.findMany({
+          where: { id: { in: leadIds } },
+          select: { id: true, name: true, type: true, phone: true, whatsapp: true, askingFor: true },
+        })
+      : [],
+  ]);
+
+  const listingById = new Map(listings.map((x) => [x.id, x]));
+  const leadById = new Map(leads.map((x) => [x.id, x]));
+
+  return opportunities.map((o) => {
+    const listing = o.listingId ? listingById.get(o.listingId) : null;
+    const counterpart = o.counterpartLeadId ? leadById.get(o.counterpartLeadId) : null;
+    const b = listing?.building ?? listing?.unit?.building;
+    return {
+      ...o,
+      subject: counterpart
+        ? { kind: 'CLIENT', title: counterpart.name, subtitle: counterpart.askingFor ?? counterpart.type, id: counterpart.id }
+        : listing
+          ? {
+              kind: 'LISTING',
+              title: listing.headline || b?.title || 'Property',
+              subtitle: [b?.city, b?.caza].filter(Boolean).join(', ') || null,
+              slug: listing.slug,
+              id: listing.id,
+            }
+          : { kind: 'UNKNOWN', title: 'No longer available', subtitle: null },
+    };
+  });
+}
+
 // ── GET / — pipeline list with filters ────────────────────────────────────────
 
 router.get(
@@ -187,6 +242,7 @@ router.get(
 
     sendSuccess(res, {
       ...lead,
+      opportunities: await hydrateOpportunities(lead.opportunities),
       insights: rejectionInsights(lead.opportunities),
       needsNewOptions: needsNewOptions(lead, lead.opportunities),
     });
@@ -264,11 +320,22 @@ router.get(
     const isDemand = DEMAND_TYPES.includes(lead.type);
     const counterpartTypes = isDemand ? SUPPLY_TYPES : DEMAND_TYPES;
 
+    // A pairing is symmetric: it's stored once (from whichever side started it)
+    // but must hide the other client from BOTH profiles. Querying only
+    // `leadId = this lead` left the rejected counterpart visible on the other
+    // side, so we look in both directions.
     const paired = await prisma.leadOpportunity.findMany({
-      where: { leadId: lead.id, counterpartLeadId: { not: null } },
-      select: { counterpartLeadId: true },
+      where: {
+        OR: [
+          { leadId: lead.id, counterpartLeadId: { not: null } },
+          { counterpartLeadId: lead.id },
+        ],
+      },
+      select: { leadId: true, counterpartLeadId: true },
     });
-    const pairedIds = paired.map((o) => o.counterpartLeadId!).filter(Boolean);
+    const pairedIds = paired
+      .flatMap((o) => [o.leadId, o.counterpartLeadId])
+      .filter((id): id is string => !!id && id !== lead.id);
 
     const counterparts = await prisma.lead.findMany({
       where: {
@@ -586,7 +653,11 @@ router.patch(
         opportunities: { orderBy: { updatedAt: 'desc' } },
       },
     });
-    sendSuccess(res, lead, 'Opportunity updated');
+    sendSuccess(
+      res,
+      lead ? { ...lead, opportunities: await hydrateOpportunities(lead.opportunities) } : lead,
+      'Opportunity updated',
+    );
   })
 );
 
@@ -678,7 +749,7 @@ router.get(
 
     const headers = [
       'Client Name', 'Client Type', 'Market', 'Status', 'Source', 'Asking For',
-      'Property Types', 'Areas', 'Regions', 'Min Beds', 'Budget Min', 'Budget Max', 'Currency',
+      'Property Types', 'Areas', 'Regions', 'Beds', 'Budget Min / Asking Price', 'Budget Max', 'Currency',
       'Phone', 'WhatsApp', 'Email',
       'Last Contact Date', 'Interval (Days)', 'Next Contact Date', 'Urgent Status',
       'Notes / Actions', 'Created',

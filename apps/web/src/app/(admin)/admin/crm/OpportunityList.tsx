@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import {
-  Building2, CalendarPlus, Check, X, ThumbsUp, ThumbsDown, Loader2, Trash2, Send, Handshake,
+  Building2, CalendarPlus, Check, X, ThumbsUp, ThumbsDown, Loader2, Trash2, Send, Handshake, Pencil,
 } from 'lucide-react'
 import { normalizeApiUrl } from '@/lib/utils/api-url'
 import {
@@ -109,9 +109,21 @@ export function OpportunityList({
                 {subtitle && <p className="text-xs text-slate-400 truncate mt-0.5">{subtitle}</p>}
 
                 {o.viewingAt && o.stage === 'VIEWING_BOOKED' && (
-                  <p className="text-xs text-violet-700 mt-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      // Pre-fill the picker with the current slot for a quick change.
+                      setViewingAt(new Date(o.viewingAt!).toISOString().slice(0, 16))
+                      setBookingId(o.id)
+                      setRejectingId(null)
+                    }}
+                    className="text-xs text-violet-700 mt-1 inline-flex items-center gap-1 hover:underline"
+                    title="Change the viewing date"
+                  >
+                    <CalendarPlus className="h-3 w-3" />
                     Viewing {new Date(o.viewingAt).toLocaleString(undefined, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
-                  </p>
+                    <Pencil className="h-2.5 w-2.5 opacity-60" />
+                  </button>
                 )}
                 {isRejected && o.rejectionReason && (
                   <p className="text-xs text-red-600 mt-1">
@@ -145,9 +157,24 @@ export function OpportunityList({
                   </ActionBtn>
                 )}
                 {o.stage === 'VIEWING_BOOKED' && (
-                  <ActionBtn onClick={() => patch(o.id, { stage: 'VIEWED' })} disabled={busy} icon={<Check className="h-3 w-3" />}>
-                    Viewing done
-                  </ActionBtn>
+                  <>
+                    <ActionBtn onClick={() => patch(o.id, { stage: 'VIEWED' })} disabled={busy} icon={<Check className="h-3 w-3" />}>
+                      Viewing done
+                    </ActionBtn>
+                    <ActionBtn
+                      onClick={() => {
+                        setViewingAt(o.viewingAt ? new Date(o.viewingAt).toISOString().slice(0, 16) : '')
+                        setBookingId(o.id); setRejectingId(null)
+                      }}
+                      disabled={busy}
+                      icon={<CalendarPlus className="h-3 w-3" />}
+                    >
+                      Reschedule
+                    </ActionBtn>
+                    <ActionBtn onClick={() => patch(o.id, { stage: 'SHARED', viewingAt: null })} disabled={busy} icon={<X className="h-3 w-3" />}>
+                      Cancel viewing
+                    </ActionBtn>
+                  </>
                 )}
                 {o.stage === 'VIEWED' && (
                   <>
@@ -181,6 +208,9 @@ export function OpportunityList({
             {/* Book a viewing */}
             {bookingId === o.id && (
               <div className="mt-2 pt-2 border-t border-slate-100 flex flex-wrap items-center gap-2">
+                <label className="text-xs font-medium text-slate-600">
+                  {o.stage === 'VIEWING_BOOKED' ? 'New viewing time' : 'Viewing time'}
+                </label>
                 <input
                   type="datetime-local"
                   value={viewingAt}
@@ -188,13 +218,16 @@ export function OpportunityList({
                   className="px-2 py-1.5 border border-slate-200 rounded-lg text-sm"
                 />
                 <button
-                  onClick={() => patch(o.id, { stage: 'VIEWING_BOOKED', viewingAt: viewingAt || new Date().toISOString() })}
+                  onClick={() => patch(o.id, {
+                    stage: 'VIEWING_BOOKED',
+                    viewingAt: viewingAt ? new Date(viewingAt).toISOString() : new Date().toISOString(),
+                  })}
                   disabled={busy}
                   className="px-3 py-1.5 rounded-lg bg-violet-600 text-white text-xs font-medium hover:bg-violet-700 disabled:opacity-50"
                 >
-                  Book
+                  {o.stage === 'VIEWING_BOOKED' ? 'Save new time' : 'Book'}
                 </button>
-                <button onClick={() => setBookingId(null)} className="text-xs text-slate-400 hover:text-slate-700">Cancel</button>
+                <button onClick={() => { setBookingId(null); setViewingAt('') }} className="text-xs text-slate-400 hover:text-slate-700">Cancel</button>
               </div>
             )}
 

@@ -141,6 +141,10 @@ export function LeadDrawer({ lead, onClose, onChanged }: { lead: Lead; onClose: 
   }
 
   const l = detail ?? lead
+  const isSupply = l.type === 'SELLER' || l.type === 'LANDLORD'
+  // Strong fits vs. worth-a-call near misses — brokers want both, but clearly separated.
+  const strongMatches = matches.filter((m) => m.match.score >= 70)
+  const nearMatches = matches.filter((m) => m.match.score < 70)
   const due = formatDue(l.nextContactAt)
   const where = [l.areas.join(', '), l.regions.map(regionLabel).join(', ')].filter(Boolean).join(' · ')
   const phone = l.whatsapp || l.phone
@@ -306,87 +310,15 @@ export function LeadDrawer({ lead, onClose, onChanged }: { lead: Lead; onClose: 
 
             <OpportunityList
               opportunities={l.opportunities ?? []}
-              labelFor={(o: Opportunity) => {
-                if (o.counterpartLeadId) {
-                  const c = leadMatches.find((m) => m.lead.id === o.counterpartLeadId)?.lead
-                  return { title: c?.name ?? 'Client', subtitle: c?.askingFor ?? undefined, isClient: true }
-                }
-                const m = matches.find((x) => x.listing.id === o.listingId)?.listing
-                const b = m?.building ?? m?.unit?.building
-                return {
-                  title: m?.headline || b?.title || 'Property',
-                  subtitle: b ? [b.city, b.caza].filter(Boolean).join(', ') : undefined,
-                  isClient: false,
-                }
-              }}
+              labelFor={(o: Opportunity) => ({
+                // The API resolves this for us — ruled-out items are excluded
+                // from the match lists, so we can't look them up there.
+                title: o.subject?.title ?? (o.counterpartLeadId ? 'Client' : 'Property'),
+                subtitle: o.subject?.subtitle ?? undefined,
+                isClient: o.subject?.kind === 'CLIENT' || !!o.counterpartLeadId,
+              })}
               onChanged={() => { load(); onChanged() }}
             />
-          </section>
-
-          {/* Matching listings */}
-          <section className="bg-white border border-slate-200 rounded-xl p-4">
-            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3 flex items-center gap-1.5">
-              <Building2 className="h-3.5 w-3.5" /> Matching properties
-              {matches.length > 0 && <span className="text-slate-400 font-normal normal-case">({matches.length})</span>}
-            </p>
-            {loading ? (
-              <div className="flex justify-center py-6 text-slate-400"><Loader2 className="h-5 w-5 animate-spin" /></div>
-            ) : matches.length === 0 ? (
-              <p className="text-sm text-slate-400">
-                {l.market === 'GEORGIA'
-                  ? 'Georgia inventory lives on propgrp.com — no local matches.'
-                  : 'No live listings fit these criteria closely enough yet.'}
-              </p>
-            ) : (
-              <div className="space-y-2">
-                {matches.map(({ listing: m, match }) => {
-                  const b = m.building ?? m.unit?.building
-                  const img = b?.images?.[0]
-                  return (
-                    <div key={m.id} className="flex items-center gap-3 p-2 rounded-lg hover:bg-slate-50 border border-slate-100">
-                    <Link
-                      href={m.slug ? `/listings/${m.slug}` : '#'}
-                      target="_blank"
-                      className="flex items-center gap-3 min-w-0 flex-1"
-                    >
-                      {img ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img src={normalizeFileUrl(img)} alt="" className="h-12 w-16 object-cover rounded-md shrink-0" />
-                      ) : (
-                        <div className="h-12 w-16 bg-slate-100 rounded-md flex items-center justify-center shrink-0">
-                          <Building2 className="h-4 w-4 text-slate-300" />
-                        </div>
-                      )}
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-1.5">
-                          <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${scoreCls(match.score)}`}>{match.score}%</span>
-                          <p className="text-sm font-medium text-slate-900 truncate">{m.headline || b?.title || 'Listing'}</p>
-                        </div>
-                        <p className="text-xs text-slate-500 mt-0.5 truncate">
-                          {match.reasons.slice(0, 3).join(' · ') || [b?.city, b?.caza].filter(Boolean).join(', ')}
-                        </p>
-                        {match.misses.length > 0 && (
-                          <p className="text-[11px] text-amber-600 mt-0.5 truncate">⚠ {match.misses.slice(0, 2).join(' · ')}</p>
-                        )}
-                      </div>
-                      <div className="text-right shrink-0">
-                        <p className="text-sm font-semibold text-slate-900">{m.currency} {m.price?.toLocaleString()}</p>
-                        <ExternalLink className="h-3 w-3 text-slate-400 ml-auto" />
-                      </div>
-                    </Link>
-                    <button
-                      onClick={() => addOpportunity({ listingId: m.id, matchScore: match.score })}
-                      disabled={busy}
-                      title="Add to shortlist"
-                      className="shrink-0 p-1.5 rounded-lg border border-slate-200 text-slate-500 hover:text-slate-900 hover:bg-slate-100 disabled:opacity-50"
-                    >
-                      <Plus className="h-3.5 w-3.5" />
-                    </button>
-                    </div>
-                  )
-                })}
-              </div>
-            )}
           </section>
 
           {/* Client-to-client common ground */}
@@ -440,6 +372,86 @@ export function LeadDrawer({ lead, onClose, onChanged }: { lead: Lead; onClose: 
               </div>
             )}
           </section>
+
+          {/* Matching listings — only useful for clients who are looking */}
+          {!isSupply && (
+          <section className="bg-white border border-slate-200 rounded-xl p-4">
+            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3 flex items-center gap-1.5">
+              <Building2 className="h-3.5 w-3.5" /> Matching properties
+              {matches.length > 0 && <span className="text-slate-400 font-normal normal-case">({matches.length})</span>}
+            </p>
+            {loading ? (
+              <div className="flex justify-center py-6 text-slate-400"><Loader2 className="h-5 w-5 animate-spin" /></div>
+            ) : matches.length === 0 ? (
+              <p className="text-sm text-slate-400">
+                {l.market === 'GEORGIA'
+                  ? 'Georgia inventory lives on propgrp.com — no local matches.'
+                  : 'No live listings fit these criteria closely enough yet.'}
+              </p>
+            ) : (
+              <div className="space-y-2">
+                {/* Near misses are worth a call even when they don't tick every box. */}
+                {nearMatches.length > 0 && strongMatches.length > 0 && (
+                  <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide">Strong fit</p>
+                )}
+                {[...strongMatches, ...nearMatches].map(({ listing: m, match }, idx) => {
+                  const startsNear = idx === strongMatches.length && nearMatches.length > 0 && strongMatches.length > 0
+                  const b = m.building ?? m.unit?.building
+                  const img = b?.images?.[0]
+                  return (
+                    <div key={m.id}>
+                    {startsNear && (
+                      <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide pt-2 pb-1">
+                        Worth a call — close but not exact
+                      </p>
+                    )}
+                    <div className="flex items-center gap-3 p-2 rounded-lg hover:bg-slate-50 border border-slate-100">
+                    <Link
+                      href={m.slug ? `/listings/${m.slug}` : '#'}
+                      target="_blank"
+                      className="flex items-center gap-3 min-w-0 flex-1"
+                    >
+                      {img ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={normalizeFileUrl(img)} alt="" className="h-12 w-16 object-cover rounded-md shrink-0" />
+                      ) : (
+                        <div className="h-12 w-16 bg-slate-100 rounded-md flex items-center justify-center shrink-0">
+                          <Building2 className="h-4 w-4 text-slate-300" />
+                        </div>
+                      )}
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-1.5">
+                          <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${scoreCls(match.score)}`}>{match.score}%</span>
+                          <p className="text-sm font-medium text-slate-900 truncate">{m.headline || b?.title || 'Listing'}</p>
+                        </div>
+                        <p className="text-xs text-slate-500 mt-0.5 truncate">
+                          {match.reasons.slice(0, 3).join(' · ') || [b?.city, b?.caza].filter(Boolean).join(', ')}
+                        </p>
+                        {match.misses.length > 0 && (
+                          <p className="text-[11px] text-amber-600 mt-0.5 truncate">⚠ {match.misses.slice(0, 2).join(' · ')}</p>
+                        )}
+                      </div>
+                      <div className="text-right shrink-0">
+                        <p className="text-sm font-semibold text-slate-900">{m.currency} {m.price?.toLocaleString()}</p>
+                        <ExternalLink className="h-3 w-3 text-slate-400 ml-auto" />
+                      </div>
+                    </Link>
+                    <button
+                      onClick={() => addOpportunity({ listingId: m.id, matchScore: match.score })}
+                      disabled={busy}
+                      title="Add to shortlist"
+                      className="shrink-0 p-1.5 rounded-lg border border-slate-200 text-slate-500 hover:text-slate-900 hover:bg-slate-100 disabled:opacity-50"
+                    >
+                      <Plus className="h-3.5 w-3.5" />
+                    </button>
+                    </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </section>
+          )}
 
           {/* History */}
           <section className="bg-white border border-slate-200 rounded-xl p-4">

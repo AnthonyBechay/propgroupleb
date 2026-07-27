@@ -7,7 +7,7 @@ import {
 } from 'lucide-react'
 import {
   type Lead, type LeadStatus, BOARD_STAGES, STATUS_META, TYPE_LABELS, MARKET_META,
-  formatDue, isWaitingOnUs, hasAwaitingFeedback, nextViewing,
+  formatDue, isWaitingOnUs, hasAwaitingFeedback, nextViewing, TYPE_META,
 } from './types'
 
 const STAGE_ACCENT: Record<string, string> = {
@@ -96,6 +96,7 @@ export function LeadBoard({
                   const feedbackDue = hasAwaitingFeedback(l)
                   const viewingAt = nextViewing(l)
                   const shown = (l.opportunities ?? []).length
+                  const isSupply = l.type === 'SELLER' || l.type === 'LANDLORD'
                   return (
                     <article
                       key={l.id}
@@ -103,9 +104,9 @@ export function LeadBoard({
                       onDragStart={() => setDragId(l.id)}
                       onDragEnd={() => { setDragId(null); setOverStage(null) }}
                       onClick={() => onOpen(l.id)}
-                      className={`bg-white rounded-lg border p-2.5 cursor-pointer hover:shadow-md transition-all ${
+                      className={`bg-white rounded-lg border border-l-4 p-2.5 cursor-pointer hover:shadow-md transition-all ${
                         dragId === l.id ? 'opacity-40' : ''
-                      } ${due.tone === 'overdue' ? 'border-red-200' : 'border-slate-200'}`}
+                      } ${TYPE_META[l.type].accent} ${due.tone === 'overdue' ? 'border-red-200' : 'border-slate-200'}`}
                     >
                       <div className="flex items-start justify-between gap-2">
                         <p className="font-medium text-slate-900 text-sm leading-tight truncate">{l.name}</p>
@@ -114,8 +115,13 @@ export function LeadBoard({
                         </span>
                       </div>
 
+                      {/* Which side of the deal they're on — colour-coded */}
+                      <span className={`inline-block mt-1 text-[10px] font-bold px-1.5 py-0.5 rounded ${TYPE_META[l.type].chip}`}>
+                        {TYPE_LABELS[l.type]}
+                      </span>
+
                       <p className="text-xs text-slate-500 mt-1 line-clamp-2">
-                        {l.askingFor || l.unitKinds.join(', ') || TYPE_LABELS[l.type]}
+                        {l.askingFor || l.unitKinds.join(', ')}
                       </p>
 
                       {/* Action signals — what this client needs from us */}
@@ -150,7 +156,9 @@ export function LeadBoard({
                         {(l.budgetMin || l.budgetMax) && (
                           <span className="inline-flex items-center gap-0.5 text-[10px] text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">
                             <Wallet className="h-2.5 w-2.5" />
-                            {l.budgetMax ? `≤${(l.budgetMax / 1000).toFixed(0)}k` : `≥${((l.budgetMin ?? 0) / 1000).toFixed(0)}k`}
+                            {isSupply
+                              ? `asks ${((l.budgetMin ?? 0) / 1000).toFixed(0)}k`
+                              : l.budgetMax ? `≤${(l.budgetMax / 1000).toFixed(0)}k` : `≥${((l.budgetMin ?? 0) / 1000).toFixed(0)}k`}
                           </span>
                         )}
                       </div>

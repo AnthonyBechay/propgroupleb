@@ -10,13 +10,17 @@ export interface LebanonLocation {
   city?: string      // parent town/area when `name` is a sub-area
 }
 
+// Lebanon's 9 governorates. Keserwan and Jbeil were separated from Mount
+// Lebanon into their own governorate (Keserwan-Jbeil) in 2017 — Mount Lebanon
+// now covers only Baabda, Aley, Chouf and Metn.
 export const MOHAFAZAT_LABEL: Record<string, string> = {
-  BEIRUT: 'Beirut', MOUNT_LEBANON: 'Mount Lebanon', NORTH: 'North Lebanon',
-  SOUTH: 'South Lebanon', BEKAA: 'Bekaa', NABATIEH: 'Nabatieh',
-  AKKAR: 'Akkar', BAALBEK_HERMEL: 'Baalbek-Hermel',
+  BEIRUT: 'Beirut', MOUNT_LEBANON: 'Mount Lebanon', KESERWAN_JBEIL: 'Keserwan-Jbeil',
+  NORTH: 'North Lebanon', SOUTH: 'South Lebanon', BEKAA: 'Bekaa',
+  NABATIEH: 'Nabatieh', AKKAR: 'Akkar', BAALBEK_HERMEL: 'Baalbek-Hermel',
 }
 
 const ML = 'MOUNT_LEBANON'
+const KJ = 'KESERWAN_JBEIL'
 const town = (names: string[], caza: string, mohafazat: string): LebanonLocation[] =>
   names.map((name) => ({ name, caza, mohafazat }))
 // Sub-areas/neighborhoods of a parent town — picking one fills city + neighborhood.
@@ -48,19 +52,19 @@ export const LEBANON_LOCATIONS: LebanonLocation[] = [
     'Daychounieh', 'Jouret El Ballout', 'Qennabet Broumana', 'Bqennaya', 'Zouk El Kharab',
   ], 'Metn', ML),
 
-  // ── Mount Lebanon — Keserwan ───────────────────────────────────────────────
+  // ── Keserwan-Jbeil — Keserwan ──────────────────────────────────────────────
   ...town([
     'Jounieh', 'Zouk Mosbeh', 'Zouk Mikael', 'Adma', 'Ghazir', 'Tabarja', 'Safra', 'Bouar', 'Kfardebian',
     'Faraya', 'Hrajel', 'Mayrouba', 'Reyfoun', 'Ajaltoun', 'Ballouneh', 'Jeita', 'Harissa', 'Daraoun',
     'Sahel Alma', 'Kleiat', 'Bkerke', 'Sheileh', 'Aajaltoun', 'Faitroun', 'Ghineh', 'Nahr El Kalb',
     'Zouk El Kharab Keserwan', 'Halat Keserwan', 'Fatqa', 'Chnaniir', 'Haret Sakhr Highway',
-  ], 'Keserwan', ML),
+  ], 'Keserwan', KJ),
   // Greater Jounieh sub-areas → city = Jounieh, neighborhood = the sub-area
-  ...sub('Jounieh', ['Kaslik', 'Sarba', 'Haret Sakher', 'Ghadir', 'Maameltein'], 'Keserwan', ML),
+  ...sub('Jounieh', ['Kaslik', 'Sarba', 'Haret Sakher', 'Ghadir', 'Maameltein'], 'Keserwan', KJ),
 
-  // ── Mount Lebanon — Jbeil (Byblos) ─────────────────────────────────────────
+  // ── Keserwan-Jbeil — Jbeil (Byblos) ────────────────────────────────────────
   ...town(['Jbeil (Byblos)', 'Amchit', 'Halat', 'Fidar', 'Blat', 'Mastita', 'Edde', 'Hboub', 'Aaqoura', 'Laqlouq', 'Kartaba', 'Mechmech', 'Berbara', 'Maad',
-    'Nahr Ibrahim', 'Bentael', 'Jaj', 'Ehmej', 'Gharzouz', 'Hosrayel', 'Aannaya', 'Machnaqa', 'Voile Bleu'], 'Jbeil', ML),
+    'Nahr Ibrahim', 'Bentael', 'Jaj', 'Ehmej', 'Gharzouz', 'Hosrayel', 'Aannaya', 'Machnaqa', 'Voile Bleu'], 'Jbeil', KJ),
 
   // ── Mount Lebanon — Baabda ─────────────────────────────────────────────────
   ...town(['Baabda', 'Hazmieh', 'Furn El Chebbak', 'Hadath', 'Chiyah', 'Ghobeiry', 'Haret Hreik', 'Bir Hassan', 'Jnah', 'Yarze', 'Louaize', 'Kfarshima', 'Wadi Chahrour', 'Bsaba',
