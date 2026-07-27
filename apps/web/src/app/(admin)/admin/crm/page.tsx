@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   UserSearch, Plus, Search, Loader2, Phone, MessageCircle, Mail, AlertTriangle,
   CalendarClock, Flame, X, LayoutGrid, List, Download, Upload, MapPin,
+  MessageSquareWarning, Sparkles,
 } from 'lucide-react'
 import { normalizeApiUrl } from '@/lib/utils/api-url'
 import { LeadDrawer } from './LeadDrawer'
@@ -11,8 +12,9 @@ import { LeadFormModal } from './LeadFormModal'
 import { LeadBoard } from './LeadBoard'
 import { ImportModal } from './ImportModal'
 import {
-  type Lead, type LeadMarket, type LeadStatus,
+  type Lead, type LeadMarket, type LeadStatus, type LeadType,
   STATUS_META, TYPE_LABELS, MARKET_META, formatDue,
+  isWaitingOnUs, hasAwaitingFeedback,
 } from './types'
 
 interface Stats {
@@ -32,7 +34,8 @@ export default function CrmPage() {
   const [view, setView] = useState<View>('board')
   const [market, setMarket] = useState<'all' | LeadMarket>('all')
   const [search, setSearch] = useState('')
-  const [onlyOverdue, setOnlyOverdue] = useState(false)
+  const [focus, setFocus] = useState<'none' | 'overdue' | 'feedback' | 'options'>('none')
+  const [typeFilter, setTypeFilter] = useState<'all' | LeadType>('all')
   const [openId, setOpenId] = useState<string | null>(null)
   const [creating, setCreating] = useState(false)
   const [importing, setImporting] = useState(false)
@@ -62,10 +65,21 @@ export default function CrmPage() {
     return () => clearTimeout(t)
   }, [load, search])
 
-  const visible = useMemo(
-    () => (onlyOverdue ? leads.filter((l) => formatDue(l.nextContactAt).tone === 'overdue') : leads),
-    [leads, onlyOverdue],
-  )
+  const visible = useMemo(() => {
+    let out = leads
+    if (typeFilter !== 'all') out = out.filter((l) => l.type === typeFilter)
+    if (focus === 'overdue') out = out.filter((l) => formatDue(l.nextContactAt).tone === 'overdue')
+    else if (focus === 'feedback') out = out.filter(hasAwaitingFeedback)
+    else if (focus === 'options') out = out.filter(isWaitingOnUs)
+    return out
+  }, [leads, focus, typeFilter])
+
+  // Live counts for the focus chips, computed from what's loaded.
+  const counts = useMemo(() => ({
+    overdue: leads.filter((l) => formatDue(l.nextContactAt).tone === 'overdue').length,
+    feedback: leads.filter(hasAwaitingFeedback).length,
+    options: leads.filter(isWaitingOnUs).length,
+  }), [leads])
 
   // Optimistic move so dragging feels instant; reload reconciles with the server.
   async function moveLead(id: string, status: LeadStatus) {
@@ -125,7 +139,37 @@ export default function CrmPage() {
         </div>
       </div>
 
-      {/* Toolbar: search · overdue · market · view */}
+      {/* What needs attention right now */}
+      <div className="flex gap-2 flex-wrap">
+        <FocusChip
+          active={focus === 'overdue'} count={counts.overdue}
+          onClick={() => setFocus((f) => (f === 'overdue' ? 'none' : 'overdue'))}
+          icon={<Flame className="h-4 w-4" />} tone="red"
+        >
+          Needs follow-up
+        </FocusChip>
+        <FocusChip
+          active={focus === 'feedback'} count={counts.feedback}
+          onClick={() => setFocus((f) => (f === 'feedback' ? 'none' : 'feedback'))}
+          icon={<MessageSquareWarning className="h-4 w-4" />} tone="amber"
+        >
+          Viewing feedback due
+        </FocusChip>
+        <FocusChip
+          active={focus === 'options'} count={counts.options}
+          onClick={() => setFocus((f) => (f === 'options' ? 'none' : 'options'))}
+          icon={<Sparkles className="h-4 w-4" />} tone="sky"
+        >
+          Needs new options
+        </FocusChip>
+        {focus !== 'none' && (
+          <button onClick={() => setFocus('none')} className="text-xs text-slate-400 hover:text-slate-700 self-center inline-flex items-center gap-1">
+            <X className="h-3.5 w-3.5" /> Clear focus
+          </button>
+        )}
+      </div>
+
+      {/* Toolbar: search · type · market · view */}
       <div className="flex gap-2 flex-wrap items-center bg-white border border-slate-200 rounded-xl p-2">
         <div className="relative flex-1 min-w-[220px]">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
@@ -142,22 +186,18 @@ export default function CrmPage() {
           )}
         </div>
 
-        <button
-          onClick={() => setOnlyOverdue((v) => !v)}
-          className={`inline-flex items-center gap-1.5 h-9 px-3 rounded-lg text-sm font-medium border transition-colors ${
-            onlyOverdue ? 'bg-red-600 text-white border-red-600' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
-          }`}
+        <select
+          value={typeFilter}
+          onChange={(e) => setTypeFilter(e.target.value as typeof typeFilter)}
+          className="h-9 px-2.5 rounded-lg border border-slate-200 bg-white text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-900/10"
         >
-          <Flame className="h-4 w-4" />
-          Needs follow-up
-          {(stats?.overdue ?? 0) > 0 && (
-            <span className={`inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-bold ${
-              onlyOverdue ? 'bg-white text-red-600' : 'bg-red-500 text-white'
-            }`}>
-              {stats?.overdue}
-            </span>
-          )}
-        </button>
+          <option value="all">All types</option>
+          <option value="BUYER">Buyers</option>
+          <option value="SELLER">Sellers</option>
+          <option value="RENTER">Renters</option>
+          <option value="LANDLORD">Landlords</option>
+          <option value="INVESTOR">Investors</option>
+        </select>
 
         <div className="flex gap-1 bg-slate-100 rounded-lg p-1">
           {(['all', 'LEBANON', 'GEORGIA'] as const).map((m) => (
@@ -197,7 +237,10 @@ export default function CrmPage() {
       ) : visible.length === 0 ? (
         <div className="bg-white border rounded-xl p-16 text-center text-slate-400">
           <UserSearch className="h-10 w-10 mx-auto mb-2 opacity-30" />
-          {onlyOverdue ? 'Nothing overdue — you’re all caught up.' : 'No clients yet. Add one, or import your spreadsheet.'}
+          {focus === 'overdue' ? 'Nothing overdue — you’re all caught up.'
+            : focus === 'feedback' ? 'No viewings waiting on feedback.'
+            : focus === 'options' ? 'Nobody is stuck waiting for new options.'
+            : 'No clients yet. Add one, or import your spreadsheet.'}
         </div>
       ) : view === 'board' ? (
         <LeadBoard leads={visible} onOpen={setOpenId} onMove={moveLead} />
@@ -222,6 +265,41 @@ export default function CrmPage() {
       {creating && <LeadFormModal onClose={() => setCreating(false)} onSaved={() => { setCreating(false); load() }} />}
       {importing && <ImportModal onClose={() => setImporting(false)} onImported={load} />}
     </div>
+  )
+}
+
+/** A one-click "what needs me now" filter with a live count. */
+function FocusChip({
+  children, count, active, onClick, icon, tone,
+}: {
+  children: React.ReactNode; count: number; active: boolean; onClick: () => void
+  icon: React.ReactNode; tone: 'red' | 'amber' | 'sky'
+}) {
+  const on = {
+    red: 'bg-red-600 text-white border-red-600',
+    amber: 'bg-amber-500 text-white border-amber-500',
+    sky: 'bg-sky-600 text-white border-sky-600',
+  }[tone]
+  const badge = {
+    red: 'bg-red-500 text-white',
+    amber: 'bg-amber-500 text-white',
+    sky: 'bg-sky-500 text-white',
+  }[tone]
+  return (
+    <button
+      onClick={onClick}
+      className={`inline-flex items-center gap-1.5 h-9 px-3 rounded-lg text-sm font-medium border transition-colors ${
+        active ? on : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+      } ${count === 0 && !active ? 'opacity-60' : ''}`}
+    >
+      {icon}
+      {children}
+      <span className={`inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-bold ${
+        active ? 'bg-white/25 text-white' : count > 0 ? badge : 'bg-slate-100 text-slate-400'
+      }`}>
+        {count}
+      </span>
+    </button>
   )
 }
 

@@ -1461,7 +1461,8 @@ model Lead {
   updatedAt DateTime @updatedAt
   createdBy String? // admin who added the lead
 
-  contacts LeadContact[]
+  contacts      LeadContact[]
+  opportunities LeadOpportunity[] @relation("LeadOpportunities")
 
   @@index([market])
   @@index([status])
@@ -1488,4 +1489,79 @@ model LeadContact {
   @@index([leadId])
   @@index([contactedAt])
   @@map("lead_contacts")
+}
+
+// ── Opportunities ─────────────────────────────────────────────────────────────
+// A client's interest in ONE specific property (or in one counterpart client).
+//
+// Why this exists: a viewing that goes badly doesn't end the relationship — it
+// rules out that property and sends the client back to searching. Tracking the
+// stage on the Lead alone loses that: you can't tell what was shown, why it was
+// rejected, or stop the matcher re-suggesting the same apartment. A client can
+// also be viewing one property while negotiating another, which a single status
+// can't express. So the deal lives here, and Lead.status describes the
+// relationship.
+
+enum OpportunityStage {
+  SUGGESTED      // matched by the system, not shown to the client yet
+  SHARED         // sent to the client (WhatsApp/email)
+  VIEWING_BOOKED // viewing scheduled
+  VIEWED         // viewing happened — awaiting or has feedback
+  INTERESTED     // liked it, wants to proceed
+  OFFER_MADE     // offer submitted
+  WON            // deal closed on this property
+  REJECTED       // ruled out — never suggest again
+}
+
+// Why a client ruled a property out. Drives smarter future matching.
+enum RejectionReason {
+  PRICE_TOO_HIGH
+  TOO_SMALL
+  TOO_BIG
+  LOCATION
+  CONDITION
+  LAYOUT
+  FLOOR_LEVEL
+  NO_PARKING
+  NOISE
+  NO_VIEW
+  NO_ELEVATOR
+  BUILDING_QUALITY
+  CHANGED_MIND
+  BOUGHT_ELSEWHERE
+  UNAVAILABLE   // sold/rented to someone else
+  OTHER
+}
+
+model LeadOpportunity {
+  id     String           @id @default(cuid())
+  leadId String
+  stage  OpportunityStage @default(SUGGESTED)
+
+  // Exactly one of these identifies what's on offer:
+  listingId         String? // a live listing on our site
+  counterpartLeadId String? // another client (a seller/landlord in the CRM)
+
+  // Match score (0-100) when the pairing was created - for later review.
+  matchScore Int?
+
+  // Viewing + outcome
+  viewingAt       DateTime?
+  viewedAt        DateTime?
+  rejectionReason RejectionReason?
+  feedback        String? // what the client actually said
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  createdBy String?
+
+  lead Lead @relation("LeadOpportunities", fields: [leadId], references: [id], onDelete: Cascade)
+
+  // One row per client × property so re-suggesting is impossible.
+  @@unique([leadId, listingId])
+  @@unique([leadId, counterpartLeadId])
+  @@index([leadId])
+  @@index([stage])
+  @@index([viewingAt])
+  @@map("lead_opportunities")
 }

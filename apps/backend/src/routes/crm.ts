@@ -3,10 +3,11 @@ import { z } from 'zod';
 import { prisma } from '@propgroup/db';
 import { authenticateToken, requireAdmin, logAdminAction } from '../middleware/auth.js';
 import { asyncHandler } from '../utils/errors.js';
-import { sendSuccess, sendCreated, sendPaginated, sendNotFound } from '../utils/response.js';
+import { sendSuccess, sendCreated, sendPaginated, sendNotFound, sendError } from '../utils/response.js';
 import { parsePagination, buildPaginationResponse } from '../utils/pagination.js';
 import type { AuthenticatedRequest } from '../types/index.js';
 import { matchListingToLead, matchLeadToLead, SUPPLY_TYPES, DEMAND_TYPES } from '../utils/lead-matching.js';
+import { deriveLeadStatus, needsNewOptions, rejectionInsights } from '../utils/lead-pipeline.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // CRM — the team's buyer/seller pipeline (replaces the follow-up spreadsheet).
@@ -132,7 +133,10 @@ router.get(
         orderBy,
         skip,
         take: limit,
-        include: { _count: { select: { contacts: true } } },
+        include: {
+          _count: { select: { contacts: true } },
+          opportunities: { select: { id: true, stage: true, viewingAt: true } },
+        },
       }),
       prisma.lead.count({ where }),
     ]);
@@ -174,10 +178,18 @@ router.get(
   asyncHandler(async (req: Request, res: Response) => {
     const lead = await prisma.lead.findUnique({
       where: { id: req.params.id },
-      include: { contacts: { orderBy: { contactedAt: 'desc' } } },
+      include: {
+        contacts: { orderBy: { contactedAt: 'desc' } },
+        opportunities: { orderBy: { updatedAt: 'desc' } },
+      },
     });
     if (!lead) { sendNotFound(res, 'Lead'); return; }
-    sendSuccess(res, lead);
+
+    sendSuccess(res, {
+      ...lead,
+      insights: rejectionInsights(lead.opportunities),
+      needsNewOptions: needsNewOptions(lead, lead.opportunities),
+    });
   })
 );
 
@@ -195,11 +207,20 @@ router.get(
     // Georgia leads are served by the sister site — we have no local inventory.
     if (lead.market !== 'LEBANON') { sendSuccess(res, []); return; }
 
+    // Never re-suggest something this client has already been shown or ruled
+    // out — that's the whole point of tracking opportunities.
+    const seen = await prisma.leadOpportunity.findMany({
+      where: { leadId: lead.id, listingId: { not: null } },
+      select: { listingId: true },
+    });
+    const seenIds = seen.map((o) => o.listingId!).filter(Boolean);
+
     // Pull a broad candidate pool (cheap filters only) and rank it in memory —
     // scoring is what decides relevance, not a hard SQL filter, so a client
     // still sees near-misses that are worth a phone call.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const where: Record<string, any> = { status: 'ACTIVE', visibility: 'PUBLIC' };
+    if (seenIds.length) where.id = { notIn: seenIds };
 
     const candidates = await prisma.listing.findMany({
       where,
@@ -243,9 +264,15 @@ router.get(
     const isDemand = DEMAND_TYPES.includes(lead.type);
     const counterpartTypes = isDemand ? SUPPLY_TYPES : DEMAND_TYPES;
 
+    const paired = await prisma.leadOpportunity.findMany({
+      where: { leadId: lead.id, counterpartLeadId: { not: null } },
+      select: { counterpartLeadId: true },
+    });
+    const pairedIds = paired.map((o) => o.counterpartLeadId!).filter(Boolean);
+
     const counterparts = await prisma.lead.findMany({
       where: {
-        id: { not: lead.id },
+        id: { notIn: [lead.id, ...pairedIds] },
         market: lead.market,
         type: { in: counterpartTypes as never },
         status: { notIn: ['LOST', 'ARCHIVED'] as never },
@@ -438,6 +465,192 @@ router.post(
 
     await logAdminAction('CREATE_LEAD_FROM_INQUIRY', 'lead', lead.id, { inquiryId: inquiry.id }, authReq);
     sendCreated(res, lead, 'Client added to CRM');
+  })
+);
+
+// ── Opportunities — one client's interest in one specific property ───────────
+// A failed viewing rules out that property and returns the client to the
+// search; it never ends the relationship.
+
+const STAGES = ['SUGGESTED', 'SHARED', 'VIEWING_BOOKED', 'VIEWED', 'INTERESTED', 'OFFER_MADE', 'WON', 'REJECTED'] as const;
+const REJECTION_REASONS = [
+  'PRICE_TOO_HIGH', 'TOO_SMALL', 'TOO_BIG', 'LOCATION', 'CONDITION', 'LAYOUT',
+  'FLOOR_LEVEL', 'NO_PARKING', 'NOISE', 'NO_VIEW', 'NO_ELEVATOR', 'BUILDING_QUALITY',
+  'CHANGED_MIND', 'BOUGHT_ELSEWHERE', 'UNAVAILABLE', 'OTHER',
+] as const;
+
+/** Recompute the client's pipeline status from their live deals. */
+async function syncLeadStatus(leadId: string) {
+  const lead = await prisma.lead.findUnique({
+    where: { id: leadId },
+    include: { opportunities: { select: { stage: true } } },
+  });
+  if (!lead) return;
+  const next = deriveLeadStatus(lead.status, lead.opportunities);
+  if (next && next !== lead.status) {
+    await prisma.lead.update({ where: { id: leadId }, data: { status: next as never } });
+  }
+}
+
+const opportunitySchema = z.object({
+  listingId: z.string().optional().nullable(),
+  counterpartLeadId: z.string().optional().nullable(),
+  stage: z.enum(STAGES).default('SUGGESTED'),
+  matchScore: z.number().int().min(0).max(100).optional().nullable(),
+  viewingAt: z.string().optional().nullable(),
+  feedback: z.string().max(2000).optional().nullable(),
+});
+
+// POST /:id/opportunities — shortlist a property (or a counterpart client)
+router.post(
+  '/:id/opportunities',
+  authenticateToken,
+  requireAdmin,
+  asyncHandler(async (req: Request, res: Response) => {
+    const authReq = req as AuthenticatedRequest;
+    const lead = await prisma.lead.findUnique({ where: { id: req.params.id }, select: { id: true } });
+    if (!lead) { sendNotFound(res, 'Lead'); return; }
+
+    const data = opportunitySchema.parse(req.body);
+    if (!data.listingId && !data.counterpartLeadId) {
+      sendError(res, 400, 'Provide a listingId or a counterpartLeadId');
+      return;
+    }
+
+    // Idempotent: re-adding an existing pairing just returns it.
+    const existing = await prisma.leadOpportunity.findFirst({
+      where: {
+        leadId: lead.id,
+        ...(data.listingId ? { listingId: data.listingId } : { counterpartLeadId: data.counterpartLeadId }),
+      },
+    });
+    if (existing) { sendSuccess(res, existing, 'Already on the shortlist'); return; }
+
+    const opportunity = await prisma.leadOpportunity.create({
+      data: {
+        leadId: lead.id,
+        listingId: data.listingId || null,
+        counterpartLeadId: data.counterpartLeadId || null,
+        stage: data.stage,
+        matchScore: data.matchScore ?? null,
+        viewingAt: data.viewingAt ? new Date(data.viewingAt) : null,
+        feedback: data.feedback || null,
+        createdBy: authReq.user?.id ?? null,
+      },
+    });
+
+    await syncLeadStatus(lead.id);
+    await logAdminAction('CREATE_OPPORTUNITY', 'lead', lead.id, { opportunityId: opportunity.id }, authReq);
+    sendCreated(res, opportunity, 'Added to shortlist');
+  })
+);
+
+// PATCH /opportunities/:oid — move the deal along, book a viewing, or record
+// the outcome. Rejecting sends the client back to searching automatically.
+const opportunityUpdateSchema = z.object({
+  stage: z.enum(STAGES).optional(),
+  viewingAt: z.string().optional().nullable(),
+  rejectionReason: z.enum(REJECTION_REASONS).optional().nullable(),
+  feedback: z.string().max(2000).optional().nullable(),
+});
+
+router.patch(
+  '/opportunities/:oid',
+  authenticateToken,
+  requireAdmin,
+  asyncHandler(async (req: Request, res: Response) => {
+    const authReq = req as AuthenticatedRequest;
+    const existing = await prisma.leadOpportunity.findUnique({ where: { id: req.params.oid } });
+    if (!existing) { sendNotFound(res, 'Opportunity'); return; }
+
+    const data = opportunityUpdateSchema.parse(req.body);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const patch: Record<string, any> = {};
+    if (data.stage) patch.stage = data.stage;
+    if (data.viewingAt !== undefined) patch.viewingAt = data.viewingAt ? new Date(data.viewingAt) : null;
+    if (data.rejectionReason !== undefined) patch.rejectionReason = data.rejectionReason;
+    if (data.feedback !== undefined) patch.feedback = data.feedback;
+    // Stamp when the viewing actually happened, so "awaiting feedback" is real.
+    if (data.stage === 'VIEWED' && !existing.viewedAt) patch.viewedAt = new Date();
+
+    const opportunity = await prisma.leadOpportunity.update({ where: { id: req.params.oid }, data: patch });
+
+    await syncLeadStatus(existing.leadId);
+    await logAdminAction('UPDATE_OPPORTUNITY', 'lead', existing.leadId, { stage: opportunity.stage }, authReq);
+
+    // Return the refreshed lead so the UI can re-render everything at once.
+    const lead = await prisma.lead.findUnique({
+      where: { id: existing.leadId },
+      include: {
+        contacts: { orderBy: { contactedAt: 'desc' } },
+        opportunities: { orderBy: { updatedAt: 'desc' } },
+      },
+    });
+    sendSuccess(res, lead, 'Opportunity updated');
+  })
+);
+
+// DELETE /opportunities/:oid — remove a shortlist entry entirely
+router.delete(
+  '/opportunities/:oid',
+  authenticateToken,
+  requireAdmin,
+  asyncHandler(async (req: Request, res: Response) => {
+    const authReq = req as AuthenticatedRequest;
+    const existing = await prisma.leadOpportunity.findUnique({ where: { id: req.params.oid } });
+    if (!existing) { sendNotFound(res, 'Opportunity'); return; }
+
+    await prisma.leadOpportunity.delete({ where: { id: req.params.oid } });
+    await syncLeadStatus(existing.leadId);
+    await logAdminAction('DELETE_OPPORTUNITY', 'lead', existing.leadId, {}, authReq);
+    sendSuccess(res, { id: req.params.oid }, 'Removed from shortlist');
+  })
+);
+
+// ── GET /agenda — everything that needs the team today ───────────────────────
+// Viewings booked, viewings done with no feedback recorded, and clients whose
+// options are exhausted and are waiting on us for something new.
+
+router.get(
+  '/agenda',
+  authenticateToken,
+  requireAdmin,
+  asyncHandler(async (req: Request, res: Response) => {
+    const q = req.query as Record<string, string>;
+    const marketWhere = q.market && MARKETS.includes(q.market as never) ? { market: q.market as never } : {};
+
+    const in7Days = new Date();
+    in7Days.setDate(in7Days.getDate() + 7);
+
+    const [upcomingViewings, awaitingFeedbackOps, leadsWithOps] = await Promise.all([
+      prisma.leadOpportunity.findMany({
+        where: { stage: 'VIEWING_BOOKED', viewingAt: { lte: in7Days } },
+        orderBy: { viewingAt: 'asc' },
+        take: 50,
+        include: { lead: { select: { id: true, name: true, phone: true, market: true } } },
+      }),
+      prisma.leadOpportunity.findMany({
+        where: { stage: 'VIEWED' },
+        orderBy: { viewedAt: 'asc' },
+        take: 50,
+        include: { lead: { select: { id: true, name: true, phone: true, market: true } } },
+      }),
+      prisma.lead.findMany({
+        where: { status: { notIn: ['NEW', 'WON', 'LOST', 'ARCHIVED'] as never }, ...marketWhere },
+        select: { id: true, name: true, phone: true, market: true, status: true, opportunities: { select: { stage: true } } },
+        take: 500,
+      }),
+    ]);
+
+    const needsOptions = leadsWithOps
+      .filter((l) => needsNewOptions(l, l.opportunities))
+      .map(({ opportunities, ...l }) => l);
+
+    sendSuccess(res, {
+      upcomingViewings: upcomingViewings.filter((o) => !q.market || o.lead.market === q.market),
+      awaitingFeedback: awaitingFeedbackOps.filter((o) => !q.market || o.lead.market === q.market),
+      needsNewOptions: needsOptions,
+    });
   })
 );
 

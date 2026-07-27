@@ -12,6 +12,62 @@ export interface LeadContact {
   contactedAt: string
 }
 
+export type OpportunityStage =
+  | 'SUGGESTED' | 'SHARED' | 'VIEWING_BOOKED' | 'VIEWED'
+  | 'INTERESTED' | 'OFFER_MADE' | 'WON' | 'REJECTED'
+
+export type RejectionReason =
+  | 'PRICE_TOO_HIGH' | 'TOO_SMALL' | 'TOO_BIG' | 'LOCATION' | 'CONDITION' | 'LAYOUT'
+  | 'FLOOR_LEVEL' | 'NO_PARKING' | 'NOISE' | 'NO_VIEW' | 'NO_ELEVATOR'
+  | 'BUILDING_QUALITY' | 'CHANGED_MIND' | 'BOUGHT_ELSEWHERE' | 'UNAVAILABLE' | 'OTHER'
+
+export interface Opportunity {
+  id: string
+  leadId: string
+  stage: OpportunityStage
+  listingId: string | null
+  counterpartLeadId: string | null
+  matchScore: number | null
+  viewingAt: string | null
+  viewedAt: string | null
+  rejectionReason: RejectionReason | null
+  feedback: string | null
+  updatedAt: string
+}
+
+export const OPPORTUNITY_META: Record<OpportunityStage, { label: string; cls: string; dot: string }> = {
+  SUGGESTED:      { label: 'Shortlisted',   cls: 'bg-slate-100 text-slate-600',   dot: 'bg-slate-400' },
+  SHARED:         { label: 'Sent to client',cls: 'bg-sky-100 text-sky-700',       dot: 'bg-sky-500' },
+  VIEWING_BOOKED: { label: 'Viewing booked',cls: 'bg-violet-100 text-violet-700', dot: 'bg-violet-500' },
+  VIEWED:         { label: 'Viewed',        cls: 'bg-amber-100 text-amber-800',   dot: 'bg-amber-500' },
+  INTERESTED:     { label: 'Interested',    cls: 'bg-emerald-100 text-emerald-700',dot: 'bg-emerald-500' },
+  OFFER_MADE:     { label: 'Offer made',    cls: 'bg-indigo-100 text-indigo-700', dot: 'bg-indigo-500' },
+  WON:            { label: 'Closed',        cls: 'bg-green-600 text-white',       dot: 'bg-green-600' },
+  REJECTED:       { label: 'Ruled out',     cls: 'bg-red-50 text-red-600',        dot: 'bg-red-400' },
+}
+
+export const REJECTION_LABELS: Record<RejectionReason, string> = {
+  PRICE_TOO_HIGH: 'Too expensive',
+  TOO_SMALL: 'Too small',
+  TOO_BIG: 'Too big',
+  LOCATION: 'Wrong location',
+  CONDITION: 'Poor condition',
+  LAYOUT: 'Layout',
+  FLOOR_LEVEL: 'Floor level',
+  NO_PARKING: 'No parking',
+  NOISE: 'Too noisy',
+  NO_VIEW: 'No view',
+  NO_ELEVATOR: 'No elevator',
+  BUILDING_QUALITY: 'Building quality',
+  CHANGED_MIND: 'Changed their mind',
+  BOUGHT_ELSEWHERE: 'Bought elsewhere',
+  UNAVAILABLE: 'No longer available',
+  OTHER: 'Other',
+}
+
+/** Stages where the deal is still in play. */
+export const LIVE_STAGES: OpportunityStage[] = ['SHARED', 'VIEWING_BOOKED', 'VIEWED', 'INTERESTED', 'OFFER_MADE']
+
 export interface Lead {
   id: string
   market: LeadMarket
@@ -36,7 +92,32 @@ export interface Lead {
   notes: string | null
   createdAt: string
   contacts?: LeadContact[]
+  opportunities?: Opportunity[]
+  insights?: Array<{ reason: string; count: number; advice: string }>
+  needsNewOptions?: boolean
   _count?: { contacts: number }
+}
+
+/** Client is waiting on us for fresh options: everything shown is ruled out. */
+export function isWaitingOnUs(lead: Lead): boolean {
+  if (lead.needsNewOptions !== undefined) return lead.needsNewOptions
+  const ops = lead.opportunities ?? []
+  if (['NEW', 'WON', 'LOST', 'ARCHIVED'].includes(lead.status) || ops.length === 0) return false
+  return !ops.some((o) => LIVE_STAGES.includes(o.stage)) && ops.some((o) => o.stage === 'REJECTED')
+}
+
+/** A viewing happened but no feedback was recorded. */
+export function hasAwaitingFeedback(lead: Lead): boolean {
+  return (lead.opportunities ?? []).some((o) => o.stage === 'VIEWED')
+}
+
+/** The soonest booked viewing, if any. */
+export function nextViewing(lead: Lead): string | null {
+  const booked = (lead.opportunities ?? [])
+    .filter((o) => o.stage === 'VIEWING_BOOKED' && o.viewingAt)
+    .map((o) => o.viewingAt as string)
+    .sort()
+  return booked[0] ?? null
 }
 
 /** Board columns, in pipeline order. WON/LOST/ARCHIVED live off-board. */

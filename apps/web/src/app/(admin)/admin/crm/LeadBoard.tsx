@@ -1,8 +1,14 @@
 'use client'
 
 import { useState } from 'react'
-import { Phone, MessageCircle, AlertTriangle, CalendarClock, MapPin, Wallet } from 'lucide-react'
-import { type Lead, type LeadStatus, BOARD_STAGES, STATUS_META, TYPE_LABELS, MARKET_META, formatDue } from './types'
+import {
+  Phone, MessageCircle, AlertTriangle, CalendarClock, MapPin, Wallet,
+  MessageSquareWarning, CalendarCheck, Sparkles,
+} from 'lucide-react'
+import {
+  type Lead, type LeadStatus, BOARD_STAGES, STATUS_META, TYPE_LABELS, MARKET_META,
+  formatDue, isWaitingOnUs, hasAwaitingFeedback, nextViewing,
+} from './types'
 
 const STAGE_ACCENT: Record<string, string> = {
   NEW: 'bg-sky-500',
@@ -86,6 +92,10 @@ export function LeadBoard({
                   const due = formatDue(l.nextContactAt)
                   const where = l.areas.slice(0, 2).join(', ')
                   const phone = l.whatsapp || l.phone
+                  const waiting = isWaitingOnUs(l)
+                  const feedbackDue = hasAwaitingFeedback(l)
+                  const viewingAt = nextViewing(l)
+                  const shown = (l.opportunities ?? []).length
                   return (
                     <article
                       key={l.id}
@@ -107,6 +117,28 @@ export function LeadBoard({
                       <p className="text-xs text-slate-500 mt-1 line-clamp-2">
                         {l.askingFor || l.unitKinds.join(', ') || TYPE_LABELS[l.type]}
                       </p>
+
+                      {/* Action signals — what this client needs from us */}
+                      {(waiting || feedbackDue || viewingAt) && (
+                        <div className="flex flex-wrap gap-1 mt-1.5">
+                          {feedbackDue && (
+                            <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-amber-800 bg-amber-100 px-1.5 py-0.5 rounded">
+                              <MessageSquareWarning className="h-2.5 w-2.5" /> Feedback needed
+                            </span>
+                          )}
+                          {viewingAt && (
+                            <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-violet-800 bg-violet-100 px-1.5 py-0.5 rounded">
+                              <CalendarCheck className="h-2.5 w-2.5" />
+                              {new Date(viewingAt).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}
+                            </span>
+                          )}
+                          {waiting && (
+                            <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-sky-800 bg-sky-100 px-1.5 py-0.5 rounded">
+                              <Sparkles className="h-2.5 w-2.5" /> Needs new options
+                            </span>
+                          )}
+                        </div>
+                      )}
 
                       <div className="flex flex-wrap gap-1 mt-1.5">
                         {where && (
@@ -134,6 +166,9 @@ export function LeadBoard({
                           {due.tone === 'overdue' ? <AlertTriangle className="h-3 w-3" /> : <CalendarClock className="h-3 w-3" />}
                           {due.text}
                         </span>
+                        {shown > 0 && (
+                          <span className="text-[10px] text-slate-400">{shown} shown</span>
+                        )}
                         {phone && (
                           <span className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
                             <a href={`tel:${l.phone}`} className="p-1 rounded text-slate-400 hover:text-slate-800 hover:bg-slate-100">

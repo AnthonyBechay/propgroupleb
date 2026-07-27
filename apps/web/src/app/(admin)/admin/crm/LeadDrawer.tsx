@@ -5,14 +5,16 @@ import Link from 'next/link'
 import {
   X, Phone, MessageCircle, Mail, Loader2, Send, Pencil, Trash2, Building2,
   CalendarClock, AlertTriangle, ExternalLink, History, Handshake,
+  ClipboardCheck, Lightbulb, Sparkles, Plus,
 } from 'lucide-react'
 import { normalizeApiUrl, normalizeFileUrl } from '@/lib/utils/api-url'
 import { regionLabel } from '@/lib/crm-locations'
 import { LeadFormModal } from './LeadFormModal'
 import {
-  type Lead, type LeadContact, STATUS_META, TYPE_LABELS, MARKET_META,
-  UNIT_KIND_LABELS, formatDue,
+  type Lead, type LeadContact, type Opportunity, STATUS_META, TYPE_LABELS, MARKET_META,
+  UNIT_KIND_LABELS, formatDue, REJECTION_LABELS,
 } from './types'
+import { OpportunityList } from './OpportunityList'
 
 interface MatchScore {
   score: number
@@ -100,6 +102,20 @@ export function LeadDrawer({ lead, onClose, onChanged }: { lead: Lead; onClose: 
         await load()
         onChanged()
       }
+    } finally { setBusy(false) }
+  }
+
+  /** Shortlist a matched listing / counterpart client so it starts being tracked. */
+  async function addOpportunity(body: Record<string, unknown>) {
+    setBusy(true)
+    try {
+      const res = await fetch(`${apiUrl}/api/crm/${lead.id}/opportunities`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+      if (res.ok) { await load(); onChanged() }
     } finally { setBusy(false) }
   }
 
@@ -256,6 +272,57 @@ export function LeadDrawer({ lead, onClose, onChanged }: { lead: Lead; onClose: 
             </div>
           </section>
 
+          {/* What we've shown them, and how it went */}
+          <section className="bg-white border border-slate-200 rounded-xl p-4">
+            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3 flex items-center gap-1.5">
+              <ClipboardCheck className="h-3.5 w-3.5" /> Shortlist &amp; viewings
+              {(l.opportunities?.length ?? 0) > 0 && (
+                <span className="text-slate-400 font-normal normal-case">({l.opportunities!.length})</span>
+              )}
+            </p>
+
+            {/* Why their search isn't landing */}
+            {(l.insights?.length ?? 0) > 0 && (
+              <div className="mb-3 rounded-lg bg-amber-50 border border-amber-200 p-2.5">
+                <p className="text-xs font-semibold text-amber-800 flex items-center gap-1.5">
+                  <Lightbulb className="h-3.5 w-3.5" /> Pattern in their rejections
+                </p>
+                <ul className="mt-1 space-y-0.5">
+                  {l.insights!.map((i) => (
+                    <li key={i.reason} className="text-xs text-amber-800">
+                      <strong>{i.count}×</strong> {REJECTION_LABELS[i.reason as keyof typeof REJECTION_LABELS] ?? i.reason} — {i.advice}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {l.needsNewOptions && (
+              <div className="mb-3 rounded-lg bg-sky-50 border border-sky-200 p-2.5 text-xs text-sky-800 flex items-start gap-1.5">
+                <Sparkles className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+                <span>Everything shown has been ruled out — this client is waiting on new options from us.</span>
+              </div>
+            )}
+
+            <OpportunityList
+              opportunities={l.opportunities ?? []}
+              labelFor={(o: Opportunity) => {
+                if (o.counterpartLeadId) {
+                  const c = leadMatches.find((m) => m.lead.id === o.counterpartLeadId)?.lead
+                  return { title: c?.name ?? 'Client', subtitle: c?.askingFor ?? undefined, isClient: true }
+                }
+                const m = matches.find((x) => x.listing.id === o.listingId)?.listing
+                const b = m?.building ?? m?.unit?.building
+                return {
+                  title: m?.headline || b?.title || 'Property',
+                  subtitle: b ? [b.city, b.caza].filter(Boolean).join(', ') : undefined,
+                  isClient: false,
+                }
+              }}
+              onChanged={() => { load(); onChanged() }}
+            />
+          </section>
+
           {/* Matching listings */}
           <section className="bg-white border border-slate-200 rounded-xl p-4">
             <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3 flex items-center gap-1.5">
@@ -276,11 +343,11 @@ export function LeadDrawer({ lead, onClose, onChanged }: { lead: Lead; onClose: 
                   const b = m.building ?? m.unit?.building
                   const img = b?.images?.[0]
                   return (
+                    <div key={m.id} className="flex items-center gap-3 p-2 rounded-lg hover:bg-slate-50 border border-slate-100">
                     <Link
-                      key={m.id}
                       href={m.slug ? `/listings/${m.slug}` : '#'}
                       target="_blank"
-                      className="flex items-center gap-3 p-2 rounded-lg hover:bg-slate-50 border border-slate-100"
+                      className="flex items-center gap-3 min-w-0 flex-1"
                     >
                       {img ? (
                         // eslint-disable-next-line @next/next/no-img-element
@@ -307,6 +374,15 @@ export function LeadDrawer({ lead, onClose, onChanged }: { lead: Lead; onClose: 
                         <ExternalLink className="h-3 w-3 text-slate-400 ml-auto" />
                       </div>
                     </Link>
+                    <button
+                      onClick={() => addOpportunity({ listingId: m.id, matchScore: match.score })}
+                      disabled={busy}
+                      title="Add to shortlist"
+                      className="shrink-0 p-1.5 rounded-lg border border-slate-200 text-slate-500 hover:text-slate-900 hover:bg-slate-100 disabled:opacity-50"
+                    >
+                      <Plus className="h-3.5 w-3.5" />
+                    </button>
+                    </div>
                   )
                 })}
               </div>
@@ -351,6 +427,14 @@ export function LeadDrawer({ lead, onClose, onChanged }: { lead: Lead; onClose: 
                         <MessageCircle className="h-3.5 w-3.5" />
                       </a>
                     )}
+                    <button
+                      onClick={() => addOpportunity({ counterpartLeadId: other.id, matchScore: match.score })}
+                      disabled={busy}
+                      title="Add to shortlist"
+                      className="shrink-0 p-1.5 rounded-lg border border-slate-200 text-slate-500 hover:text-slate-900 hover:bg-slate-100 disabled:opacity-50"
+                    >
+                      <Plus className="h-3.5 w-3.5" />
+                    </button>
                   </div>
                 ))}
               </div>
