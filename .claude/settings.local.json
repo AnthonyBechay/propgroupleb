@@ -399,7 +399,14 @@
       "Bash(awk '/^model Listing /{f=1} f{print; c++} c>60{exit}' packages/db/prisma/schema.prisma)",
       "Bash(awk '/^model Unit /{f=1} f{print; c++} c>50{exit}' packages/db/prisma/schema.prisma)",
       "Bash(awk '/enum ListingStatus/{f=1} f{print} /^}/{if\\(f\\)exit}' packages/db/prisma/schema.prisma)",
-      "Bash(awk '/^model Unit /{f=1} f{print} /^}/{if\\(f\\)exit}' packages/db/prisma/schema.prisma)"
+      "Bash(awk '/^model Unit /{f=1} f{print} /^}/{if\\(f\\)exit}' packages/db/prisma/schema.prisma)",
+      "Bash(awk '/enum UserRole/{f=1} f{print} /^}/{if\\(f\\)exit}' packages/db/prisma/schema.prisma)",
+      "Bash(awk '/^model Organization \\\\{/{f=1} f{print} /^}/{if\\(f\\)exit}' packages/db/prisma/schema.prisma)",
+      "Bash(awk '/^model OrganizationMember/{f=1} f{print} /^}/{if\\(f\\)exit}' packages/db/prisma/schema.prisma)",
+      "Bash(awk '/^model User \\\\{/{f=1} f{print} /^}/{if\\(f\\)exit}' packages/db/prisma/schema.prisma)",
+      "Bash(git rm *)",
+      "Bash(python3 -)",
+      "Bash(DATABASE_URL=\"postgresql://u:p@localhost:5432/db\" npx prisma validate)"
     ],
     "deny": [],
     "ask": []

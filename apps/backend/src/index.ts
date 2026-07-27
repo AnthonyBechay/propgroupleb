@@ -17,12 +17,6 @@ import propertyRoutes from './routes/properties.js';
 import buildingRoutes from './routes/buildings.js';
 import unitRoutes from './routes/units.js';
 import listingRoutes from './routes/listings.js';
-import tenancyRoutes from './routes/tenancies.js';
-import ticketRoutes from './routes/tickets.js';
-import vendorRoutes from './routes/vendors.js';
-import utilityRoutes from './routes/utilities.js';
-import serviceChargeRoutes from './routes/service-charges.js';
-import managementRoutes from './routes/management.js';
 import fxRateRoutes from './routes/fx-rates.js';
 import userRoutes from './routes/users.js';
 import favoriteRoutes from './routes/favorites.js';
@@ -34,7 +28,6 @@ import aiSearchRoutes from './routes/ai-search.js';
 import aiSeoRoutes from './routes/ai-seo.js';
 import analyticsRoutes from './routes/analytics.js';
 import settingsRoutes from './routes/settings.js';
-import organizationsRoutes from './routes/organizations.js';
 import contentRoutes from './routes/content.js';
 import contactRoutes from './routes/contact.js';
 import uploadRoutes from './routes/upload.js';
@@ -43,6 +36,7 @@ import documentRoutes from './routes/documents.js';
 import fileRoutes from './routes/files.js';
 import locationGuideRoutes from './routes/location-guides.js';
 import submissionRoutes from './routes/submissions.js';
+import crmRoutes from './routes/crm.js';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -239,7 +233,6 @@ app.use('/api/ai-search', aiSearchRoutes);
 app.use('/api/ai-seo', aiSeoRoutes);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/settings', settingsRoutes);
-app.use('/api/organizations', organizationsRoutes);
 app.use('/api/content', contentRoutes);
 app.use('/api/contact', contactRoutes);
 app.use('/api/upload', uploadRoutes);
@@ -248,14 +241,8 @@ app.use('/api/files', fileRoutes);
 app.use('/api/location-guides', locationGuideRoutes);
 app.use('/api/share', shareRoutes);
 app.use('/api/submissions', submissionRoutes);
+app.use('/api/crm', crmRoutes);
 
-// API routes — property management
-app.use('/api/tenancies', tenancyRoutes);
-app.use('/api/tickets', ticketRoutes);
-app.use('/api/vendors', vendorRoutes);
-app.use('/api/utilities', utilityRoutes);
-app.use('/api/service-charges', serviceChargeRoutes);
-app.use('/api/management', managementRoutes);
 app.use('/api/fx-rates', fxRateRoutes);
 
 // Legacy alias — keep /api/properties working during transition

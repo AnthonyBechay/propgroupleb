@@ -89,12 +89,6 @@ export const UNIT_LIST_INCLUDE = {
       images: true,
     },
   },
-  _count: {
-    select: {
-      tenancies: true,
-      tickets: true,
-    },
-  },
 } as const;
 
 /** Full include for single unit detail page. */
@@ -118,23 +112,6 @@ export const UNIT_DETAIL_INCLUDE = {
       mimeType: true,
       type: true,
       createdAt: true,
-    },
-  },
-  tenancies: {
-    where: { status: 'ACTIVE' as const },
-  },
-  meters: {
-    include: {
-      readings: {
-        orderBy: { readingAt: 'desc' as const },
-        take: 1,
-      },
-    },
-  },
-  _count: {
-    select: {
-      tenancies: true,
-      tickets: true,
     },
   },
 } as const;

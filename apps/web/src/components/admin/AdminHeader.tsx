@@ -1,7 +1,7 @@
 'use client'
 
 import { useAuth } from '@/contexts/AuthContext'
-import { Bell, Menu, X, Home, Building2, Users, Shield, FileText, Settings, BarChart3, LogOut, Bot, MessageSquare, Inbox, PenTool, MapPin } from 'lucide-react'
+import { Bell, Menu, X, Home, Building2, Users, Shield, FileText, Settings, BarChart3, LogOut, MessageSquare, Inbox, PenTool, MapPin, ListFilter, ClipboardList, UserSearch } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useState } from 'react'
 import Link from 'next/link'
@@ -12,17 +12,20 @@ export function AdminHeader() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const pathname = usePathname()
 
+  // Mirrors the desktop sidebar groups, flattened for the mobile drawer.
   const navigation = [
     { name: 'Dashboard', href: '/admin', icon: Home },
-    { name: 'Properties', href: '/admin/properties', icon: Building2 },
+    { name: 'Properties', href: '/admin/buildings', icon: Building2 },
+    { name: 'Listings', href: '/admin/listings', icon: ListFilter },
+    { name: 'Owner Submissions', href: '/admin/submissions', icon: ClipboardList },
     { name: 'Location Guides', href: '/admin/location-guides', icon: MapPin },
-    { name: 'User Management', href: '/admin/users', icon: Users },
+    { name: 'Documents', href: '/admin/documents', icon: FileText },
+    { name: 'CRM — Leads', href: '/admin/crm', icon: UserSearch },
     { name: 'Inquiries', href: '/admin/inquiries', icon: MessageSquare },
     { name: 'Contact Messages', href: '/admin/contacts', icon: Inbox },
     { name: 'Site Content', href: '/admin/content', icon: PenTool },
     { name: 'Analytics', href: '/admin/analytics', icon: BarChart3 },
-    { name: 'AI Settings', href: '/admin/ai-settings', icon: Bot },
-    { name: 'Documents', href: '/admin/documents', icon: FileText },
+    { name: 'Users', href: '/admin/users', icon: Users },
     { name: 'Settings', href: '/admin/settings', icon: Settings },
   ]
 

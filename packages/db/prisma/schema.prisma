@@ -159,7 +159,6 @@ enum InvestmentGoal {
 enum Role {
   USER
   AGENT
-  PROPERTY_MANAGER
   ADMIN
   SUPER_ADMIN
 }
@@ -221,119 +220,10 @@ enum NotificationType {
   SYSTEM_ANNOUNCEMENT
 }
 
-// ── Property Management enums ─────────────────────────────────────────────────
-
-enum TenancyStatus {
-  ACTIVE
-  NOTICE_PERIOD
-  ENDED
-  EVICTED
-}
-
 enum RentPeriod {
   MONTHLY
   QUARTERLY
   YEARLY
-}
-
-enum RentPaymentStatus {
-  DUE
-  PARTIAL
-  PAID
-  OVERDUE
-  WAIVED
-}
-
-// Lebanese-realistic payment methods
-enum PaymentMethod {
-  CASH
-  BANK_TRANSFER
-  OMT
-  WHISH
-  FRESH_USD   // actual fresh dollars (not lollar)
-  LOLLAR      // USD trapped in Lebanese banks
-  OTHER
-}
-
-enum TicketScope {
-  UNIT            // issue inside a specific unit
-  BUILDING_COMMON // elevator, water tank, lobby, etc.
-}
-
-enum TicketCategory {
-  PLUMBING
-  ELECTRICAL
-  HVAC
-  APPLIANCE
-  STRUCTURAL
-  CLEANING
-  PEST
-  KEYS_LOCKS
-  INTERNET
-  GENERATOR
-  ELEVATOR
-  WATER_TANK
-  OTHER
-}
-
-enum TicketPriority {
-  LOW
-  NORMAL
-  HIGH
-  EMERGENCY
-}
-
-enum TicketStatus {
-  OPEN
-  TRIAGED
-  SCHEDULED
-  IN_PROGRESS
-  RESOLVED
-  CANCELLED
-}
-
-// Lebanon-specific utility kinds
-enum UtilityKind {
-  ELECTRICITY_EDL        // state grid (hours/day)
-  ELECTRICITY_GENERATOR  // private generator subscription
-  WATER                  // municipal or tanker
-  INTERNET
-  GAS
-  OTHER
-}
-
-enum AllocationMethod {
-  METERED           // by kWh/m3 consumed per unit
-  AREA_PROPORTIONAL // by unit sqm share
-  FIXED_SHARE       // manually set % per unit
-  OCCUPANT_COUNT    // by number of people in tenancy
-}
-
-enum BillStatus {
-  RECORDED   // bill entered but not split yet
-  ALLOCATED  // split into per-unit amounts
-  INVOICED   // per-unit invoices issued
-  SETTLED    // all units paid
-}
-
-enum AllocationStatus {
-  PENDING
-  INVOICED
-  PAID
-  DISPUTED
-}
-
-enum ChargeCadence {
-  MONTHLY
-  QUARTERLY
-  YEARLY
-}
-
-enum ChargeStatus {
-  DUE
-  PAID
-  WAIVED
-  OVERDUE
 }
 
 enum ShareScope {
@@ -427,8 +317,6 @@ model User {
   invitedUsers         User[]                @relation("InvitedByAdmin")
   invitedByAdmin       User?                 @relation("InvitedByAdmin", fields: [invitedBy], references: [id])
   managedBuildings     Building[]            @relation("BuildingAgent")
-  orgMemberships       OrganizationMember[]
-  assignedTickets      MaintenanceTicket[]   @relation("TicketTechnician")
 
   @@index([role])
   @@index([isActive])
@@ -558,13 +446,11 @@ model Building {
   developerId     String?
   locationGuideId String?
   agentId         String?
-  organizationId  String? // owning org (PM company / agency) — null = managed by the platform directly
 
   // Relations
   developer     Developer?     @relation(fields: [developerId], references: [id])
   locationGuide LocationGuide? @relation(fields: [locationGuideId], references: [id])
   agent         User?          @relation("BuildingAgent", fields: [agentId], references: [id])
-  organization  Organization?  @relation(fields: [organizationId], references: [id])
 
   units            Unit[]
   listings         Listing[]
@@ -578,11 +464,6 @@ model Building {
   reservations     PropertyReservation[]
   investmentData   BuildingInvestmentData?
   priceHistory     BuildingPriceHistory[]
-  tickets          MaintenanceTicket[]
-  serviceCharges   ServiceCharge[]
-  buildingExpenses BuildingExpense[]
-  utilityMeters    UtilityMeter[]
-  utilityBills     UtilityBill[]
 
   @@index([kind])
   @@index([country])
@@ -593,7 +474,6 @@ model Building {
   @@index([featured])
   @@index([slug])
   @@index([agentId])
-  @@index([organizationId])
   @@index([createdAt])
   @@map("buildings")
 }
@@ -711,11 +591,6 @@ model Unit {
   options    UnitOption[]
   listings   Listing[]
   documents  PropertyDocument[]
-  tenancies  Tenancy[]
-  tickets    MaintenanceTicket[]
-  meters     UtilityMeter[]
-  expenses   UnitExpenseShare[]
-  allocations BillAllocation[]
   priceHistory UnitPriceHistory[]
 
   @@index([buildingId])
@@ -1239,335 +1114,7 @@ model Transaction {
 // PROPERTY MANAGEMENT
 // ============================================
 
-// ── Vendor ────────────────────────────────────────────────────────────────────
-model Vendor {
-  id       String   @id @default(cuid())
-  name     String
-  trades   String[] // ["PLUMBING","ELECTRICAL"]
-  phone    String?
-  whatsapp String?
-  email    String?
-  notes    String?
-  rating   Float?
-  isActive Boolean  @default(true)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  tickets MaintenanceTicket[]
-
-  @@map("vendors")
-}
-
-// ── Tenancy ───────────────────────────────────────────────────────────────────
-model Tenancy {
-  id     String @id @default(cuid())
-  unitId String
-
-  tenantName     String
-  tenantUserId   String?
-  tenantPhone    String?
-  tenantEmail    String?
-  tenantWhatsapp String?
-
-  startDate DateTime
-  endDate   DateTime?
-
-  rentAmount   Decimal
-  rentCurrency Currency   @default(USD)
-  rentPeriod   RentPeriod @default(MONTHLY)
-
-  depositAmount   Decimal?
-  depositCurrency Currency?
-
-  status         TenancyStatus @default(ACTIVE)
-  contractFileKey String?
-  notes          String?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  unit     Unit          @relation(fields: [unitId], references: [id], onDelete: Cascade)
-  payments RentPayment[]
-
-  @@index([unitId])
-  @@index([status])
-  @@index([startDate])
-  @@map("tenancies")
-}
-
-model RentPayment {
-  id         String @id @default(cuid())
-  tenancyId  String
-
-  dueDate    DateTime
-  paidDate   DateTime?
-  amount     Decimal
-  currency   Currency          @default(USD)
-  method     PaymentMethod?
-  status     RentPaymentStatus @default(DUE)
-
-  receiptFileKey String?
-  notes          String?
-  recordedBy     String // userId of staff
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  tenancy Tenancy @relation(fields: [tenancyId], references: [id], onDelete: Cascade)
-
-  @@index([tenancyId])
-  @@index([status])
-  @@index([dueDate])
-  @@map("rent_payments")
-}
-
-// ── Maintenance ───────────────────────────────────────────────────────────────
-model MaintenanceTicket {
-  id         String      @id @default(cuid())
-  buildingId String
-  unitId     String?     // null = building-common issue
-  scope      TicketScope @default(UNIT)
-
-  category    TicketCategory  @default(OTHER)
-  priority    TicketPriority  @default(NORMAL)
-  status      TicketStatus    @default(OPEN)
-
-  title       String
-  description String
-
-  // Reporter — may or may not be a platform user
-  reportedBy    String?
-  reporterName  String?
-  reporterPhone String?
-  reporterWhatsapp String?
-
-  // Assignment
-  assignedToUserId String?
-  vendorId         String?
-
-  // Cost tracking
-  costEstimate Decimal?
-  costActual   Decimal?
-  costCurrency Currency?
-
-  scheduledFor DateTime?
-  resolvedAt   DateTime?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  building   Building          @relation(fields: [buildingId], references: [id], onDelete: Cascade)
-  unit       Unit?             @relation(fields: [unitId], references: [id], onDelete: SetNull)
-  vendor     Vendor?           @relation(fields: [vendorId], references: [id], onDelete: SetNull)
-  assignedTo User?             @relation("TicketTechnician", fields: [assignedToUserId], references: [id], onDelete: SetNull)
-  photos     TicketPhoto[]
-  updates    TicketUpdate[]
-
-  @@index([buildingId])
-  @@index([unitId])
-  @@index([status])
-  @@index([priority])
-  @@index([category])
-  @@index([assignedToUserId])
-  @@index([createdAt])
-  @@map("maintenance_tickets")
-}
-
-model TicketPhoto {
-  id        String @id @default(cuid())
-  ticketId  String
-  fileKey   String
-  caption   String?
-  uploadedBy String?
-  createdAt DateTime @default(now())
-
-  ticket MaintenanceTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
-
-  @@map("ticket_photos")
-}
-
-model TicketUpdate {
-  id           String       @id @default(cuid())
-  ticketId     String
-  authorUserId String
-  body         String
-  statusFrom   TicketStatus?
-  statusTo     TicketStatus?
-  createdAt    DateTime     @default(now())
-
-  ticket MaintenanceTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
-
-  @@index([ticketId])
-  @@map("ticket_updates")
-}
-
 // ── Utilities ─────────────────────────────────────────────────────────────────
-
-model UtilityMeter {
-  id          String   @id @default(cuid())
-  buildingId  String
-  unitId      String?  // null = building-level / common meter
-  kind        UtilityKind
-  identifier  String?  // meter serial or subscription ID
-  unitOfMeasure String @default("kWh") // kWh, amp, m3, GB
-  isActive    Boolean  @default(true)
-  notes       String?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  building Building         @relation(fields: [buildingId], references: [id], onDelete: Cascade)
-  unit     Unit?            @relation(fields: [unitId], references: [id], onDelete: SetNull)
-  readings UtilityReading[]
-
-  @@index([buildingId])
-  @@index([unitId])
-  @@index([kind])
-  @@map("utility_meters")
-}
-
-model UtilityReading {
-  id        String   @id @default(cuid())
-  meterId   String
-  readingAt DateTime
-  value     Decimal              // cumulative meter value
-  consumed  Decimal?             // diff vs previous (computed on insert)
-  enteredBy String              // userId of staff
-  photoKey  String?             // R2 key of meter photo
-
-  createdAt DateTime @default(now())
-
-  meter UtilityMeter @relation(fields: [meterId], references: [id], onDelete: Cascade)
-
-  @@index([meterId])
-  @@index([readingAt])
-  @@map("utility_readings")
-}
-
-model UtilityBill {
-  id          String   @id @default(cuid())
-  buildingId  String
-  kind        UtilityKind
-  periodStart DateTime
-  periodEnd   DateTime
-  totalAmount Decimal
-  currency    Currency @default(USD)
-  totalConsumed Decimal? // total kWh/m3 on invoice (for METERED splits)
-  invoiceFileKey String?
-  status      BillStatus @default(RECORDED)
-  notes       String?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  building    Building         @relation(fields: [buildingId], references: [id], onDelete: Cascade)
-  allocations BillAllocation[]
-
-  @@index([buildingId])
-  @@index([kind])
-  @@index([periodStart])
-  @@index([status])
-  @@map("utility_bills")
-}
-
-model BillAllocation {
-  id      String @id @default(cuid())
-  billId  String
-  unitId  String
-
-  method  AllocationMethod
-  basis   Decimal?   // kWh consumed, sqm ratio, headcount
-  share   Decimal    // fraction of total (0–1)
-  amount  Decimal    // currency amount this unit owes
-  currency Currency  @default(USD)
-
-  status   AllocationStatus @default(PENDING)
-  paidAt   DateTime?
-  notes    String?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  bill UtilityBill @relation(fields: [billId], references: [id], onDelete: Cascade)
-  unit Unit        @relation(fields: [unitId], references: [id], onDelete: Cascade)
-
-  @@index([billId])
-  @@index([unitId])
-  @@index([status])
-  @@map("bill_allocations")
-}
-
-// ── Service Charges (recurring HOA / maintenance fees) ────────────────────────
-model ServiceCharge {
-  id          String   @id @default(cuid())
-  buildingId  String
-  name        String
-  description String?
-  amount      Decimal
-  currency    Currency @default(USD)
-  cadence     ChargeCadence @default(MONTHLY)
-  splitMethod AllocationMethod @default(AREA_PROPORTIONAL)
-  isActive    Boolean  @default(true)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  building  Building           @relation(fields: [buildingId], references: [id], onDelete: Cascade)
-  unitShares UnitExpenseShare[]
-
-  @@index([buildingId])
-  @@index([isActive])
-  @@map("service_charges")
-}
-
-model UnitExpenseShare {
-  id              String  @id @default(cuid())
-  unitId          String
-  serviceChargeId String?
-  billAllocationId String?
-  description     String?
-
-  amount   Decimal
-  currency Currency @default(USD)
-  dueDate  DateTime
-  paidAt   DateTime?
-  status   ChargeStatus @default(DUE)
-  notes    String?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  unit          Unit          @relation(fields: [unitId], references: [id], onDelete: Cascade)
-  serviceCharge ServiceCharge? @relation(fields: [serviceChargeId], references: [id], onDelete: SetNull)
-
-  @@index([unitId])
-  @@index([status])
-  @@index([dueDate])
-  @@map("unit_expense_shares")
-}
-
-model BuildingExpense {
-  id          String   @id @default(cuid())
-  buildingId  String
-  description String
-  amount      Decimal
-  currency    Currency @default(USD)
-  category    String   // "REPAIR", "CLEANING", "INSURANCE", "MAINTENANCE", ...
-  vendorId    String?
-  splitMethod AllocationMethod?
-  spentAt     DateTime
-  receiptFileKey String?
-  notes       String?
-
-  createdAt DateTime @default(now())
-
-  building Building @relation(fields: [buildingId], references: [id], onDelete: Cascade)
-
-  @@index([buildingId])
-  @@index([spentAt])
-  @@map("building_expenses")
-}
 
 // ============================================
 // NOTIFICATIONS & MESSAGING
@@ -1729,74 +1276,6 @@ model ShareToken {
 }
 
 // ============================================
-// ORGANIZATIONS — multi-tenant property management
-// ============================================
-// PropGroup itself is an AGENCY org; property-management companies are PM_COMPANY
-// orgs created by a super admin. Buildings belong to an org (Building.organizationId);
-// org members only see their org's data. Members carry an org-scoped role.
-
-enum OrgType {
-  AGENCY     // the platform operator (real-estate sell/rent side)
-  PM_COMPANY // a property-management company operating under PropGroup
-}
-
-enum OrgRole {
-  OWNER      // full control of the org
-  ADMIN      // manage members, buildings, tickets
-  MANAGER    // day-to-day property management
-  TECHNICIAN // assigned maintenance work only
-}
-
-model Organization {
-  id          String   @id @default(cuid())
-  name        String
-  slug        String   @unique
-  type        OrgType  @default(PM_COMPANY)
-  isActive    Boolean  @default(true)
-
-  // Contact / branding
-  email       String?
-  phone       String?
-  logoUrl     String?
-  description String?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  createdBy String? // super admin who created it
-
-  members   OrganizationMember[]
-  buildings Building[]
-
-  @@index([type])
-  @@index([isActive])
-  @@map("organizations")
-}
-
-model OrganizationMember {
-  id             String   @id @default(cuid())
-  organizationId String
-  userId         String
-  role           OrgRole  @default(MANAGER)
-
-  // Technician profile fields (used when role = TECHNICIAN)
-  title       String? // e.g. "Plumber", "Electrician"
-  phone       String?
-  isActive    Boolean @default(true)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([organizationId, userId])
-  @@index([organizationId])
-  @@index([userId])
-  @@index([role])
-  @@map("organization_members")
-}
-
-// ============================================
 // ANALYTICS — first-party behavioural events
 // ============================================
 // Lightweight append-only event log powering the admin analytics dashboard.
@@ -1885,4 +1364,127 @@ model PropertySubmission {
   @@index([status])
   @@index([createdAt])
   @@map("property_submissions")
+}
+
+// ============================================
+// CRM — buyer/seller leads and follow-up
+// ============================================
+// Replaces the follow-up spreadsheet: who wants what, where, how much, when we
+// last spoke and when to call next. Shared across both PropGroup markets
+// (Lebanon listings here, Georgia investment sales on propgrp.com) so the team
+// works one pipeline. Leads can be entered by hand or captured automatically
+// from an inquiry / favourite / owner submission.
+
+enum LeadType {
+  BUYER
+  SELLER
+  RENTER
+  LANDLORD
+  INVESTOR
+}
+
+enum LeadStatus {
+  NEW         // just captured, nobody worked it yet
+  ACTIVE      // in conversation / actively searching
+  VIEWING     // scheduled or completed viewings
+  NEGOTIATING // offer on the table
+  WON         // closed a deal
+  LOST        // went elsewhere / not interested
+  ARCHIVED    // parked, no longer followed up
+}
+
+enum LeadSource {
+  MANUAL      // typed in by the team
+  INQUIRY     // property inquiry form
+  FAVORITE    // saved a property while logged in
+  SUBMISSION  // came through list-your-property
+  REFERRAL
+  WHATSAPP
+  PHONE
+  WALK_IN
+}
+
+// Which side of the business the lead belongs to.
+enum LeadMarket {
+  LEBANON // propgrouplb.com — local sale/rent
+  GEORGIA // propgrp.com — Batumi/Tbilisi investment
+}
+
+enum ContactChannel {
+  CALL
+  WHATSAPP
+  EMAIL
+  MEETING
+  VIEWING
+  NOTE
+}
+
+model Lead {
+  id     String     @id @default(cuid())
+  market LeadMarket @default(LEBANON)
+  type   LeadType   @default(BUYER)
+  status LeadStatus @default(NEW)
+  source LeadSource @default(MANUAL)
+
+  // Who
+  name     String
+  phone    String?
+  email    String?
+  whatsapp String?
+
+  // What they're asking for — free text mirrors the old sheet's "Asking for",
+  // the structured fields power matching against live listings.
+  askingFor String? // e.g. "Land", "Apartment", "Studio for investment"
+  unitKinds UnitKind[]
+  areas     String[] // ["Achrafieh", "Bouchrieh", "Zalka"] — free-form neighbourhoods
+  mohafazat String?
+  caza      String?
+  city      String?
+  minBeds   Int?
+  budgetMin Float?
+  budgetMax Float?
+  currency  Currency @default(USD)
+
+  // Follow-up cadence — nextContactAt in the past means overdue.
+  lastContactAt       DateTime?
+  contactIntervalDays Int       @default(7)
+  nextContactAt       DateTime?
+
+  notes String?
+
+  // Optional links back into the platform
+  userId    String? // registered user this lead corresponds to
+  listingId String? // a specific listing they asked about
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  createdBy String? // admin who added the lead
+
+  contacts LeadContact[]
+
+  @@index([market])
+  @@index([status])
+  @@index([type])
+  @@index([nextContactAt])
+  @@index([userId])
+  @@index([createdAt])
+  @@map("leads")
+}
+
+model LeadContact {
+  id      String         @id @default(cuid())
+  leadId  String
+  channel ContactChannel @default(CALL)
+  body    String
+  outcome String?
+
+  contactedAt DateTime @default(now())
+  createdAt   DateTime @default(now())
+  createdBy   String? // admin who logged it
+
+  lead Lead @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  @@index([leadId])
+  @@index([contactedAt])
+  @@map("lead_contacts")
 }

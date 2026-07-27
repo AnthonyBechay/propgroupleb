@@ -1,14 +1,13 @@
 import express, { type Request, type Response, type Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '@propgroup/db';
-import { authenticateToken, requireAdmin, requireRole, logAdminAction, optionalAuthenticateToken } from '../middleware/auth.js';
+import { authenticateToken, requireAdmin, logAdminAction, optionalAuthenticateToken } from '../middleware/auth.js';
 import { asyncHandler } from '../utils/errors.js';
 import { logger } from '../utils/logger.js';
 import { sendSuccess, sendCreated, sendPaginated, sendNotFound } from '../utils/response.js';
 import { parsePagination, buildPaginationResponse } from '../utils/pagination.js';
 import { BUILDING_LIST_INCLUDE, BUILDING_DETAIL_INCLUDE } from '../utils/prisma-includes.js';
 import { deleteFile, extractKeyFromUrl } from '../services/upload.service.js';
-import { getOrgScope } from '../utils/org-scope.js';
 import type { AuthenticatedRequest } from '../types/index.js';
 
 /** Best-effort delete a batch of file URLs from R2. Failures are logged but do not throw. */
@@ -27,7 +26,6 @@ async function purgeFileUrls(urls: string[]): Promise<void> {
 
 const router: Router = express.Router();
 
-const requirePropertyManager = requireRole('PROPERTY_MANAGER', 'ADMIN', 'SUPER_ADMIN');
 
 // ── Slug helper ───────────────────────────────────────────────────────────────
 
@@ -101,7 +99,6 @@ const buildingSchema = z.object({
   developerId: z.string().optional().nullable(),
   locationGuideId: z.string().optional().nullable(),
   agentId: z.string().optional().nullable(),
-  organizationId: z.string().optional().nullable(), // owning PM company / agency
   paymentPlans: z.array(z.object({
     name: z.string(),
     kind: z.enum(['CASH', 'INSTALLMENTS', 'CUSTOM']),
@@ -137,7 +134,7 @@ const unitCreateSchema = z.object({
   views: z.array(z.string()).optional(),
 });
 
-// ── GET / — public list (org-scoped for authenticated PM members) ─────────────
+// ── GET / — public list ───────────────────────────────────────────────────────
 
 router.get(
   '/',
@@ -149,14 +146,6 @@ router.get(
     const where: Record<string, any> = {};
 
     const { kind, mohafazat, caza, city, status, featured, search, visibility } = req.query as Record<string, string>;
-
-    // Org isolation: an authenticated PM-company member only sees their org's
-    // buildings here. Anonymous/public callers and platform staff are unaffected.
-    const authUser = (req as AuthenticatedRequest).user;
-    if (authUser) {
-      const scope = await getOrgScope(authUser);
-      if (!scope.all) where.organizationId = { in: scope.orgIds.length ? scope.orgIds : ['__none__'] };
-    }
 
     // Default to PUBLIC unless admin passes visibility=all
     if (visibility && visibility !== 'all') {
@@ -252,7 +241,7 @@ router.get(
   asyncHandler(async (req: Request, res: Response) => {
     const authReq = req as AuthenticatedRequest;
     const isAdmin =
-      authReq.user && ['ADMIN', 'SUPER_ADMIN', 'PROPERTY_MANAGER'].includes(authReq.user.role);
+      authReq.user && ['ADMIN', 'SUPER_ADMIN'].includes(authReq.user.role);
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const where: Record<string, any> = { buildingId: req.params.id };
@@ -282,30 +271,16 @@ router.get(
 router.post(
   '/',
   authenticateToken,
-  requirePropertyManager,
+  requireAdmin,
   asyncHandler(async (req: Request, res: Response) => {
     const authReq = req as AuthenticatedRequest;
     const data = buildingSchema.parse(req.body);
-
-    // Org members (PM companies) can only create buildings inside their own org;
-    // force organizationId to their org regardless of any value posted. Platform
-    // staff may set it freely (via the form's "Managed by" selector).
-    const scope = await getOrgScope(authReq.user);
-    let organizationId = data.organizationId ?? null;
-    if (!scope.all) {
-      organizationId = scope.orgIds[0] ?? null;
-      if (!organizationId) {
-        sendSuccess(res, null, 'You are not a member of any organization');
-        return;
-      }
-    }
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const result = await prisma.$transaction(async (tx: any) => {
       const slug = data.slug || (await generateUniqueSlug(data.title, undefined, tx));
       const createData = {
         ...data,
-        organizationId,
         slug,
         images: data.images ?? [],
         youtubeUrls: data.youtubeUrls ?? [],
@@ -321,27 +296,20 @@ router.post(
   })
 );
 
-// ── POST /:id/units — create unit under building (admin or owning PM member) ──
+// ── POST /:id/units — create unit under building (admin) ──────────────────────
 
 router.post(
   '/:id/units',
   authenticateToken,
-  requirePropertyManager,
+  requireAdmin,
   asyncHandler(async (req: Request, res: Response) => {
     const authReq = req as AuthenticatedRequest;
 
     const building = await prisma.building.findUnique({
       where: { id: req.params.id },
-      select: { id: true, organizationId: true },
+      select: { id: true },
     });
     if (!building) { sendNotFound(res, 'Building'); return; }
-
-    // Org isolation: a PM member can only add units to their own org's buildings.
-    const scope = await getOrgScope(authReq.user);
-    if (!scope.all && (!building.organizationId || !scope.orgIds.includes(building.organizationId))) {
-      sendNotFound(res, 'Building');
-      return;
-    }
 
     const data = unitCreateSchema.parse(req.body);
     const unit = await prisma.unit.create({

@@ -166,7 +166,6 @@ export async function optionalAuthenticateToken(req: Request, _res: Response, ne
 export const requireAdmin = requireRole('ADMIN', 'SUPER_ADMIN');
 export const requireSuperAdmin = requireRole('SUPER_ADMIN');
 export const requireAgent = requireRole('AGENT', 'ADMIN', 'SUPER_ADMIN');
-export const requirePropertyManager = requireRole('PROPERTY_MANAGER', 'ADMIN', 'SUPER_ADMIN');
 
 /**
  * Log an admin action to the audit log.
@@ -181,7 +180,7 @@ export async function logAdminAction(
 ) {
   try {
     const user = (req as AuthenticatedRequest).user;
-    const privileged = ['ADMIN', 'SUPER_ADMIN', 'PROPERTY_MANAGER'];
+    const privileged = ['ADMIN', 'SUPER_ADMIN'];
     if (!user || !privileged.includes(user.role)) {
       return;
     }

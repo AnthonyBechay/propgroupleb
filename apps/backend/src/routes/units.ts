@@ -1,7 +1,7 @@
 import express, { type Request, type Response, type Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '@propgroup/db';
-import { authenticateToken, requireAdmin, requireRole, logAdminAction } from '../middleware/auth.js';
+import { authenticateToken, requireAdmin, logAdminAction } from '../middleware/auth.js';
 import { asyncHandler } from '../utils/errors.js';
 import { logger } from '../utils/logger.js';
 import { sendSuccess, sendCreated, sendPaginated, sendNotFound, sendError } from '../utils/response.js';
@@ -13,7 +13,6 @@ import type { AuthenticatedRequest } from '../types/index.js';
 
 const router: Router = express.Router();
 
-const requirePropertyManager = requireRole('PROPERTY_MANAGER', 'ADMIN', 'SUPER_ADMIN');
 
 // ── Schemas ───────────────────────────────────────────────────────────────────
 
@@ -65,7 +64,7 @@ const optionSchema = z.object({
 router.get(
   '/',
   authenticateToken,
-  requirePropertyManager,
+  requireAdmin,
   asyncHandler(async (req: Request, res: Response) => {
     const { page, limit, skip } = parsePagination(req.query as Record<string, string>);
     const { buildingId, kind, lifecycle, ownershipSource } = req.query as Record<string, string>;
@@ -107,7 +106,7 @@ router.get(
 
     const isPublicLifecycle = ['FOR_SALE', 'FOR_RENT', 'RESERVED', 'SOLD'].includes(unit.lifecycle);
     const isAdmin =
-      authReq.user && ['ADMIN', 'SUPER_ADMIN', 'PROPERTY_MANAGER'].includes(authReq.user.role);
+      authReq.user && ['ADMIN', 'SUPER_ADMIN'].includes(authReq.user.role);
 
     if (!isPublicLifecycle && !isAdmin) {
       sendError(res, 403, 'Access denied');
@@ -205,7 +204,7 @@ router.delete(
 router.put(
   '/:id',
   authenticateToken,
-  requirePropertyManager,
+  requireAdmin,
   asyncHandler(async (req: Request, res: Response) => {
     const authReq = req as AuthenticatedRequest;
     const data = unitUpdateSchema.parse(req.body);

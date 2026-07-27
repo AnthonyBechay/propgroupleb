@@ -207,118 +207,6 @@ export const listingQuerySchema = z.object({
   sortOrder: z.enum(['asc', 'desc']).optional(),
 });
 
-// ─── Tenancy ──────────────────────────────────────────────────────────────────
-
-export const tenancySchema = z.object({
-  unitId: z.string().min(1),
-  tenantName: z.string().min(1),
-  tenantPhone: z.string().optional().nullable(),
-  tenantEmail: z.string().email().optional().nullable(),
-  tenantWhatsapp: z.string().optional().nullable(),
-  startDate: z.string().min(1),
-  endDate: z.string().optional().nullable(),
-  rentAmount: z.number().min(0),
-  rentCurrency: z.enum(['USD', 'LBP']).default('USD'),
-  rentPeriod: z.enum(['MONTHLY', 'QUARTERLY', 'YEARLY']).default('MONTHLY'),
-  depositAmount: z.number().optional().nullable(),
-  depositCurrency: z.enum(['USD', 'LBP']).optional().nullable(),
-  contractFileKey: z.string().optional().nullable(),
-  notes: z.string().optional().nullable(),
-});
-
-export const rentPaymentSchema = z.object({
-  dueDate: z.string().min(1),
-  paidDate: z.string().optional().nullable(),
-  amount: z.number().min(0),
-  currency: z.enum(['USD', 'LBP']).default('USD'),
-  method: z.enum(['CASH', 'BANK_TRANSFER', 'OMT', 'WHISH', 'FRESH_USD', 'LOLLAR', 'OTHER']).optional().nullable(),
-  status: z.enum(['DUE', 'PARTIAL', 'PAID', 'OVERDUE', 'WAIVED']).default('DUE'),
-  receiptFileKey: z.string().optional().nullable(),
-  notes: z.string().optional().nullable(),
-});
-
-// ─── Maintenance Ticket ───────────────────────────────────────────────────────
-
-export const ticketSchema = z.object({
-  buildingId: z.string().min(1),
-  unitId: z.string().optional().nullable(),
-  scope: z.enum(['UNIT', 'BUILDING_COMMON']).default('UNIT'),
-  category: z.enum(['PLUMBING', 'ELECTRICAL', 'HVAC', 'APPLIANCE', 'STRUCTURAL', 'CLEANING', 'PEST', 'KEYS_LOCKS', 'INTERNET', 'GENERATOR', 'ELEVATOR', 'WATER_TANK', 'OTHER']).default('OTHER'),
-  priority: z.enum(['LOW', 'NORMAL', 'HIGH', 'EMERGENCY']).default('NORMAL'),
-  title: z.string().min(1),
-  description: z.string().min(1),
-  reporterName: z.string().optional().nullable(),
-  reporterPhone: z.string().optional().nullable(),
-  reporterWhatsapp: z.string().optional().nullable(),
-  assignedToUserId: z.string().optional().nullable(),
-  vendorId: z.string().optional().nullable(),
-  costEstimate: z.number().optional().nullable(),
-  scheduledFor: z.string().optional().nullable(),
-});
-
-export const ticketUpdateSchema = z.object({
-  body: z.string().min(1),
-  statusTo: z.enum(['OPEN', 'TRIAGED', 'SCHEDULED', 'IN_PROGRESS', 'RESOLVED', 'CANCELLED']).optional(),
-});
-
-// ─── Vendor ───────────────────────────────────────────────────────────────────
-
-export const vendorSchema = z.object({
-  name: z.string().min(1),
-  trades: z.array(z.string()).default([]),
-  phone: z.string().optional().nullable(),
-  whatsapp: z.string().optional().nullable(),
-  email: z.string().email().optional().nullable(),
-  notes: z.string().optional().nullable(),
-  rating: z.number().min(0).max(5).optional().nullable(),
-});
-
-// ─── Utility ──────────────────────────────────────────────────────────────────
-
-export const meterSchema = z.object({
-  buildingId: z.string().min(1),
-  unitId: z.string().optional().nullable(),
-  kind: z.enum(['ELECTRICITY_EDL', 'ELECTRICITY_GENERATOR', 'WATER', 'INTERNET', 'GAS', 'OTHER']),
-  identifier: z.string().optional().nullable(),
-  unitOfMeasure: z.string().default('kWh'),
-  notes: z.string().optional().nullable(),
-});
-
-export const meterReadingSchema = z.object({
-  readingAt: z.string().min(1),
-  value: z.number(),
-  photoKey: z.string().optional().nullable(),
-});
-
-export const utilityBillSchema = z.object({
-  buildingId: z.string().min(1),
-  kind: z.enum(['ELECTRICITY_EDL', 'ELECTRICITY_GENERATOR', 'WATER', 'INTERNET', 'GAS', 'OTHER']),
-  periodStart: z.string().min(1),
-  periodEnd: z.string().min(1),
-  totalAmount: z.number().min(0),
-  currency: z.enum(['USD', 'LBP']).default('USD'),
-  totalConsumed: z.number().optional().nullable(),
-  invoiceFileKey: z.string().optional().nullable(),
-  notes: z.string().optional().nullable(),
-});
-
-export const billAllocationSchema = z.object({
-  method: z.enum(['METERED', 'AREA_PROPORTIONAL', 'FIXED_SHARE', 'OCCUPANT_COUNT']),
-  unitShares: z.array(z.object({ unitId: z.string(), share: z.number() })).optional(),
-});
-
-// ─── Service Charge ───────────────────────────────────────────────────────────
-
-export const serviceChargeSchema = z.object({
-  buildingId: z.string().min(1),
-  name: z.string().min(1),
-  description: z.string().optional().nullable(),
-  amount: z.number().min(0),
-  currency: z.enum(['USD', 'LBP']).default('USD'),
-  cadence: z.enum(['MONTHLY', 'QUARTERLY', 'YEARLY']).default('MONTHLY'),
-  splitMethod: z.enum(['METERED', 'AREA_PROPORTIONAL', 'FIXED_SHARE', 'OCCUPANT_COUNT']).default('AREA_PROPORTIONAL'),
-});
-
 // ─── FX Rate ──────────────────────────────────────────────────────────────────
 
 export const fxRateSchema = z.object({
@@ -330,7 +218,7 @@ export const fxRateSchema = z.object({
 // ─── Shared ───────────────────────────────────────────────────────────────────
 
 export const updateRoleSchema = z.object({
-  role: z.enum(['USER', 'AGENT', 'PROPERTY_MANAGER', 'ADMIN', 'SUPER_ADMIN']),
+  role: z.enum(['USER', 'AGENT', 'ADMIN', 'SUPER_ADMIN']),
 });
 
 export const banUserSchema = z.object({
@@ -339,7 +227,7 @@ export const banUserSchema = z.object({
 
 export const inviteAdminSchema = z.object({
   email: z.string().email('Invalid email address'),
-  role: z.enum(['AGENT', 'PROPERTY_MANAGER', 'ADMIN', 'SUPER_ADMIN']),
+  role: z.enum(['AGENT', 'ADMIN', 'SUPER_ADMIN']),
 });
 
 export const inquirySchema = z.object({
