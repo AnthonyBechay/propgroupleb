@@ -25,9 +25,7 @@ export interface Lead {
   askingFor: string | null
   unitKinds: string[]
   areas: string[]
-  mohafazat: string | null
-  caza: string | null
-  city: string | null
+  regions: string[]
   minBeds: number | null
   budgetMin: number | null
   budgetMax: number | null
@@ -40,6 +38,9 @@ export interface Lead {
   contacts?: LeadContact[]
   _count?: { contacts: number }
 }
+
+/** Board columns, in pipeline order. WON/LOST/ARCHIVED live off-board. */
+export const BOARD_STAGES: LeadStatus[] = ['NEW', 'ACTIVE', 'VIEWING', 'NEGOTIATING', 'WON']
 
 export const STATUS_META: Record<LeadStatus, { label: string; cls: string }> = {
   NEW:         { label: 'New',         cls: 'bg-sky-100 text-sky-700' },

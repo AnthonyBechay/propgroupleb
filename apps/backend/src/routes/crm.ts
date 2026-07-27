@@ -6,6 +6,7 @@ import { asyncHandler } from '../utils/errors.js';
 import { sendSuccess, sendCreated, sendPaginated, sendNotFound } from '../utils/response.js';
 import { parsePagination, buildPaginationResponse } from '../utils/pagination.js';
 import type { AuthenticatedRequest } from '../types/index.js';
+import { matchListingToLead, matchLeadToLead, SUPPLY_TYPES, DEMAND_TYPES } from '../utils/lead-matching.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // CRM — the team's buyer/seller pipeline (replaces the follow-up spreadsheet).
@@ -34,9 +35,7 @@ const leadSchema = z.object({
   askingFor: z.string().max(200).optional().nullable(),
   unitKinds: z.array(z.enum(UNIT_KINDS)).default([]),
   areas: z.array(z.string().max(80)).default([]),
-  mohafazat: z.string().max(50).optional().nullable(),
-  caza: z.string().max(80).optional().nullable(),
-  city: z.string().max(80).optional().nullable(),
+  regions: z.array(z.string().max(50)).default([]),
   minBeds: z.number().int().min(0).max(20).optional().nullable(),
   budgetMin: z.number().min(0).optional().nullable(),
   budgetMax: z.number().min(0).optional().nullable(),
@@ -73,9 +72,7 @@ function toLeadData(data: z.infer<typeof leadSchema>): Record<string, any> {
     askingFor: data.askingFor || null,
     unitKinds: data.unitKinds,
     areas: data.areas,
-    mohafazat: data.mohafazat || null,
-    caza: data.caza || null,
-    city: data.city || null,
+    regions: data.regions,
     minBeds: data.minBeds ?? null,
     budgetMin: data.budgetMin ?? null,
     budgetMax: data.budgetMax ?? null,
@@ -119,7 +116,6 @@ router.get(
         { email: { contains: q.search, mode: 'insensitive' } },
         { askingFor: { contains: q.search, mode: 'insensitive' } },
         { notes: { contains: q.search, mode: 'insensitive' } },
-        { city: { contains: q.search, mode: 'insensitive' } },
         { areas: { has: q.search } },
       ];
     }
@@ -199,57 +195,77 @@ router.get(
     // Georgia leads are served by the sister site — we have no local inventory.
     if (lead.market !== 'LEBANON') { sendSuccess(res, []); return; }
 
+    // Pull a broad candidate pool (cheap filters only) and rank it in memory —
+    // scoring is what decides relevance, not a hard SQL filter, so a client
+    // still sees near-misses that are worth a phone call.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const where: Record<string, any> = { status: 'ACTIVE', visibility: 'PUBLIC' };
-    where.intent = lead.type === 'RENTER' ? 'FOR_RENT' : 'FOR_SALE';
 
-    if (lead.budgetMin != null || lead.budgetMax != null) {
-      where.price = {
-        ...(lead.budgetMin != null ? { gte: lead.budgetMin } : {}),
-        ...(lead.budgetMax != null ? { lte: lead.budgetMax } : {}),
-      };
-    }
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const unitFilter: Record<string, any> = {};
-    if (lead.unitKinds.length) unitFilter.kind = { in: lead.unitKinds };
-    if (lead.minBeds != null) unitFilter.bedrooms = { gte: lead.minBeds };
-    if (Object.keys(unitFilter).length) where.unit = unitFilter;
-
-    // Location: any of the lead's areas / city / caza / mohafazat, matched
-    // against the building either directly or through its unit.
-    const areaTerms = [...lead.areas, lead.city, lead.caza].filter(Boolean) as string[];
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const locationOr: any[] = [];
-    for (const term of areaTerms) {
-      for (const field of ['city', 'neighborhood', 'caza']) {
-        locationOr.push({ building: { [field]: { contains: term, mode: 'insensitive' } } });
-        locationOr.push({ unit: { building: { [field]: { contains: term, mode: 'insensitive' } } } });
-      }
-    }
-    if (!areaTerms.length && lead.mohafazat) {
-      locationOr.push({ building: { mohafazat: lead.mohafazat } });
-      locationOr.push({ unit: { building: { mohafazat: lead.mohafazat } } });
-    }
-    if (locationOr.length) where.OR = locationOr;
-
-    const matches = await prisma.listing.findMany({
+    const candidates = await prisma.listing.findMany({
       where,
-      take: 12,
+      take: 400,
       orderBy: { createdAt: 'desc' },
       select: {
         id: true, slug: true, headline: true, price: true, currency: true, intent: true,
-        building: { select: { title: true, city: true, caza: true, images: true } },
+        building: { select: { title: true, city: true, caza: true, neighborhood: true, mohafazat: true, images: true } },
         unit: {
           select: {
             kind: true, bedrooms: true, bathrooms: true, areaSqm: true,
-            building: { select: { title: true, city: true, caza: true, images: true } },
+            building: { select: { title: true, city: true, caza: true, neighborhood: true, mohafazat: true, images: true } },
           },
         },
       },
     });
 
-    sendSuccess(res, matches);
+    const MIN_SCORE = Number(req.query.minScore ?? 45);
+    const scored = candidates
+      .map((listing) => ({ listing, match: matchListingToLead(lead, listing) }))
+      .filter((r) => r.match.score >= MIN_SCORE)
+      .sort((a, b) => b.match.score - a.match.score)
+      .slice(0, 20);
+
+    sendSuccess(res, scored);
+  })
+);
+
+// ── GET /:id/lead-matches — other clients who are the other side of the deal ──
+// A buyer looking in Achrafieh and a seller with an Achrafieh apartment are a
+// potential introduction long before anything is listed publicly.
+
+router.get(
+  '/:id/lead-matches',
+  authenticateToken,
+  requireAdmin,
+  asyncHandler(async (req: Request, res: Response) => {
+    const lead = await prisma.lead.findUnique({ where: { id: req.params.id } });
+    if (!lead) { sendNotFound(res, 'Lead'); return; }
+
+    const isDemand = DEMAND_TYPES.includes(lead.type);
+    const counterpartTypes = isDemand ? SUPPLY_TYPES : DEMAND_TYPES;
+
+    const counterparts = await prisma.lead.findMany({
+      where: {
+        id: { not: lead.id },
+        market: lead.market,
+        type: { in: counterpartTypes as never },
+        status: { notIn: ['LOST', 'ARCHIVED'] as never },
+      },
+      take: 300,
+      orderBy: { createdAt: 'desc' },
+    });
+
+    const MIN_SCORE = Number(req.query.minScore ?? 45);
+    const scored = counterparts
+      .map((other) => ({
+        lead: other,
+        // Always score demand-side wants against supply-side offering.
+        match: isDemand ? matchLeadToLead(lead, other) : matchLeadToLead(other, lead),
+      }))
+      .filter((r) => r.match.score >= MIN_SCORE)
+      .sort((a, b) => b.match.score - a.match.score)
+      .slice(0, 20);
+
+    sendSuccess(res, scored);
   })
 );
 
@@ -409,9 +425,8 @@ router.post(
         phone: inquiry.phone,
         email: inquiry.email,
         askingFor: inquiry.building?.title ? `Enquired about ${inquiry.building.title}` : null,
-        city: inquiry.building?.city ?? null,
-        caza: inquiry.building?.caza ?? null,
-        mohafazat: inquiry.building?.mohafazat ?? null,
+        areas: [inquiry.building?.city, inquiry.building?.caza].filter(Boolean) as string[],
+        regions: inquiry.building?.mohafazat ? [inquiry.building.mohafazat] : [],
         notes: inquiry.message,
         userId: inquiry.userId,
         lastContactAt: now,
@@ -423,6 +438,57 @@ router.post(
 
     await logAdminAction('CREATE_LEAD_FROM_INQUIRY', 'lead', lead.id, { inquiryId: inquiry.id }, authReq);
     sendCreated(res, lead, 'Client added to CRM');
+  })
+);
+
+// ── GET /export.csv — download the pipeline as a spreadsheet ─────────────────
+// CSV with a UTF-8 BOM so Excel opens Arabic/accented names correctly.
+
+function csvCell(v: unknown): string {
+  if (v === null || v === undefined) return '';
+  const s = String(v);
+  return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+}
+
+router.get(
+  '/export.csv',
+  authenticateToken,
+  requireAdmin,
+  asyncHandler(async (req: Request, res: Response) => {
+    const q = req.query as Record<string, string>;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const where: Record<string, any> = {};
+    if (q.market && MARKETS.includes(q.market as never)) where.market = q.market;
+    if (q.status && LEAD_STATUSES.includes(q.status as never)) where.status = q.status;
+
+    const leads = await prisma.lead.findMany({ where, orderBy: { createdAt: 'desc' }, take: 5000 });
+
+    const headers = [
+      'Client Name', 'Client Type', 'Market', 'Status', 'Source', 'Asking For',
+      'Property Types', 'Areas', 'Regions', 'Min Beds', 'Budget Min', 'Budget Max', 'Currency',
+      'Phone', 'WhatsApp', 'Email',
+      'Last Contact Date', 'Interval (Days)', 'Next Contact Date', 'Urgent Status',
+      'Notes / Actions', 'Created',
+    ];
+
+    const iso = (d: Date | null) => (d ? new Date(d).toISOString().slice(0, 10) : '');
+    const rows = leads.map((l) => {
+      const overdue = l.nextContactAt && l.nextContactAt <= new Date() && !['WON', 'LOST', 'ARCHIVED'].includes(l.status);
+      return [
+        l.name, l.type, l.market, l.status, l.source, l.askingFor,
+        l.unitKinds.join(' | '), l.areas.join(' | '), l.regions.join(' | '),
+        l.minBeds, l.budgetMin, l.budgetMax, l.currency,
+        l.phone, l.whatsapp, l.email,
+        iso(l.lastContactAt), l.contactIntervalDays, iso(l.nextContactAt),
+        overdue ? 'OVERDUE' : '',
+        l.notes, iso(l.createdAt),
+      ].map(csvCell).join(',');
+    });
+
+    const csv = '\uFEFF' + [headers.join(','), ...rows].join('\r\n');
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="propgroup-crm-${new Date().toISOString().slice(0, 10)}.csv"`);
+    res.send(csv);
   })
 );
 

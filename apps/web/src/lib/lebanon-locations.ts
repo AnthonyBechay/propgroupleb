@@ -30,6 +30,8 @@ export const LEBANON_LOCATIONS: LebanonLocation[] = [
     'Gemmayze', 'Mar Mikhael', 'Saifi', 'Downtown', 'Manara', 'Raouche', 'Ain El Mreisseh', 'Clemenceau',
     'Qantari', 'Mathaf', 'Tallet El Khayat', 'Ras El Nabaa', 'Bachoura', 'Zqaq El Blat', 'Basta',
     'Tariq El Jdideh', 'Ain El Tineh', 'Karantina', 'Corniche El Nahr',
+    'Ramlet El Baida', 'Jnah Beirut', 'Unesco', 'Barbir', 'Mar Elias', 'Caracas', 'Wata Msaytbeh',
+    'Sanayeh', 'Kantari', 'Minet El Hosn', 'Port District', 'Horsh Beirut',
   ], 'Beirut', 'BEIRUT'),
   // Achrafieh sub-neighborhoods → city = Achrafieh, neighborhood = the sub-area
   ...sub('Achrafieh', ['Sassine', 'Sioufi', 'Karm El Zeitoun', 'Geitawi', 'Rmeil', 'Furn El Hayek', 'Adlieh', 'Nasra', 'Monot'], 'Beirut', 'BEIRUT'),
@@ -41,33 +43,42 @@ export const LEBANON_LOCATIONS: LebanonLocation[] = [
     'Dhour Choueir', 'Antelias', 'Naccache', 'Rabieh', 'Rabweh', 'Mtayleb', 'Dbayeh', 'Zalka',
     'Jal El Dib', 'Bsalim', 'Mazraat Yachouh', 'Aoukar', 'Roumieh', 'Ain Saadeh', 'Ain Aar',
     'Qornet El Hamra', 'Cornet Chehwane', 'Beit El Chaar', 'Monteverde', 'Elissar', 'Mar Roukoz', 'New Rawda',
+    'Nahr El Mot', 'Jal El Dib Highway', 'Biakout', 'Ain Najm', 'Mansouriyeh El Metn', 'Bteghrine',
+    'Douar', 'Chouaya', 'Bhersaf', 'Mrouj', 'Zaarour', 'Ain El Kharroubeh', 'Baabdat Highway',
+    'Daychounieh', 'Jouret El Ballout', 'Qennabet Broumana', 'Bqennaya', 'Zouk El Kharab',
   ], 'Metn', ML),
 
   // ── Mount Lebanon — Keserwan ───────────────────────────────────────────────
   ...town([
     'Jounieh', 'Zouk Mosbeh', 'Zouk Mikael', 'Adma', 'Ghazir', 'Tabarja', 'Safra', 'Bouar', 'Kfardebian',
     'Faraya', 'Hrajel', 'Mayrouba', 'Reyfoun', 'Ajaltoun', 'Ballouneh', 'Jeita', 'Harissa', 'Daraoun',
-    'Sahel Alma', 'Kleiat',
+    'Sahel Alma', 'Kleiat', 'Bkerke', 'Sheileh', 'Aajaltoun', 'Faitroun', 'Ghineh', 'Nahr El Kalb',
+    'Zouk El Kharab Keserwan', 'Halat Keserwan', 'Fatqa', 'Chnaniir', 'Haret Sakhr Highway',
   ], 'Keserwan', ML),
   // Greater Jounieh sub-areas → city = Jounieh, neighborhood = the sub-area
   ...sub('Jounieh', ['Kaslik', 'Sarba', 'Haret Sakher', 'Ghadir', 'Maameltein'], 'Keserwan', ML),
 
   // ── Mount Lebanon — Jbeil (Byblos) ─────────────────────────────────────────
-  ...town(['Jbeil (Byblos)', 'Amchit', 'Halat', 'Fidar', 'Blat', 'Mastita', 'Edde', 'Hboub', 'Aaqoura', 'Laqlouq', 'Kartaba', 'Mechmech', 'Berbara', 'Maad'], 'Jbeil', ML),
+  ...town(['Jbeil (Byblos)', 'Amchit', 'Halat', 'Fidar', 'Blat', 'Mastita', 'Edde', 'Hboub', 'Aaqoura', 'Laqlouq', 'Kartaba', 'Mechmech', 'Berbara', 'Maad',
+    'Nahr Ibrahim', 'Bentael', 'Jaj', 'Ehmej', 'Gharzouz', 'Hosrayel', 'Aannaya', 'Machnaqa', 'Voile Bleu'], 'Jbeil', ML),
 
   // ── Mount Lebanon — Baabda ─────────────────────────────────────────────────
-  ...town(['Baabda', 'Hazmieh', 'Furn El Chebbak', 'Hadath', 'Chiyah', 'Ghobeiry', 'Haret Hreik', 'Bir Hassan', 'Jnah', 'Yarze', 'Louaize', 'Kfarshima', 'Wadi Chahrour', 'Bsaba'], 'Baabda', ML),
+  ...town(['Baabda', 'Hazmieh', 'Furn El Chebbak', 'Hadath', 'Chiyah', 'Ghobeiry', 'Haret Hreik', 'Bir Hassan', 'Jnah', 'Yarze', 'Louaize', 'Kfarshima', 'Wadi Chahrour', 'Bsaba',
+    'Mar Takla', 'Mreijeh', 'Laylaki', 'Tahwitat El Ghadir', 'Chweifat El Amroussieh', 'Brasil Baabda',
+    'Ain El Remmaneh', 'Sabtieh Baabda', 'Dahieh', 'Bourj El Brajneh', 'Hay El Sellom', 'Choueifat Baabda'], 'Baabda', ML),
 
   // ── Mount Lebanon — Aley ───────────────────────────────────────────────────
-  ...town(['Aley', 'Bhamdoun', 'Sofar', 'Bchamoun', 'Choueifat', 'Aaramoun', 'Kahale', 'Souk El Gharb', 'Bsous', 'Ainab', 'Kaifoun'], 'Aley', ML),
+  ...town(['Aley', 'Bhamdoun', 'Sofar', 'Bchamoun', 'Choueifat', 'Aaramoun', 'Kahale', 'Souk El Gharb', 'Bsous', 'Ainab', 'Kaifoun',
+    'Aitat', 'Bmakine', 'Chartoun', 'Ras El Jabal', 'Btater', 'Baissour', 'Doha Aramoun', 'Khalde'], 'Aley', ML),
 
   // ── Mount Lebanon — Chouf ──────────────────────────────────────────────────
-  ...town(['Beiteddine', 'Deir El Qamar', 'Baakline', 'Moukhtara', 'Damour', 'Barouk', 'Maaser El Chouf', 'Jdeidet El Chouf', 'Kfarhim', 'Semqanieh'], 'Chouf', ML),
+  ...town(['Beiteddine', 'Deir El Qamar', 'Baakline', 'Moukhtara', 'Damour', 'Barouk', 'Maaser El Chouf', 'Jdeidet El Chouf', 'Kfarhim', 'Semqanieh',
+    'Naameh', 'Jiyeh', 'Rmeileh', 'Chhim', 'Barja', 'Ketermaya', 'Mazboud', 'Ain Zhalta', 'Bater', 'Joun'], 'Chouf', ML),
 
   // ── North ──────────────────────────────────────────────────────────────────
-  ...town(['Tripoli', 'El Mina', 'Beddawi', 'Qalamoun', 'Dahr El Ain'], 'Tripoli', 'NORTH'),
+  ...town(['Tripoli', 'El Mina', 'Beddawi', 'Qalamoun', 'Dahr El Ain', 'Abou Samra', 'Zahrieh', 'Tell Tripoli', 'Ras Maska'], 'Tripoli', 'NORTH'),
   ...town(['Amioun', 'Anfeh', 'Chekka', 'Kousba', 'Kfaraakka', 'Btouratij'], 'Koura', 'NORTH'),
-  ...town(['Batroun', 'Tannourine', 'Douma', 'Kfifane', 'Chatine', 'Kfar Abida'], 'Batroun', 'NORTH'),
+  ...town(['Batroun', 'Tannourine', 'Douma', 'Kfifane', 'Chatine', 'Kfar Abida', 'Hamat', 'Basbina', 'Ras Nhach', 'Thoum', 'Smar Jbeil'], 'Batroun', 'NORTH'),
   ...town(['Zgharta', 'Ehden', 'Kfardlakos'], 'Zgharta', 'NORTH'),
   ...town(['Bcharre', 'Hasroun', 'The Cedars', 'Hadchit'], 'Bcharre', 'NORTH'),
   ...town(['Sir El Danniyeh', 'Minieh', 'Bakhoun', 'Bqaa Safrine'], 'Minieh-Danniyeh', 'NORTH'),
@@ -85,7 +96,7 @@ export const LEBANON_LOCATIONS: LebanonLocation[] = [
   ...town(['Hermel', 'Qasr', 'Fissan'], 'Hermel', 'BAALBEK_HERMEL'),
 
   // ── South ──────────────────────────────────────────────────────────────────
-  ...town(['Saida (Sidon)', 'Ghazieh', 'Haret Saida', 'Abra', 'Miye Ou Miye', 'Hlaliyeh'], 'Saida', 'SOUTH'),
+  ...town(['Saida (Sidon)', 'Ghazieh', 'Haret Saida', 'Abra', 'Miye Ou Miye', 'Hlaliyeh', 'Sarafand', 'Adloun', 'Zahrani', 'Maghdouche', 'Darb El Sim'], 'Saida', 'SOUTH'),
   ...town(['Jezzine', 'Bkassine', 'Roum'], 'Jezzine', 'SOUTH'),
   ...town(['Tyre (Sour)', 'Abbassiyeh', 'Qana', 'Naqoura', 'Bourj El Chemali', 'Maaroub'], 'Tyre', 'SOUTH'),
 

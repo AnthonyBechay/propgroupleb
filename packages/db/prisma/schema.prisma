@@ -1436,11 +1436,12 @@ model Lead {
   // the structured fields power matching against live listings.
   askingFor String? // e.g. "Land", "Apartment", "Studio for investment"
   unitKinds UnitKind[]
-  areas     String[] // ["Achrafieh", "Bouchrieh", "Zalka"] — free-form neighbourhoods
-  mohafazat String?
-  caza      String?
-  city      String?
-  minBeds   Int?
+  // Locations are picked from the curated per-market catalogue (never free text).
+  // A client may name specific areas, or only regions when they're open to a
+  // whole region, or both.
+  areas   String[] // ["Achrafieh", "Bouchrieh", "Zalka"]
+  regions String[] // Lebanese mohafazat values, or GE_* for Georgia
+  minBeds Int?
   budgetMin Float?
   budgetMax Float?
   currency  Currency @default(USD)

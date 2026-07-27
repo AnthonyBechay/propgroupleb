@@ -4,36 +4,61 @@ import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import {
   X, Phone, MessageCircle, Mail, Loader2, Send, Pencil, Trash2, Building2,
-  CalendarClock, AlertTriangle, ExternalLink, History,
+  CalendarClock, AlertTriangle, ExternalLink, History, Handshake,
 } from 'lucide-react'
 import { normalizeApiUrl, normalizeFileUrl } from '@/lib/utils/api-url'
+import { regionLabel } from '@/lib/crm-locations'
 import { LeadFormModal } from './LeadFormModal'
 import {
   type Lead, type LeadContact, STATUS_META, TYPE_LABELS, MARKET_META,
   UNIT_KIND_LABELS, formatDue,
 } from './types'
 
-interface Match {
-  id: string
-  slug: string | null
-  headline: string | null
-  price: number
-  currency: string
-  intent: string
-  building?: { title: string; city: string | null; caza: string | null; images: string[] } | null
-  unit?: {
-    kind: string; bedrooms: number | null; bathrooms: number | null; areaSqm: number | null
+interface MatchScore {
+  score: number
+  reasons: string[]
+  misses: string[]
+}
+
+interface ListingMatch {
+  listing: {
+    id: string
+    slug: string | null
+    headline: string | null
+    price: number
+    currency: string
+    intent: string
     building?: { title: string; city: string | null; caza: string | null; images: string[] } | null
-  } | null
+    unit?: {
+      kind: string; bedrooms: number | null; bathrooms: number | null; areaSqm: number | null
+      building?: { title: string; city: string | null; caza: string | null; images: string[] } | null
+    } | null
+  }
+  match: MatchScore
+}
+
+interface LeadMatch {
+  lead: Lead
+  match: MatchScore
+}
+
+/** Colour the match badge by strength so strong fits jump out. */
+function scoreCls(score: number): string {
+  if (score >= 80) return 'bg-emerald-100 text-emerald-800'
+  if (score >= 60) return 'bg-sky-100 text-sky-800'
+  return 'bg-amber-100 text-amber-800'
 }
 
 const CHANNELS = ['CALL', 'WHATSAPP', 'EMAIL', 'MEETING', 'VIEWING', 'NOTE'] as const
+/** Lead types that are looking for something (vs. offering). */
+const DEMAND = ['BUYER', 'RENTER', 'INVESTOR']
 
 /** Full client view: contact history, quick log, and matching live listings. */
 export function LeadDrawer({ lead, onClose, onChanged }: { lead: Lead; onClose: () => void; onChanged: () => void }) {
   const apiUrl = normalizeApiUrl(process.env.NEXT_PUBLIC_API_URL || '')
   const [detail, setDetail] = useState<Lead | null>(null)
-  const [matches, setMatches] = useState<Match[]>([])
+  const [matches, setMatches] = useState<ListingMatch[]>([])
+  const [leadMatches, setLeadMatches] = useState<LeadMatch[]>([])
   const [loading, setLoading] = useState(true)
   const [editing, setEditing] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -46,12 +71,14 @@ export function LeadDrawer({ lead, onClose, onChanged }: { lead: Lead; onClose: 
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const [d, m] = await Promise.all([
+      const [d, m, lm] = await Promise.all([
         fetch(`${apiUrl}/api/crm/${lead.id}`, { credentials: 'include', cache: 'no-store' }),
         fetch(`${apiUrl}/api/crm/${lead.id}/matches`, { credentials: 'include', cache: 'no-store' }),
+        fetch(`${apiUrl}/api/crm/${lead.id}/lead-matches`, { credentials: 'include', cache: 'no-store' }),
       ])
       if (d.ok) setDetail((await d.json()).data ?? null)
       if (m.ok) setMatches((await m.json()).data ?? [])
+      if (lm.ok) setLeadMatches((await lm.json()).data ?? [])
     } finally {
       setLoading(false)
     }
@@ -99,7 +126,7 @@ export function LeadDrawer({ lead, onClose, onChanged }: { lead: Lead; onClose: 
 
   const l = detail ?? lead
   const due = formatDue(l.nextContactAt)
-  const where = [l.areas.join(', '), l.city, l.caza].filter(Boolean).join(' · ')
+  const where = [l.areas.join(', '), l.regions.map(regionLabel).join(', ')].filter(Boolean).join(' · ')
   const phone = l.whatsapp || l.phone
 
   return (
@@ -233,6 +260,7 @@ export function LeadDrawer({ lead, onClose, onChanged }: { lead: Lead; onClose: 
           <section className="bg-white border border-slate-200 rounded-xl p-4">
             <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3 flex items-center gap-1.5">
               <Building2 className="h-3.5 w-3.5" /> Matching properties
+              {matches.length > 0 && <span className="text-slate-400 font-normal normal-case">({matches.length})</span>}
             </p>
             {loading ? (
               <div className="flex justify-center py-6 text-slate-400"><Loader2 className="h-5 w-5 animate-spin" /></div>
@@ -240,11 +268,11 @@ export function LeadDrawer({ lead, onClose, onChanged }: { lead: Lead; onClose: 
               <p className="text-sm text-slate-400">
                 {l.market === 'GEORGIA'
                   ? 'Georgia inventory lives on propgrp.com — no local matches.'
-                  : 'No live listings match these criteria yet.'}
+                  : 'No live listings fit these criteria closely enough yet.'}
               </p>
             ) : (
               <div className="space-y-2">
-                {matches.map((m) => {
+                {matches.map(({ listing: m, match }) => {
                   const b = m.building ?? m.unit?.building
                   const img = b?.images?.[0]
                   return (
@@ -263,12 +291,16 @@ export function LeadDrawer({ lead, onClose, onChanged }: { lead: Lead; onClose: 
                         </div>
                       )}
                       <div className="min-w-0 flex-1">
-                        <p className="text-sm font-medium text-slate-900 truncate">{m.headline || b?.title || 'Listing'}</p>
-                        <p className="text-xs text-slate-500">
-                          {[b?.city, b?.caza].filter(Boolean).join(', ')}
-                          {m.unit?.bedrooms != null && ` · ${m.unit.bedrooms} bed`}
-                          {m.unit?.areaSqm != null && ` · ${m.unit.areaSqm} m²`}
+                        <div className="flex items-center gap-1.5">
+                          <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${scoreCls(match.score)}`}>{match.score}%</span>
+                          <p className="text-sm font-medium text-slate-900 truncate">{m.headline || b?.title || 'Listing'}</p>
+                        </div>
+                        <p className="text-xs text-slate-500 mt-0.5 truncate">
+                          {match.reasons.slice(0, 3).join(' · ') || [b?.city, b?.caza].filter(Boolean).join(', ')}
                         </p>
+                        {match.misses.length > 0 && (
+                          <p className="text-[11px] text-amber-600 mt-0.5 truncate">⚠ {match.misses.slice(0, 2).join(' · ')}</p>
+                        )}
                       </div>
                       <div className="text-right shrink-0">
                         <p className="text-sm font-semibold text-slate-900">{m.currency} {m.price?.toLocaleString()}</p>
@@ -277,6 +309,50 @@ export function LeadDrawer({ lead, onClose, onChanged }: { lead: Lead; onClose: 
                     </Link>
                   )
                 })}
+              </div>
+            )}
+          </section>
+
+          {/* Client-to-client common ground */}
+          <section className="bg-white border border-slate-200 rounded-xl p-4">
+            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3 flex items-center gap-1.5">
+              <Handshake className="h-3.5 w-3.5" /> Possible client matches
+              {leadMatches.length > 0 && <span className="text-slate-400 font-normal normal-case">({leadMatches.length})</span>}
+            </p>
+            <p className="text-[11px] text-slate-400 -mt-2 mb-3">
+              {DEMAND.includes(l.type)
+                ? 'Sellers/landlords in our CRM whose property could suit this client.'
+                : 'Buyers/renters in our CRM who are looking for what this client has.'}
+            </p>
+            {loading ? (
+              <div className="flex justify-center py-6 text-slate-400"><Loader2 className="h-5 w-5 animate-spin" /></div>
+            ) : leadMatches.length === 0 ? (
+              <p className="text-sm text-slate-400">No counterpart clients match closely enough yet.</p>
+            ) : (
+              <div className="space-y-2">
+                {leadMatches.map(({ lead: other, match }) => (
+                  <div key={other.id} className="flex items-center gap-3 p-2 rounded-lg border border-slate-100">
+                    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded shrink-0 ${scoreCls(match.score)}`}>{match.score}%</span>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium text-slate-900 truncate">
+                        {other.name} <span className="text-xs font-normal text-slate-400">· {TYPE_LABELS[other.type]}</span>
+                      </p>
+                      <p className="text-xs text-slate-500 truncate">
+                        {match.reasons.slice(0, 3).join(' · ') || other.askingFor || other.areas.join(', ')}
+                      </p>
+                    </div>
+                    {other.phone && (
+                      <a
+                        href={`https://wa.me/${(other.whatsapp || other.phone).replace(/[^0-9]/g, '')}`}
+                        target="_blank" rel="noopener noreferrer"
+                        className="p-1.5 rounded-lg border border-slate-200 text-slate-500 hover:text-emerald-600 shrink-0"
+                        title={`Message ${other.name}`}
+                      >
+                        <MessageCircle className="h-3.5 w-3.5" />
+                      </a>
+                    )}
+                  </div>
+                ))}
               </div>
             )}
           </section>

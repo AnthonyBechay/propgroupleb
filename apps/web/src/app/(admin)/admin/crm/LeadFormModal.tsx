@@ -4,12 +4,8 @@ import { useState } from 'react'
 import { X, Loader2, Save } from 'lucide-react'
 import { normalizeApiUrl } from '@/lib/utils/api-url'
 import { type Lead, UNIT_KINDS, UNIT_KIND_LABELS } from './types'
-
-const MOHAFAZAT = ['BEIRUT', 'MOUNT_LEBANON', 'NORTH', 'SOUTH', 'BEKAA', 'NABATIEH', 'AKKAR', 'BAALBEK_HERMEL']
-const MOHAFAZAT_LABEL: Record<string, string> = {
-  BEIRUT: 'Beirut', MOUNT_LEBANON: 'Mount Lebanon', NORTH: 'North', SOUTH: 'South',
-  BEKAA: 'Bekaa', NABATIEH: 'Nabatieh', AKKAR: 'Akkar', BAALBEK_HERMEL: 'Baalbek-Hermel',
-}
+import { LocationPicker } from './LocationPicker'
+import type { Market } from '@/lib/crm-locations'
 
 /**
  * Add / edit a CRM client. Mirrors the old spreadsheet columns (name, type,
@@ -33,9 +29,8 @@ export function LeadFormModal({ lead, onClose, onSaved }: { lead?: Lead; onClose
     whatsapp: lead?.whatsapp ?? '',
     askingFor: lead?.askingFor ?? '',
     unitKinds: lead?.unitKinds ?? ([] as string[]),
-    areasText: (lead?.areas ?? []).join(', '),
-    mohafazat: lead?.mohafazat ?? '',
-    city: lead?.city ?? '',
+    areas: lead?.areas ?? ([] as string[]),
+    regions: lead?.regions ?? ([] as string[]),
     minBeds: lead?.minBeds?.toString() ?? '',
     budgetMin: lead?.budgetMin?.toString() ?? '',
     budgetMax: lead?.budgetMax?.toString() ?? '',
@@ -66,9 +61,8 @@ export function LeadFormModal({ lead, onClose, onSaved }: { lead?: Lead; onClose
         whatsapp: f.whatsapp.trim() || null,
         askingFor: f.askingFor.trim() || null,
         unitKinds: f.unitKinds,
-        areas: f.areasText.split(',').map((a) => a.trim()).filter(Boolean),
-        mohafazat: f.mohafazat || null,
-        city: f.city.trim() || null,
+        areas: f.areas,
+        regions: f.regions,
         minBeds: f.minBeds !== '' ? Number(f.minBeds) : null,
         budgetMin: f.budgetMin !== '' ? Number(f.budgetMin) : null,
         budgetMax: f.budgetMax !== '' ? Number(f.budgetMax) : null,
@@ -113,7 +107,11 @@ export function LeadFormModal({ lead, onClose, onSaved }: { lead?: Lead; onClose
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <div>
               <label className={lbl}>Market</label>
-              <select value={f.market} onChange={(e) => set('market', e.target.value)} className={inp}>
+              <select
+                value={f.market}
+                onChange={(e) => setF((p) => ({ ...p, market: e.target.value as Market, regions: [], areas: [] }))}
+                className={inp}
+              >
                 <option value="LEBANON">🇱🇧 Lebanon</option>
                 <option value="GEORGIA">🇬🇪 Georgia</option>
               </select>
@@ -195,24 +193,13 @@ export function LeadFormModal({ lead, onClose, onSaved }: { lead?: Lead; onClose
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <div className="sm:col-span-2">
-              <label className={lbl}>Areas of interest</label>
-              <input
-                value={f.areasText}
-                onChange={(e) => set('areasText', e.target.value)}
-                className={inp}
-                placeholder="Bouchrieh, Zalka, Nahr el Mot, Jdeideh, Fanar"
-              />
-              <p className="text-[11px] text-slate-400 mt-1">Comma-separated — used to match live listings.</p>
-            </div>
-            <div>
-              <label className={lbl}>Region</label>
-              <select value={f.mohafazat} onChange={(e) => set('mohafazat', e.target.value)} className={inp}>
-                <option value="">Any</option>
-                {MOHAFAZAT.map((m) => <option key={m} value={m}>{MOHAFAZAT_LABEL[m]}</option>)}
-              </select>
-            </div>
+          <div className="rounded-xl border border-slate-200 p-3.5 bg-slate-50/50">
+            <LocationPicker
+              market={f.market as Market}
+              regions={f.regions}
+              areas={f.areas}
+              onChange={(patch) => setF((p) => ({ ...p, ...patch }))}
+            />
           </div>
 
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
