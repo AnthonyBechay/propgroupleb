@@ -20,7 +20,7 @@ export function AdminHeader() {
     { name: 'Owner Submissions', href: '/admin/submissions', icon: ClipboardList },
     { name: 'Location Guides', href: '/admin/location-guides', icon: MapPin },
     { name: 'Documents', href: '/admin/documents', icon: FileText },
-    { name: 'CRM — Leads', href: '/admin/crm', icon: UserSearch },
+    { name: 'CRM — Clients', href: '/admin/crm', icon: UserSearch },
     { name: 'Inquiries', href: '/admin/inquiries', icon: MessageSquare },
     { name: 'Contact Messages', href: '/admin/contacts', icon: Inbox },
     { name: 'Site Content', href: '/admin/content', icon: PenTool },

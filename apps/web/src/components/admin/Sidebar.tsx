@@ -58,7 +58,7 @@ const GROUPS: NavGroup[] = [
     label: 'Clients',
     icon: Contact,
     items: [
-      { name: 'CRM — Leads', href: '/admin/crm', icon: UserSearch },
+      { name: 'CRM — Clients', href: '/admin/crm', icon: UserSearch },
       { name: 'Inquiries', href: '/admin/inquiries', icon: MessageSquare },
       { name: 'Contact Messages', href: '/admin/contacts', icon: Inbox },
     ],

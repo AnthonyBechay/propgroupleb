@@ -12,7 +12,7 @@ import { regionLabel } from '@/lib/crm-locations'
 import { LeadFormModal } from './LeadFormModal'
 import {
   type Lead, type LeadContact, type Opportunity, STATUS_META, TYPE_LABELS, MARKET_META,
-  UNIT_KIND_LABELS, formatDue, REJECTION_LABELS,
+  UNIT_KIND_LABELS, formatDue, REJECTION_LABELS, isSupplyType,
 } from './types'
 import { OpportunityList } from './OpportunityList'
 
@@ -52,8 +52,6 @@ function scoreCls(score: number): string {
 }
 
 const CHANNELS = ['CALL', 'WHATSAPP', 'EMAIL', 'MEETING', 'VIEWING', 'NOTE'] as const
-/** Lead types that are looking for something (vs. offering). */
-const DEMAND = ['BUYER', 'RENTER', 'INVESTOR']
 
 /** Full client view: contact history, quick log, and matching live listings. */
 export function LeadDrawer({ lead, onClose, onChanged }: { lead: Lead; onClose: () => void; onChanged: () => void }) {
@@ -141,7 +139,7 @@ export function LeadDrawer({ lead, onClose, onChanged }: { lead: Lead; onClose: 
   }
 
   const l = detail ?? lead
-  const isSupply = l.type === 'SELLER' || l.type === 'LANDLORD'
+  const isSupply = isSupplyType(l.type)
   // Strong fits vs. worth-a-call near misses — brokers want both, but clearly separated.
   const strongMatches = matches.filter((m) => m.match.score >= 70)
   const nearMatches = matches.filter((m) => m.match.score < 70)
@@ -328,7 +326,7 @@ export function LeadDrawer({ lead, onClose, onChanged }: { lead: Lead; onClose: 
               {leadMatches.length > 0 && <span className="text-slate-400 font-normal normal-case">({leadMatches.length})</span>}
             </p>
             <p className="text-[11px] text-slate-400 -mt-2 mb-3">
-              {DEMAND.includes(l.type)
+              {!isSupply
                 ? 'Sellers/landlords in our CRM whose property could suit this client.'
                 : 'Buyers/renters in our CRM who are looking for what this client has.'}
             </p>

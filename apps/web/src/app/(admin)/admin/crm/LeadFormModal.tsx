@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { X, Loader2, Save } from 'lucide-react'
 import { normalizeApiUrl } from '@/lib/utils/api-url'
-import { type Lead, UNIT_KINDS, UNIT_KIND_LABELS, TYPE_LABELS, TYPE_META, SUPPLY_TYPES } from './types'
+import { type Lead, type LeadType, UNIT_KINDS, UNIT_KIND_LABELS, TYPE_LABELS, TYPE_META, isSupplyType } from './types'
 import { LocationPicker } from './LocationPicker'
 import type { Market } from '@/lib/crm-locations'
 
@@ -44,7 +44,7 @@ export function LeadFormModal({ lead, onClose, onSaved }: { lead?: Lead; onClose
   // Sellers/landlords OFFER a property; buyers/renters LOOK for one. The two
   // need different questions — an asking price isn't a budget range, and beds
   // are a fact about their property rather than a minimum requirement.
-  const isSupply = SUPPLY_TYPES.includes(f.type as never)
+  const isSupply = isSupplyType(f.type as LeadType)
 
   function toggleKind(k: string) {
     setF((p) => ({

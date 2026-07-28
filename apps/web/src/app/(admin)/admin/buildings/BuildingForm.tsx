@@ -9,7 +9,7 @@ import { PaymentPlansEditor, type PaymentPlan } from '@/components/admin/Payment
 import { LocationFields } from '@/components/admin/LocationFields'
 import { isKnownLocation } from '@/lib/lebanon-locations'
 import { BuildingDocumentsManager } from '@/components/admin/BuildingDocumentsManager'
-import { showsBuildingSpecs, isResidential } from '@/lib/property-types'
+import { showsBuildingSpecs, isResidential, PROPERTY_TYPE_GROUPS, typeLabel } from '@/lib/property-types'
 
 interface Props {
   initialData?: any
@@ -32,6 +32,10 @@ export function BuildingForm({ initialData, buildingId, embedded }: Props) {
   // "Listing structure" only means something for an actual development. For the
   // ordinary single-property listing it's noise, so we hide it.
   const isDevelopment = units.length > 1 || (initialData?.kind && initialData.kind !== 'STANDALONE')
+  // A single-property listing has exactly one unit, and its type IS the
+  // property type — so it belongs here in Basic Information, mirroring the
+  // create form. Developments keep their types per unit in the Units tab.
+  const soleUnit = units.length === 1 ? units[0] : null
   const fileInputRef = useRef<HTMLInputElement>(null)
   const videoInputRef = useRef<HTMLInputElement>(null)
 
@@ -79,6 +83,8 @@ export function BuildingForm({ initialData, buildingId, embedded }: Props) {
     metaTitle: initialData?.metaTitle ?? '',
     metaDescription: initialData?.metaDescription ?? '',
     paymentPlans: (initialData?.paymentPlans ?? []) as PaymentPlan[],
+    // Mirrors the create form's primary question. Saved to the unit, not the building.
+    unitKind: (units.length === 1 ? units[0]?.kind : '') ?? '',
   })
 
   const setField = (key: keyof typeof form, value: any) =>
@@ -238,6 +244,16 @@ export function BuildingForm({ initialData, buildingId, embedded }: Props) {
         setSaving(false)
         return
       }
+      // The property type lives on the unit — save it too when it changed.
+      if (soleUnit && form.unitKind && form.unitKind !== soleUnit.kind) {
+        await fetch(`${apiUrl}/api/units/${soleUnit.id}`, {
+          method: 'PUT',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ kind: form.unitKind }),
+        }).catch(() => { /* building already saved; type change is best-effort */ })
+      }
+
       if (embedded) {
         // Stay on the tab — just show success confirmation.
         // CRITICAL: reset `saving` here, otherwise the Save button stays stuck
@@ -353,6 +369,20 @@ export function BuildingForm({ initialData, buildingId, embedded }: Props) {
               <input type="text" value={form.title} onChange={e => setField('title', e.target.value)} className={inputCls} placeholder="e.g., Verdun Residences" required />
               <p className="text-xs text-slate-400 mt-1">This is the title shown on the website.</p>
             </div>
+            {soleUnit && (
+              <div>
+                <label className={labelCls}>Property type</label>
+                <select value={form.unitKind} onChange={e => setField('unitKind', e.target.value)} className={inputCls}>
+                  {PROPERTY_TYPE_GROUPS.map(g => (
+                    <optgroup key={g.group} label={g.label}>
+                      {g.kinds.map(k => <option key={k} value={k}>{typeLabel(k)}</option>)}
+                    </optgroup>
+                  ))}
+                </select>
+                <p className="text-xs text-slate-400 mt-1">What is being sold or rented.</p>
+              </div>
+            )}
+
             {isDevelopment && (
             <div>
               <label className={labelCls}>Listing structure</label>

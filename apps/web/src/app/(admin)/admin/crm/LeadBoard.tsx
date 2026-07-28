@@ -8,7 +8,7 @@ import {
 import {
   type Lead, type LeadStatus, BOARD_STAGES, STATUS_META, TYPE_LABELS, MARKET_META,
   formatDue, isWaitingOnUs, hasAwaitingFeedback, nextViewing, TYPE_META,
-  isRecentWin, WON_WINDOW_MONTHS,
+  isRecentWin, WON_WINDOW_MONTHS, isSupplyType,
 } from './types'
 
 const STAGE_ACCENT: Record<string, string> = {
@@ -102,7 +102,7 @@ export function LeadBoard({
                   const feedbackDue = hasAwaitingFeedback(l)
                   const viewingAt = nextViewing(l)
                   const shown = (l.opportunities ?? []).length
-                  const isSupply = l.type === 'SELLER' || l.type === 'LANDLORD'
+                  const isSupply = isSupplyType(l.type)
                   const untappedCount = untapped[l.id] ?? 0
                   return (
                     <article
