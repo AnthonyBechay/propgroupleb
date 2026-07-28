@@ -3,11 +3,12 @@
 import { useState } from 'react'
 import {
   Phone, MessageCircle, AlertTriangle, CalendarClock, MapPin, Wallet,
-  MessageSquareWarning, CalendarCheck, Sparkles,
+  MessageSquareWarning, CalendarCheck, Sparkles, Target,
 } from 'lucide-react'
 import {
   type Lead, type LeadStatus, BOARD_STAGES, STATUS_META, TYPE_LABELS, MARKET_META,
   formatDue, isWaitingOnUs, hasAwaitingFeedback, nextViewing, TYPE_META,
+  isRecentWin, WON_WINDOW_MONTHS,
 } from './types'
 
 const STAGE_ACCENT: Record<string, string> = {
@@ -23,7 +24,7 @@ const STAGE_HINT: Record<string, string> = {
   ACTIVE: 'Searching with us',
   VIEWING: 'Viewing requested / booked',
   NEGOTIATING: 'Offer on the table',
-  WON: 'Deal closed',
+  WON: `Closed in the last ${WON_WINDOW_MONTHS} months`,
 }
 
 /**
@@ -35,10 +36,13 @@ export function LeadBoard({
   leads,
   onOpen,
   onMove,
+  untapped = {},
 }: {
   leads: Lead[]
   onOpen: (id: string) => void
   onMove: (id: string, status: LeadStatus) => void
+  /** leadId -> count of matches nobody has shortlisted yet. */
+  untapped?: Record<string, number>
 }) {
   const [dragId, setDragId] = useState<string | null>(null)
   const [overStage, setOverStage] = useState<string | null>(null)
@@ -46,7 +50,9 @@ export function LeadBoard({
   return (
     <div className="flex gap-3 overflow-x-auto pb-3 -mx-1 px-1">
       {BOARD_STAGES.map((stage) => {
-        const items = leads.filter((l) => l.status === stage)
+        // Won only shows recent closes — older wins stay in the record but stop
+        // cluttering the working board.
+        const items = leads.filter((l) => l.status === stage && (stage !== 'WON' || isRecentWin(l)))
         const overdueCount = items.filter((l) => formatDue(l.nextContactAt).tone === 'overdue').length
         const isOver = overStage === stage
 
@@ -64,12 +70,12 @@ export function LeadBoard({
               }
               setDragId(null)
             }}
-            className={`flex-shrink-0 w-[280px] rounded-xl border transition-colors ${
+            className={`flex-shrink-0 w-[240px] rounded-xl border transition-colors ${
               isOver ? 'border-slate-400 bg-slate-100' : 'border-slate-200 bg-slate-50'
             }`}
           >
             {/* Column header */}
-            <div className="px-3 pt-3 pb-2 sticky top-0">
+            <div className="px-2.5 pt-2.5 pb-1.5 sticky top-0">
               <div className="flex items-center gap-2">
                 <span className={`h-2 w-2 rounded-full ${STAGE_ACCENT[stage]}`} />
                 <h3 className="text-sm font-semibold text-slate-800">{STATUS_META[stage].label}</h3>
@@ -80,11 +86,11 @@ export function LeadBoard({
                   </span>
                 )}
               </div>
-              <p className="text-[11px] text-slate-400 mt-0.5">{STAGE_HINT[stage]}</p>
+              <p className="text-[10px] text-slate-400 mt-0.5 leading-tight">{STAGE_HINT[stage]}</p>
             </div>
 
             {/* Cards */}
-            <div className="px-2 pb-2 space-y-2 min-h-[120px] max-h-[calc(100vh-380px)] overflow-y-auto">
+            <div className="px-2 pb-2 space-y-1.5 min-h-[100px] max-h-[calc(100vh-320px)] overflow-y-auto">
               {items.length === 0 ? (
                 <p className="text-xs text-slate-300 text-center py-6">Drop a client here</p>
               ) : (
@@ -97,6 +103,7 @@ export function LeadBoard({
                   const viewingAt = nextViewing(l)
                   const shown = (l.opportunities ?? []).length
                   const isSupply = l.type === 'SELLER' || l.type === 'LANDLORD'
+                  const untappedCount = untapped[l.id] ?? 0
                   return (
                     <article
                       key={l.id}
@@ -104,29 +111,38 @@ export function LeadBoard({
                       onDragStart={() => setDragId(l.id)}
                       onDragEnd={() => { setDragId(null); setOverStage(null) }}
                       onClick={() => onOpen(l.id)}
-                      className={`bg-white rounded-lg border border-l-4 p-2.5 cursor-pointer hover:shadow-md transition-all ${
+                      className={`bg-white rounded-lg border border-l-4 p-2 cursor-pointer hover:shadow-md transition-all ${
                         dragId === l.id ? 'opacity-40' : ''
                       } ${TYPE_META[l.type].accent} ${due.tone === 'overdue' ? 'border-red-200' : 'border-slate-200'}`}
                     >
                       <div className="flex items-start justify-between gap-2">
-                        <p className="font-medium text-slate-900 text-sm leading-tight truncate">{l.name}</p>
+                        <p className="font-medium text-slate-900 text-[13px] leading-tight truncate">{l.name}</p>
                         <span className={`shrink-0 text-[10px] px-1.5 py-0.5 rounded ${MARKET_META[l.market].cls}`}>
                           {l.market === 'GEORGIA' ? '🇬🇪' : '🇱🇧'}
                         </span>
                       </div>
 
-                      {/* Which side of the deal they're on — colour-coded */}
-                      <span className={`inline-block mt-1 text-[10px] font-bold px-1.5 py-0.5 rounded ${TYPE_META[l.type].chip}`}>
-                        {TYPE_LABELS[l.type]}
-                      </span>
-
-                      <p className="text-xs text-slate-500 mt-1 line-clamp-2">
-                        {l.askingFor || l.unitKinds.join(', ')}
-                      </p>
+                      {/* Side of the deal + what they want, on one compact line */}
+                      <div className="flex items-center gap-1 mt-0.5 min-w-0">
+                        <span className={`shrink-0 text-[9px] font-bold px-1 py-0.5 rounded ${TYPE_META[l.type].chip}`}>
+                          {TYPE_LABELS[l.type]}
+                        </span>
+                        <span className="text-[11px] text-slate-500 truncate">
+                          {l.askingFor || l.unitKinds.join(', ')}
+                        </span>
+                      </div>
 
                       {/* Action signals — what this client needs from us */}
-                      {(waiting || feedbackDue || viewingAt) && (
-                        <div className="flex flex-wrap gap-1 mt-1.5">
+                      {(waiting || feedbackDue || viewingAt || untappedCount > 0) && (
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {untappedCount > 0 && (
+                            <span
+                              className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-emerald-800 bg-emerald-100 px-1.5 py-0.5 rounded"
+                              title={`${untappedCount} match${untappedCount === 1 ? '' : 'es'} nobody has shortlisted yet`}
+                            >
+                              <Target className="h-2.5 w-2.5" /> {untappedCount} to explore
+                            </span>
+                          )}
                           {feedbackDue && (
                             <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-amber-800 bg-amber-100 px-1.5 py-0.5 rounded">
                               <MessageSquareWarning className="h-2.5 w-2.5" /> Feedback needed
@@ -146,7 +162,7 @@ export function LeadBoard({
                         </div>
                       )}
 
-                      <div className="flex flex-wrap gap-1 mt-1.5">
+                      <div className="flex flex-wrap gap-1 mt-1">
                         {where && (
                           <span className="inline-flex items-center gap-0.5 text-[10px] text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">
                             <MapPin className="h-2.5 w-2.5" />{where}
@@ -163,7 +179,7 @@ export function LeadBoard({
                         )}
                       </div>
 
-                      <div className="flex items-center justify-between gap-2 mt-2 pt-2 border-t border-slate-100">
+                      <div className="flex items-center justify-between gap-2 mt-1.5 pt-1.5 border-t border-slate-100">
                         <span
                           className={`inline-flex items-center gap-1 text-[10px] font-medium ${
                             due.tone === 'overdue' ? 'text-red-600'

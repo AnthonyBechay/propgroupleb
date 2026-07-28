@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   UserSearch, Plus, Search, Loader2, Phone, MessageCircle, Mail, AlertTriangle,
   CalendarClock, Flame, X, LayoutGrid, List, Download, Upload, MapPin,
-  MessageSquareWarning, Sparkles,
+  MessageSquareWarning, Sparkles, Target,
 } from 'lucide-react'
 import { normalizeApiUrl } from '@/lib/utils/api-url'
 import { LeadDrawer } from './LeadDrawer'
@@ -34,7 +34,9 @@ export default function CrmPage() {
   const [view, setView] = useState<View>('board')
   const [market, setMarket] = useState<'all' | LeadMarket>('all')
   const [search, setSearch] = useState('')
-  const [focus, setFocus] = useState<'none' | 'overdue' | 'feedback' | 'options'>('none')
+  const [focus, setFocus] = useState<'none' | 'overdue' | 'feedback' | 'options' | 'untapped'>('none')
+  // leadId -> number of matches nobody has shortlisted yet (computed server-side)
+  const [untapped, setUntapped] = useState<Record<string, number>>({})
   const [typeFilter, setTypeFilter] = useState<'all' | LeadType>('all')
   const [openId, setOpenId] = useState<string | null>(null)
   const [creating, setCreating] = useState(false)
@@ -49,12 +51,14 @@ export default function CrmPage() {
       if (market !== 'all') p.set('market', market)
       if (search.trim()) p.set('search', search.trim())
 
-      const [listRes, statsRes] = await Promise.all([
+      const [listRes, statsRes, untappedRes] = await Promise.all([
         fetch(`${apiUrl}/api/crm?${p}`, { credentials: 'include', cache: 'no-store' }),
         fetch(`${apiUrl}/api/crm/stats`, { credentials: 'include', cache: 'no-store' }),
+        fetch(`${apiUrl}/api/crm/untapped`, { credentials: 'include', cache: 'no-store' }),
       ])
       if (listRes.ok) setLeads((await listRes.json()).data ?? [])
       if (statsRes.ok) setStats((await statsRes.json()).data ?? null)
+      if (untappedRes.ok) setUntapped((await untappedRes.json()).data?.counts ?? {})
     } finally {
       setLoading(false)
     }
@@ -71,15 +75,17 @@ export default function CrmPage() {
     if (focus === 'overdue') out = out.filter((l) => formatDue(l.nextContactAt).tone === 'overdue')
     else if (focus === 'feedback') out = out.filter(hasAwaitingFeedback)
     else if (focus === 'options') out = out.filter(isWaitingOnUs)
+    else if (focus === 'untapped') out = out.filter((l) => (untapped[l.id] ?? 0) > 0)
     return out
-  }, [leads, focus, typeFilter])
+  }, [leads, focus, typeFilter, untapped])
 
   // Live counts for the focus chips, computed from what's loaded.
   const counts = useMemo(() => ({
     overdue: leads.filter((l) => formatDue(l.nextContactAt).tone === 'overdue').length,
     feedback: leads.filter(hasAwaitingFeedback).length,
     options: leads.filter(isWaitingOnUs).length,
-  }), [leads])
+    untapped: leads.filter((l) => (untapped[l.id] ?? 0) > 0).length,
+  }), [leads, untapped])
 
   // Optimistic move so dragging feels instant; reload reconciles with the server.
   async function moveLead(id: string, status: LeadStatus) {
@@ -96,11 +102,39 @@ export default function CrmPage() {
     }
   }
 
-  function exportCsv() {
-    const p = new URLSearchParams()
-    if (market !== 'all') p.set('market', market)
-    // Plain navigation so the browser handles the download + auth cookie.
-    window.open(`${apiUrl}/api/crm/export.csv?${p}`, '_blank')
+  const [exporting, setExporting] = useState(false)
+
+  // Fetch + save as a blob rather than opening a tab: the auth cookie is sent
+  // reliably, and a failure surfaces as a message instead of a blank tab
+  // showing raw JSON.
+  async function exportCsv() {
+    setExporting(true)
+    try {
+      const p = new URLSearchParams()
+      if (market !== 'all') p.set('market', market)
+      const res = await fetch(`${apiUrl}/api/crm/export.csv?${p}`, {
+        credentials: 'include',
+        cache: 'no-store',
+      })
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}))
+        alert(j.message || j.error || `Export failed (${res.status})`)
+        return
+      }
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `propgroup-crm-${new Date().toISOString().slice(0, 10)}.csv`
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      URL.revokeObjectURL(url)
+    } catch {
+      alert('Export failed — check your connection and try again.')
+    } finally {
+      setExporting(false)
+    }
   }
 
   const openLead = leads.find((l) => l.id === openId) ?? null
@@ -120,9 +154,10 @@ export default function CrmPage() {
         <div className="flex items-center gap-2">
           <button
             onClick={exportCsv}
-            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-slate-200 bg-white text-sm font-medium text-slate-700 hover:bg-slate-50"
+            disabled={exporting}
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-slate-200 bg-white text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
           >
-            <Download className="h-4 w-4" /> Export
+            {exporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />} Export
           </button>
           <button
             onClick={() => setImporting(true)}
@@ -161,6 +196,13 @@ export default function CrmPage() {
           icon={<Sparkles className="h-4 w-4" />} tone="sky"
         >
           Needs new options
+        </FocusChip>
+        <FocusChip
+          active={focus === 'untapped'} count={counts.untapped}
+          onClick={() => setFocus((f) => (f === 'untapped' ? 'none' : 'untapped'))}
+          icon={<Target className="h-4 w-4" />} tone="emerald"
+        >
+          Has matches to explore
         </FocusChip>
         {focus !== 'none' && (
           <button onClick={() => setFocus('none')} className="text-xs text-slate-400 hover:text-slate-700 self-center inline-flex items-center gap-1">
@@ -240,10 +282,11 @@ export default function CrmPage() {
           {focus === 'overdue' ? 'Nothing overdue — you’re all caught up.'
             : focus === 'feedback' ? 'No viewings waiting on feedback.'
             : focus === 'options' ? 'Nobody is stuck waiting for new options.'
+            : focus === 'untapped' ? 'No untapped matches — everything promising has been shortlisted.'
             : 'No clients yet. Add one, or import your spreadsheet.'}
         </div>
       ) : view === 'board' ? (
-        <LeadBoard leads={visible} onOpen={setOpenId} onMove={moveLead} />
+        <LeadBoard leads={visible} onOpen={setOpenId} onMove={moveLead} untapped={untapped} />
       ) : (
         <ListView leads={visible} onOpen={setOpenId} />
       )}
@@ -273,17 +316,19 @@ function FocusChip({
   children, count, active, onClick, icon, tone,
 }: {
   children: React.ReactNode; count: number; active: boolean; onClick: () => void
-  icon: React.ReactNode; tone: 'red' | 'amber' | 'sky'
+  icon: React.ReactNode; tone: 'red' | 'amber' | 'sky' | 'emerald'
 }) {
   const on = {
     red: 'bg-red-600 text-white border-red-600',
     amber: 'bg-amber-500 text-white border-amber-500',
     sky: 'bg-sky-600 text-white border-sky-600',
+    emerald: 'bg-emerald-600 text-white border-emerald-600',
   }[tone]
   const badge = {
     red: 'bg-red-500 text-white',
     amber: 'bg-amber-500 text-white',
     sky: 'bg-sky-500 text-white',
+    emerald: 'bg-emerald-500 text-white',
   }[tone]
   return (
     <button

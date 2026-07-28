@@ -224,6 +224,186 @@ router.get(
   })
 );
 
+// ── GET /untapped — clients who have matches nobody has acted on yet ─────────
+// The opposite of "needs new options": these clients have real potential
+// sitting in our inventory (or in a counterpart client) that has never been
+// shortlisted. Computed in one pass so the board can flag them.
+
+router.get(
+  '/untapped',
+  authenticateToken,
+  requireAdmin,
+  asyncHandler(async (req: Request, res: Response) => {
+    const q = req.query as Record<string, string>;
+    const minScore = Number(q.minScore ?? 60);
+
+    const openLeads = await prisma.lead.findMany({
+      where: { status: { notIn: ['WON', 'LOST', 'ARCHIVED'] as never } },
+      include: { opportunities: { select: { listingId: true, counterpartLeadId: true, leadId: true } } },
+      take: 1000,
+    });
+    if (openLeads.length === 0) { sendSuccess(res, { counts: {}, total: 0 }); return; }
+
+    const listings = await prisma.listing.findMany({
+      where: { status: 'ACTIVE', visibility: 'PUBLIC' },
+      take: 400,
+      select: {
+        id: true, price: true, intent: true,
+        building: { select: { city: true, caza: true, neighborhood: true, mohafazat: true } },
+        unit: {
+          select: {
+            kind: true, bedrooms: true,
+            building: { select: { city: true, caza: true, neighborhood: true, mohafazat: true } },
+          },
+        },
+      },
+    });
+
+    // Pairings are symmetric — a rejection recorded from either side counts for
+    // both, so build one global set of already-paired lead couples.
+    const pairedKey = (a: string, b: string) => [a, b].sort().join('::');
+    const pairedCouples = new Set<string>();
+    const shownListings = new Map<string, Set<string>>();
+    for (const lead of openLeads) {
+      for (const o of lead.opportunities) {
+        if (o.counterpartLeadId) pairedCouples.add(pairedKey(o.leadId, o.counterpartLeadId));
+        if (o.listingId) {
+          if (!shownListings.has(o.leadId)) shownListings.set(o.leadId, new Set());
+          shownListings.get(o.leadId)!.add(o.listingId);
+        }
+      }
+    }
+
+    const counts: Record<string, number> = {};
+    for (const lead of openLeads) {
+      const isDemand = DEMAND_TYPES.includes(lead.type);
+      const seen = shownListings.get(lead.id) ?? new Set<string>();
+      let n = 0;
+
+      // Live inventory — only relevant to clients who are looking, in Lebanon.
+      if (isDemand && lead.market === 'LEBANON') {
+        for (const listing of listings) {
+          if (seen.has(listing.id)) continue;
+          if (matchListingToLead(lead, listing).score >= minScore) n++;
+        }
+      }
+
+      // Counterpart clients — relevant to both sides.
+      const counterpartTypes = isDemand ? SUPPLY_TYPES : DEMAND_TYPES;
+      for (const other of openLeads) {
+        if (other.id === lead.id) continue;
+        if (other.market !== lead.market) continue;
+        if (!counterpartTypes.includes(other.type)) continue;
+        if (pairedCouples.has(pairedKey(lead.id, other.id))) continue;
+        const m = isDemand ? matchLeadToLead(lead, other) : matchLeadToLead(other, lead);
+        if (m.score >= minScore) n++;
+      }
+
+      if (n > 0) counts[lead.id] = n;
+    }
+
+    sendSuccess(res, { counts, total: Object.keys(counts).length });
+  })
+);
+
+// ── GET /agenda — everything that needs the team today ───────────────────────
+// Viewings booked, viewings done with no feedback recorded, and clients whose
+// options are exhausted and are waiting on us for something new.
+
+router.get(
+  '/agenda',
+  authenticateToken,
+  requireAdmin,
+  asyncHandler(async (req: Request, res: Response) => {
+    const q = req.query as Record<string, string>;
+    const marketWhere = q.market && MARKETS.includes(q.market as never) ? { market: q.market as never } : {};
+
+    const in7Days = new Date();
+    in7Days.setDate(in7Days.getDate() + 7);
+
+    const [upcomingViewings, awaitingFeedbackOps, leadsWithOps] = await Promise.all([
+      prisma.leadOpportunity.findMany({
+        where: { stage: 'VIEWING_BOOKED', viewingAt: { lte: in7Days } },
+        orderBy: { viewingAt: 'asc' },
+        take: 50,
+        include: { lead: { select: { id: true, name: true, phone: true, market: true } } },
+      }),
+      prisma.leadOpportunity.findMany({
+        where: { stage: 'VIEWED' },
+        orderBy: { viewedAt: 'asc' },
+        take: 50,
+        include: { lead: { select: { id: true, name: true, phone: true, market: true } } },
+      }),
+      prisma.lead.findMany({
+        where: { status: { notIn: ['NEW', 'WON', 'LOST', 'ARCHIVED'] as never }, ...marketWhere },
+        select: { id: true, name: true, phone: true, market: true, status: true, opportunities: { select: { stage: true } } },
+        take: 500,
+      }),
+    ]);
+
+    const needsOptions = leadsWithOps
+      .filter((l) => needsNewOptions(l, l.opportunities))
+      .map(({ opportunities, ...l }) => l);
+
+    sendSuccess(res, {
+      upcomingViewings: upcomingViewings.filter((o) => !q.market || o.lead.market === q.market),
+      awaitingFeedback: awaitingFeedbackOps.filter((o) => !q.market || o.lead.market === q.market),
+      needsNewOptions: needsOptions,
+    });
+  })
+);
+
+// ── GET /export.csv — download the pipeline as a spreadsheet ─────────────────
+// CSV with a UTF-8 BOM so Excel opens Arabic/accented names correctly.
+
+function csvCell(v: unknown): string {
+  if (v === null || v === undefined) return '';
+  const s = String(v);
+  return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+}
+
+router.get(
+  '/export.csv',
+  authenticateToken,
+  requireAdmin,
+  asyncHandler(async (req: Request, res: Response) => {
+    const q = req.query as Record<string, string>;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const where: Record<string, any> = {};
+    if (q.market && MARKETS.includes(q.market as never)) where.market = q.market;
+    if (q.status && LEAD_STATUSES.includes(q.status as never)) where.status = q.status;
+
+    const leads = await prisma.lead.findMany({ where, orderBy: { createdAt: 'desc' }, take: 5000 });
+
+    const headers = [
+      'Client Name', 'Client Type', 'Market', 'Status', 'Source', 'Asking For',
+      'Property Types', 'Areas', 'Regions', 'Beds', 'Budget Min / Asking Price', 'Budget Max', 'Currency',
+      'Phone', 'WhatsApp', 'Email',
+      'Last Contact Date', 'Interval (Days)', 'Next Contact Date', 'Urgent Status',
+      'Notes / Actions', 'Created',
+    ];
+
+    const iso = (d: Date | null) => (d ? new Date(d).toISOString().slice(0, 10) : '');
+    const rows = leads.map((l) => {
+      const overdue = l.nextContactAt && l.nextContactAt <= new Date() && !['WON', 'LOST', 'ARCHIVED'].includes(l.status);
+      return [
+        l.name, l.type, l.market, l.status, l.source, l.askingFor,
+        l.unitKinds.join(' | '), l.areas.join(' | '), l.regions.join(' | '),
+        l.minBeds, l.budgetMin, l.budgetMax, l.currency,
+        l.phone, l.whatsapp, l.email,
+        iso(l.lastContactAt), l.contactIntervalDays, iso(l.nextContactAt),
+        overdue ? 'OVERDUE' : '',
+        l.notes, iso(l.createdAt),
+      ].map(csvCell).join(',');
+    });
+
+    const csv = '\uFEFF' + [headers.join(','), ...rows].join('\r\n');
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="propgroup-crm-${new Date().toISOString().slice(0, 10)}.csv"`);
+    res.send(csv);
+  })
+);
+
 // ── GET /:id — detail with contact history ────────────────────────────────────
 
 router.get(
@@ -398,6 +578,11 @@ router.put(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const patch: Record<string, any> = { ...data };
     if (data.email === '') patch.email = null;
+    // Stamp when the relationship closed, and clear it if it reopens — the
+    // board uses this to show only recent wins.
+    if (data.status) {
+      patch.closedAt = ['WON', 'LOST'].includes(data.status) ? new Date() : null;
+    }
     if (data.lastContactAt !== undefined) patch.lastContactAt = data.lastContactAt ? new Date(data.lastContactAt) : null;
     if (data.nextContactAt !== undefined) patch.nextContactAt = data.nextContactAt ? new Date(data.nextContactAt) : null;
 
@@ -555,7 +740,13 @@ async function syncLeadStatus(leadId: string) {
   if (!lead) return;
   const next = deriveLeadStatus(lead.status, lead.opportunities);
   if (next && next !== lead.status) {
-    await prisma.lead.update({ where: { id: leadId }, data: { status: next as never } });
+    await prisma.lead.update({
+      where: { id: leadId },
+      data: {
+        status: next as never,
+        closedAt: ['WON', 'LOST'].includes(next) ? new Date() : null,
+      },
+    });
   }
 }
 
@@ -675,104 +866,6 @@ router.delete(
     await syncLeadStatus(existing.leadId);
     await logAdminAction('DELETE_OPPORTUNITY', 'lead', existing.leadId, {}, authReq);
     sendSuccess(res, { id: req.params.oid }, 'Removed from shortlist');
-  })
-);
-
-// ── GET /agenda — everything that needs the team today ───────────────────────
-// Viewings booked, viewings done with no feedback recorded, and clients whose
-// options are exhausted and are waiting on us for something new.
-
-router.get(
-  '/agenda',
-  authenticateToken,
-  requireAdmin,
-  asyncHandler(async (req: Request, res: Response) => {
-    const q = req.query as Record<string, string>;
-    const marketWhere = q.market && MARKETS.includes(q.market as never) ? { market: q.market as never } : {};
-
-    const in7Days = new Date();
-    in7Days.setDate(in7Days.getDate() + 7);
-
-    const [upcomingViewings, awaitingFeedbackOps, leadsWithOps] = await Promise.all([
-      prisma.leadOpportunity.findMany({
-        where: { stage: 'VIEWING_BOOKED', viewingAt: { lte: in7Days } },
-        orderBy: { viewingAt: 'asc' },
-        take: 50,
-        include: { lead: { select: { id: true, name: true, phone: true, market: true } } },
-      }),
-      prisma.leadOpportunity.findMany({
-        where: { stage: 'VIEWED' },
-        orderBy: { viewedAt: 'asc' },
-        take: 50,
-        include: { lead: { select: { id: true, name: true, phone: true, market: true } } },
-      }),
-      prisma.lead.findMany({
-        where: { status: { notIn: ['NEW', 'WON', 'LOST', 'ARCHIVED'] as never }, ...marketWhere },
-        select: { id: true, name: true, phone: true, market: true, status: true, opportunities: { select: { stage: true } } },
-        take: 500,
-      }),
-    ]);
-
-    const needsOptions = leadsWithOps
-      .filter((l) => needsNewOptions(l, l.opportunities))
-      .map(({ opportunities, ...l }) => l);
-
-    sendSuccess(res, {
-      upcomingViewings: upcomingViewings.filter((o) => !q.market || o.lead.market === q.market),
-      awaitingFeedback: awaitingFeedbackOps.filter((o) => !q.market || o.lead.market === q.market),
-      needsNewOptions: needsOptions,
-    });
-  })
-);
-
-// ── GET /export.csv — download the pipeline as a spreadsheet ─────────────────
-// CSV with a UTF-8 BOM so Excel opens Arabic/accented names correctly.
-
-function csvCell(v: unknown): string {
-  if (v === null || v === undefined) return '';
-  const s = String(v);
-  return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
-}
-
-router.get(
-  '/export.csv',
-  authenticateToken,
-  requireAdmin,
-  asyncHandler(async (req: Request, res: Response) => {
-    const q = req.query as Record<string, string>;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const where: Record<string, any> = {};
-    if (q.market && MARKETS.includes(q.market as never)) where.market = q.market;
-    if (q.status && LEAD_STATUSES.includes(q.status as never)) where.status = q.status;
-
-    const leads = await prisma.lead.findMany({ where, orderBy: { createdAt: 'desc' }, take: 5000 });
-
-    const headers = [
-      'Client Name', 'Client Type', 'Market', 'Status', 'Source', 'Asking For',
-      'Property Types', 'Areas', 'Regions', 'Beds', 'Budget Min / Asking Price', 'Budget Max', 'Currency',
-      'Phone', 'WhatsApp', 'Email',
-      'Last Contact Date', 'Interval (Days)', 'Next Contact Date', 'Urgent Status',
-      'Notes / Actions', 'Created',
-    ];
-
-    const iso = (d: Date | null) => (d ? new Date(d).toISOString().slice(0, 10) : '');
-    const rows = leads.map((l) => {
-      const overdue = l.nextContactAt && l.nextContactAt <= new Date() && !['WON', 'LOST', 'ARCHIVED'].includes(l.status);
-      return [
-        l.name, l.type, l.market, l.status, l.source, l.askingFor,
-        l.unitKinds.join(' | '), l.areas.join(' | '), l.regions.join(' | '),
-        l.minBeds, l.budgetMin, l.budgetMax, l.currency,
-        l.phone, l.whatsapp, l.email,
-        iso(l.lastContactAt), l.contactIntervalDays, iso(l.nextContactAt),
-        overdue ? 'OVERDUE' : '',
-        l.notes, iso(l.createdAt),
-      ].map(csvCell).join(',');
-    });
-
-    const csv = '\uFEFF' + [headers.join(','), ...rows].join('\r\n');
-    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-    res.setHeader('Content-Disposition', `attachment; filename="propgroup-crm-${new Date().toISOString().slice(0, 10)}.csv"`);
-    res.send(csv);
   })
 );
 

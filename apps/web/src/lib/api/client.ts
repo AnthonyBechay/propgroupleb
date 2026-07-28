@@ -53,6 +53,19 @@ class ApiClient {
         // Log detailed error for debugging
         if (response.status === 401) {
           console.error(`[API] Unauthorized request to ${endpoint}`);
+          // Session ended (expired/invalid token) — bounce to login and come
+          // back to where they were. Skipped for the /me probe, which is how we
+          // *check* whether someone is signed in.
+          const code = (() => { try { return JSON.parse(text).code } catch { return undefined } })();
+          if (
+            typeof window !== 'undefined' &&
+            (code === 'TOKEN_EXPIRED' || code === 'TOKEN_INVALID') &&
+            !endpoint.includes('/auth/me') &&
+            !window.location.pathname.startsWith('/auth/')
+          ) {
+            const next = encodeURIComponent(window.location.pathname + window.location.search);
+            window.location.href = `/auth/login?next=${next}&expired=1`;
+          }
         } else if (response.status >= 500) {
           console.error(`[API] Server error on ${endpoint}:`, errorMessage);
         }

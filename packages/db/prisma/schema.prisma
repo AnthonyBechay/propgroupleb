@@ -1453,6 +1453,10 @@ model Lead {
 
   notes String?
 
+  // When the relationship reached a terminal state (WON/LOST). Lets the board
+  // show only recent wins instead of accumulating closed deals forever.
+  closedAt DateTime?
+
   // Optional links back into the platform
   userId    String? // registered user this lead corresponds to
   listingId String? // a specific listing they asked about

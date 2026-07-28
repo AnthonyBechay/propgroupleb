@@ -13,6 +13,8 @@ import { sendWelcomeEmail, sendPasswordResetEmail } from '../services/email.serv
 import passport from '../config/passport.js';
 import type { AuthenticatedRequest } from '../types/index.js';
 
+import { createToken, setTokenCookie, clearTokenCookie } from '../utils/session.js';
+
 const router: Router = express.Router();
 
 // No-cache headers for all auth routes
@@ -24,26 +26,6 @@ router.use((_req: Request, res: Response, next: NextFunction) => {
 });
 
 // Helper: create JWT token
-function createToken(userId: string): string {
-  const secret = process.env.JWT_SECRET;
-  if (!secret) throw new Error('JWT_SECRET is not configured');
-  const options: jwt.SignOptions = {};
-  (options as Record<string, unknown>).expiresIn = process.env.JWT_EXPIRES_IN || '7d';
-  return jwt.sign({ userId }, secret, options);
-}
-
-// Helper: set secure cookie
-function setTokenCookie(res: Response, token: string) {
-  const isProduction = process.env.NODE_ENV === 'production';
-  res.cookie('token', token, {
-    httpOnly: true,
-    secure: isProduction,
-    sameSite: isProduction ? 'none' : 'lax',
-    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-    path: '/',
-  });
-}
-
 // Register
 router.post(
   '/register',
@@ -176,15 +158,7 @@ router.get(
 
 // Logout — stateless JWT, just clear the cookie.
 router.post('/logout', (_req: Request, res: Response) => {
-  const cookieOptions = {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: (process.env.NODE_ENV === 'production' ? 'none' : 'lax') as 'none' | 'lax',
-    path: '/',
-  };
-
-  res.clearCookie('token', cookieOptions);
-  res.clearCookie('connect.sid', cookieOptions);
+  clearTokenCookie(res);
 
   res.json({
     success: true,

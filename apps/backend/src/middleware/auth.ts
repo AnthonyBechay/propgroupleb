@@ -1,6 +1,7 @@
 import type { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { prisma } from '@propgroup/db';
+import { maybeRenewSession } from '../utils/session.js';
 import type { AuthenticatedRequest, AuthUser } from '../types/index.js';
 import { logger } from '../utils/logger.js';
 
@@ -35,7 +36,10 @@ export async function authenticateToken(req: Request, res: Response, next: NextF
       throw new Error('JWT_SECRET is not configured');
     }
 
-    const decoded = jwt.verify(token, secret) as { userId: string };
+    const decoded = jwt.verify(token, secret) as { userId: string; exp?: number };
+
+    // Keep active users signed in — slide the cookie forward past halfway.
+    maybeRenewSession(res, decoded);
 
     const user = await prisma.user.findUnique({
       where: { id: decoded.userId },
@@ -81,11 +85,12 @@ export async function authenticateToken(req: Request, res: Response, next: NextF
   } catch (error) {
     if (error instanceof Error) {
       if (error.name === 'JsonWebTokenError') {
-        res.status(401).json({ error: 'Unauthorized', message: 'Invalid token' });
+        res.status(401).json({ error: 'Unauthorized', code: 'TOKEN_INVALID', message: 'Invalid token' });
         return;
       }
       if (error.name === 'TokenExpiredError') {
-        res.status(401).json({ error: 'Unauthorized', message: 'Token expired' });
+        // `code` lets the frontend distinguish "log in again" from other 401s.
+        res.status(401).json({ error: 'Unauthorized', code: 'TOKEN_EXPIRED', message: 'Token expired' });
         return;
       }
     }

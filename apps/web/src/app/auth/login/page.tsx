@@ -25,6 +25,8 @@ function LoginForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const next = searchParams.get('next') || '/'
+  // Set when the API bounced us here because the session ran out.
+  const sessionExpired = searchParams.get('expired') === '1'
   const { signIn, user, loading } = useAuth()
 
   const [hasCheckedRedirect, setHasCheckedRedirect] = useState(false)
@@ -117,6 +119,12 @@ function LoginForm() {
             <p className="mt-2 text-sm text-slate-500">
               Sign in to access your account
             </p>
+
+            {sessionExpired && (
+              <div className="mt-4 rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 text-sm text-amber-800">
+                Your session expired. Please sign in again.
+              </div>
+            )}
 
             {next.startsWith('/admin') && (
               <div className="mt-4 inline-flex items-center px-4 py-2 rounded-lg text-xs font-semibold bg-slate-900 text-white">

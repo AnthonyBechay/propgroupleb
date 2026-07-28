@@ -98,6 +98,8 @@ export interface Lead {
   contactIntervalDays: number
   nextContactAt: string | null
   notes: string | null
+  /** Set when the relationship reached WON/LOST. */
+  closedAt?: string | null
   createdAt: string
   contacts?: LeadContact[]
   opportunities?: Opportunity[]
@@ -126,6 +128,18 @@ export function nextViewing(lead: Lead): string | null {
     .map((o) => o.viewingAt as string)
     .sort()
   return booked[0] ?? null
+}
+
+/** How far back the Won column looks, so closed deals don't pile up forever. */
+export const WON_WINDOW_MONTHS = 6
+
+/** True when a won deal is recent enough to still show on the board. */
+export function isRecentWin(lead: Lead): boolean {
+  if (lead.status !== 'WON') return true
+  const closed = lead.closedAt ?? lead.createdAt
+  const cutoff = new Date()
+  cutoff.setMonth(cutoff.getMonth() - WON_WINDOW_MONTHS)
+  return new Date(closed) >= cutoff
 }
 
 /** Board columns, in pipeline order. WON/LOST/ARCHIVED live off-board. */
