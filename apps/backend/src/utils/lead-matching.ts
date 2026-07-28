@@ -169,6 +169,21 @@ export function matchLeadToLead(buyer: any, seller: any): MatchResult {
   ]);
 }
 
+/**
+ * Minimum score for a pairing to be worth showing. Shared by the drawer's match
+ * lists AND the "has matches to explore" counter — if these ever diverge, the
+ * board shows a match the filter doesn't count (which is exactly what happened
+ * when they were 45 and 60).
+ */
+export const MATCH_MIN_SCORE = 45;
+
+/**
+ * Statuses a counterpart can be in and still be worth pairing with. WON is
+ * excluded because that client is done; NEW is included because a fresh lead is
+ * a perfectly good match.
+ */
+export const PAIRABLE_STATUSES = ['NEW', 'ACTIVE', 'VIEWING', 'NEGOTIATING'];
+
 /** Leads whose type means they have something to offer. */
 export const SUPPLY_TYPES = ['SELLER', 'LANDLORD'];
 /** Leads whose type means they're looking for something. */

@@ -6,7 +6,7 @@ import { asyncHandler } from '../utils/errors.js';
 import { sendSuccess, sendCreated, sendPaginated, sendNotFound, sendError } from '../utils/response.js';
 import { parsePagination, buildPaginationResponse } from '../utils/pagination.js';
 import type { AuthenticatedRequest } from '../types/index.js';
-import { matchListingToLead, matchLeadToLead, SUPPLY_TYPES, DEMAND_TYPES } from '../utils/lead-matching.js';
+import { matchListingToLead, matchLeadToLead, SUPPLY_TYPES, DEMAND_TYPES, MATCH_MIN_SCORE, PAIRABLE_STATUSES } from '../utils/lead-matching.js';
 import { deriveLeadStatus, needsNewOptions, rejectionInsights } from '../utils/lead-pipeline.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -235,7 +235,7 @@ router.get(
   requireAdmin,
   asyncHandler(async (req: Request, res: Response) => {
     const q = req.query as Record<string, string>;
-    const minScore = Number(q.minScore ?? 60);
+    const minScore = Number(q.minScore ?? MATCH_MIN_SCORE);
 
     const openLeads = await prisma.lead.findMany({
       where: { status: { notIn: ['WON', 'LOST', 'ARCHIVED'] as never } },
@@ -474,7 +474,7 @@ router.get(
       },
     });
 
-    const MIN_SCORE = Number(req.query.minScore ?? 45);
+    const MIN_SCORE = Number(req.query.minScore ?? MATCH_MIN_SCORE);
     const scored = candidates
       .map((listing) => ({ listing, match: matchListingToLead(lead, listing) }))
       .filter((r) => r.match.score >= MIN_SCORE)
@@ -522,13 +522,13 @@ router.get(
         id: { notIn: [lead.id, ...pairedIds] },
         market: lead.market,
         type: { in: counterpartTypes as never },
-        status: { notIn: ['LOST', 'ARCHIVED'] as never },
+        status: { in: PAIRABLE_STATUSES as never },
       },
       take: 300,
       orderBy: { createdAt: 'desc' },
     });
 
-    const MIN_SCORE = Number(req.query.minScore ?? 45);
+    const MIN_SCORE = Number(req.query.minScore ?? MATCH_MIN_SCORE);
     const scored = counterparts
       .map((other) => ({
         lead: other,
