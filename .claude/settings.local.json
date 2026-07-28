@@ -409,7 +409,8 @@
       "Bash(DATABASE_URL=\"postgresql://u:p@localhost:5432/db\" npx prisma validate)",
       "Bash(git ls-tree *)",
       "Bash(awk '/^model Lead \\\\{/{f=1} f{print} /^}/{if\\(f\\)exit}' packages/db/prisma/schema.prisma)",
-      "Bash(DATABASE_URL=\"postgresql://u:p@localhost:5432/db\" npx prisma validate --schema packages/db/prisma/schema.prisma)"
+      "Bash(DATABASE_URL=\"postgresql://u:p@localhost:5432/db\" npx prisma validate --schema packages/db/prisma/schema.prisma)",
+      "Bash(awk '/export const BUILDING_DETAIL_INCLUDE/{f=1} f{print} /^} as const;/{if\\(f\\)exit}' apps/backend/src/utils/prisma-includes.ts)"
     ],
     "deny": [],
     "ask": []

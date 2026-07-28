@@ -84,7 +84,7 @@ export function BuildingForm({ initialData, buildingId, embedded }: Props) {
     metaDescription: initialData?.metaDescription ?? '',
     paymentPlans: (initialData?.paymentPlans ?? []) as PaymentPlan[],
     // Mirrors the create form's primary question. Saved to the unit, not the building.
-    unitKind: (units.length === 1 ? units[0]?.kind : '') ?? '',
+    unitKind: (units.length === 1 ? units[0]?.kind : units[0]?.kind) ?? 'APARTMENT',
   })
 
   const setField = (key: keyof typeof form, value: any) =>
@@ -244,14 +244,29 @@ export function BuildingForm({ initialData, buildingId, embedded }: Props) {
         setSaving(false)
         return
       }
-      // The property type lives on the unit — save it too when it changed.
-      if (soleUnit && form.unitKind && form.unitKind !== soleUnit.kind) {
-        await fetch(`${apiUrl}/api/units/${soleUnit.id}`, {
-          method: 'PUT',
-          credentials: 'include',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ kind: form.unitKind }),
-        }).catch(() => { /* building already saved; type change is best-effort */ })
+      // The property type lives on the unit, so save it there too. A building
+      // with no unit yet gets one created, which also repairs older records
+      // that were saved without one.
+      if (isEdit && units.length <= 1 && form.unitKind) {
+        try {
+          if (soleUnit) {
+            if (form.unitKind !== soleUnit.kind) {
+              await fetch(`${apiUrl}/api/units/${soleUnit.id}`, {
+                method: 'PUT',
+                credentials: 'include',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ kind: form.unitKind }),
+              })
+            }
+          } else {
+            await fetch(`${apiUrl}/api/buildings/${buildingId}/units`, {
+              method: 'POST',
+              credentials: 'include',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ kind: form.unitKind, lifecycle: 'VACANT' }),
+            })
+          }
+        } catch { /* building already saved; the type change is best-effort */ }
       }
 
       if (embedded) {
@@ -369,19 +384,30 @@ export function BuildingForm({ initialData, buildingId, embedded }: Props) {
               <input type="text" value={form.title} onChange={e => setField('title', e.target.value)} className={inputCls} placeholder="e.g., Verdun Residences" required />
               <p className="text-xs text-slate-400 mt-1">This is the title shown on the website.</p>
             </div>
-            {soleUnit && (
-              <div>
-                <label className={labelCls}>Property type</label>
-                <select value={form.unitKind} onChange={e => setField('unitKind', e.target.value)} className={inputCls}>
-                  {PROPERTY_TYPE_GROUPS.map(g => (
-                    <optgroup key={g.group} label={g.label}>
-                      {g.kinds.map(k => <option key={k} value={k}>{typeLabel(k)}</option>)}
-                    </optgroup>
-                  ))}
-                </select>
-                <p className="text-xs text-slate-400 mt-1">What is being sold or rented.</p>
-              </div>
-            )}
+            <div>
+              <label className={labelCls}>Property type</label>
+              {units.length > 1 ? (
+                <>
+                  <div className={inputCls + ' bg-slate-50 text-slate-600'}>
+                    {Array.from(new Set(units.map((u: any) => typeLabel(u.kind)))).join(' · ')}
+                  </div>
+                  <p className="text-xs text-slate-400 mt-1">
+                    This development has {units.length} units — set each one&apos;s type in the <strong>Units &amp; Listings</strong> tab.
+                  </p>
+                </>
+              ) : (
+                <>
+                  <select value={form.unitKind} onChange={e => setField('unitKind', e.target.value)} className={inputCls}>
+                    {PROPERTY_TYPE_GROUPS.map(g => (
+                      <optgroup key={g.group} label={g.label}>
+                        {g.kinds.map(k => <option key={k} value={k}>{typeLabel(k)}</option>)}
+                      </optgroup>
+                    ))}
+                  </select>
+                  <p className="text-xs text-slate-400 mt-1">What is being sold or rented.</p>
+                </>
+              )}
+            </div>
 
             {isDevelopment && (
             <div>
