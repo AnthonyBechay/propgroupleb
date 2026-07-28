@@ -1,3 +1,5 @@
+import { ALL_PROPERTY_KINDS, typeLabel } from '@/lib/property-types'
+
 export type LeadMarket = 'LEBANON' | 'GEORGIA'
 export type LeadType = 'BUYER' | 'SELLER' | 'RENTER' | 'LANDLORD' | 'INVESTOR'
 export type LeadStatus = 'NEW' | 'ACTIVE' | 'VIEWING' | 'NEGOTIATING' | 'WON' | 'LOST' | 'ARCHIVED'
@@ -188,16 +190,12 @@ export const MARKET_META: Record<LeadMarket, { label: string; cls: string }> = {
   GEORGIA: { label: '🇬🇪 Georgia', cls: 'bg-teal-100 text-teal-800' },
 }
 
-export const UNIT_KINDS = [
-  'APARTMENT', 'STUDIO', 'DUPLEX', 'PENTHOUSE', 'VILLA', 'TOWNHOUSE',
-  'SHOP', 'OFFICE', 'LAND_PARCEL',
-] as const
-
-export const UNIT_KIND_LABELS: Record<string, string> = {
-  APARTMENT: 'Apartment', STUDIO: 'Studio', DUPLEX: 'Duplex', PENTHOUSE: 'Penthouse',
-  VILLA: 'Villa', TOWNHOUSE: 'Townhouse', SHOP: 'Shop', OFFICE: 'Office',
-  LAND_PARCEL: 'Land', STORAGE: 'Storage', PARKING: 'Parking',
-}
+// Clients can be looking for anything we sell — including commercial — so this
+// mirrors the shared property registry rather than keeping its own short list.
+export const UNIT_KINDS = ALL_PROPERTY_KINDS
+export const UNIT_KIND_LABELS: Record<string, string> = Object.fromEntries(
+  ALL_PROPERTY_KINDS.map((k) => [k, typeLabel(k)])
+)
 
 /** Days until the next follow-up. Negative = overdue. Null when unscheduled. */
 export function daysUntil(iso: string | null): number | null {

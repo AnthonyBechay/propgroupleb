@@ -8,6 +8,7 @@ import {
 } from 'lucide-react'
 import { normalizeApiUrl, normalizeFileUrl } from '@/lib/utils/api-url'
 import { MOHAFAZAT_LABEL } from '@/lib/lebanon-locations'
+import { typeLabel } from '@/lib/property-types'
 
 interface Submission {
   id: string
@@ -49,12 +50,6 @@ const STATUS_META: Record<Submission['status'], { label: string; cls: string }> 
   IN_REVIEW: { label: 'In review', cls: 'bg-sky-100 text-sky-700' },
   APPROVED:  { label: 'Published', cls: 'bg-emerald-100 text-emerald-700' },
   REJECTED:  { label: 'Rejected',  cls: 'bg-red-100 text-red-600' },
-}
-
-const KIND_LABELS: Record<string, string> = {
-  APARTMENT: 'Apartment', STUDIO: 'Studio', DUPLEX: 'Duplex', PENTHOUSE: 'Penthouse',
-  VILLA: 'Villa', TOWNHOUSE: 'Townhouse', SHOP: 'Shop', OFFICE: 'Office',
-  LAND_PARCEL: 'Land', STORAGE: 'Storage', PARKING: 'Parking',
 }
 
 const TABS: Array<{ key: string; label: string }> = [
@@ -227,7 +222,7 @@ export default function AdminSubmissionsPage() {
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="font-semibold text-slate-900 truncate">{s.title}</span>
                         <span className={`px-2 py-0.5 rounded text-xs font-medium ${meta.cls}`}>{meta.label}</span>
-                        <span className="text-xs text-slate-400">{KIND_LABELS[s.unitKind] ?? s.unitKind} · {s.intent === 'FOR_RENT' ? 'Rent' : 'Sale'}</span>
+                        <span className="text-xs text-slate-400">{typeLabel(s.unitKind)} · {s.intent === 'FOR_RENT' ? 'Rent' : 'Sale'}</span>
                       </div>
                       <div className="flex items-center gap-3 mt-1 text-sm text-slate-500 flex-wrap">
                         <span className="inline-flex items-center gap-1"><MapPin className="h-3.5 w-3.5" />{location}</span>

@@ -24,6 +24,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { apiClient } from '@/lib/api/client'
 import { normalizeFileUrl } from '@/lib/utils/api-url'
+import { typeLabel } from '@/lib/property-types'
 
 const KIND_LABELS: Record<string, string> = {
   STANDALONE: 'Standalone',
@@ -44,11 +45,10 @@ const STATUS_COLORS: Record<string, string> = {
   RESALE:   'bg-zinc-100 text-zinc-600',
 }
 
-const UNIT_KIND_LABELS: Record<string, string> = {
-  APARTMENT: 'Apt', STUDIO: 'Studio', DUPLEX: 'Duplex', PENTHOUSE: 'Penthouse',
-  VILLA: 'Villa', TOWNHOUSE: 'Townhouse', SHOP: 'Shop', OFFICE: 'Office',
-  LAND_PARCEL: 'Land', STORAGE: 'Storage', PARKING: 'Parking',
-}
+// Short labels for the compact unit-mix line; anything else falls back to the
+// shared registry so new types show up automatically.
+const SHORT_LABELS: Record<string, string> = { APARTMENT: 'Apt', LAND_PARCEL: 'Land', PARKING: 'Parking' }
+const unitKindLabel = (k: string) => SHORT_LABELS[k] ?? typeLabel(k)
 
 type SortKey = 'newest' | 'oldest' | 'views' | 'units' | 'title'
 
@@ -73,7 +73,7 @@ function unitMix(units: any[] = []): string {
   const counts = new Map<string, number>()
   for (const u of units) counts.set(u.kind, (counts.get(u.kind) ?? 0) + 1)
   return Array.from(counts.entries())
-    .map(([k, n]) => `${n} ${UNIT_KIND_LABELS[k] ?? k}`)
+    .map(([k, n]) => `${n} ${unitKindLabel(k)}`)
     .join(' · ')
 }
 

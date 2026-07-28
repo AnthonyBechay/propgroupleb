@@ -46,7 +46,7 @@ const mediaUpload = multer({
   },
 });
 
-const UNIT_KINDS = ['APARTMENT', 'STUDIO', 'DUPLEX', 'PENTHOUSE', 'VILLA', 'TOWNHOUSE', 'SHOP', 'OFFICE', 'LAND_PARCEL', 'STORAGE', 'PARKING'] as const;
+const UNIT_KINDS = ['APARTMENT', 'STUDIO', 'DUPLEX', 'PENTHOUSE', 'VILLA', 'TOWNHOUSE', 'SHOP', 'OFFICE', 'SHOWROOM', 'WAREHOUSE', 'RESTAURANT', 'CLINIC', 'WHOLE_BUILDING', 'LAND_PARCEL', 'STORAGE', 'PARKING'] as const;
 
 // Multipart form fields arrive as strings — coerce numerics.
 const submissionSchema = z.object({

@@ -30,14 +30,23 @@ enum BuildingKind {
 
 // Atomic unit kind — what kind of space is this unit
 enum UnitKind {
+  // Residential
   APARTMENT
   STUDIO
   DUPLEX
   PENTHOUSE
   VILLA
   TOWNHOUSE
+  // Commercial
   SHOP
   OFFICE
+  SHOWROOM
+  WAREHOUSE
+  RESTAURANT
+  CLINIC
+  // Whole building sold/rented as one (offices, shops, apartments)
+  WHOLE_BUILDING
+  // Other
   LAND_PARCEL
   STORAGE
   PARKING

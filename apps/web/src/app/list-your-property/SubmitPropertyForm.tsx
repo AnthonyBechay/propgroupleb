@@ -6,14 +6,8 @@ import { Loader2, ImagePlus, X, Send, Video, Camera, CheckCircle2 } from 'lucide
 import { LocationFields } from '@/components/admin/LocationFields'
 import { isKnownLocation } from '@/lib/lebanon-locations'
 import { normalizeApiUrl } from '@/lib/utils/api-url'
+import { PROPERTY_TYPE_GROUPS, typeDef, typeLabel } from '@/lib/property-types'
 
-const UNIT_KINDS = [
-  { value: 'APARTMENT', label: 'Apartment' }, { value: 'STUDIO', label: 'Studio' },
-  { value: 'DUPLEX', label: 'Duplex' }, { value: 'PENTHOUSE', label: 'Penthouse' },
-  { value: 'VILLA', label: 'Villa' }, { value: 'TOWNHOUSE', label: 'Townhouse' },
-  { value: 'SHOP', label: 'Shop' }, { value: 'OFFICE', label: 'Office' },
-  { value: 'LAND_PARCEL', label: 'Land' },
-]
 
 const MAX_PHOTOS = 12
 const MAX_VIDEOS = 3
@@ -45,10 +39,11 @@ export function SubmitPropertyForm() {
 
   const set = (k: keyof typeof f, v: string | boolean) => setF(p => ({ ...p, [k]: v }))
 
+  const def = typeDef(f.unitKind)
   const isLand = f.unitKind === 'LAND_PARCEL'
-  const showBeds = ['APARTMENT', 'STUDIO', 'DUPLEX', 'PENTHOUSE', 'VILLA', 'TOWNHOUSE'].includes(f.unitKind)
-  const showBaths = showBeds || ['SHOP', 'OFFICE'].includes(f.unitKind)
-  const showFloor = !['VILLA', 'TOWNHOUSE', 'LAND_PARCEL'].includes(f.unitKind)
+  const showBeds = def.beds
+  const showBaths = def.baths
+  const showFloor = def.floor
 
   function addPhotos(files: FileList) {
     const next = [...photos]
@@ -185,12 +180,16 @@ export function SubmitPropertyForm() {
           <div className="col-span-2 sm:col-span-1">
             <label className={lbl}>Type</label>
             <select value={f.unitKind} onChange={e => set('unitKind', e.target.value)} className={inp}>
-              {UNIT_KINDS.map(k => <option key={k.value} value={k.value}>{k.label}</option>)}
+              {PROPERTY_TYPE_GROUPS.map(g => (
+                <optgroup key={g.group} label={g.label}>
+                  {g.kinds.map(k => <option key={k} value={k}>{typeLabel(k)}</option>)}
+                </optgroup>
+              ))}
             </select>
           </div>
           {showBeds && <div><label className={lbl}>Beds</label><input type="number" min="0" value={f.bedrooms} onChange={e => set('bedrooms', e.target.value)} className={inp} /></div>}
           {showBaths && <div><label className={lbl}>Baths</label><input type="number" min="0" value={f.bathrooms} onChange={e => set('bathrooms', e.target.value)} className={inp} /></div>}
-          <div><label className={lbl}>{isLand ? 'Land area m²' : 'Area m²'}</label><input type="number" min="0" value={f.areaSqm} onChange={e => set('areaSqm', e.target.value)} className={inp} /></div>
+          <div><label className={lbl}>{def.areaLabel}</label><input type="number" min="0" value={f.areaSqm} onChange={e => set('areaSqm', e.target.value)} className={inp} /></div>
           {showFloor && <div><label className={lbl}>Floor</label><input type="number" value={f.floor} onChange={e => set('floor', e.target.value)} className={inp} /></div>}
         </div>
         <div>

@@ -6,17 +6,18 @@ import { Search, Sparkles, X, Loader2, ArrowRight, SlidersHorizontal } from 'luc
 import { ListingIntent } from '@/types'
 import { normalizeApiUrl } from '@/lib/utils/api-url'
 import { track } from '@/lib/analytics'
+import { ALL_PROPERTY_KINDS, typeLabel } from '@/lib/property-types'
 
 const MOHAFAZAT_LABELS: Record<string, string> = {
   BEIRUT: 'Beirut', MOUNT_LEBANON: 'Mount Lebanon', KESERWAN_JBEIL: 'Keserwan-Jbeil',
   NORTH: 'North Lebanon', SOUTH: 'South Lebanon', BEKAA: 'Bekaa',
   NABATIEH: 'Nabatieh', AKKAR: 'Akkar', BAALBEK_HERMEL: 'Baalbek-Hermel',
 }
-const KIND_LABELS: Record<string, string> = {
-  APARTMENT: 'Apartment', STUDIO: 'Studio', DUPLEX: 'Duplex', PENTHOUSE: 'Penthouse',
-  VILLA: 'Villa', TOWNHOUSE: 'Townhouse', SHOP: 'Shop', OFFICE: 'Office',
-  LAND_PARCEL: 'Land', STORAGE: 'Storage', PARKING: 'Parking',
-}
+// Labels come from the shared registry so the filter can never offer a type the
+// admin form doesn't create (or miss one it does).
+const KIND_LABELS: Record<string, string> = Object.fromEntries(
+  ALL_PROPERTY_KINDS.map((k) => [k, typeLabel(k)])
+)
 
 interface Facets {
   mohafazat: string[]

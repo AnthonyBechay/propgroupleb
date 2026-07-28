@@ -8,14 +8,17 @@ import { normalizeApiUrl, normalizeFileUrl } from '@/lib/utils/api-url'
 import { PaymentPlansEditor, type PaymentPlan } from '@/components/admin/PaymentPlansEditor'
 import { LocationFields } from '@/components/admin/LocationFields'
 import { isKnownLocation } from '@/lib/lebanon-locations'
+import { PROPERTY_TYPE_GROUPS, typeDef, typeLabel, isResidential } from '@/lib/property-types'
 
-const UNIT_KINDS = ['APARTMENT', 'STUDIO', 'DUPLEX', 'PENTHOUSE', 'VILLA', 'TOWNHOUSE', 'SHOP', 'OFFICE', 'LAND_PARCEL']
-const AMENITIES = [
+// Amenities split by who they're relevant to — a warehouse has no pool or gym.
+const SHARED_AMENITIES = [
   { key: 'hasGenerator', label: 'Generator' }, { key: 'hasElevator', label: 'Elevator' },
+  { key: 'hasSecurity', label: 'Security' }, { key: 'hasSolarPower', label: 'Solar Power' },
+] as const
+const RESIDENTIAL_AMENITIES = [
   { key: 'hasPool', label: 'Pool' }, { key: 'hasGym', label: 'Gym' },
-  { key: 'hasConcierge', label: 'Concierge' }, { key: 'hasSecurity', label: 'Security' },
-  { key: 'hasGarden', label: 'Garden' }, { key: 'hasRooftop', label: 'Rooftop' },
-  { key: 'hasSolarPower', label: 'Solar Power' },
+  { key: 'hasConcierge', label: 'Concierge' }, { key: 'hasGarden', label: 'Garden' },
+  { key: 'hasRooftop', label: 'Rooftop' },
 ] as const
 const DOC_TYPES = ['FLOOR_PLAN', 'BROCHURE', 'CONTRACT', 'LEGAL_DOCUMENT', 'CERTIFICATE', 'OTHER']
 const DOC_TYPE_LABELS: Record<string, string> = {
@@ -222,17 +225,22 @@ export function CreatePropertyForm() {
 
   const inp = 'w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400'
   const lbl = 'block text-sm font-medium text-slate-700 mb-1'
-  // Which fields/sections make sense for the chosen unit type.
+  // Every "does this field apply?" answer comes from the shared type registry,
+  // so the form, the filters and the public pages always agree.
+  const def = typeDef(f.unitKind)
   const isLand = f.unitKind === 'LAND_PARCEL'
-  const showBeds = ['APARTMENT', 'STUDIO', 'DUPLEX', 'PENTHOUSE', 'VILLA', 'TOWNHOUSE'].includes(f.unitKind)
-  const showBaths = showBeds || ['SHOP', 'OFFICE'].includes(f.unitKind)
-  const showFloor = !['VILLA', 'TOWNHOUSE', 'LAND_PARCEL'].includes(f.unitKind)
-  const showBuildingSections = !['LAND_PARCEL', 'PARKING', 'STORAGE'].includes(f.unitKind)
+  const showBeds = def.beds
+  const showBaths = def.baths
+  const showFloor = def.floor
+  const showBuildingSections = def.inBuilding || f.unitKind === 'WHOLE_BUILDING'
+  const amenities = isResidential(f.unitKind)
+    ? [...SHARED_AMENITIES, ...RESIDENTIAL_AMENITIES]
+    : SHARED_AMENITIES
   const detailsHint =
-    isLand ? 'For land, set the plot area and list it for sale below — bedrooms, floors and building amenities don’t apply.' :
-    f.unitKind === 'PARKING' ? 'For a parking spot, set the area and floor/level — bedrooms and building amenities don’t apply.' :
-    f.unitKind === 'STORAGE' ? 'For a storage unit, set the area and floor/level — bedrooms and building amenities don’t apply.' :
-    (f.unitKind === 'SHOP' || f.unitKind === 'OFFICE') ? 'Commercial space — bedrooms don’t apply.' :
+    f.unitKind === 'PARKING' ? 'A parking spot only needs its area and level.' :
+    f.unitKind === 'STORAGE' ? 'A storage unit only needs its area and level.' :
+    f.unitKind === 'WHOLE_BUILDING' ? 'The entire building is sold or rented as one.' :
+    def.group === 'COMMERCIAL' ? 'Commercial space — bedrooms don’t apply.' :
     ''
 
   return (
@@ -241,7 +249,7 @@ export function CreatePropertyForm() {
         <Link href="/admin/buildings" className="p-2 rounded-lg hover:bg-slate-100 text-slate-600"><ArrowLeft className="h-4 w-4" /></Link>
         <div>
           <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2"><Building2 className="h-6 w-6" /> Add Property</h1>
-          <p className="text-sm text-slate-500 mt-0.5">Create a property and its first unit in one step.</p>
+          <p className="text-sm text-slate-500 mt-0.5">Add a property and put it on the market in one step.</p>
         </div>
       </div>
 
@@ -257,12 +265,27 @@ export function CreatePropertyForm() {
               <input value={f.title} onChange={e => set('title', e.target.value)} className={inp} placeholder="e.g., Elegant Apartment in Verdun" required />
               <p className="text-xs text-slate-400 mt-1">This is the title shown on the website.</p>
             </div>
-            <div>
-              <label className={lbl}>Kind</label>
-              <select value={f.kind} onChange={e => set('kind', e.target.value)} className={inp}>
-                <option value="STANDALONE">Standalone</option><option value="PROJECT">Project</option><option value="COMMUNITY">Community</option><option value="MIXED_USE">Mixed Use</option>
+            <div className={isLand ? '' : 'sm:col-span-2'}>
+              <label className={lbl}>Property type <span className="text-red-500">*</span></label>
+              <select value={f.unitKind} onChange={e => set('unitKind', e.target.value)} className={inp}>
+                {PROPERTY_TYPE_GROUPS.map(g => (
+                  <optgroup key={g.group} label={g.label}>
+                    {g.kinds.map(k => <option key={k} value={k}>{typeLabel(k)}</option>)}
+                  </optgroup>
+                ))}
               </select>
+              <p className="text-xs text-slate-400 mt-1">What is being sold or rented. This decides which fields appear below.</p>
             </div>
+
+            {/* Land has no rooms or floors — its only measurement is the plot. */}
+            {isLand && (
+              <div>
+                <label className={lbl}>{def.areaLabel}</label>
+                <input type="number" min="0" value={f.areaSqm} onChange={e => set('areaSqm', e.target.value)} className={inp} placeholder="e.g., 800" />
+              </div>
+            )}
+
+
             <div>
               <label className={lbl}>Status</label>
               <select value={f.status} onChange={e => set('status', e.target.value)} className={inp}>
@@ -297,23 +320,22 @@ export function CreatePropertyForm() {
           </div>
         </div>
 
-        {/* What & details — Type drives which fields/sections show below */}
+        {/* Size & layout — the physical facts. Land has none of these (its plot
+            area lives in Basic Information), so the whole section disappears. */}
+        {!isLand && (
         <div className="bg-white border rounded-xl p-6 space-y-4">
-          <h2 className="font-semibold text-slate-900 flex items-center gap-2"><Home className="h-4 w-4 text-slate-500" /> {isLand ? 'Land details' : 'Unit details'}</h2>
-          <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
-            <div className="col-span-2 sm:col-span-1">
-              <label className={lbl}>Type</label>
-              <select value={f.unitKind} onChange={e => set('unitKind', e.target.value)} className={inp}>
-                {UNIT_KINDS.map(k => <option key={k} value={k}>{k.charAt(0) + k.slice(1).toLowerCase().replace('_', ' ')}</option>)}
-              </select>
-            </div>
-            {showBeds && <div><label className={lbl}>Beds</label><input type="number" min="0" value={f.bedrooms} onChange={e => set('bedrooms', e.target.value)} className={inp} /></div>}
-            {showBaths && <div><label className={lbl}>Baths</label><input type="number" min="0" value={f.bathrooms} onChange={e => set('bathrooms', e.target.value)} className={inp} /></div>}
-            <div><label className={lbl}>{isLand ? 'Land area m²' : 'Area m²'}</label><input type="number" min="0" value={f.areaSqm} onChange={e => set('areaSqm', e.target.value)} className={inp} /></div>
+          <h2 className="font-semibold text-slate-900 flex items-center gap-2">
+            <Home className="h-4 w-4 text-slate-500" /> {typeLabel(f.unitKind)} details
+          </h2>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+            {showBeds && <div><label className={lbl}>Bedrooms</label><input type="number" min="0" value={f.bedrooms} onChange={e => set('bedrooms', e.target.value)} className={inp} /></div>}
+            {showBaths && <div><label className={lbl}>Bathrooms</label><input type="number" min="0" value={f.bathrooms} onChange={e => set('bathrooms', e.target.value)} className={inp} /></div>}
+            <div><label className={lbl}>{def.areaLabel}</label><input type="number" min="0" value={f.areaSqm} onChange={e => set('areaSqm', e.target.value)} className={inp} /></div>
             {showFloor && <div><label className={lbl}>Floor</label><input type="number" value={f.floor} onChange={e => set('floor', e.target.value)} className={inp} /></div>}
           </div>
           {detailsHint && <p className="text-xs text-slate-400">{detailsHint}</p>}
         </div>
+        )}
 
         {/* Building details — not applicable to land, parking or storage */}
         {showBuildingSections && (
@@ -332,7 +354,7 @@ export function CreatePropertyForm() {
         <div className="bg-white border rounded-xl p-6">
           <h2 className="font-semibold text-slate-900 mb-4">Amenities</h2>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-            {AMENITIES.map(({ key, label }) => (
+            {amenities.map(({ key, label }) => (
               <label key={key} className="flex items-center gap-2 cursor-pointer p-3 rounded-lg border border-slate-100 hover:bg-slate-50">
                 {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
                 <input type="checkbox" checked={(f as any)[key]} onChange={e => set(key as keyof typeof f, e.target.checked)} className="rounded border-slate-300" />

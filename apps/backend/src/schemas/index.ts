@@ -130,7 +130,7 @@ export const buildingQuerySchema = z.object({
 export const unitSchema = z.object({
   name: z.string().optional().nullable(),
   unitNumber: z.string().optional().nullable(),
-  kind: z.enum(['APARTMENT', 'STUDIO', 'DUPLEX', 'PENTHOUSE', 'VILLA', 'TOWNHOUSE', 'SHOP', 'OFFICE', 'LAND_PARCEL', 'STORAGE', 'PARKING']).default('APARTMENT'),
+  kind: z.enum(['APARTMENT', 'STUDIO', 'DUPLEX', 'PENTHOUSE', 'VILLA', 'TOWNHOUSE', 'SHOP', 'OFFICE', 'SHOWROOM', 'WAREHOUSE', 'RESTAURANT', 'CLINIC', 'WHOLE_BUILDING', 'LAND_PARCEL', 'STORAGE', 'PARKING']).default('APARTMENT'),
   bedrooms: z.number().optional().nullable(),
   bathrooms: z.number().optional().nullable(),
   areaSqm: z.number().optional().nullable(),

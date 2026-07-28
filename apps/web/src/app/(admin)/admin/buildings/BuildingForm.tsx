@@ -9,6 +9,7 @@ import { PaymentPlansEditor, type PaymentPlan } from '@/components/admin/Payment
 import { LocationFields } from '@/components/admin/LocationFields'
 import { isKnownLocation } from '@/lib/lebanon-locations'
 import { BuildingDocumentsManager } from '@/components/admin/BuildingDocumentsManager'
+import { showsBuildingSpecs, isResidential } from '@/lib/property-types'
 
 interface Props {
   initialData?: any
@@ -23,9 +24,14 @@ export function BuildingForm({ initialData, buildingId, embedded }: Props) {
   const isEdit = !!buildingId
   // Hide building-specific sections (floors, parking, amenities) when every unit
   // is a type they don't apply to — land parcels, parking spots or storage.
-  const NON_BUILDING_KINDS = ['LAND_PARCEL', 'PARKING', 'STORAGE']
-  const hideBuildingSections = Array.isArray(initialData?.units) && initialData.units.length > 0 &&
-    initialData.units.every((u: any) => NON_BUILDING_KINDS.includes(u.kind))
+  const units: any[] = Array.isArray(initialData?.units) ? initialData.units : []
+  const hideBuildingSections = units.length > 0 &&
+    units.every((u: any) => !showsBuildingSpecs(u.kind))
+  // Residential-only amenities are noise on a shop, warehouse or office.
+  const hasResidentialUnit = units.length === 0 || units.some((u: any) => isResidential(u.kind))
+  // "Listing structure" only means something for an actual development. For the
+  // ordinary single-property listing it's noise, so we hide it.
+  const isDevelopment = units.length > 1 || (initialData?.kind && initialData.kind !== 'STANDALONE')
   const fileInputRef = useRef<HTMLInputElement>(null)
   const videoInputRef = useRef<HTMLInputElement>(null)
 
@@ -287,17 +293,23 @@ export function BuildingForm({ initialData, buildingId, embedded }: Props) {
   const inputCls = 'w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400'
   const labelCls = 'block text-sm font-medium text-slate-700 mb-1'
 
-  const AMENITIES = [
+  const SHARED_AMENITIES = [
     { key: 'hasGenerator', label: 'Generator' },
     { key: 'hasElevator', label: 'Elevator' },
+    { key: 'hasSecurity', label: 'Security' },
+    { key: 'hasSolarPower', label: 'Solar Power' },
+  ] as const
+  const RESIDENTIAL_AMENITIES = [
     { key: 'hasPool', label: 'Pool' },
     { key: 'hasGym', label: 'Gym' },
     { key: 'hasConcierge', label: 'Concierge' },
-    { key: 'hasSecurity', label: 'Security' },
     { key: 'hasGarden', label: 'Garden' },
     { key: 'hasRooftop', label: 'Rooftop' },
-    { key: 'hasSolarPower', label: 'Solar Power' },
   ] as const
+  // A warehouse or shop has no pool or gym — only offer what's plausible.
+  const AMENITIES = hasResidentialUnit
+    ? [...SHARED_AMENITIES, ...RESIDENTIAL_AMENITIES]
+    : SHARED_AMENITIES
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">
@@ -341,15 +353,20 @@ export function BuildingForm({ initialData, buildingId, embedded }: Props) {
               <input type="text" value={form.title} onChange={e => setField('title', e.target.value)} className={inputCls} placeholder="e.g., Verdun Residences" required />
               <p className="text-xs text-slate-400 mt-1">This is the title shown on the website.</p>
             </div>
+            {isDevelopment && (
             <div>
-              <label className={labelCls}>Kind</label>
+              <label className={labelCls}>Listing structure</label>
               <select value={form.kind} onChange={e => setField('kind', e.target.value)} className={inputCls}>
-                <option value="STANDALONE">Standalone</option>
-                <option value="PROJECT">Project</option>
-                <option value="COMMUNITY">Community</option>
-                <option value="MIXED_USE">Mixed Use</option>
+                <option value="STANDALONE">Single property</option>
+                <option value="PROJECT">Project — several units</option>
+                <option value="COMMUNITY">Community / compound</option>
+                <option value="MIXED_USE">Mixed use — residential + commercial</option>
               </select>
+              <p className="text-xs text-slate-400 mt-1">
+                How the development is organised. Property types are set per unit in the Units tab.
+              </p>
             </div>
+            )}
             <div>
               <label className={labelCls}>Status</label>
               <select value={form.status} onChange={e => setField('status', e.target.value)} className={inputCls}>

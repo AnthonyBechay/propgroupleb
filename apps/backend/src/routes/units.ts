@@ -17,7 +17,7 @@ const router: Router = express.Router();
 // ── Schemas ───────────────────────────────────────────────────────────────────
 
 const unitUpdateSchema = z.object({
-  kind: z.enum(['APARTMENT', 'STUDIO', 'DUPLEX', 'PENTHOUSE', 'VILLA', 'TOWNHOUSE', 'SHOP', 'OFFICE', 'LAND_PARCEL', 'STORAGE', 'PARKING']).optional(),
+  kind: z.enum(['APARTMENT', 'STUDIO', 'DUPLEX', 'PENTHOUSE', 'VILLA', 'TOWNHOUSE', 'SHOP', 'OFFICE', 'SHOWROOM', 'WAREHOUSE', 'RESTAURANT', 'CLINIC', 'WHOLE_BUILDING', 'LAND_PARCEL', 'STORAGE', 'PARKING']).optional(),
   name: z.string().optional().nullable(),
   unitNumber: z.string().optional().nullable(),
   bedrooms: z.number().int().optional().nullable(),

@@ -9,22 +9,11 @@ import {
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { normalizeApiUrl, normalizeFileUrl } from '@/lib/utils/api-url'
+import { ALL_PROPERTY_KINDS, typeLabel, typeDef } from '@/lib/property-types'
 
 // ── constants ─────────────────────────────────────────────────────────────────
 
-const KIND_OPTIONS = [
-  { value: 'APARTMENT',   label: 'Apartment' },
-  { value: 'STUDIO',      label: 'Studio' },
-  { value: 'DUPLEX',      label: 'Duplex' },
-  { value: 'PENTHOUSE',   label: 'Penthouse' },
-  { value: 'VILLA',       label: 'Villa' },
-  { value: 'TOWNHOUSE',   label: 'Townhouse' },
-  { value: 'SHOP',        label: 'Shop' },
-  { value: 'OFFICE',      label: 'Office' },
-  { value: 'LAND_PARCEL', label: 'Land' },
-  { value: 'STORAGE',     label: 'Storage' },
-  { value: 'PARKING',     label: 'Parking' },
-]
+const KIND_OPTIONS = ALL_PROPERTY_KINDS.map((value) => ({ value, label: typeLabel(value) }))
 
 const LIFECYCLE_OPTIONS = [
   { value: 'DRAFT',          label: 'Draft' },
@@ -81,9 +70,9 @@ type UnitFormState = typeof EMPTY_UNIT
 
 function buildUnitPayload(f: UnitFormState) {
   // Drop fields that don't apply to the chosen type so stale values aren't saved.
-  const bedsOk = ['APARTMENT', 'STUDIO', 'DUPLEX', 'PENTHOUSE', 'VILLA', 'TOWNHOUSE'].includes(f.kind)
-  const bathsOk = bedsOk || ['SHOP', 'OFFICE'].includes(f.kind)
-  const floorOk = !['VILLA', 'TOWNHOUSE', 'LAND_PARCEL'].includes(f.kind)
+  const bedsOk = typeDef(f.kind).beds
+  const bathsOk = typeDef(f.kind).baths
+  const floorOk = typeDef(f.kind).floor
   return {
     kind:      f.kind || undefined,
     name:      f.name || null,
@@ -113,9 +102,9 @@ function UnitFormPanel({
   const inp = 'w-full px-3 py-2 border border-zinc-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-sky-600/15 focus:border-sky-500 bg-white'
   const lbl = 'block text-xs font-medium text-zinc-600 mb-1'
   // Only show fields that make sense for the chosen unit type.
-  const showBeds = ['APARTMENT', 'STUDIO', 'DUPLEX', 'PENTHOUSE', 'VILLA', 'TOWNHOUSE'].includes(f.kind)
-  const showBaths = showBeds || ['SHOP', 'OFFICE'].includes(f.kind)
-  const showFloor = !['VILLA', 'TOWNHOUSE', 'LAND_PARCEL'].includes(f.kind)
+  const showBeds = typeDef(f.kind).beds
+  const showBaths = typeDef(f.kind).baths
+  const showFloor = typeDef(f.kind).floor
 
   // Admin: assign this unit to a registered user (by email) — shows in their portal.
   // (apiUrl is already declared above for image uploads.)
@@ -187,7 +176,7 @@ function UnitFormPanel({
       <p className="text-xs font-semibold text-zinc-500 uppercase tracking-wider">Unit details</p>
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <div className="col-span-2 sm:col-span-1">
-          <label className={lbl}>Type</label>
+          <label className={lbl}>Unit type</label>
           <select value={f.kind} onChange={e => set('kind', e.target.value)} className={inp}>
             {KIND_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
           </select>

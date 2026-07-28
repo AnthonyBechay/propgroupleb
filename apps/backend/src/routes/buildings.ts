@@ -109,7 +109,7 @@ const buildingSchema = z.object({
 });
 
 const unitCreateSchema = z.object({
-  kind: z.enum(['APARTMENT', 'STUDIO', 'DUPLEX', 'PENTHOUSE', 'VILLA', 'TOWNHOUSE', 'SHOP', 'OFFICE', 'LAND_PARCEL', 'STORAGE', 'PARKING']).optional(),
+  kind: z.enum(['APARTMENT', 'STUDIO', 'DUPLEX', 'PENTHOUSE', 'VILLA', 'TOWNHOUSE', 'SHOP', 'OFFICE', 'SHOWROOM', 'WAREHOUSE', 'RESTAURANT', 'CLINIC', 'WHOLE_BUILDING', 'LAND_PARCEL', 'STORAGE', 'PARKING']).optional(),
   name: z.string().optional().nullable(),
   unitNumber: z.string().optional().nullable(),
   bedrooms: z.number().int().optional().nullable(),
@@ -324,6 +324,16 @@ router.post(
       },
       include: { options: true },
     });
+
+    // The admin never has to declare "is this a project?" — a building becomes
+    // one the moment it holds more than one unit.
+    const unitCount = await prisma.unit.count({ where: { buildingId: req.params.id } });
+    if (unitCount > 1) {
+      await prisma.building.updateMany({
+        where: { id: req.params.id, kind: 'STANDALONE' },
+        data: { kind: 'PROJECT' },
+      });
+    }
 
     await logAdminAction('CREATE_UNIT', 'unit', unit.id, { buildingId: req.params.id }, authReq);
     sendCreated(res, unit, 'Unit created successfully');
