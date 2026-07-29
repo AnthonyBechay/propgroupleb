@@ -106,8 +106,13 @@ async function hydrateOpportunities(opportunities: any[]): Promise<any[]> {
           where: { id: { in: listingIds } },
           select: {
             id: true, slug: true, headline: true, price: true, currency: true,
-            building: { select: { title: true, city: true, caza: true } },
-            unit: { select: { building: { select: { title: true, city: true, caza: true } } } },
+            building: { select: { ref: true, title: true, city: true, caza: true } },
+            unit: {
+              select: {
+                ref: true,
+                building: { select: { ref: true, title: true, city: true, caza: true } },
+              },
+            },
           },
         })
       : [],
@@ -135,6 +140,8 @@ async function hydrateOpportunities(opportunities: any[]): Promise<any[]> {
               kind: 'LISTING',
               title: listing.headline || b?.title || 'Property',
               subtitle: [b?.city, b?.caza].filter(Boolean).join(', ') || null,
+              // Unit code when the listing sells a unit, else the property code.
+              ref: listing.unit?.ref ?? listing.building?.ref ?? null,
               slug: listing.slug,
               id: listing.id,
             }
@@ -464,11 +471,11 @@ router.get(
       orderBy: { createdAt: 'desc' },
       select: {
         id: true, slug: true, headline: true, price: true, currency: true, intent: true,
-        building: { select: { title: true, city: true, caza: true, neighborhood: true, mohafazat: true, images: true } },
+        building: { select: { ref: true, title: true, city: true, caza: true, neighborhood: true, mohafazat: true, images: true } },
         unit: {
           select: {
-            kind: true, bedrooms: true, bathrooms: true, areaSqm: true,
-            building: { select: { title: true, city: true, caza: true, neighborhood: true, mohafazat: true, images: true } },
+            ref: true, kind: true, bedrooms: true, bathrooms: true, areaSqm: true,
+            building: { select: { ref: true, title: true, city: true, caza: true, neighborhood: true, mohafazat: true, images: true } },
           },
         },
       },

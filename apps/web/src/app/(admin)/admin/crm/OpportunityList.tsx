@@ -98,6 +98,9 @@ export function OpportunityList({
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-1.5 flex-wrap">
                   {isClient ? <Handshake className="h-3.5 w-3.5 text-slate-400 shrink-0" /> : <Building2 className="h-3.5 w-3.5 text-slate-400 shrink-0" />}
+                  {o.subject?.ref && (
+                    <span className="shrink-0 font-mono text-[10px] font-semibold text-slate-500">{o.subject.ref}</span>
+                  )}
                   <span className={`text-sm font-medium truncate ${isRejected ? 'text-slate-500 line-through' : 'text-slate-900'}`}>
                     {title}
                   </span>

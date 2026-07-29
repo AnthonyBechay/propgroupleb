@@ -15,6 +15,7 @@ import {
   UNIT_KIND_LABELS, formatDue, REJECTION_LABELS, isSupplyType,
 } from './types'
 import { OpportunityList } from './OpportunityList'
+import { listingRef } from '@/lib/reference'
 
 interface MatchScore {
   score: number
@@ -30,10 +31,11 @@ interface ListingMatch {
     price: number
     currency: string
     intent: string
-    building?: { title: string; city: string | null; caza: string | null; images: string[] } | null
+    building?: { ref?: string | null; title: string; city: string | null; caza: string | null; images: string[] } | null
     unit?: {
+      ref?: string | null
       kind: string; bedrooms: number | null; bathrooms: number | null; areaSqm: number | null
-      building?: { title: string; city: string | null; caza: string | null; images: string[] } | null
+      building?: { ref?: string | null; title: string; city: string | null; caza: string | null; images: string[] } | null
     } | null
   }
   match: MatchScore
@@ -420,6 +422,7 @@ export function LeadDrawer({ lead, onClose, onChanged }: { lead: Lead; onClose: 
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-1.5">
                           <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${scoreCls(match.score)}`}>{match.score}%</span>
+                          {listingRef(m) && <span className="font-mono text-[10px] font-semibold text-slate-400 shrink-0">{listingRef(m)}</span>}
                           <p className="text-sm font-medium text-slate-900 truncate">{m.headline || b?.title || 'Listing'}</p>
                         </div>
                         <p className="text-xs text-slate-500 mt-0.5 truncate">

@@ -419,6 +419,8 @@ model Building {
   hasRooftop    Boolean @default(false)
 
   // Status / marketing
+  // Short human reference quoted by clients ("PG-1042"). Unique, never reused.
+  ref         String?   @unique
   status      PropertyStatus @default(RESALE)
   source      PropertySource @default(ADMIN) // OWNER when created from a public submission
   visibility  PropertyVisibility @default(PUBLIC)
@@ -474,6 +476,7 @@ model Building {
   investmentData   BuildingInvestmentData?
   priceHistory     BuildingPriceHistory[]
 
+  @@index([ref])
   @@index([kind])
   @@index([country])
   @@index([mohafazat])
@@ -545,6 +548,10 @@ model Unit {
   id         String @id @default(cuid())
   buildingId String
 
+  // Human-friendly code derived from the parent property: "PG-1234-1".
+  // Clients quote it, so it must stay stable for the unit's whole life.
+  ref String? @unique
+
   // Identity
   name       String?  // "2BR Type A", "Shop 3", "Penthouse"
   unitNumber String?  // "4B", "G-01", "P"
@@ -602,6 +609,7 @@ model Unit {
   documents  PropertyDocument[]
   priceHistory UnitPriceHistory[]
 
+  @@index([ref])
   @@index([buildingId])
   @@index([kind])
   @@index([lifecycle])

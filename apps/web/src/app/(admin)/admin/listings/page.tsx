@@ -24,6 +24,7 @@ import {
 import Link from 'next/link'
 import { apiClient } from '@/lib/api/client'
 import { normalizeApiUrl } from '@/lib/utils/api-url'
+import { listingRef, refMatches } from '@/lib/reference'
 
 const INTENT_COLORS: Record<string, string> = {
   FOR_SALE: 'bg-emerald-100 text-emerald-800',
@@ -99,8 +100,13 @@ export default function AdminListingsPage() {
     }
     if (cazaFilter !== 'all' && cazaOf(l) !== cazaFilter) return false
     if (!search) return true
+    const q = search.toLowerCase()
     const title = l.building?.title ?? l.unit?.name ?? l.headline ?? ''
-    return title.toLowerCase().includes(search.toLowerCase())
+    // Match the code shown on the row, or the property code it sits under, so
+    // searching PG-1042 finds every unit of that property.
+    return title.toLowerCase().includes(q)
+      || refMatches(listingRef(l), search)
+      || refMatches(l.building?.ref ?? l.unit?.building?.ref, search)
   })
 
   const sorted = [...filtered].sort((a, b) => {
@@ -158,7 +164,7 @@ export default function AdminListingsPage() {
         <div className="relative flex-1 min-w-[200px]">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
           <Input
-            placeholder="Search listings..."
+            placeholder="Search by ref (PG-1042), title…"
             value={search}
             onChange={e => setSearch(e.target.value)}
             className="pl-9"
@@ -286,7 +292,14 @@ export default function AdminListingsPage() {
                 <TableRow key={l.id} className="hover:bg-slate-50">
                   <TableCell>
                     <div>
-                      <p className="font-medium text-slate-900 text-sm">{title}</p>
+                      <div className="flex items-center gap-1.5">
+                        {listingRef(l) && (
+                          <span className="shrink-0 font-mono text-[10px] font-semibold text-slate-500 bg-slate-100 border border-slate-200 rounded px-1.5 py-0.5">
+                            {listingRef(l)}
+                          </span>
+                        )}
+                        <p className="font-medium text-slate-900 text-sm">{title}</p>
+                      </div>
                       <p className="text-xs text-slate-400">{unitInfo}</p>
                     </div>
                   </TableCell>

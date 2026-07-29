@@ -6,6 +6,7 @@ import { MapPin, Bed, Bath, Square, Building2, Home } from 'lucide-react'
 import { normalizeFileUrl } from '@/lib/utils/api-url'
 import { BLUR_DATA_URL } from '@/lib/blur'
 import { track } from '@/lib/analytics'
+import { listingRef } from '@/lib/reference'
 import type { Listing } from '@/types'
 import { ListingIntent, UnitKind, BuildingKind, Currency } from '@/types'
 
@@ -74,6 +75,9 @@ export function ListingCard({ listing, priority = false }: ListingCardProps) {
   // Headline
   const headline = listing.headline ?? building?.title ?? 'Listing'
 
+  // The code a client quotes back to us — the unit's, or the property's.
+  const ref = listingRef(listing)
+
   // Specs
   const bedrooms = unit?.bedrooms
   const bathrooms = unit?.bathrooms
@@ -136,6 +140,12 @@ export function ListingCard({ listing, priority = false }: ListingCardProps) {
         <h3 className="text-base font-semibold text-slate-900 line-clamp-1 group-hover:text-slate-700 transition-colors">
           {headline}
         </h3>
+        {/* Reference clients quote back to us when they enquire. */}
+        {ref && (
+          <span className="inline-block mt-0.5 font-mono text-[10px] font-semibold text-slate-400">
+            Ref {ref}
+          </span>
+        )}
 
         {/* Location */}
         <div className="flex items-center gap-1 text-slate-500 text-sm">

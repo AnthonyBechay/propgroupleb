@@ -1,4 +1,5 @@
 import express, { type Request, type Response, type Router } from 'express';
+import { nextUnitRef } from '../utils/reference.js';
 import { z } from 'zod';
 import multer from 'multer';
 import rateLimit from 'express-rate-limit';
@@ -281,6 +282,7 @@ router.post(
       const unit = await tx.unit.create({
         data: {
           buildingId: building.id,
+          ref: await nextUnitRef(building.id, tx),
           kind: submission.unitKind,
           bedrooms: submission.bedrooms,
           bathrooms: submission.bathrooms,

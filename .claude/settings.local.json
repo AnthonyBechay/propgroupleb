@@ -410,7 +410,17 @@
       "Bash(git ls-tree *)",
       "Bash(awk '/^model Lead \\\\{/{f=1} f{print} /^}/{if\\(f\\)exit}' packages/db/prisma/schema.prisma)",
       "Bash(DATABASE_URL=\"postgresql://u:p@localhost:5432/db\" npx prisma validate --schema packages/db/prisma/schema.prisma)",
-      "Bash(awk '/export const BUILDING_DETAIL_INCLUDE/{f=1} f{print} /^} as const;/{if\\(f\\)exit}' apps/backend/src/utils/prisma-includes.ts)"
+      "Bash(awk '/export const BUILDING_DETAIL_INCLUDE/{f=1} f{print} /^} as const;/{if\\(f\\)exit}' apps/backend/src/utils/prisma-includes.ts)",
+      "Bash(ls -la ~/Desktop/ 2>/dev/null | grep -iE \"georgia|lebanon\")",
+      "Bash(xxd)",
+      "Bash(unzip -l georgia.csv.numbers)",
+      "Bash(./venv/bin/python3 -)",
+      "Bash(awk '/^model Building /{f=1} f&&/@@index/{print} /^}/{if\\(f\\)exit}' packages/db/prisma/schema.prisma)",
+      "Bash(awk '/^model Listing \\\\{/{f=1} f{print; c++} c>6{exit}' packages/db/prisma/schema.prisma)",
+      "Bash(node -e \"for \\(const s of ['1-May-2026','24-May-2026','7-May-2026']\\) console.log\\(s, new Date\\(s\\).toString\\(\\).slice\\(0,15\\)\\)\")",
+      "Bash(python3 -c ' *)",
+      "Bash(docker info *)",
+      "Bash(pnpm --filter @propgroup/db exec prisma generate)"
     ],
     "deny": [],
     "ask": []

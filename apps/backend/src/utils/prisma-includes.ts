@@ -83,6 +83,7 @@ export const UNIT_LIST_INCLUDE = {
       id: true,
       title: true,
       slug: true,
+      ref: true,
       city: true,
       caza: true,
       mohafazat: true,
@@ -125,6 +126,7 @@ export const LISTING_CARD_INCLUDE = {
       id: true,
       title: true,
       slug: true,
+      ref: true, // clients quote this back to us
       city: true,
       caza: true,
       mohafazat: true, // card location fallback when city/caza are empty
@@ -137,6 +139,7 @@ export const LISTING_CARD_INCLUDE = {
   unit: {
     select: {
       id: true,
+      ref: true, // "PG-1042-2" — the code a client quotes for this unit
       kind: true,
       unitNumber: true,
       bedrooms: true,

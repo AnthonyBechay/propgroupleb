@@ -10,6 +10,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { normalizeApiUrl, normalizeFileUrl } from '@/lib/utils/api-url'
 import { ALL_PROPERTY_KINDS, typeLabel, typeDef } from '@/lib/property-types'
+import { unitRef, buildingRefOf } from '@/lib/reference'
 
 // ── constants ─────────────────────────────────────────────────────────────────
 
@@ -1022,6 +1023,11 @@ export function UnitsManager({ buildingId, buildingImages = [] }: { buildingId: 
                   {/* Identity */}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
+                      {unitRef(unit, units.length, unit.ref ? buildingRefOf(unit.ref) : null) && (
+                        <span className="font-mono text-[10px] font-semibold text-zinc-500 bg-zinc-100 border border-zinc-200 rounded px-1.5 py-0.5">
+                          {unitRef(unit, units.length, unit.ref ? buildingRefOf(unit.ref) : null)}
+                        </span>
+                      )}
                       <span className="font-semibold text-zinc-900 text-sm">{label}</span>
                       {unit.kind && (
                         <span className="text-xs text-zinc-400 bg-zinc-100 px-2 py-0.5 rounded-full">

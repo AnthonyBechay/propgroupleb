@@ -242,7 +242,7 @@ export function ListingsFilterBar() {
           <input
             type="text"
             inputMode="search"
-            placeholder="Search area, project or keyword…"
+            placeholder="Search ref (PG-1042), area or project…"
             value={filters.search}
             onChange={(e) => set({ search: e.target.value })}
             className="w-full h-12 pl-11 pr-9 text-base sm:text-sm rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-sky-600/15 focus:border-sky-500"

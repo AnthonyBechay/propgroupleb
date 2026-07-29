@@ -246,6 +246,8 @@ export interface UnitOption {
 
 export interface Unit {
   id: string;
+  /** Reference code derived from the property, e.g. "PG-1042-2". */
+  ref?: string | null;
   buildingId: string;
   kind: UnitKind;
   name?: string | null;
@@ -272,6 +274,8 @@ export interface Unit {
 
 export interface Building {
   id: string;
+  /** Human-friendly reference code, e.g. "PG-1042". */
+  ref?: string | null;
   kind: BuildingKind;
   title: string;
   description?: string | null;

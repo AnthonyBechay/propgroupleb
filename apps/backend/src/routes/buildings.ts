@@ -9,6 +9,7 @@ import { parsePagination, buildPaginationResponse } from '../utils/pagination.js
 import { BUILDING_LIST_INCLUDE, BUILDING_DETAIL_INCLUDE } from '../utils/prisma-includes.js';
 import { deleteFile, extractKeyFromUrl } from '../services/upload.service.js';
 import type { AuthenticatedRequest } from '../types/index.js';
+import { nextBuildingRef, nextUnitRef, normalizeRef, looksLikeRef, buildingRefOf } from '../utils/reference.js';
 
 /** Best-effort delete a batch of file URLs from R2. Failures are logged but do not throw. */
 async function purgeFileUrls(urls: string[]): Promise<void> {
@@ -162,12 +163,20 @@ router.get(
     if (featured === 'true') where.featured = true;
 
     if (search) {
-      where.OR = [
-        { title: { contains: search, mode: 'insensitive' } },
-        { description: { contains: search, mode: 'insensitive' } },
-        { city: { contains: search, mode: 'insensitive' } },
-        { neighborhood: { contains: search, mode: 'insensitive' } },
-      ];
+      // A client quoting "PG-1042" should land on exactly that property, so a
+      // reference-shaped query becomes an exact lookup rather than a text match.
+      if (looksLikeRef(search)) {
+        // A unit code (PG-1042-2) still finds its property.
+        where.ref = buildingRefOf(normalizeRef(search));
+      } else {
+        where.OR = [
+          { ref: { contains: search, mode: 'insensitive' } },
+          { title: { contains: search, mode: 'insensitive' } },
+          { description: { contains: search, mode: 'insensitive' } },
+          { city: { contains: search, mode: 'insensitive' } },
+          { neighborhood: { contains: search, mode: 'insensitive' } },
+        ];
+      }
     }
 
     const [buildings, total] = await Promise.all([
@@ -281,6 +290,7 @@ router.post(
       const slug = data.slug || (await generateUniqueSlug(data.title, undefined, tx));
       const createData = {
         ...data,
+        ref: await nextBuildingRef(tx),
         slug,
         images: data.images ?? [],
         youtubeUrls: data.youtubeUrls ?? [],
@@ -316,6 +326,7 @@ router.post(
       data: {
         ...data,
         buildingId: req.params.id,
+        ref: await nextUnitRef(req.params.id),
         images: data.images ?? [],
         features: data.features ?? [],
         views: data.views ?? [],

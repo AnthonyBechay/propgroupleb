@@ -3,6 +3,7 @@
 import { useRef, useState } from 'react'
 import { X, Upload, Loader2, CheckCircle2, AlertTriangle, FileSpreadsheet } from 'lucide-react'
 import { normalizeApiUrl } from '@/lib/utils/api-url'
+import { areasFor, cazasFor, regionOfArea, type Market } from '@/lib/crm-locations'
 
 interface ParsedRow {
   name: string
@@ -11,6 +12,8 @@ interface ParsedRow {
   askingFor: string
   phone: string
   areas: string[]
+  regions: string[]
+  unitKinds: string[]
   notes: string
   contactIntervalDays: number
   lastContactAt: string | null
@@ -60,6 +63,60 @@ function parseType(v: string): string {
   return 'BUYER'
 }
 
+/**
+ * Map the sheet's "Asking for" wording to unit kinds. The matcher scores on
+ * these, so an import that skipped them would produce zero suggestions.
+ */
+const KIND_WORDS: Array<[RegExp, string]> = [
+  [/studio/i, 'STUDIO'],
+  [/dorm/i, 'STUDIO'],
+  [/appart|apart|flat/i, 'APARTMENT'],
+  [/chalet|villa/i, 'VILLA'],
+  [/duplex/i, 'DUPLEX'],
+  [/penthouse/i, 'PENTHOUSE'],
+  [/townhouse/i, 'TOWNHOUSE'],
+  [/land|terrain|plot/i, 'LAND_PARCEL'],
+  [/shop|store/i, 'SHOP'],
+  [/office/i, 'OFFICE'],
+  [/showroom/i, 'SHOWROOM'],
+  [/warehouse|depot/i, 'WAREHOUSE'],
+  [/restaurant/i, 'RESTAURANT'],
+  [/clinic/i, 'CLINIC'],
+  [/whole building|entire building/i, 'WHOLE_BUILDING'],
+]
+
+function parseKinds(text: string): string[] {
+  const found = KIND_WORDS.filter(([re]) => re.test(text)).map(([, kind]) => kind)
+  return Array.from(new Set(found))
+}
+
+/**
+ * Pull known locations out of the free-text notes ("Need a Land in Achrafieh").
+ * Only names from the curated catalogue are accepted, so nothing unmatchable
+ * ever reaches `areas[]`. A caza mention with no specific area contributes its
+ * region instead — the client is open to the whole district.
+ */
+function detectLocations(market: Market, text: string): { areas: string[]; regions: string[] } {
+  if (!text.trim()) return { areas: [], regions: [] }
+  const hay = text.toLowerCase()
+  const hit = (name: string) =>
+    name.length >= 4 && new RegExp(`(^|[^a-z])${name.toLowerCase().replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}([^a-z]|$)`).test(hay)
+
+  const areas = areasFor(market).filter((a) => hit(a.name)).map((a) => a.name)
+  const regions = new Set<string>()
+  for (const a of areas) {
+    const r = regionOfArea(market, a)
+    if (r) regions.add(r)
+  }
+  // Districts named without a specific area — keep the client open to the whole caza.
+  for (const caza of cazasFor(market)) {
+    if (!hit(caza)) continue
+    const r = regionOfArea(market, caza) ?? areasFor(market).find((a) => a.caza === caza)?.region
+    if (r) regions.add(r)
+  }
+  return { areas: Array.from(new Set(areas)), regions: Array.from(regions) }
+}
+
 function parseDate(v: string): string | null {
   if (!v) return null
   const d = new Date(v)
@@ -99,16 +156,24 @@ export function ImportModal({ onClose, onImported }: { onClose: () => void; onIm
       headers.forEach((field, i) => { if (field) rec[field] = cells[i] ?? '' })
       if (!rec.name?.trim()) continue
 
+      const market: Market = (rec.market || '').toLowerCase().includes('georg') ? 'GEORGIA' : 'LEBANON'
+      const askingFor = (rec.askingFor || '').trim()
+      const notes = [rec.notes, rec.areas ? `Areas from sheet: ${rec.areas}` : ''].filter(Boolean).join('\n').trim()
+      // Areas are free text in the sheet — resolve what we can against the
+      // catalogue so the matcher works straight away, and keep the original
+      // wording in the notes for anything we couldn't place.
+      const loc = detectLocations(market, `${rec.areas ?? ''} ${notes}`)
+
       parsed.push({
         name: rec.name.trim(),
         type: parseType(rec.type),
-        market: (rec.market || '').toLowerCase().includes('georg') ? 'GEORGIA' : 'LEBANON',
-        askingFor: (rec.askingFor || '').trim(),
+        market,
+        askingFor,
         phone: (rec.phone || '').trim(),
-        // Areas are free text in the sheet; keep them as notes-worthy hints and
-        // let the team re-pick proper areas from the catalogue after import.
-        areas: [],
-        notes: [rec.notes, rec.areas ? `Areas from sheet: ${rec.areas}` : ''].filter(Boolean).join('\n').trim(),
+        areas: loc.areas,
+        regions: loc.regions,
+        unitKinds: parseKinds(`${askingFor} ${notes}`),
+        notes,
         contactIntervalDays: Number(rec.contactIntervalDays) || 7,
         lastContactAt: parseDate(rec.lastContactAt),
       })
@@ -135,8 +200,8 @@ export function ImportModal({ onClose, onImported }: { onClose: () => void; onIm
             askingFor: r.askingFor || null,
             phone: r.phone || null,
             areas: r.areas,
-            regions: [],
-            unitKinds: [],
+            regions: r.regions,
+            unitKinds: r.unitKinds,
             notes: r.notes || null,
             contactIntervalDays: r.contactIntervalDays,
             lastContactAt: r.lastContactAt,
@@ -214,6 +279,8 @@ export function ImportModal({ onClose, onImported }: { onClose: () => void; onIm
                         <span className="font-medium text-slate-800 truncate">{r.name}</span>
                         <span className="text-xs text-slate-400 shrink-0">
                           {r.type} · {r.market === 'GEORGIA' ? '🇬🇪' : '🇱🇧'} · {r.phone || 'no phone'}
+                          {r.unitKinds.length > 0 && ` · ${r.unitKinds.join('/')}`}
+                          {r.areas.length > 0 && ` · ${r.areas.slice(0, 2).join(', ')}`}
                         </span>
                       </div>
                     ))}

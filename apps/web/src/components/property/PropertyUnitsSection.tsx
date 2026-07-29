@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/button'
 import { useComparator } from '@/contexts/ComparatorContext'
 import { useAuth } from '@/contexts/AuthContext'
 import { normalizeApiUrl, normalizeFileUrl } from '@/lib/utils/api-url'
+import { unitRef, buildingRefOf } from '@/lib/reference'
 import type { Unit, UnitOption, PropertyDocument, PaymentPlanDetails, ComparatorItem } from '@/lib/types/api'
 
 // ── Print helper ──────────────────────────────────────────────────────────────
@@ -1498,6 +1499,11 @@ function ProjectSheetPrint({
                     <div style={{ minWidth: 0, flex: 1 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '2px', flexWrap: 'wrap' }}>
                         <span style={{ fontSize: '13px', fontWeight: 800, color: '#1B3A5C' }}>{unit.name}</span>
+                        {unitRef(unit, units.length, unit.ref ? buildingRefOf(unit.ref) : null) && (
+                          <span style={{ fontSize: '9px', fontFamily: 'monospace', fontWeight: 700, background: '#F1F5F9', color: '#475569', padding: '2px 6px', borderRadius: '3px' }}>
+                            {unitRef(unit, units.length, unit.ref ? buildingRefOf(unit.ref) : null)}
+                          </span>
+                        )}
                         {unit.unitNumber && (
                           <span style={{ fontSize: '9px', fontFamily: 'monospace', fontWeight: 700, background: '#E0EDF7', color: '#1B3A5C', padding: '2px 6px', borderRadius: '3px' }}>
                             #{unit.unitNumber}
@@ -1863,6 +1869,14 @@ export function PropertyUnitsSection({
                       <span className={`font-bold text-base ${isExpanded ? 'text-white' : 'text-slate-900'}`}>
                         {unit.name}
                       </span>
+                      {/* The code a client quotes when they enquire about this unit. */}
+                      {unitRef(unit, units.length, unit.ref ? buildingRefOf(unit.ref) : null) && (
+                        <span className={`text-xs px-2 py-0.5 rounded font-mono font-semibold ${
+                          isExpanded ? 'bg-white/15 text-white' : 'bg-slate-100 text-slate-500'
+                        }`}>
+                          {unitRef(unit, units.length, unit.ref ? buildingRefOf(unit.ref) : null)}
+                        </span>
+                      )}
                       {unit.unitNumber && (
                         <span className={`text-xs px-2 py-0.5 rounded font-mono font-semibold ${
                           isExpanded ? 'bg-[#C49A2E] text-white' : 'bg-[#E0EDF7] text-[#1B3A5C]'

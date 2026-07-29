@@ -40,6 +40,8 @@ export interface Opportunity {
     kind: 'LISTING' | 'CLIENT' | 'UNKNOWN'
     title: string
     subtitle: string | null
+    /** Reference code, present for LISTING subjects. */
+    ref?: string | null
     slug?: string | null
     id?: string
   }

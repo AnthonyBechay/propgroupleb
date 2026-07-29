@@ -51,6 +51,8 @@ export interface UnitOption {
 export interface Unit {
   id: string;
   propertyId: string;
+  /** Reference code derived from the property, e.g. "PG-1042-2". */
+  ref?: string | null;
   name: string;
   unitNumber?: string | null;
   /** Unit-level property type (overrides project-level when set) */

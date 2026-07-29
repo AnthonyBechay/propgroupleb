@@ -8,6 +8,7 @@ import { buildPaginationResponse } from '../utils/pagination.js';
 import { PROPERTY_LIST_INCLUDE, PROPERTY_DETAIL_INCLUDE } from '../utils/prisma-includes.js';
 import { buildingSchema, buildingQuerySchema, extractInvestmentData, buildInvestmentDataPayload, unitSchema, unitOptionSchema } from '../schemas/index.js';
 import { deleteFile, extractKeyFromUrl } from '../services/upload.service.js';
+import { nextUnitRef } from '../utils/reference.js';
 import type { AuthenticatedRequest } from '../types/index.js';
 
 const router: Router = express.Router();
@@ -369,7 +370,7 @@ router.post('/:id/units', authenticateToken, requireAdmin, asyncHandler(async (r
   const authReq = req as AuthenticatedRequest;
   const data = unitSchema.parse(req.body);
   const unit = await prisma.unit.create({
-    data: { ...data, buildingId: req.params.id },
+    data: { ...data, buildingId: req.params.id, ref: await nextUnitRef(req.params.id) },
     include: { options: true },
   });
   await logAdminAction('CREATE_UNIT', 'unit', unit.id, { buildingId: req.params.id, name: unit.name }, authReq);

@@ -9,6 +9,7 @@ import { listingSchema } from '../schemas/index.js';
 import { LISTING_CARD_INCLUDE } from '../utils/prisma-includes.js';
 import type { AuthenticatedRequest } from '../types/index.js';
 import { logger } from '../utils/logger.js';
+import { normalizeRef, looksLikeRef, buildingRefOf, isUnitRef } from '../utils/reference.js';
 import {
   syncUnitLifecycleFromListing,
   TERMINAL_LIFECYCLES,
@@ -80,6 +81,9 @@ const BUILDING_PUBLIC_INCLUDE = {
     select: { id: true, firstName: true, lastName: true, email: true, agentCompany: true },
   },
   investmentData: true,
+  // Unit count decides whether a unit shows its own code or just the
+  // property's — a single-unit property has one identity, not two.
+  _count: { select: { units: true } },
 } as const;
 
 // ── Shared listing detail include ─────────────────────────────────────────────
@@ -102,11 +106,14 @@ const LISTING_DETAIL_INCLUDE = {
       hasPool: true,
       latitude: true,
       longitude: true,
+      ref: true,
+      _count: { select: { units: true } },
     },
   },
   unit: {
     select: {
       id: true,
+      ref: true,
       kind: true,
       unitNumber: true,
       name: true,
@@ -165,11 +172,25 @@ router.get(
 
     // Free-text search — matches building title or listing headline
     if (q.search) {
-      where.OR = [
-        { headline: { contains: q.search, mode: 'insensitive' } },
-        { building: { title: { contains: q.search, mode: 'insensitive' } } },
-        { unit: { building: { title: { contains: q.search, mode: 'insensitive' } } } },
-      ];
+      // Exact match when the visitor pastes a reference code. A unit code
+      // (PG-1042-2) narrows to that unit; a property code (PG-1042) returns
+      // everything under it — the whole-property listing and every unit.
+      if (looksLikeRef(q.search)) {
+        const ref = normalizeRef(q.search);
+        where.OR = isUnitRef(ref)
+          ? [{ unit: { ref } }]
+          : [
+              { building: { ref } },
+              { unit: { building: { ref } } },
+              { unit: { ref: { startsWith: `${buildingRefOf(ref)}-` } } },
+            ];
+      } else {
+        where.OR = [
+          { headline: { contains: q.search, mode: 'insensitive' } },
+          { building: { title: { contains: q.search, mode: 'insensitive' } } },
+          { unit: { building: { title: { contains: q.search, mode: 'insensitive' } } } },
+        ];
+      }
     }
 
     // Location filters — must match through direct building relation OR via unit → building
