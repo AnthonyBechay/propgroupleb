@@ -10,6 +10,7 @@ import passport from './config/passport.js';
 import { errorHandler } from './utils/errors.js';
 import { logger } from './utils/logger.js';
 import { validateEnv } from './utils/validate-env.js';
+import { ensureReferenceCodes } from './utils/reference.js';
 
 // Import routes
 import authRoutes from './routes/auth.js';
@@ -286,6 +287,16 @@ async function startServer() {
     validateEnv();
     await prisma.$queryRaw`SELECT 1`;
     logger.info('Database connected');
+
+    // Deployment uses `prisma db push`, which never runs migration SQL, so the
+    // reference-code sequence and backfill have to be established here.
+    try {
+      await ensureReferenceCodes();
+      logger.info('Reference codes ready');
+    } catch (err) {
+      // Never block startup over this — the site works without codes.
+      logger.error('Could not initialise reference codes', { error: (err as Error).message });
+    }
 
     const server = app.listen(PORT, () => {
       logger.info('Server started', {

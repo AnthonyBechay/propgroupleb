@@ -17,6 +17,74 @@ import { prisma } from '@propgroup/db';
 
 const PREFIX = 'PG-';
 
+/**
+ * Create the sequence and fill in any missing codes.
+ *
+ * Deployment runs `prisma db push`, which syncs columns but never executes
+ * migration SQL — so sequences and backfills in a migration file simply never
+ * happen in production. Anything SQL-only therefore has to be established at
+ * boot instead. Idempotent and cheap: after the first run every property has a
+ * code and both statements match zero rows.
+ */
+export async function ensureReferenceCodes(): Promise<void> {
+  await prisma.$transaction(async (tx: any) => {
+    // Serialise against other instances booting at the same time, otherwise two
+    // of them can hand out the same number.
+    await tx.$executeRawUnsafe(`SELECT pg_advisory_xact_lock(4917283)`);
+    await tx.$executeRawUnsafe(`CREATE SEQUENCE IF NOT EXISTS building_ref_seq START WITH 1000`);
+
+    // Never rewind: the sequence must sit past the highest code already issued.
+    await tx.$executeRawUnsafe(`
+      SELECT setval('building_ref_seq', GREATEST(
+        (SELECT last_value FROM building_ref_seq),
+        999,
+        COALESCE((SELECT MAX(substring("ref" from '^PG-(\\d+)$')::bigint)
+                    FROM "buildings" WHERE "ref" ~ '^PG-\\d+$'), 0)
+      ))
+    `);
+
+    // Properties without a code, oldest first so PG-1000 is the oldest.
+    const assigned = await tx.$executeRawUnsafe(`
+      WITH base AS (SELECT last_value AS v FROM building_ref_seq),
+      ordered AS (
+        SELECT "id", ROW_NUMBER() OVER (ORDER BY "createdAt", "id") AS rn
+          FROM "buildings" WHERE "ref" IS NULL
+      )
+      UPDATE "buildings" b
+         SET "ref" = 'PG-' || ((SELECT v FROM base) + ordered.rn)::text
+        FROM ordered
+       WHERE b."id" = ordered."id"
+    `);
+    if (assigned > 0) {
+      await tx.$executeRawUnsafe(
+        `SELECT setval('building_ref_seq', (SELECT last_value FROM building_ref_seq) + ${assigned})`
+      );
+    }
+
+    // Units continue past the highest suffix their property has already used,
+    // so a partially-numbered property never reissues a code.
+    await tx.$executeRawUnsafe(`
+      WITH ordered AS (
+        SELECT u."id",
+               b."ref" AS building_ref,
+               ROW_NUMBER() OVER (PARTITION BY u."buildingId" ORDER BY u."createdAt", u."id")
+                 + COALESCE((
+                     SELECT MAX(substring(u2."ref" from '^PG-\\d+-(\\d+)$')::int)
+                       FROM "units" u2
+                      WHERE u2."buildingId" = u."buildingId" AND u2."ref" IS NOT NULL
+                   ), 0) AS n
+          FROM "units" u
+          JOIN "buildings" b ON b."id" = u."buildingId"
+         WHERE u."ref" IS NULL AND b."ref" IS NOT NULL
+      )
+      UPDATE "units" u
+         SET "ref" = ordered.building_ref || '-' || ordered.n::text
+        FROM ordered
+       WHERE u."id" = ordered."id"
+    `);
+  });
+}
+
 /* eslint-disable @typescript-eslint/no-explicit-any */
 async function nextval(sequence: string, tx?: any): Promise<number> {
   const db = tx ?? prisma;

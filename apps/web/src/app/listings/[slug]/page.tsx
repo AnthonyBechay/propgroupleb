@@ -28,6 +28,7 @@ import { TrackListingView } from '@/components/analytics/TrackListingView'
 import { ProposalExport } from '@/components/listing/ProposalExport'
 import { FavoriteButton } from '@/components/listing/FavoriteButton'
 import { listingRef } from '@/lib/reference'
+import { CopyRef } from '@/components/listing/CopyRef'
 import type { Listing } from '@/types'
 import {
   ListingIntent,
@@ -273,10 +274,11 @@ export default async function ListingDetailPage({ params }: PageProps) {
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
                   <h1 className="text-2xl font-bold text-slate-900">{title}</h1>
+                  {/* Tap-to-copy: clients quote this code when they message us. */}
                   {listingRef(listing) && (
-                    <p className="mt-1 inline-flex items-center gap-1.5 font-mono text-xs font-semibold text-slate-500 bg-slate-100 border border-slate-200 rounded px-2 py-1">
-                      Ref {listingRef(listing)}
-                    </p>
+                    <div className="mt-1.5">
+                      <CopyRef refCode={listingRef(listing)!} />
+                    </div>
                   )}
                   {building && (
                     <div className="flex items-center gap-1.5 mt-1.5 text-slate-500 text-sm">

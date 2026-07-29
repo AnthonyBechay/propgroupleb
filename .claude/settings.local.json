@@ -420,7 +420,9 @@
       "Bash(node -e \"for \\(const s of ['1-May-2026','24-May-2026','7-May-2026']\\) console.log\\(s, new Date\\(s\\).toString\\(\\).slice\\(0,15\\)\\)\")",
       "Bash(python3 -c ' *)",
       "Bash(docker info *)",
-      "Bash(pnpm --filter @propgroup/db exec prisma generate)"
+      "Bash(pnpm --filter @propgroup/db exec prisma generate)",
+      "Bash(export DATABASE_URL=\"postgresql://postgres:test@localhost:55433/reftest\")",
+      "Bash(npx prisma *)"
     ],
     "deny": [],
     "ask": []

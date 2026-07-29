@@ -19,6 +19,12 @@ export interface MatchCriterion {
   /** 0 = miss, 1 = exact, in-between = partial (e.g. slightly over budget). */
   score: number;
   detail?: string;
+  /**
+   * A miss so fundamental that no amount of fit elsewhere rescues it — someone
+   * who wants land will not buy an apartment in a nice area. Fatal criteria
+   * zero the whole match instead of merely costing it their weight.
+   */
+  fatal?: boolean;
 }
 
 export interface MatchResult {
@@ -71,12 +77,80 @@ function scoreLocation(
   return { label: 'Location', weight: WEIGHTS.location, score: 0, detail: 'Different area' };
 }
 
+/**
+ * Property families for matching purposes.
+ *
+ * Substituting within a family is a conversation worth having — a villa hunter
+ * might look at a townhouse, a shop hunter at a showroom. Substituting across
+ * families never is: land, a flat, a warehouse and a parking spot are different
+ * purchases, not different flavours of the same one.
+ *
+ * These are deliberately NOT the UI's groups in property-types.ts, which exist
+ * to organise a dropdown — that file files land, storage and parking together
+ * under "Other", which would make a parking spot a near-match for a land buyer.
+ */
+const KIND_FAMILY: Record<string, string> = {
+  APARTMENT: 'RESIDENTIAL',
+  STUDIO: 'RESIDENTIAL',
+  DUPLEX: 'RESIDENTIAL',
+  PENTHOUSE: 'RESIDENTIAL',
+  VILLA: 'RESIDENTIAL',
+  TOWNHOUSE: 'RESIDENTIAL',
+
+  SHOP: 'COMMERCIAL',
+  OFFICE: 'COMMERCIAL',
+  SHOWROOM: 'COMMERCIAL',
+  WAREHOUSE: 'COMMERCIAL',
+  RESTAURANT: 'COMMERCIAL',
+  CLINIC: 'COMMERCIAL',
+
+  // An entire building is an investment product of its own — someone after one
+  // apartment is not served by being sold the block it sits in.
+  WHOLE_BUILDING: 'BUILDING',
+
+  LAND_PARCEL: 'LAND',
+
+  STORAGE: 'UTILITY',
+  PARKING: 'UTILITY',
+};
+
+const familyOf = (kind?: string | null): string | null => (kind ? KIND_FAMILY[kind] ?? null : null);
+
+const KIND_LABEL = (kind: string) =>
+  kind.charAt(0) + kind.slice(1).toLowerCase().replace(/_/g, ' ');
+
+/**
+ * Type fit. An exact kind scores full, a different kind in the same family
+ * scores partial, and a different family is fatal — see `fatal` on
+ * MatchCriterion for why that isn't just a heavy penalty.
+ */
 function scoreUnitKind(want: string[], have?: string | null): MatchCriterion | null {
   if (!want.length) return null;
-  if (!have) return { label: 'Type', weight: WEIGHTS.unitKind, score: 0 };
-  return want.includes(have)
-    ? { label: 'Type', weight: WEIGHTS.unitKind, score: 1, detail: have }
-    : { label: 'Type', weight: WEIGHTS.unitKind, score: 0, detail: `Is ${have}` };
+  if (!have) return { label: 'Type', weight: WEIGHTS.unitKind, score: 0, detail: 'Type unknown' };
+
+  if (want.includes(have)) {
+    return { label: 'Type', weight: WEIGHTS.unitKind, score: 1, detail: KIND_LABEL(have) };
+  }
+
+  const haveFamily = familyOf(have);
+  const sameFamily = haveFamily != null && want.some((w) => familyOf(w) === haveFamily);
+  if (sameFamily) {
+    return {
+      label: 'Type',
+      weight: WEIGHTS.unitKind,
+      score: 0.5,
+      detail: `${KIND_LABEL(have)} — close to what they asked for`,
+    };
+  }
+
+  const wanted = want.map(KIND_LABEL).join(' or ');
+  return {
+    label: 'Type',
+    weight: WEIGHTS.unitKind,
+    score: 0,
+    fatal: true,
+    detail: `Wants ${wanted}, this is ${KIND_LABEL(have)}`,
+  };
 }
 
 /**
@@ -100,22 +174,41 @@ function scoreBudget(min: number | null, max: number | null, price?: number | nu
   return { label: 'Budget', weight: WEIGHTS.budget, score: 1, detail: 'In budget' };
 }
 
+/**
+ * Bedroom fit. One bedroom short is worth a phone call — a family after a 3-bed
+ * will look at a good 2-bed. Two or more short is a different product: someone
+ * who needs three bedrooms cannot live in a studio, however well it scores on
+ * location and price, so it's fatal rather than a 10-point deduction.
+ */
 function scoreBeds(want: number | null, have?: number | null): MatchCriterion | null {
   if (want == null) return null;
-  if (have == null) return { label: 'Bedrooms', weight: WEIGHTS.beds, score: 0 };
+  if (have == null) return { label: 'Bedrooms', weight: WEIGHTS.beds, score: 0, detail: 'Bedrooms unknown' };
   if (have >= want) return { label: 'Bedrooms', weight: WEIGHTS.beds, score: 1, detail: `${have} beds` };
   if (want - have === 1) return { label: 'Bedrooms', weight: WEIGHTS.beds, score: 0.5, detail: `${have} beds (1 short)` };
-  return { label: 'Bedrooms', weight: WEIGHTS.beds, score: 0, detail: `${have} beds` };
+  return {
+    label: 'Bedrooms',
+    weight: WEIGHTS.beds,
+    score: 0,
+    fatal: true,
+    detail: `Needs ${want} beds, this has ${have}`,
+  };
 }
 
 function finalize(criteria: (MatchCriterion | null)[]): MatchResult {
   const used = criteria.filter(Boolean) as MatchCriterion[];
+  const reasons = used.filter((c) => c.score >= 0.6).map((c) => c.detail || c.label);
+  const misses = used.filter((c) => c.score < 0.4).map((c) => c.detail || `${c.label} mismatch`);
+
+  // A fatal miss ends it. Scoring on would let a strong location carry a
+  // property the client fundamentally cannot use.
+  const fatal = used.filter((c) => c.fatal);
+  if (fatal.length) {
+    return { score: 0, criteria: used, reasons: [], misses };
+  }
+
   const available = used.reduce((s, c) => s + c.weight, 0);
   const earned = used.reduce((s, c) => s + c.weight * c.score, 0);
   const score = available === 0 ? 0 : Math.round((earned / available) * 100);
-
-  const reasons = used.filter((c) => c.score >= 0.6).map((c) => c.detail || c.label);
-  const misses = used.filter((c) => c.score < 0.4).map((c) => c.detail || `${c.label} mismatch`);
 
   return { score, criteria: used, reasons, misses };
 }
@@ -125,12 +218,18 @@ export function matchListingToLead(lead: any, listing: any): MatchResult {
   const building = listing.building ?? listing.unit?.building;
   const unit = listing.unit;
 
+  // Buying and renting are different transactions, not adjacent preferences —
+  // showing a rental to a buyer wastes both their time and yours.
   const wantIntent = lead.type === 'RENTER' ? 'FOR_RENT' : 'FOR_SALE';
+  const intentMatches = listing.intent === wantIntent;
   const intentCriterion: MatchCriterion = {
     label: 'Deal type',
     weight: WEIGHTS.intent,
-    score: listing.intent === wantIntent ? 1 : 0,
-    detail: listing.intent === 'FOR_RENT' ? 'For rent' : 'For sale',
+    score: intentMatches ? 1 : 0,
+    fatal: !intentMatches,
+    detail: intentMatches
+      ? listing.intent === 'FOR_RENT' ? 'For rent' : 'For sale'
+      : `Wants ${wantIntent === 'FOR_RENT' ? 'to rent' : 'to buy'}, this is ${listing.intent === 'FOR_RENT' ? 'for rent' : 'for sale'}`,
   };
 
   return finalize([
@@ -161,9 +260,19 @@ export function matchLeadToLead(buyer: any, seller: any): MatchResult {
   // The seller's asking price sits in budgetMin/Max too (what they want for it).
   const askingPrice = seller.budgetMin ?? seller.budgetMax ?? null;
 
+  // Score against the seller's best-fitting kind, not whichever happens to be
+  // first — a seller offering "shop or office" should match either request.
+  const sellerKinds: string[] = seller.unitKinds ?? [];
+  const kindCriterion = sellerKinds.length
+    ? sellerKinds
+        .map((k) => scoreUnitKind(buyer.unitKinds ?? [], k))
+        .filter(Boolean)
+        .sort((a, b) => (b as MatchCriterion).score - (a as MatchCriterion).score)[0] ?? null
+    : scoreUnitKind(buyer.unitKinds ?? [], null);
+
   return finalize([
     scoreLocation(buyer.areas ?? [], buyer.regions ?? [], seller.areas ?? [], (seller.regions ?? [])[0]),
-    scoreUnitKind(buyer.unitKinds ?? [], (seller.unitKinds ?? [])[0]),
+    kindCriterion,
     scoreBudget(buyer.budgetMin ?? null, buyer.budgetMax ?? null, askingPrice),
     scoreBeds(buyer.minBeds ?? null, seller.minBeds ?? null),
   ]);
