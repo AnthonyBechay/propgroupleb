@@ -9,7 +9,7 @@ import type { Market } from '@/lib/crm-locations'
 
 /**
  * Add / edit a CRM client. Mirrors the old spreadsheet columns (name, type,
- * asking for, phone, interval, notes) plus structured fields that power
+ * asking for, phone, follow-up, notes) plus structured fields that power
  * matching against live listings.
  */
 export function LeadFormModal({ lead, onClose, onSaved }: { lead?: Lead; onClose: () => void; onSaved: () => void }) {
@@ -21,7 +21,7 @@ export function LeadFormModal({ lead, onClose, onSaved }: { lead?: Lead; onClose
   const [f, setF] = useState({
     market: lead?.market ?? 'LEBANON',
     type: lead?.type ?? 'BUYER',
-    status: lead?.status ?? 'NEW',
+    status: lead?.status ?? 'ACTIVE',
     source: lead?.source ?? 'MANUAL',
     name: lead?.name ?? '',
     phone: lead?.phone ?? '',
@@ -36,7 +36,7 @@ export function LeadFormModal({ lead, onClose, onSaved }: { lead?: Lead; onClose
     budgetMax: lead?.budgetMax?.toString() ?? '',
     currency: lead?.currency ?? 'USD',
     lastContactAt: lead?.lastContactAt ? lead.lastContactAt.slice(0, 10) : new Date().toISOString().slice(0, 10),
-    contactIntervalDays: lead?.contactIntervalDays?.toString() ?? '7',
+    nextContactAt: lead?.nextContactAt?.slice(0, 10) ?? '',
     notes: lead?.notes ?? '',
   })
   const set = (k: keyof typeof f, v: unknown) => setF((p) => ({ ...p, [k]: v }))
@@ -74,7 +74,7 @@ export function LeadFormModal({ lead, onClose, onSaved }: { lead?: Lead; onClose
         budgetMax: !isSupply && f.budgetMax !== '' ? Number(f.budgetMax) : null,
         currency: f.currency,
         lastContactAt: f.lastContactAt || null,
-        contactIntervalDays: Number(f.contactIntervalDays) || 7,
+        nextContactAt: f.nextContactAt ? new Date(f.nextContactAt).toISOString() : null,
         notes: f.notes.trim() || null,
       }
       const res = await fetch(`${apiUrl}/api/crm${isEdit ? `/${lead!.id}` : ''}`, {
@@ -157,7 +157,6 @@ export function LeadFormModal({ lead, onClose, onSaved }: { lead?: Lead; onClose
               <div>
                 <label className={lbl}>Status</label>
                 <select value={f.status} onChange={(e) => set('status', e.target.value)} className={inp}>
-                  <option value="NEW">New</option>
                   <option value="ACTIVE">Active</option>
                   <option value="VIEWING">Viewing</option>
                   <option value="NEGOTIATING">Negotiating</option>
@@ -297,9 +296,9 @@ export function LeadFormModal({ lead, onClose, onSaved }: { lead?: Lead; onClose
               <input type="date" value={f.lastContactAt} onChange={(e) => set('lastContactAt', e.target.value)} className={inp} />
             </div>
             <div>
-              <label className={lbl}>Follow up every (days)</label>
-              <input type="number" min="1" value={f.contactIntervalDays} onChange={(e) => set('contactIntervalDays', e.target.value)} className={inp} />
-              <p className="text-[11px] text-slate-400 mt-1">Next contact date is calculated from these.</p>
+              <label className={lbl}>Plan a follow-up</label>
+              <input type="date" value={f.nextContactAt} onChange={(e) => set('nextContactAt', e.target.value)} className={inp} />
+              <p className="text-[11px] text-slate-400 mt-1">Optional. Only dates you set here appear as follow-ups.</p>
             </div>
           </div>
 

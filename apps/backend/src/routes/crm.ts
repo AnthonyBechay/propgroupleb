@@ -20,14 +20,16 @@ const router: Router = express.Router();
 const UNIT_KINDS = ['APARTMENT', 'STUDIO', 'DUPLEX', 'PENTHOUSE', 'VILLA', 'TOWNHOUSE', 'SHOP', 'OFFICE', 'SHOWROOM', 'WAREHOUSE', 'RESTAURANT', 'CLINIC', 'WHOLE_BUILDING', 'LAND_PARCEL', 'STORAGE', 'PARKING'] as const;
 const LEAD_TYPES = ['BUYER', 'SELLER', 'RENTER', 'LANDLORD', 'INVESTOR'] as const;
 const LEAD_STATUSES = ['NEW', 'ACTIVE', 'VIEWING', 'NEGOTIATING', 'WON', 'LOST', 'ARCHIVED'] as const;
-const LEAD_SOURCES = ['MANUAL', 'INQUIRY', 'FAVORITE', 'SUBMISSION', 'REFERRAL', 'WHATSAPP', 'PHONE', 'WALK_IN'] as const;
+const LEAD_SOURCES = ['MANUAL', 'INQUIRY', 'FAVORITE', 'SUBMISSION', 'REFERRAL', 'WHATSAPP', 'PHONE', 'WALK_IN', 'FACEBOOK_AD'] as const;
+const SUB_STATUSES = ['SEARCHING', 'AWAITING_REPLY', 'NEEDS_OPTIONS', 'BUDGET_MISMATCH', 'FINANCING', 'PAUSED', 'DOCS_PENDING', 'PRICE_REVIEW'] as const;
 const MARKETS = ['LEBANON', 'GEORGIA'] as const;
 const CHANNELS = ['CALL', 'WHATSAPP', 'EMAIL', 'MEETING', 'VIEWING', 'NOTE'] as const;
 
 const leadSchema = z.object({
   market: z.enum(MARKETS).default('LEBANON'),
   type: z.enum(LEAD_TYPES).default('BUYER'),
-  status: z.enum(LEAD_STATUSES).default('NEW'),
+  status: z.enum(LEAD_STATUSES).default('ACTIVE'),
+  subStatus: z.enum(SUB_STATUSES).optional().nullable(),
   source: z.enum(LEAD_SOURCES).default('MANUAL'),
   name: z.string().min(2).max(120),
   phone: z.string().max(40).optional().nullable(),
@@ -44,18 +46,18 @@ const leadSchema = z.object({
   lastContactAt: z.string().optional().nullable(),
   contactIntervalDays: z.number().int().min(1).max(365).default(7),
   nextContactAt: z.string().optional().nullable(),
+  nextContactNote: z.string().max(300).optional().nullable(),
   notes: z.string().max(5000).optional().nullable(),
   userId: z.string().optional().nullable(),
   listingId: z.string().optional().nullable(),
 });
 
-/** Derive the next follow-up date from the last contact + cadence. */
-function computeNextContact(lastContactAt: Date | null, intervalDays: number): Date | null {
-  if (!lastContactAt) return null;
-  const next = new Date(lastContactAt);
-  next.setDate(next.getDate() + intervalDays);
-  return next;
-}
+/**
+ * Sub-statuses the team may set by hand. NEEDS_OPTIONS is deliberately absent:
+ * "we've run out of things to show him" is only true once we've actually shown
+ * him something, so it's derived from his shortlist rather than typed in.
+ */
+const MANUAL_SUB_STATUSES: readonly string[] = SUB_STATUSES.filter((s) => s !== 'NEEDS_OPTIONS');
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function toLeadData(data: z.infer<typeof leadSchema>): Record<string, any> {
@@ -80,8 +82,11 @@ function toLeadData(data: z.infer<typeof leadSchema>): Record<string, any> {
     currency: data.currency,
     lastContactAt: last,
     contactIntervalDays: interval,
-    // An explicit nextContactAt wins; otherwise derive it from the cadence.
-    nextContactAt: data.nextContactAt ? new Date(data.nextContactAt) : computeNextContact(last, interval),
+    // Only ever an appointment someone actually made — never derived from the
+    // cadence, which used to mark every imported client overdue on day one.
+    nextContactAt: data.nextContactAt ? new Date(data.nextContactAt) : null,
+    nextContactNote: data.nextContactNote || null,
+    subStatus: data.subStatus ?? null,
     notes: data.notes || null,
     userId: data.userId || null,
     listingId: data.listingId || null,
@@ -183,11 +188,14 @@ router.get(
       ];
     }
 
-    // Default order: most urgent first (soonest/overdue follow-up), then newest.
+    // Default order: whatever was touched last, first. `updatedAt` moves on
+    // create, edit, contact log and opportunity change, so it reads as "last
+    // action on this client" without a second column to keep in sync.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    let orderBy: any = [{ nextContactAt: { sort: 'asc', nulls: 'last' } }, { createdAt: 'desc' }];
+    let orderBy: any = [{ updatedAt: 'desc' }];
     if (q.sort === 'newest') orderBy = [{ createdAt: 'desc' }];
     else if (q.sort === 'name') orderBy = [{ name: 'asc' }];
+    else if (q.sort === 'planned') orderBy = [{ nextContactAt: { sort: 'asc', nulls: 'last' } }];
 
     const [items, total] = await Promise.all([
       prisma.lead.findMany({
@@ -197,7 +205,12 @@ router.get(
         take: limit,
         include: {
           _count: { select: { contacts: true } },
-          opportunities: { select: { id: true, stage: true, viewingAt: true } },
+          opportunities: {
+            select: {
+              id: true, stage: true, viewingAt: true, listingId: true,
+              counterpartLeadId: true, matchScore: true,
+            },
+          },
         },
       }),
       prisma.lead.count({ where }),
@@ -215,7 +228,9 @@ router.get(
   requireAdmin,
   asyncHandler(async (_req: Request, res: Response) => {
     const openStatuses = { notIn: ['WON', 'LOST', 'ARCHIVED'] as string[] };
-    const [total, overdue, byMarket, byStatus] = await Promise.all([
+    // "Due" now means a follow-up someone actually planned, not a date invented
+    // from a cadence — so the number means something when it's non-zero.
+    const [total, dueFollowUps, byMarket, byStatus] = await Promise.all([
       prisma.lead.count({ where: { status: openStatuses as never } }),
       prisma.lead.count({ where: { nextContactAt: { lte: new Date() }, status: openStatuses as never } }),
       prisma.lead.groupBy({ by: ['market'], _count: { _all: true }, where: { status: openStatuses as never } }),
@@ -224,7 +239,7 @@ router.get(
 
     sendSuccess(res, {
       openLeads: total,
-      overdue,
+      dueFollowUps,
       byMarket: Object.fromEntries(byMarket.map((r) => [r.market, r._count._all])),
       byStatus: Object.fromEntries(byStatus.map((r) => [r.status, r._count._all])),
     });
@@ -386,23 +401,21 @@ router.get(
       'Client Name', 'Client Type', 'Market', 'Status', 'Source', 'Asking For',
       'Property Types', 'Areas', 'Regions', 'Beds', 'Budget Min / Asking Price', 'Budget Max', 'Currency',
       'Phone', 'WhatsApp', 'Email',
-      'Last Contact Date', 'Interval (Days)', 'Next Contact Date', 'Urgent Status',
+      'Last Contact Date', 'Planned Follow-up', 'Follow-up Note', 'Sub-status',
       'Notes / Actions', 'Created',
     ];
 
     const iso = (d: Date | null) => (d ? new Date(d).toISOString().slice(0, 10) : '');
-    const rows = leads.map((l) => {
-      const overdue = l.nextContactAt && l.nextContactAt <= new Date() && !['WON', 'LOST', 'ARCHIVED'].includes(l.status);
-      return [
+    const rows = leads.map((l) =>
+      [
         l.name, l.type, l.market, l.status, l.source, l.askingFor,
         l.unitKinds.join(' | '), l.areas.join(' | '), l.regions.join(' | '),
         l.minBeds, l.budgetMin, l.budgetMax, l.currency,
         l.phone, l.whatsapp, l.email,
-        iso(l.lastContactAt), l.contactIntervalDays, iso(l.nextContactAt),
-        overdue ? 'OVERDUE' : '',
+        iso(l.lastContactAt), iso(l.nextContactAt), l.nextContactNote, l.subStatus,
         l.notes, iso(l.createdAt),
-      ].map(csvCell).join(',');
-    });
+      ].map(csvCell).join(',')
+    );
 
     const csv = '\uFEFF' + [headers.join(','), ...rows].join('\r\n');
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
@@ -593,6 +606,16 @@ router.put(
     if (data.lastContactAt !== undefined) patch.lastContactAt = data.lastContactAt ? new Date(data.lastContactAt) : null;
     if (data.nextContactAt !== undefined) patch.nextContactAt = data.nextContactAt ? new Date(data.nextContactAt) : null;
 
+    // Derived sub-statuses are earned, not typed: "needs new options" means
+    // everything we showed him is ruled out, which only his shortlist can say.
+    if (data.subStatus && !MANUAL_SUB_STATUSES.includes(data.subStatus)) {
+      const shown = await prisma.leadOpportunity.count({ where: { leadId: req.params.id } });
+      if (shown === 0) {
+        sendError(res, 400, 'Shortlist a property for this client before marking them as needing new options.');
+        return;
+      }
+    }
+
     const lead = await prisma.lead.update({ where: { id: req.params.id }, data: patch });
     await logAdminAction('UPDATE_LEAD', 'lead', lead.id, { name: lead.name }, authReq);
     sendSuccess(res, lead, 'Lead updated');
@@ -608,7 +631,11 @@ const contactSchema = z.object({
   contactedAt: z.string().optional().nullable(),
   // Optional overrides applied alongside the log entry
   status: z.enum(LEAD_STATUSES).optional(),
+  subStatus: z.enum(SUB_STATUSES).optional().nullable(),
   contactIntervalDays: z.number().int().min(1).max(365).optional(),
+  // "Call him back Monday" — captured at the moment you'd actually know it.
+  nextContactAt: z.string().optional().nullable(),
+  nextContactNote: z.string().max(300).optional().nullable(),
 });
 
 router.post(
@@ -641,8 +668,16 @@ router.post(
         data: {
           lastContactAt: contactedAt,
           contactIntervalDays: interval,
-          nextContactAt: computeNextContact(contactedAt, interval),
-          // First touch moves a NEW lead into the active pipeline.
+          // Only what the team explicitly planned. Passing null clears a plan
+          // that has now been honoured; omitting it leaves any plan alone.
+          ...(data.nextContactAt !== undefined
+            ? {
+                nextContactAt: data.nextContactAt ? new Date(data.nextContactAt) : null,
+                nextContactNote: data.nextContactAt ? data.nextContactNote || null : null,
+              }
+            : {}),
+          ...(data.subStatus !== undefined ? { subStatus: data.subStatus } : {}),
+          // First touch moves an untouched lead into the active pipeline.
           status: data.status ?? (lead.status === 'NEW' ? 'ACTIVE' : lead.status),
         },
         include: { contacts: { orderBy: { contactedAt: 'desc' } } },
@@ -705,7 +740,8 @@ router.post(
       data: {
         market: 'LEBANON',
         type: 'BUYER',
-        status: 'NEW',
+        status: 'ACTIVE',
+        subStatus: 'AWAITING_REPLY',
         source: 'INQUIRY',
         name: inquiry.name,
         phone: inquiry.phone,
@@ -715,9 +751,9 @@ router.post(
         regions: inquiry.building?.mohafazat ? [inquiry.building.mohafazat] : [],
         notes: inquiry.message,
         userId: inquiry.userId,
-        lastContactAt: now,
+        // They contacted us, we haven't replied — lastContactAt stays null so
+        // the card reads "never contacted" rather than claiming we called.
         contactIntervalDays: 3,
-        nextContactAt: computeNextContact(now, 3),
         createdBy: authReq.user?.id ?? null,
       },
     });
@@ -738,23 +774,39 @@ const REJECTION_REASONS = [
   'CHANGED_MIND', 'BOUGHT_ELSEWHERE', 'UNAVAILABLE', 'OTHER',
 ] as const;
 
-/** Recompute the client's pipeline status from their live deals. */
+/**
+ * Recompute the client's pipeline status and sub-status from their live deals.
+ *
+ * Always writes, even when nothing changed, so `updatedAt` reflects the
+ * shortlist edit — the board sorts on "last action", and shortlisting a
+ * property for someone is very much an action.
+ */
 async function syncLeadStatus(leadId: string) {
   const lead = await prisma.lead.findUnique({
     where: { id: leadId },
     include: { opportunities: { select: { stage: true } } },
   });
   if (!lead) return;
+
   const next = deriveLeadStatus(lead.status, lead.opportunities);
-  if (next && next !== lead.status) {
-    await prisma.lead.update({
-      where: { id: leadId },
-      data: {
-        status: next as never,
-        closedAt: ['WON', 'LOST'].includes(next) ? new Date() : null,
-      },
-    });
-  }
+  const status = next ?? lead.status;
+
+  // NEEDS_OPTIONS is owned by the pipeline: it goes on when everything shown is
+  // ruled out and comes straight back off the moment we shortlist something.
+  // Any other sub-status is the team's, so we leave it alone.
+  let subStatus = lead.subStatus;
+  if (needsNewOptions({ status }, lead.opportunities)) subStatus = 'NEEDS_OPTIONS' as never;
+  else if (lead.subStatus === 'NEEDS_OPTIONS') subStatus = null;
+
+  await prisma.lead.update({
+    where: { id: leadId },
+    data: {
+      status: status as never,
+      subStatus,
+      ...(next && ['WON', 'LOST'].includes(next) ? { closedAt: new Date() } : {}),
+      ...(next && !['WON', 'LOST'].includes(next) ? { closedAt: null } : {}),
+    },
+  });
 }
 
 const opportunitySchema = z.object({

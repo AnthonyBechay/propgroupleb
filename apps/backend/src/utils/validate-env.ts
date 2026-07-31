@@ -42,6 +42,14 @@ const RECOMMENDED_GROUPS: Array<{ feature: string; vars: string[] }> = [
     feature: 'AI search (Claude)',
     vars: ['ANTHROPIC_API_KEY'],
   },
+  {
+    feature: 'WhatsApp / Facebook lead intake (Meta webhooks)',
+    vars: ['META_APP_SECRET', 'META_VERIFY_TOKEN'],
+  },
+  {
+    feature: 'Facebook Lead Ads answers (needs a page token)',
+    vars: ['META_PAGE_TOKEN'],
+  },
 ];
 
 export function validateEnv(): void {

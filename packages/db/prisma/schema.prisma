@@ -1410,6 +1410,20 @@ enum LeadStatus {
   ARCHIVED    // parked, no longer followed up
 }
 
+// Why an active client is still active. LeadStatus says where they are in the
+// pipeline; this says what is actually holding them there, so a card sitting in
+// Active for three weeks explains itself.
+enum LeadSubStatus {
+  SEARCHING       // we're actively sending them options
+  AWAITING_REPLY  // ball is in their court
+  NEEDS_OPTIONS   // everything shown is ruled out — we owe them fresh stock
+  BUDGET_MISMATCH // what they want costs more than they'll pay
+  FINANCING       // arranging a loan / selling something first
+  PAUSED          // asked us to pause (travel, ramadan, waiting on a sale)
+  DOCS_PENDING    // seller side: waiting on papers, deed, authorisation
+  PRICE_REVIEW    // seller side: asking price needs revisiting
+}
+
 enum LeadSource {
   MANUAL      // typed in by the team
   INQUIRY     // property inquiry form
@@ -1419,6 +1433,7 @@ enum LeadSource {
   WHATSAPP
   PHONE
   WALK_IN
+  FACEBOOK_AD // auto-created from a Lead Ads webhook
 }
 
 // Which side of the business the lead belongs to.
@@ -1440,8 +1455,11 @@ model Lead {
   id     String     @id @default(cuid())
   market LeadMarket @default(LEBANON)
   type   LeadType   @default(BUYER)
-  status LeadStatus @default(NEW)
+  status LeadStatus @default(ACTIVE)
   source LeadSource @default(MANUAL)
+
+  // Nullable = derive it from the pipeline; set = the team overrode it.
+  subStatus LeadSubStatus?
 
   // Who
   name     String
@@ -1463,10 +1481,14 @@ model Lead {
   budgetMax Float?
   currency  Currency @default(USD)
 
-  // Follow-up cadence — nextContactAt in the past means overdue.
   lastContactAt       DateTime?
   contactIntervalDays Int       @default(7)
+  // An appointment the team deliberately made ("call him Monday"). Never
+  // derived from a cadence — an inbox full of invented overdue dates is noise,
+  // and the team stops trusting the red badges.
   nextContactAt       DateTime?
+  // What the planned contact is for, shown next to the date.
+  nextContactNote     String?
 
   notes String?
 
@@ -1477,6 +1499,11 @@ model Lead {
   // Optional links back into the platform
   userId    String? // registered user this lead corresponds to
   listingId String? // a specific listing they asked about
+
+  // External identities, so an inbound WhatsApp message or Lead Ads submission
+  // lands on the existing client instead of creating a duplicate.
+  waId           String? @unique // WhatsApp phone-number id (digits, E.164 without +)
+  externalLeadId String? @unique // Facebook leadgen id
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1489,6 +1516,7 @@ model Lead {
   @@index([status])
   @@index([type])
   @@index([nextContactAt])
+  @@index([subStatus])
   @@index([userId])
   @@index([createdAt])
   @@map("leads")

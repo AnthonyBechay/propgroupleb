@@ -3,7 +3,12 @@ import { ALL_PROPERTY_KINDS, typeLabel } from '@/lib/property-types'
 export type LeadMarket = 'LEBANON' | 'GEORGIA'
 export type LeadType = 'BUYER' | 'SELLER' | 'RENTER' | 'LANDLORD' | 'INVESTOR'
 export type LeadStatus = 'NEW' | 'ACTIVE' | 'VIEWING' | 'NEGOTIATING' | 'WON' | 'LOST' | 'ARCHIVED'
-export type LeadSource = 'MANUAL' | 'INQUIRY' | 'FAVORITE' | 'SUBMISSION' | 'REFERRAL' | 'WHATSAPP' | 'PHONE' | 'WALK_IN'
+export type LeadSource = 'MANUAL' | 'INQUIRY' | 'FAVORITE' | 'SUBMISSION' | 'REFERRAL' | 'WHATSAPP' | 'PHONE' | 'WALK_IN' | 'FACEBOOK_AD'
+
+/** Why an open client is still open. Answers "he's Active — waiting on what?". */
+export type LeadSubStatus =
+  | 'SEARCHING' | 'AWAITING_REPLY' | 'NEEDS_OPTIONS' | 'BUDGET_MISMATCH'
+  | 'FINANCING' | 'PAUSED' | 'DOCS_PENDING' | 'PRICE_REVIEW'
 export type ContactChannel = 'CALL' | 'WHATSAPP' | 'EMAIL' | 'MEETING' | 'VIEWING' | 'NOTE'
 
 export interface LeadContact {
@@ -85,6 +90,7 @@ export interface Lead {
   market: LeadMarket
   type: LeadType
   status: LeadStatus
+  subStatus: LeadSubStatus | null
   source: LeadSource
   name: string
   phone: string | null
@@ -101,7 +107,9 @@ export interface Lead {
   lastContactAt: string | null
   contactIntervalDays: number
   nextContactAt: string | null
+  nextContactNote: string | null
   notes: string | null
+  updatedAt?: string
   /** Set when the relationship reached WON/LOST. */
   closedAt?: string | null
   createdAt: string
@@ -112,11 +120,16 @@ export interface Lead {
   _count?: { contacts: number }
 }
 
-/** Client is waiting on us for fresh options: everything shown is ruled out. */
+/**
+ * Client is waiting on us for fresh options: everything shown is ruled out.
+ * The server owns this — it sets `subStatus` when it syncs the pipeline — so
+ * trust that first and only fall back to recomputing for older payloads.
+ */
 export function isWaitingOnUs(lead: Lead): boolean {
+  if (lead.subStatus === 'NEEDS_OPTIONS') return true
   if (lead.needsNewOptions !== undefined) return lead.needsNewOptions
   const ops = lead.opportunities ?? []
-  if (['NEW', 'WON', 'LOST', 'ARCHIVED'].includes(lead.status) || ops.length === 0) return false
+  if (['WON', 'LOST', 'ARCHIVED'].includes(lead.status) || ops.length === 0) return false
   return !ops.some((o) => LIVE_STAGES.includes(o.stage)) && ops.some((o) => o.stage === 'REJECTED')
 }
 
@@ -146,8 +159,57 @@ export function isRecentWin(lead: Lead): boolean {
   return new Date(closed) >= cutoff
 }
 
-/** Board columns, in pipeline order. WON/LOST/ARCHIVED live off-board. */
-export const BOARD_STAGES: LeadStatus[] = ['NEW', 'ACTIVE', 'VIEWING', 'NEGOTIATING', 'WON']
+/**
+ * Board columns.
+ *
+ * The two sides of the business need separate columns, not one "Active" pile:
+ * a seller with a flat to move and a buyer looking for one are different work,
+ * and mixing them is how a broker loses track of which side is short. Statuses
+ * further down the pipeline (Viewing, Negotiating) are already about a specific
+ * deal, so both sides share those.
+ *
+ * `NEW` is folded into the active columns — a client nobody has called yet is
+ * simply an active client nobody has called yet, not a separate stage.
+ */
+export interface BoardColumn {
+  key: string
+  label: string
+  hint: string
+  accent: string
+  /** Status written when a card is dropped here. */
+  status: LeadStatus
+  /** Which side of the deal this column holds; undefined = both. */
+  side?: 'supply' | 'demand'
+}
+
+export const BOARD_COLUMNS: BoardColumn[] = [
+  {
+    key: 'ACTIVE_SUPPLY', label: 'Active Sellers', side: 'supply', status: 'ACTIVE',
+    hint: 'Have a property to move', accent: 'bg-amber-500',
+  },
+  {
+    key: 'ACTIVE_DEMAND', label: 'Active Buyers', side: 'demand', status: 'ACTIVE',
+    hint: 'Looking for a property', accent: 'bg-sky-500',
+  },
+  { key: 'VIEWING', label: 'Viewing', status: 'VIEWING', hint: 'Viewing booked', accent: 'bg-violet-500' },
+  { key: 'NEGOTIATING', label: 'Negotiating', status: 'NEGOTIATING', hint: 'Offer on the table', accent: 'bg-amber-600' },
+  { key: 'WON', label: 'Won', status: 'WON', hint: `Closed in the last ${WON_WINDOW_MONTHS} months`, accent: 'bg-green-600' },
+]
+
+/** Which column a lead belongs in. */
+export function columnOf(lead: Lead): string {
+  // An untouched lead still needs working, so it sits with the active ones.
+  if (lead.status === 'ACTIVE' || lead.status === 'NEW') {
+    return isSupplyType(lead.type) ? 'ACTIVE_SUPPLY' : 'ACTIVE_DEMAND'
+  }
+  return lead.status
+}
+
+/** True when this client may be dropped into this column. */
+export function acceptsDrop(column: BoardColumn, lead: Lead): boolean {
+  if (!column.side) return true
+  return column.side === (isSupplyType(lead.type) ? 'supply' : 'demand')
+}
 
 export const STATUS_META: Record<LeadStatus, { label: string; cls: string }> = {
   NEW:         { label: 'New',         cls: 'bg-sky-100 text-sky-700' },
@@ -199,18 +261,76 @@ export const UNIT_KIND_LABELS: Record<string, string> = Object.fromEntries(
   ALL_PROPERTY_KINDS.map((k) => [k, typeLabel(k)])
 )
 
-/** Days until the next follow-up. Negative = overdue. Null when unscheduled. */
+/** Whole days between a date and today. Negative = in the past. */
 export function daysUntil(iso: string | null): number | null {
   if (!iso) return null
   const ms = new Date(iso).setHours(0, 0, 0, 0) - new Date().setHours(0, 0, 0, 0)
   return Math.round(ms / 86_400_000)
 }
 
-export function formatDue(iso: string | null): { text: string; tone: 'overdue' | 'today' | 'soon' | 'later' | 'none' } {
+/**
+ * How long since we last spoke to them. This replaced a countdown to an
+ * invented due date: a cadence the team never agreed to made every card red,
+ * so the colour stopped meaning anything. A plain fact — "last spoke 9 days
+ * ago" — lets the broker judge for themselves.
+ */
+export function formatLastContact(iso: string | null): { text: string; stale: boolean } {
   const d = daysUntil(iso)
-  if (d === null) return { text: 'Not scheduled', tone: 'none' }
-  if (d < 0) return { text: `${Math.abs(d)}d overdue`, tone: 'overdue' }
-  if (d === 0) return { text: 'Due today', tone: 'today' }
-  if (d <= 3) return { text: `In ${d}d`, tone: 'soon' }
-  return { text: new Date(iso as string).toLocaleDateString(undefined, { day: 'numeric', month: 'short' }), tone: 'later' }
+  if (d === null) return { text: 'Never contacted', stale: true }
+  const ago = Math.abs(d)
+  if (ago === 0) return { text: 'Spoke today', stale: false }
+  if (ago === 1) return { text: 'Spoke yesterday', stale: false }
+  if (ago < 7) return { text: `${ago}d ago`, stale: false }
+  if (ago < 30) return { text: `${Math.floor(ago / 7)}w ago`, stale: ago >= 21 }
+  return { text: `${Math.floor(ago / 30)}mo ago`, stale: true }
+}
+
+/** A follow-up the team actually planned, e.g. "call him Monday". */
+export function formatPlanned(iso: string | null): { text: string; due: boolean } | null {
+  const d = daysUntil(iso)
+  if (d === null) return null
+  if (d < 0) return { text: 'Follow-up due', due: true }
+  if (d === 0) return { text: 'Follow-up today', due: true }
+  if (d === 1) return { text: 'Follow-up tomorrow', due: false }
+  if (d <= 6) return { text: new Date(iso as string).toLocaleDateString(undefined, { weekday: 'long' }), due: false }
+  return { text: new Date(iso as string).toLocaleDateString(undefined, { day: 'numeric', month: 'short' }), due: false }
+}
+
+export const SUB_STATUS_META: Record<LeadSubStatus, { label: string; cls: string; forSide?: 'supply' | 'demand' }> = {
+  SEARCHING:       { label: 'Searching',        cls: 'bg-sky-50 text-sky-700 border-sky-200' },
+  AWAITING_REPLY:  { label: 'Awaiting reply',   cls: 'bg-slate-100 text-slate-600 border-slate-200' },
+  NEEDS_OPTIONS:   { label: 'Needs new options',cls: 'bg-indigo-50 text-indigo-700 border-indigo-200' },
+  BUDGET_MISMATCH: { label: 'Budget too low',   cls: 'bg-rose-50 text-rose-700 border-rose-200' },
+  FINANCING:       { label: 'Arranging finance',cls: 'bg-violet-50 text-violet-700 border-violet-200' },
+  PAUSED:          { label: 'Paused',           cls: 'bg-slate-100 text-slate-500 border-slate-200' },
+  DOCS_PENDING:    { label: 'Waiting on papers',cls: 'bg-amber-50 text-amber-800 border-amber-200', forSide: 'supply' },
+  PRICE_REVIEW:    { label: 'Price needs review',cls: 'bg-orange-50 text-orange-800 border-orange-200', forSide: 'supply' },
+}
+
+/**
+ * Sub-statuses a person may pick. NEEDS_OPTIONS is missing on purpose — it
+ * means "everything we showed him is ruled out", which only his shortlist can
+ * establish, so the server sets and clears it.
+ */
+export const MANUAL_SUB_STATUSES = (Object.keys(SUB_STATUS_META) as LeadSubStatus[])
+  .filter((k) => k !== 'NEEDS_OPTIONS')
+
+/** Sub-statuses worth offering for this client's side of the deal. */
+export function subStatusesFor(type: LeadType): LeadSubStatus[] {
+  const side = isSupplyType(type) ? 'supply' : 'demand'
+  return MANUAL_SUB_STATUSES.filter((k) => {
+    const only = SUB_STATUS_META[k].forSide
+    return !only || only === side
+  })
+}
+
+/**
+ * When something last happened on this client — created, edited, contacted or
+ * had their shortlist changed. The board sorts on this.
+ */
+export function lastActivityAt(lead: Lead): number {
+  const stamps = [lead.updatedAt, lead.lastContactAt, lead.createdAt]
+    .filter(Boolean)
+    .map((d) => new Date(d as string).getTime())
+  return stamps.length ? Math.max(...stamps) : 0
 }

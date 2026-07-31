@@ -11,6 +11,7 @@ import { errorHandler } from './utils/errors.js';
 import { logger } from './utils/logger.js';
 import { validateEnv } from './utils/validate-env.js';
 import { ensureReferenceCodes } from './utils/reference.js';
+import { normaliseCrmData } from './utils/crm-bootstrap.js';
 
 // Import routes
 import authRoutes from './routes/auth.js';
@@ -38,6 +39,7 @@ import fileRoutes from './routes/files.js';
 import locationGuideRoutes from './routes/location-guides.js';
 import submissionRoutes from './routes/submissions.js';
 import crmRoutes from './routes/crm.js';
+import webhookRoutes from './routes/webhooks.js';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -123,7 +125,18 @@ app.use(
     }
   )
 );
-app.use(express.json({ limit: '10mb' }));
+app.use(
+  express.json({
+    limit: '10mb',
+    // Meta webhook signatures cover the exact bytes sent, which JSON.parse
+    // throws away — stash them for the signature check.
+    verify: (req, _res, buf) => {
+      if (req.url?.startsWith('/api/webhooks/')) {
+        (req as express.Request & { rawBody?: Buffer }).rawBody = Buffer.from(buf);
+      }
+    },
+  })
+);
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
@@ -183,7 +196,24 @@ const authLimiter = rateLimit({
   legacyHeaders: false,
 });
 
-app.use('/api/', generalLimiter);
+/**
+ * Meta delivers every WhatsApp message and ad submission from a shared pool of
+ * IPs, so a busy campaign looks like one very chatty client. Tripping the
+ * general limit would make Meta retry, then disable the subscription — and
+ * these requests are already gated by an HMAC signature, which is a stronger
+ * check than counting requests per IP.
+ */
+const webhookLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 600,
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+app.use('/api/webhooks/', webhookLimiter);
+app.use('/api/', (req, res, next) =>
+  req.path.startsWith('/webhooks/') ? next() : generalLimiter(req, res, next)
+);
 app.use('/api/auth/login', authLimiter);
 app.use('/api/auth/register', authLimiter);
 
@@ -243,6 +273,8 @@ app.use('/api/location-guides', locationGuideRoutes);
 app.use('/api/share', shareRoutes);
 app.use('/api/submissions', submissionRoutes);
 app.use('/api/crm', crmRoutes);
+// Public by design — Meta calls it. Guarded by signature, not by auth.
+app.use('/api/webhooks', webhookRoutes);
 
 app.use('/api/fx-rates', fxRateRoutes);
 
@@ -292,6 +324,7 @@ async function startServer() {
     // reference-code sequence and backfill have to be established here.
     try {
       await ensureReferenceCodes();
+      await normaliseCrmData();
       logger.info('Reference codes ready');
     } catch (err) {
       // Never block startup over this — the site works without codes.

@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import {
   X, Phone, MessageCircle, Mail, Loader2, Send, Pencil, Trash2, Building2,
-  CalendarClock, AlertTriangle, ExternalLink, History, Handshake,
+  Clock, CalendarPlus, ExternalLink, History, Handshake,
   ClipboardCheck, Lightbulb, Sparkles, Plus,
 } from 'lucide-react'
 import { normalizeApiUrl, normalizeFileUrl } from '@/lib/utils/api-url'
@@ -12,10 +12,25 @@ import { regionLabel } from '@/lib/crm-locations'
 import { LeadFormModal } from './LeadFormModal'
 import {
   type Lead, type LeadContact, type Opportunity, STATUS_META, TYPE_LABELS, MARKET_META,
-  UNIT_KIND_LABELS, formatDue, REJECTION_LABELS, isSupplyType,
+  UNIT_KIND_LABELS, formatLastContact, formatPlanned, REJECTION_LABELS, isSupplyType,
+  SUB_STATUS_META, subStatusesFor, type LeadSubStatus,
 } from './types'
 import { OpportunityList } from './OpportunityList'
 import { listingRef } from '@/lib/reference'
+
+/** Date presets, as an <input type="date"> value. */
+const inDays = (n: number) => () => {
+  const d = new Date()
+  d.setDate(d.getDate() + n)
+  return d.toISOString().slice(0, 10)
+}
+
+const QUICK_PLANS: Array<{ label: string; value: () => string }> = [
+  { label: 'Tomorrow', value: inDays(1) },
+  { label: 'In 3 days', value: inDays(3) },
+  { label: 'Next week', value: inDays(7) },
+  { label: 'In 2 weeks', value: inDays(14) },
+]
 
 interface MatchScore {
   score: number
@@ -68,7 +83,11 @@ export function LeadDrawer({ lead, onClose, onChanged }: { lead: Lead; onClose: 
   // Quick contact-log form
   const [channel, setChannel] = useState<typeof CHANNELS[number]>('CALL')
   const [body, setBody] = useState('')
-  const [interval, setInterval] = useState(String(lead.contactIntervalDays))
+  // Planning the next touch belongs here — logging a call is exactly when you
+  // know whether to ring back Monday.
+  const [planDate, setPlanDate] = useState('')
+  const [planNote, setPlanNote] = useState('')
+  const [subStatusError, setSubStatusError] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -95,13 +114,42 @@ export function LeadDrawer({ lead, onClose, onChanged }: { lead: Lead; onClose: 
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ channel, body: body.trim(), contactIntervalDays: Number(interval) || undefined }),
+        body: JSON.stringify({
+          channel,
+          body: body.trim(),
+          // Send the plan only when one was entered; omitting it leaves any
+          // existing plan alone rather than silently wiping it.
+          ...(planDate ? { nextContactAt: new Date(planDate).toISOString(), nextContactNote: planNote || null } : {}),
+        }),
       })
       if (res.ok) {
         setBody('')
+        setPlanDate('')
+        setPlanNote('')
         await load()
         onChanged()
       }
+    } finally { setBusy(false) }
+  }
+
+  /** Set (or clear) why this client is still open. */
+  async function setSubStatus(next: LeadSubStatus | null) {
+    setSubStatusError(null)
+    setBusy(true)
+    try {
+      const res = await fetch(`${apiUrl}/api/crm/${lead.id}`, {
+        method: 'PUT',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ subStatus: next }),
+      })
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}))
+        setSubStatusError(j.message || j.error || 'Could not update')
+        return
+      }
+      await load()
+      onChanged()
     } finally { setBusy(false) }
   }
 
@@ -145,7 +193,8 @@ export function LeadDrawer({ lead, onClose, onChanged }: { lead: Lead; onClose: 
   // Strong fits vs. worth-a-call near misses — brokers want both, but clearly separated.
   const strongMatches = matches.filter((m) => m.match.score >= 70)
   const nearMatches = matches.filter((m) => m.match.score < 70)
-  const due = formatDue(l.nextContactAt)
+  const lastContact = formatLastContact(l.lastContactAt)
+  const planned = formatPlanned(l.nextContactAt)
   const where = [l.areas.join(', '), l.regions.map(regionLabel).join(', ')].filter(Boolean).join(' · ')
   const phone = l.whatsapp || l.phone
 
@@ -193,12 +242,53 @@ export function LeadDrawer({ lead, onClose, onChanged }: { lead: Lead; onClose: 
                 <Mail className="h-3.5 w-3.5" /> Email
               </a>
             )}
-            <span className={`ml-auto inline-flex items-center gap-1 text-xs font-medium px-2.5 py-1.5 rounded-lg ${
-              due.tone === 'overdue' ? 'bg-red-50 text-red-700' : due.tone === 'today' ? 'bg-amber-50 text-amber-700' : 'bg-slate-100 text-slate-600'
-            }`}>
-              {due.tone === 'overdue' ? <AlertTriangle className="h-3.5 w-3.5" /> : <CalendarClock className="h-3.5 w-3.5" />}
-              {due.text}
+            <span
+              className="ml-auto inline-flex items-center gap-1 text-xs font-medium px-2.5 py-1.5 rounded-lg bg-slate-100 text-slate-600"
+              title={l.lastContactAt ? new Date(l.lastContactAt).toLocaleString() : 'No contact logged yet'}
+            >
+              <Clock className="h-3.5 w-3.5" />{lastContact.text}
             </span>
+            {planned && (
+              <span
+                className={`inline-flex items-center gap-1 text-xs font-medium px-2.5 py-1.5 rounded-lg ${
+                  planned.due ? 'bg-sky-50 text-sky-700' : 'bg-slate-100 text-slate-600'
+                }`}
+                title={l.nextContactNote || 'Planned follow-up'}
+              >
+                <CalendarPlus className="h-3.5 w-3.5" />{planned.text}
+              </span>
+            )}
+          </div>
+
+          {/* Why this client is still open — the answer to "he's Active, and?" */}
+          <div className="mt-3 pt-3 border-t border-slate-100">
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide mr-1">Waiting on</span>
+              {subStatusesFor(l.type).map((k) => {
+                const on = l.subStatus === k
+                return (
+                  <button
+                    key={k}
+                    onClick={() => setSubStatus(on ? null : k)}
+                    disabled={busy}
+                    className={`px-2 py-0.5 rounded text-[11px] font-medium border transition-colors disabled:opacity-50 ${
+                      on ? SUB_STATUS_META[k].cls : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'
+                    }`}
+                  >
+                    {SUB_STATUS_META[k].label}
+                  </button>
+                )
+              })}
+              {l.subStatus === 'NEEDS_OPTIONS' && (
+                <span
+                  className={`px-2 py-0.5 rounded text-[11px] font-medium border ${SUB_STATUS_META.NEEDS_OPTIONS.cls}`}
+                  title="Set automatically: everything shortlisted for this client has been ruled out"
+                >
+                  {SUB_STATUS_META.NEEDS_OPTIONS.label} · auto
+                </span>
+              )}
+            </div>
+            {subStatusError && <p className="text-[11px] text-red-600 mt-1.5">{subStatusError}</p>}
           </div>
         </div>
 
@@ -259,19 +349,56 @@ export function LeadDrawer({ lead, onClose, onChanged }: { lead: Lead; onClose: 
               placeholder="What was said / agreed?"
               className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-900/10 resize-y"
             />
+            {/* Plan the next touch while you still remember what you agreed */}
+            <div className="rounded-lg border border-slate-200 bg-slate-50 p-2.5 space-y-2">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-xs font-medium text-slate-600 inline-flex items-center gap-1">
+                  <CalendarPlus className="h-3.5 w-3.5" /> Plan next contact
+                </span>
+                {QUICK_PLANS.map((p) => (
+                  <button
+                    key={p.label}
+                    type="button"
+                    onClick={() => setPlanDate(p.value())}
+                    className="px-2 py-0.5 rounded text-[11px] font-medium border border-slate-200 bg-white text-slate-600 hover:bg-slate-100"
+                  >
+                    {p.label}
+                  </button>
+                ))}
+                {planDate && (
+                  <button
+                    type="button"
+                    onClick={() => { setPlanDate(''); setPlanNote('') }}
+                    className="text-[11px] text-slate-400 hover:text-slate-700 inline-flex items-center gap-0.5"
+                  >
+                    <X className="h-3 w-3" /> Clear
+                  </button>
+                )}
+              </div>
+              <div className="flex gap-2">
+                <input
+                  type="date"
+                  value={planDate}
+                  onChange={(e) => setPlanDate(e.target.value)}
+                  className="px-2 py-1.5 border border-slate-200 rounded-lg text-sm bg-white"
+                />
+                <input
+                  value={planNote}
+                  onChange={(e) => setPlanNote(e.target.value)}
+                  placeholder="What for? (optional)"
+                  className="flex-1 min-w-0 px-2 py-1.5 border border-slate-200 rounded-lg text-sm bg-white"
+                />
+              </div>
+            </div>
+
             <div className="flex items-center gap-2">
-              <label className="text-xs text-slate-500">Next in</label>
-              <input
-                type="number" min="1" value={interval} onChange={(e) => setInterval(e.target.value)}
-                className="w-16 px-2 py-1.5 border border-slate-200 rounded-lg text-sm"
-              />
-              <span className="text-xs text-slate-500">days</span>
               <button
                 onClick={logContact}
                 disabled={busy || !body.trim()}
                 className="ml-auto inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-slate-800 text-white text-sm font-medium hover:bg-slate-700 disabled:opacity-50"
               >
-                {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />} Log &amp; reschedule
+                {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                {planDate ? 'Log & plan follow-up' : 'Log contact'}
               </button>
             </div>
           </section>

@@ -422,7 +422,11 @@
       "Bash(docker info *)",
       "Bash(pnpm --filter @propgroup/db exec prisma generate)",
       "Bash(export DATABASE_URL=\"postgresql://postgres:test@localhost:55433/reftest\")",
-      "Bash(npx prisma *)"
+      "Bash(npx prisma *)",
+      "Bash(docker rm *)",
+      "Bash(docker run *)",
+      "Bash(break)",
+      "Bash(DATABASE_URL=\"postgresql://postgres:test@localhost:55434/crmtest\" npx prisma db push --skip-generate --accept-data-loss)"
     ],
     "deny": [],
     "ask": []
