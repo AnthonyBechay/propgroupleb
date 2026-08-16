@@ -39,6 +39,37 @@ export async function normaliseCrmData(): Promise<void> {
     return `${count} leads moved from New to Active`;
   });
 
+  // Sellers used to be described by one set of fields, which only ever fitted
+  // one property. Give each existing seller a property row built from those
+  // fields so nothing disappears when the UI switches to the new model.
+  await once('crm_seed_seller_properties_v1', async () => {
+    const sellers = await prisma.lead.findMany({
+      where: {
+        type: { in: ['SELLER', 'LANDLORD'] as never },
+        status: { notIn: ['WON', 'LOST', 'ARCHIVED'] as never },
+        properties: { none: {} },
+      },
+      select: {
+        id: true, unitKinds: true, areas: true, regions: true, minBeds: true,
+        budgetMin: true, budgetMax: true, currency: true, askingFor: true,
+      },
+    });
+    if (sellers.length === 0) return 'no sellers to seed';
+    await prisma.leadProperty.createMany({
+      data: sellers.map((l: any) => ({
+        leadId: l.id,
+        kind: l.unitKinds?.[0] ?? 'APARTMENT',
+        areas: l.areas ?? [],
+        region: l.regions?.[0] ?? null,
+        askingPrice: l.budgetMin ?? l.budgetMax ?? null,
+        currency: l.currency,
+        bedrooms: l.minBeds,
+        notes: l.askingFor,
+      })),
+    });
+    return `${sellers.length} seller properties seeded`;
+  });
+
   // Follow-up dates used to be invented from a 7-day cadence, so every imported
   // client showed up overdue on day one and the team stopped reading the badge.
   // Clear the invented ones; from here on a date only exists if someone set it.

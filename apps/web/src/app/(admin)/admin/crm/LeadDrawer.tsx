@@ -5,7 +5,7 @@ import Link from 'next/link'
 import {
   X, Phone, MessageCircle, Mail, Loader2, Send, Pencil, Trash2, Building2,
   Clock, CalendarPlus, ExternalLink, History, Handshake,
-  ClipboardCheck, Lightbulb, Sparkles, Plus,
+  ClipboardCheck, Lightbulb, Sparkles, Plus, StickyNote, Globe,
 } from 'lucide-react'
 import { normalizeApiUrl, normalizeFileUrl } from '@/lib/utils/api-url'
 import { regionLabel } from '@/lib/crm-locations'
@@ -13,9 +13,10 @@ import { LeadFormModal } from './LeadFormModal'
 import {
   type Lead, type LeadContact, type Opportunity, STATUS_META, TYPE_LABELS, MARKET_META,
   UNIT_KIND_LABELS, formatLastContact, formatPlanned, REJECTION_LABELS, isSupplyType,
-  SUB_STATUS_META, subStatusesFor, type LeadSubStatus,
+  SUB_STATUS_META, subStatusesFor, type LeadSubStatus, STRONG_MATCH_SCORE,
 } from './types'
 import { OpportunityList } from './OpportunityList'
+import { SellerProperties } from './SellerProperties'
 import { listingRef } from '@/lib/reference'
 
 /** Date presets, as an <input type="date"> value. */
@@ -88,6 +89,11 @@ export function LeadDrawer({ lead, onClose, onChanged }: { lead: Lead; onClose: 
   const [planDate, setPlanDate] = useState('')
   const [planNote, setPlanNote] = useState('')
   const [subStatusError, setSubStatusError] = useState<string | null>(null)
+  const [note, setNote] = useState('')
+  // Recording a purchase we didn't list — a Batumi studio, a private sale.
+  const [extTitle, setExtTitle] = useState('')
+  const [extUrl, setExtUrl] = useState('')
+  const [showExternal, setShowExternal] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -128,6 +134,43 @@ export function LeadDrawer({ lead, onClose, onChanged }: { lead: Lead; onClose: 
         setPlanNote('')
         await load()
         onChanged()
+      }
+    } finally { setBusy(false) }
+  }
+
+  /** File a note. Deliberately not a contact — see the backend for why. */
+  async function addNote() {
+    if (!note.trim()) return
+    setBusy(true)
+    try {
+      const res = await fetch(`${apiUrl}/api/crm/${lead.id}/note`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ body: note.trim() }),
+      })
+      if (res.ok) { setNote(''); await load(); onChanged() }
+    } finally { setBusy(false) }
+  }
+
+  /** Shortlist something we don't list ourselves, so the deal can be tracked. */
+  async function addExternal() {
+    if (!extTitle.trim()) return
+    setBusy(true)
+    try {
+      const res = await fetch(`${apiUrl}/api/crm/${lead.id}/opportunities`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          stage: 'INTERESTED',
+          externalTitle: extTitle.trim(),
+          externalUrl: extUrl.trim() || null,
+        }),
+      })
+      if (res.ok) {
+        setExtTitle(''); setExtUrl(''); setShowExternal(false)
+        await load(); onChanged()
       }
     } finally { setBusy(false) }
   }
@@ -191,8 +234,8 @@ export function LeadDrawer({ lead, onClose, onChanged }: { lead: Lead; onClose: 
   const l = detail ?? lead
   const isSupply = isSupplyType(l.type)
   // Strong fits vs. worth-a-call near misses — brokers want both, but clearly separated.
-  const strongMatches = matches.filter((m) => m.match.score >= 70)
-  const nearMatches = matches.filter((m) => m.match.score < 70)
+  const strongMatches = matches.filter((m) => m.match.score >= STRONG_MATCH_SCORE)
+  const nearMatches = matches.filter((m) => m.match.score < STRONG_MATCH_SCORE)
   const lastContact = formatLastContact(l.lastContactAt)
   const planned = formatPlanned(l.nextContactAt)
   const where = [l.areas.join(', '), l.regions.map(regionLabel).join(', ')].filter(Boolean).join(' · ')
@@ -402,6 +445,104 @@ export function LeadDrawer({ lead, onClose, onChanged }: { lead: Lead; onClose: 
               </button>
             </div>
           </section>
+
+          {/* Notes — things worth remembering that aren't a phone call */}
+          <section className="bg-white border border-slate-200 rounded-xl p-4 space-y-2.5">
+            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide flex items-center gap-1.5">
+              <StickyNote className="h-3.5 w-3.5" /> Notes
+            </p>
+            <textarea
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              rows={2}
+              placeholder="His brother is also looking · prefers ground floor · wants to close before September"
+              className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-900/10 resize-y"
+            />
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-[11px] text-slate-400">
+                A note doesn&apos;t count as contacting them.
+              </span>
+              <button
+                onClick={addNote}
+                disabled={busy || !note.trim()}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+              >
+                {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />} Add note
+              </button>
+            </div>
+
+            {(l.contacts ?? []).filter((c) => c.channel === 'NOTE').length > 0 && (
+              <ol className="space-y-1.5 pt-1">
+                {(l.contacts ?? [])
+                  .filter((c) => c.channel === 'NOTE')
+                  .slice(0, 8)
+                  .map((c) => (
+                    <li key={c.id} className="rounded-lg bg-amber-50/60 border border-amber-100 px-2.5 py-1.5">
+                      <p className="text-sm text-slate-700 whitespace-pre-wrap">{c.body}</p>
+                      <span className="text-[10px] text-slate-400">
+                        {new Date(c.contactedAt).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })}
+                      </span>
+                    </li>
+                  ))}
+              </ol>
+            )}
+          </section>
+
+          {isSupply && (
+            <SellerProperties
+              leadId={l.id}
+              properties={l.properties ?? []}
+              onChanged={() => { load(); onChanged() }}
+            />
+          )}
+
+          {!isSupply && (
+            <section className="bg-white border border-slate-200 rounded-xl p-4">
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide flex items-center gap-1.5">
+                  <Globe className="h-3.5 w-3.5" /> Bought elsewhere
+                </p>
+                <button
+                  onClick={() => setShowExternal((v) => !v)}
+                  className="inline-flex items-center gap-1 text-xs font-medium text-slate-600 hover:text-slate-900"
+                >
+                  <Plus className="h-3.5 w-3.5" /> Add
+                </button>
+              </div>
+              <p className="text-[11px] text-slate-400 mt-1">
+                A property we don&apos;t list — a Batumi studio on propgrp.com, another agency&apos;s
+                stock. Track it here so the deal and the commission still count.
+              </p>
+              {showExternal && (
+                <div className="mt-2 space-y-2">
+                  <input
+                    value={extTitle}
+                    onChange={(e) => setExtTitle(e.target.value)}
+                    placeholder="Studio, Orbi City Batumi"
+                    className="w-full px-2 py-1.5 border border-slate-200 rounded-lg text-sm"
+                  />
+                  <input
+                    value={extUrl}
+                    onChange={(e) => setExtUrl(e.target.value)}
+                    placeholder="https://propgrp.com/… (optional)"
+                    className="w-full px-2 py-1.5 border border-slate-200 rounded-lg text-sm"
+                  />
+                  <div className="flex justify-end gap-2">
+                    <button onClick={() => setShowExternal(false)} className="px-3 py-1.5 text-xs text-slate-600 rounded hover:bg-slate-100">
+                      Cancel
+                    </button>
+                    <button
+                      onClick={addExternal}
+                      disabled={busy || !extTitle.trim()}
+                      className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-semibold text-white bg-slate-800 rounded hover:bg-slate-700 disabled:opacity-50"
+                    >
+                      {busy && <Loader2 className="h-3.5 w-3.5 animate-spin" />} Track it
+                    </button>
+                  </div>
+                </div>
+              )}
+            </section>
+          )}
 
           {/* What we've shown them, and how it went */}
           <section className="bg-white border border-slate-200 rounded-xl p-4">

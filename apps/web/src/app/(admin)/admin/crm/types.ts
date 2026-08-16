@@ -34,23 +34,75 @@ export interface Opportunity {
   stage: OpportunityStage
   listingId: string | null
   counterpartLeadId: string | null
+  leadPropertyId: string | null
+  /** Off-platform property (a Batumi studio on propgrp.com, a private sale). */
+  externalTitle: string | null
+  externalUrl: string | null
   matchScore: number | null
   viewingAt: string | null
   viewedAt: string | null
   rejectionReason: RejectionReason | null
   feedback: string | null
+  soldPrice: number | null
+  soldCurrency: 'USD' | 'LBP'
+  commissionUsd: number | null
+  closedAt: string | null
   updatedAt: string
   /** Resolved by the API so ruled-out items still show their real name. */
   subject?: {
-    kind: 'LISTING' | 'CLIENT' | 'UNKNOWN'
+    kind: 'LISTING' | 'CLIENT' | 'SELLER_PROPERTY' | 'EXTERNAL' | 'UNKNOWN'
     title: string
     subtitle: string | null
     /** Reference code, present for LISTING subjects. */
     ref?: string | null
     slug?: string | null
-    id?: string
+    url?: string | null
+    id?: string | null
   }
 }
+
+export type LeadPropertyStatus = 'AVAILABLE' | 'RESERVED' | 'SOLD' | 'WITHDRAWN'
+
+/**
+ * One thing a seller has on the market. A seller's own fields describe a single
+ * asset, which stops working the moment he lists a second — and most do.
+ */
+export interface LeadProperty {
+  id: string
+  leadId: string
+  kind: string
+  title: string | null
+  areas: string[]
+  region: string | null
+  askingPrice: number | null
+  currency: 'USD' | 'LBP'
+  bedrooms: number | null
+  areaSqm: number | null
+  status: LeadPropertyStatus
+  listingId: string | null
+  externalUrl: string | null
+  notes: string | null
+  soldPrice: number | null
+  commissionUsd: number | null
+  soldAt: string | null
+}
+
+export const PROPERTY_STATUS_META: Record<LeadPropertyStatus, { label: string; cls: string }> = {
+  AVAILABLE: { label: 'Available', cls: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
+  RESERVED:  { label: 'Reserved',  cls: 'bg-amber-50 text-amber-800 border-amber-200' },
+  SOLD:      { label: 'Sold',      cls: 'bg-slate-800 text-white border-slate-800' },
+  WITHDRAWN: { label: 'Withdrawn', cls: 'bg-slate-100 text-slate-500 border-slate-200' },
+}
+
+/**
+ * Score above which a match is worth surfacing unprompted. Mirrors the server's
+ * STRONG_MATCH_SCORE — the board badge and the drawer's strong/near split have
+ * to agree or the badge promises matches the list doesn't show.
+ */
+export const STRONG_MATCH_SCORE = 70
+
+/** The server caps the badge here; anything at the cap is shown as "9+". */
+export const UNTAPPED_CAP = 9
 
 export const OPPORTUNITY_META: Record<OpportunityStage, { label: string; cls: string; dot: string }> = {
   SUGGESTED:      { label: 'Shortlisted',   cls: 'bg-slate-100 text-slate-600',   dot: 'bg-slate-400' },
@@ -115,6 +167,7 @@ export interface Lead {
   createdAt: string
   contacts?: LeadContact[]
   opportunities?: Opportunity[]
+  properties?: LeadProperty[]
   insights?: Array<{ reason: string; count: number; advice: string }>
   needsNewOptions?: boolean
   _count?: { contacts: number }

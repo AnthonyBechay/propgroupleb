@@ -40,6 +40,10 @@ export function OpportunityList({
   const [reason, setReason] = useState<RejectionReason>('PRICE_TOO_HIGH')
   const [feedback, setFeedback] = useState('')
   const [viewingAt, setViewingAt] = useState('')
+  // Closing a deal is when the money is known, so that's when we ask.
+  const [closingId, setClosingId] = useState<string | null>(null)
+  const [soldPrice, setSoldPrice] = useState('')
+  const [commission, setCommission] = useState('')
 
   async function patch(id: string, body: Record<string, unknown>) {
     setBusyId(id)
@@ -51,7 +55,8 @@ export function OpportunityList({
         body: JSON.stringify(body),
       })
       if (res.ok) {
-        setRejectingId(null); setBookingId(null); setFeedback(''); setViewingAt('')
+        setRejectingId(null); setBookingId(null); setClosingId(null)
+        setFeedback(''); setViewingAt(''); setSoldPrice(''); setCommission('')
         onChanged()
       }
     } finally { setBusyId(null) }
@@ -110,6 +115,12 @@ export function OpportunityList({
                   )}
                 </div>
                 {subtitle && <p className="text-xs text-slate-400 truncate mt-0.5">{subtitle}</p>}
+                {o.stage === 'WON' && (o.soldPrice || o.commissionUsd) && (
+                  <p className="text-xs font-medium text-emerald-700 mt-0.5">
+                    {o.soldPrice ? `Sold ${o.soldCurrency} ${o.soldPrice.toLocaleString()}` : 'Closed'}
+                    {o.commissionUsd ? ` · we made $${o.commissionUsd.toLocaleString()}` : ''}
+                  </p>
+                )}
 
                 {o.viewingAt && o.stage === 'VIEWING_BOOKED' && (
                   <button
@@ -195,9 +206,55 @@ export function OpportunityList({
                   </ActionBtn>
                 )}
                 {o.stage === 'OFFER_MADE' && (
-                  <ActionBtn onClick={() => patch(o.id, { stage: 'WON' })} disabled={busy} tone="good" icon={<Check className="h-3 w-3" />}>
+                  <ActionBtn
+                    onClick={() => { setClosingId(o.id); setRejectingId(null); setBookingId(null) }}
+                    disabled={busy} tone="good" icon={<Check className="h-3 w-3" />}
+                  >
                     Deal closed
                   </ActionBtn>
+                )}
+                {/* Closing form appears inline once "Deal closed" is pressed */}
+                {closingId === o.id && (
+                  <div className="w-full mt-1.5 rounded-lg border border-emerald-200 bg-emerald-50/60 p-2 space-y-2">
+                    <p className="text-[11px] font-semibold text-emerald-800">What did it close at?</p>
+                    <div className="grid grid-cols-2 gap-2">
+                      <label className="block">
+                        <span className="text-[10px] text-slate-500">Sold price</span>
+                        <input
+                          type="number" min="0" value={soldPrice}
+                          onChange={(e) => setSoldPrice(e.target.value)}
+                          className="w-full px-2 py-1 border border-slate-200 rounded text-sm bg-white"
+                        />
+                      </label>
+                      <label className="block">
+                        <span className="text-[10px] text-slate-500">Our commission (USD)</span>
+                        <input
+                          type="number" min="0" value={commission}
+                          onChange={(e) => setCommission(e.target.value)}
+                          className="w-full px-2 py-1 border border-slate-200 rounded text-sm bg-white"
+                        />
+                      </label>
+                    </div>
+                    <div className="flex justify-end gap-2">
+                      <button
+                        onClick={() => setClosingId(null)}
+                        className="px-2.5 py-1 text-xs text-slate-500 rounded hover:bg-white"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={() => patch(o.id, {
+                          stage: 'WON',
+                          soldPrice: soldPrice ? Number(soldPrice) : null,
+                          commissionUsd: commission ? Number(commission) : null,
+                        })}
+                        disabled={busy}
+                        className="px-3 py-1 text-xs font-semibold text-white bg-emerald-600 rounded hover:bg-emerald-700 disabled:opacity-50"
+                      >
+                        Record the deal
+                      </button>
+                    </div>
+                  </div>
                 )}
                 {o.stage !== 'VIEWED' && (
                   <ActionBtn onClick={() => { setRejectingId(o.id); setBookingId(null) }} disabled={busy} tone="bad" icon={<X className="h-3 w-3" />}>

@@ -1511,6 +1511,7 @@ model Lead {
 
   contacts      LeadContact[]
   opportunities LeadOpportunity[] @relation("LeadOpportunities")
+  properties    LeadProperty[]    @relation("LeadProperties")
 
   @@index([market])
   @@index([status])
@@ -1582,14 +1583,71 @@ enum RejectionReason {
   OTHER
 }
 
+// A property a seller/landlord client has on the market.
+//
+// A seller's own fields (areas, budget, unitKinds) describe *one* thing, which
+// stops working the moment he lists a second — and most do. Each row here is a
+// separate saleable asset that buyers get matched against independently.
+model LeadProperty {
+  id     String @id @default(cuid())
+  leadId String
+
+  kind        UnitKind @default(APARTMENT)
+  title       String?  // "3BR Achrafieh, 5th floor, sea view"
+  areas       String[] // curated area names, same catalogue as Lead.areas
+  region      String?
+  askingPrice Float?
+  currency    Currency @default(USD)
+  bedrooms    Int?
+  areaSqm     Float?
+
+  status LeadPropertyStatus @default(AVAILABLE)
+
+  // Where it lives, if anywhere: a listing on this site, or a link to the
+  // Georgia site / an external portal for stock we don't host.
+  listingId   String?
+  externalUrl String?
+
+  notes String?
+
+  // Filled in when it sells. Commission is what we actually earned, in USD, so
+  // the total is meaningful across a book quoted in mixed currencies.
+  soldPrice     Float?
+  commissionUsd Float?
+  soldAt        DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  lead Lead @relation("LeadProperties", fields: [leadId], references: [id], onDelete: Cascade)
+
+  @@index([leadId])
+  @@index([status])
+  @@map("lead_properties")
+}
+
+enum LeadPropertyStatus {
+  AVAILABLE
+  RESERVED
+  SOLD
+  WITHDRAWN
+}
+
 model LeadOpportunity {
   id     String           @id @default(cuid())
   leadId String
   stage  OpportunityStage @default(SUGGESTED)
 
-  // Exactly one of these identifies what's on offer:
+  // What's on offer — exactly one of these identifies it:
   listingId         String? // a live listing on our site
   counterpartLeadId String? // another client (a seller/landlord in the CRM)
+  leadPropertyId    String? // a specific property a seller client has on offer
+
+  // Off-platform stock: a Batumi studio on propgrp.com, another agency's
+  // listing, a private sale. Clients buy these too, and a CRM that can't
+  // record the deal can't tell you what you earned.
+  externalTitle String?
+  externalUrl   String?
 
   // Match score (0-100) when the pairing was created - for later review.
   matchScore Int?
@@ -1599,6 +1657,13 @@ model LeadOpportunity {
   viewedAt        DateTime?
   rejectionReason RejectionReason?
   feedback        String? // what the client actually said
+
+  // The money, recorded once on the opportunity that actually closed.
+  // commissionUsd is normalised to USD so totals mean something.
+  soldPrice     Float?
+  soldCurrency  Currency @default(USD)
+  commissionUsd Float?
+  closedAt      DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

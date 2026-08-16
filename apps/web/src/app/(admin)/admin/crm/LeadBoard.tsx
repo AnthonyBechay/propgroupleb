@@ -9,7 +9,7 @@ import {
   type Lead, type LeadStatus, BOARD_COLUMNS, TYPE_LABELS, MARKET_META,
   formatLastContact, formatPlanned, hasAwaitingFeedback, TYPE_META,
   isRecentWin, isSupplyType, columnOf, acceptsDrop, lastActivityAt,
-  SUB_STATUS_META,
+  SUB_STATUS_META, UNTAPPED_CAP,
 } from './types'
 
 /**
@@ -212,9 +212,10 @@ function LeadCard({
           {untapped > 0 && (
             <span
               className="inline-flex items-center gap-0.5 text-[9.5px] font-semibold text-emerald-800 bg-emerald-100 px-1 py-px rounded"
-              title={`${untapped} match${untapped === 1 ? '' : 'es'} nobody has shortlisted yet`}
+              title={`${untapped >= UNTAPPED_CAP ? UNTAPPED_CAP + '+' : untapped} strong match${untapped === 1 ? '' : 'es'} nobody has shortlisted yet`}
             >
-              <Target className="h-2.5 w-2.5" /> {untapped} to explore
+              <Target className="h-2.5 w-2.5" />
+              {untapped >= UNTAPPED_CAP ? `${UNTAPPED_CAP}+` : untapped} strong
             </span>
           )}
           {feedbackDue && (

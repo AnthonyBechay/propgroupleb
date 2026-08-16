@@ -426,7 +426,8 @@
       "Bash(docker rm *)",
       "Bash(docker run *)",
       "Bash(break)",
-      "Bash(DATABASE_URL=\"postgresql://postgres:test@localhost:55434/crmtest\" npx prisma db push --skip-generate --accept-data-loss)"
+      "Bash(DATABASE_URL=\"postgresql://postgres:test@localhost:55434/crmtest\" npx prisma db push --skip-generate --accept-data-loss)",
+      "Bash(DATABASE_URL=\"postgresql://postgres:test@localhost:55435/crm2\" npx prisma db push --skip-generate --accept-data-loss)"
     ],
     "deny": [],
     "ask": []

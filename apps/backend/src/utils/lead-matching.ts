@@ -30,6 +30,8 @@ export interface MatchCriterion {
 export interface MatchResult {
   /** 0–100 */
   score: number;
+  /** Which of the seller's properties produced this score, when applicable. */
+  property?: unknown;
   criteria: MatchCriterion[];
   /** Short human reasons, best first — shown as chips in the UI. */
   reasons: string[];
@@ -257,6 +259,18 @@ export function matchLeadToLead(buyer: any, seller: any): MatchResult {
     return { score: 0, criteria: [], reasons: [], misses: ['Different market'] };
   }
 
+  // A seller usually has more than one thing on the market. Score the buyer
+  // against each and keep the best — one poor asset shouldn't hide a good one.
+  const onOffer = (seller.properties ?? []).filter(
+    (p: any) => !p.status || p.status === 'AVAILABLE' || p.status === 'RESERVED'
+  );
+  if (onOffer.length > 0) {
+    const scored = onOffer
+      .map((p: any) => ({ property: p, result: matchPropertyToLead(buyer, p, seller) }))
+      .sort((a: any, b: any) => b.result.score - a.result.score);
+    return { ...scored[0].result, property: scored[0].property } as MatchResult;
+  }
+
   // The seller's asking price sits in budgetMin/Max too (what they want for it).
   const askingPrice = seller.budgetMin ?? seller.budgetMax ?? null;
 
@@ -278,6 +292,21 @@ export function matchLeadToLead(buyer: any, seller: any): MatchResult {
   ]);
 }
 
+/** How well one property a seller has on offer fits a buyer. */
+export function matchPropertyToLead(buyer: any, property: any, seller?: any): MatchResult {
+  return finalize([
+    scoreLocation(
+      buyer.areas ?? [],
+      buyer.regions ?? [],
+      property.areas ?? [],
+      property.region ?? (seller?.regions ?? [])[0],
+    ),
+    scoreUnitKind(buyer.unitKinds ?? [], property.kind),
+    scoreBudget(buyer.budgetMin ?? null, buyer.budgetMax ?? null, property.askingPrice ?? null),
+    scoreBeds(buyer.minBeds ?? null, property.bedrooms ?? null),
+  ]);
+}
+
 /**
  * Minimum score for a pairing to be worth showing. Shared by the drawer's match
  * lists AND the "has matches to explore" counter — if these ever diverge, the
@@ -285,6 +314,16 @@ export function matchLeadToLead(buyer: any, seller: any): MatchResult {
  * when they were 45 and 60).
  */
 export const MATCH_MIN_SCORE = 45;
+
+/**
+ * A match worth putting in front of the broker unprompted.
+ *
+ * The board's "matches to explore" badge counts only these. Counting every
+ * 45-plus pairing produced numbers like "40 to explore" for one client — a
+ * number nobody works through, so nobody works through any of it. Shared with
+ * the drawer's strong/near split so the badge and the list can't disagree.
+ */
+export const STRONG_MATCH_SCORE = 70;
 
 /**
  * Statuses a counterpart can be in and still be worth pairing with. WON is

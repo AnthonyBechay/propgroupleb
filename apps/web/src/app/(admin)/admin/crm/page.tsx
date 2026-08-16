@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   UserSearch, Plus, Search, Loader2, Phone, MessageCircle, Mail, Clock,
   CalendarPlus, X, LayoutGrid, List, Download, Upload, MapPin,
-  MessageSquareWarning, Sparkles, Target,
+  MessageSquareWarning, Sparkles, Target, DollarSign,
 } from 'lucide-react'
 import { normalizeApiUrl } from '@/lib/utils/api-url'
 import { LeadDrawer } from './LeadDrawer'
@@ -17,6 +17,12 @@ import {
   STATUS_META, TYPE_LABELS, MARKET_META, formatLastContact, formatPlanned,
   isWaitingOnUs, hasAwaitingFeedback, SUB_STATUS_META,
 } from './types'
+
+interface Earnings {
+  totalCommissionUsd: number
+  buyerSide: { count: number; commissionUsd: number }
+  sellerSide: { count: number; commissionUsd: number }
+}
 
 interface Stats {
   openLeads: number
@@ -38,6 +44,7 @@ export default function CrmPage() {
   const [focus, setFocus] = useState<'none' | 'planned' | 'feedback' | 'options' | 'untapped'>('none')
   // leadId -> number of matches nobody has shortlisted yet (computed server-side)
   const [untapped, setUntapped] = useState<Record<string, number>>({})
+  const [earnings, setEarnings] = useState<Earnings | null>(null)
   const [typeFilter, setTypeFilter] = useState<'all' | LeadType>('all')
   const [openId, setOpenId] = useState<string | null>(null)
   const [creating, setCreating] = useState(false)
@@ -53,14 +60,16 @@ export default function CrmPage() {
       if (market !== 'all') p.set('market', market)
       if (search.trim()) p.set('search', search.trim())
 
-      const [listRes, statsRes, untappedRes] = await Promise.all([
+      const [listRes, statsRes, untappedRes, earnRes] = await Promise.all([
         fetch(`${apiUrl}/api/crm?${p}`, { credentials: 'include', cache: 'no-store' }),
         fetch(`${apiUrl}/api/crm/stats`, { credentials: 'include', cache: 'no-store' }),
         fetch(`${apiUrl}/api/crm/untapped`, { credentials: 'include', cache: 'no-store' }),
+        fetch(`${apiUrl}/api/crm/earnings?months=12`, { credentials: 'include', cache: 'no-store' }),
       ])
       if (listRes.ok) setLeads((await listRes.json()).data ?? [])
       if (statsRes.ok) setStats((await statsRes.json()).data ?? null)
       if (untappedRes.ok) setUntapped((await untappedRes.json()).data?.counts ?? {})
+      if (earnRes.ok) setEarnings((await earnRes.json()).data ?? null)
     } finally {
       setLoading(false)
     }
@@ -309,6 +318,15 @@ export default function CrmPage() {
           <span className="px-2.5 py-1 rounded-lg bg-white border border-slate-200">
             Archived: <strong className="text-slate-700">{stats?.byStatus?.ARCHIVED ?? 0}</strong>
           </span>
+          {earnings && earnings.totalCommissionUsd > 0 && (
+            <span
+              className="px-2.5 py-1 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800 inline-flex items-center gap-1"
+              title={`Buyer side: $${earnings.buyerSide.commissionUsd.toLocaleString()} across ${earnings.buyerSide.count} deals · Seller side: $${earnings.sellerSide.commissionUsd.toLocaleString()} across ${earnings.sellerSide.count} properties`}
+            >
+              <DollarSign className="h-3.5 w-3.5" />
+              Earned (12mo): <strong>${earnings.totalCommissionUsd.toLocaleString()}</strong>
+            </span>
+          )}
           <span className="text-slate-400 self-center">Drag a card between columns to move a client through the pipeline.</span>
         </div>
       )}

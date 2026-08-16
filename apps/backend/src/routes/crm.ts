@@ -6,7 +6,7 @@ import { asyncHandler } from '../utils/errors.js';
 import { sendSuccess, sendCreated, sendPaginated, sendNotFound, sendError } from '../utils/response.js';
 import { parsePagination, buildPaginationResponse } from '../utils/pagination.js';
 import type { AuthenticatedRequest } from '../types/index.js';
-import { matchListingToLead, matchLeadToLead, SUPPLY_TYPES, DEMAND_TYPES, MATCH_MIN_SCORE, PAIRABLE_STATUSES } from '../utils/lead-matching.js';
+import { matchListingToLead, matchLeadToLead, SUPPLY_TYPES, DEMAND_TYPES, MATCH_MIN_SCORE, STRONG_MATCH_SCORE, PAIRABLE_STATUSES } from '../utils/lead-matching.js';
 import { deriveLeadStatus, needsNewOptions, rejectionInsights } from '../utils/lead-pipeline.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -104,6 +104,14 @@ async function hydrateOpportunities(opportunities: any[]): Promise<any[]> {
   if (opportunities.length === 0) return [];
   const listingIds = opportunities.map((o) => o.listingId).filter(Boolean) as string[];
   const leadIds = opportunities.map((o) => o.counterpartLeadId).filter(Boolean) as string[];
+  const propertyIds = opportunities.map((o) => o.leadPropertyId).filter(Boolean) as string[];
+  const properties = propertyIds.length
+    ? await prisma.leadProperty.findMany({
+        where: { id: { in: propertyIds } },
+        include: { lead: { select: { id: true, name: true } } },
+      })
+    : [];
+  const propertyById = new Map(properties.map((p: any) => [p.id, p]));
 
   const [listings, leads] = await Promise.all([
     listingIds.length
@@ -135,10 +143,21 @@ async function hydrateOpportunities(opportunities: any[]): Promise<any[]> {
   return opportunities.map((o) => {
     const listing = o.listingId ? listingById.get(o.listingId) : null;
     const counterpart = o.counterpartLeadId ? leadById.get(o.counterpartLeadId) : null;
+    const property = o.leadPropertyId ? propertyById.get(o.leadPropertyId) : null;
     const b = listing?.building ?? listing?.unit?.building;
     return {
       ...o,
-      subject: counterpart
+      subject: property
+        ? {
+            kind: 'SELLER_PROPERTY',
+            title: property.title || `${property.kind} — ${property.lead?.name ?? 'seller'}`,
+            subtitle: (property.areas ?? []).join(', ') || null,
+            url: property.externalUrl,
+            id: property.id,
+          }
+        : o.externalTitle
+        ? { kind: 'EXTERNAL', title: o.externalTitle, subtitle: 'Off-platform', url: o.externalUrl, id: null }
+        : counterpart
         ? { kind: 'CLIENT', title: counterpart.name, subtitle: counterpart.askingFor ?? counterpart.type, id: counterpart.id }
         : listing
           ? {
@@ -246,6 +265,81 @@ router.get(
   })
 );
 
+// ── GET /earnings — what we actually made ────────────────────────────────────
+// Commission is stored in USD on the closed record, so mixed-currency asking
+// prices don't have to be converted at report time (and a stale FX rate can't
+// quietly change last quarter's numbers).
+
+router.get(
+  '/earnings',
+  authenticateToken,
+  requireAdmin,
+  asyncHandler(async (req: Request, res: Response) => {
+    const q = req.query as Record<string, string>;
+    const months = Math.min(Number(q.months ?? 12) || 12, 60);
+    const since = new Date();
+    since.setMonth(since.getMonth() - months);
+
+    // Two places record a sale: the buyer-side opportunity that closed, and a
+    // seller's own property. They're different sides of possibly the same deal,
+    // so they're reported separately rather than summed into one misleading
+    // figure.
+    const [deals, soldProperties] = await Promise.all([
+      prisma.leadOpportunity.findMany({
+        where: { stage: 'WON', closedAt: { gte: since } },
+        include: { lead: { select: { id: true, name: true, market: true, type: true } } },
+        orderBy: { closedAt: 'desc' },
+      }),
+      prisma.leadProperty.findMany({
+        where: { status: 'SOLD', soldAt: { gte: since } },
+        include: { lead: { select: { id: true, name: true, market: true } } },
+        orderBy: { soldAt: 'desc' },
+      }),
+    ]);
+
+    const sum = (rows: Array<{ commissionUsd: number | null }>) =>
+      rows.reduce((t, r) => t + (r.commissionUsd ?? 0), 0);
+
+    // Month buckets for a simple trend line.
+    const byMonth = new Map<string, number>();
+    const bucket = (d: Date | null, amount: number | null) => {
+      if (!d || !amount) return;
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      byMonth.set(key, (byMonth.get(key) ?? 0) + amount);
+    };
+    for (const d of deals) bucket(d.closedAt, d.commissionUsd);
+    for (const p of soldProperties) bucket(p.soldAt, p.commissionUsd);
+
+    sendSuccess(res, {
+      months,
+      buyerSide: {
+        count: deals.length,
+        commissionUsd: sum(deals),
+        volumeUsd: deals.reduce((t, d) => t + (d.soldCurrency === 'USD' ? d.soldPrice ?? 0 : 0), 0),
+      },
+      sellerSide: {
+        count: soldProperties.length,
+        commissionUsd: sum(soldProperties),
+        volumeUsd: soldProperties.reduce((t, p) => t + (p.currency === 'USD' ? p.soldPrice ?? 0 : 0), 0),
+      },
+      totalCommissionUsd: sum(deals) + sum(soldProperties),
+      byMonth: Array.from(byMonth.entries())
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([month, commissionUsd]) => ({ month, commissionUsd })),
+      recent: [
+        ...deals.slice(0, 20).map((d) => ({
+          id: d.id, kind: 'DEAL' as const, client: d.lead?.name ?? null, market: d.lead?.market ?? null,
+          closedAt: d.closedAt, soldPrice: d.soldPrice, currency: d.soldCurrency, commissionUsd: d.commissionUsd,
+        })),
+        ...soldProperties.slice(0, 20).map((p) => ({
+          id: p.id, kind: 'PROPERTY' as const, client: p.lead?.name ?? null, market: p.lead?.market ?? null,
+          closedAt: p.soldAt, soldPrice: p.soldPrice, currency: p.currency, commissionUsd: p.commissionUsd,
+        })),
+      ].sort((a, b) => new Date(b.closedAt ?? 0).getTime() - new Date(a.closedAt ?? 0).getTime()),
+    });
+  })
+);
+
 // ── GET /untapped — clients who have matches nobody has acted on yet ─────────
 // The opposite of "needs new options": these clients have real potential
 // sitting in our inventory (or in a counterpart client) that has never been
@@ -257,11 +351,20 @@ router.get(
   requireAdmin,
   asyncHandler(async (req: Request, res: Response) => {
     const q = req.query as Record<string, string>;
-    const minScore = Number(q.minScore ?? MATCH_MIN_SCORE);
+    // Only strong matches count here. A badge reading "40 to explore" is a
+    // badge nobody acts on; the drawer still lists the near-misses for anyone
+    // who wants to dig.
+    const minScore = Number(q.minScore ?? STRONG_MATCH_SCORE);
+    // Cap what we report — past a handful the exact number stops changing what
+    // the broker does next.
+    const CAP = 9;
 
     const openLeads = await prisma.lead.findMany({
       where: { status: { notIn: ['WON', 'LOST', 'ARCHIVED'] as never } },
-      include: { opportunities: { select: { listingId: true, counterpartLeadId: true, leadId: true } } },
+      include: {
+        opportunities: { select: { listingId: true, counterpartLeadId: true, leadId: true } },
+        properties: { where: { status: { in: ['AVAILABLE', 'RESERVED'] as never } } },
+      },
       take: 1000,
     });
     if (openLeads.length === 0) { sendSuccess(res, { counts: {}, total: 0 }); return; }
@@ -305,6 +408,7 @@ router.get(
       // Live inventory — only relevant to clients who are looking, in Lebanon.
       if (isDemand && lead.market === 'LEBANON') {
         for (const listing of listings) {
+          if (n >= CAP) break;
           if (seen.has(listing.id)) continue;
           if (matchListingToLead(lead, listing).score >= minScore) n++;
         }
@@ -313,6 +417,7 @@ router.get(
       // Counterpart clients — relevant to both sides.
       const counterpartTypes = isDemand ? SUPPLY_TYPES : DEMAND_TYPES;
       for (const other of openLeads) {
+        if (n >= CAP) break;
         if (other.id === lead.id) continue;
         if (other.market !== lead.market) continue;
         if (!counterpartTypes.includes(other.type)) continue;
@@ -321,7 +426,7 @@ router.get(
         if (m.score >= minScore) n++;
       }
 
-      if (n > 0) counts[lead.id] = n;
+      if (n > 0) counts[lead.id] = Math.min(n, CAP);
     }
 
     sendSuccess(res, { counts, total: Object.keys(counts).length });
@@ -436,6 +541,7 @@ router.get(
       include: {
         contacts: { orderBy: { contactedAt: 'desc' } },
         opportunities: { orderBy: { updatedAt: 'desc' } },
+        properties: { orderBy: { createdAt: 'desc' } },
       },
     });
     if (!lead) { sendNotFound(res, 'Lead'); return; }
@@ -514,7 +620,12 @@ router.get(
   authenticateToken,
   requireAdmin,
   asyncHandler(async (req: Request, res: Response) => {
-    const lead = await prisma.lead.findUnique({ where: { id: req.params.id } });
+    // When this lead is the supply side, its own properties are what gets
+    // scored, so they have to be loaded here too.
+    const lead = await prisma.lead.findUnique({
+      where: { id: req.params.id },
+      include: { properties: { where: { status: { in: ['AVAILABLE', 'RESERVED'] as never } } } },
+    });
     if (!lead) { sendNotFound(res, 'Lead'); return; }
 
     const isDemand = DEMAND_TYPES.includes(lead.type);
@@ -546,6 +657,9 @@ router.get(
       },
       take: 300,
       orderBy: { createdAt: 'desc' },
+      // A seller is matched on what he actually has on the market, not on the
+      // single set of fields that used to stand in for it.
+      include: { properties: { where: { status: { in: ['AVAILABLE', 'RESERVED'] as never } } } },
     });
 
     const MIN_SCORE = Number(req.query.minScore ?? MATCH_MIN_SCORE);
@@ -689,6 +803,122 @@ router.post(
   })
 );
 
+// ── POST /:id/note — jot something down without claiming you called ──────────
+// A note and a contact are different events. Filing "he mentioned his brother
+// is also looking" as a contact would reset the last-spoke clock and hide the
+// fact that nobody has actually rung him in three weeks.
+
+const noteSchema = z.object({ body: z.string().min(1).max(4000) });
+
+router.post(
+  '/:id/note',
+  authenticateToken,
+  requireAdmin,
+  asyncHandler(async (req: Request, res: Response) => {
+    const authReq = req as AuthenticatedRequest;
+    const lead = await prisma.lead.findUnique({ where: { id: req.params.id }, select: { id: true } });
+    if (!lead) { sendNotFound(res, 'Lead'); return; }
+
+    const data = noteSchema.parse(req.body);
+    const note = await prisma.leadContact.create({
+      data: {
+        leadId: lead.id,
+        channel: 'NOTE',
+        body: data.body.trim(),
+        contactedAt: new Date(),
+        createdBy: authReq.user?.id ?? null,
+      },
+    });
+    // Touch the lead so the board's "last action" sort sees it.
+    await prisma.lead.update({ where: { id: lead.id }, data: { updatedAt: new Date() } });
+
+    await logAdminAction('ADD_LEAD_NOTE', 'lead', lead.id, {}, authReq);
+    sendCreated(res, note, 'Note added');
+  })
+);
+
+// ── Seller properties — a seller usually has more than one thing on offer ────
+
+const leadPropertySchema = z.object({
+  kind: z.enum(UNIT_KINDS).default('APARTMENT'),
+  title: z.string().max(200).optional().nullable(),
+  areas: z.array(z.string().max(80)).default([]),
+  region: z.string().max(50).optional().nullable(),
+  askingPrice: z.number().min(0).optional().nullable(),
+  currency: z.enum(['USD', 'LBP']).default('USD'),
+  bedrooms: z.number().int().min(0).max(20).optional().nullable(),
+  areaSqm: z.number().min(0).optional().nullable(),
+  status: z.enum(['AVAILABLE', 'RESERVED', 'SOLD', 'WITHDRAWN']).default('AVAILABLE'),
+  listingId: z.string().optional().nullable(),
+  externalUrl: z.string().url().max(500).optional().nullable().or(z.literal('')),
+  notes: z.string().max(2000).optional().nullable(),
+  soldPrice: z.number().min(0).optional().nullable(),
+  commissionUsd: z.number().min(0).optional().nullable(),
+  soldAt: z.string().optional().nullable(),
+});
+
+router.post(
+  '/:id/properties',
+  authenticateToken,
+  requireAdmin,
+  asyncHandler(async (req: Request, res: Response) => {
+    const authReq = req as AuthenticatedRequest;
+    const lead = await prisma.lead.findUnique({ where: { id: req.params.id }, select: { id: true } });
+    if (!lead) { sendNotFound(res, 'Lead'); return; }
+
+    const data = leadPropertySchema.parse(req.body);
+    const property = await prisma.leadProperty.create({
+      data: {
+        ...data,
+        leadId: lead.id,
+        externalUrl: data.externalUrl || null,
+        // Marking it sold without a date would leave it out of every report.
+        soldAt: data.soldAt ? new Date(data.soldAt) : data.status === 'SOLD' ? new Date() : null,
+      },
+    });
+    await logAdminAction('CREATE_LEAD_PROPERTY', 'lead', lead.id, { propertyId: property.id }, authReq);
+    sendCreated(res, property, 'Property added');
+  })
+);
+
+router.patch(
+  '/properties/:pid',
+  authenticateToken,
+  requireAdmin,
+  asyncHandler(async (req: Request, res: Response) => {
+    const authReq = req as AuthenticatedRequest;
+    const existing = await prisma.leadProperty.findUnique({ where: { id: req.params.pid } });
+    if (!existing) { sendNotFound(res, 'Property'); return; }
+
+    const data = leadPropertySchema.partial().parse(req.body);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const patch: Record<string, any> = { ...data };
+    if (data.externalUrl !== undefined) patch.externalUrl = data.externalUrl || null;
+    if (data.soldAt !== undefined) patch.soldAt = data.soldAt ? new Date(data.soldAt) : null;
+    // Stamp the sale date on the transition, so reports have something to group by.
+    if (data.status === 'SOLD' && !existing.soldAt && !data.soldAt) patch.soldAt = new Date();
+    if (data.status && data.status !== 'SOLD') patch.soldAt = null;
+
+    const property = await prisma.leadProperty.update({ where: { id: req.params.pid }, data: patch });
+    await logAdminAction('UPDATE_LEAD_PROPERTY', 'lead', existing.leadId, { propertyId: property.id }, authReq);
+    sendSuccess(res, property, 'Property updated');
+  })
+);
+
+router.delete(
+  '/properties/:pid',
+  authenticateToken,
+  requireAdmin,
+  asyncHandler(async (req: Request, res: Response) => {
+    const authReq = req as AuthenticatedRequest;
+    const existing = await prisma.leadProperty.findUnique({ where: { id: req.params.pid } });
+    if (!existing) { sendNotFound(res, 'Property'); return; }
+    await prisma.leadProperty.delete({ where: { id: req.params.pid } });
+    await logAdminAction('DELETE_LEAD_PROPERTY', 'lead', existing.leadId, { propertyId: req.params.pid }, authReq);
+    sendSuccess(res, { id: req.params.pid }, 'Property removed');
+  })
+);
+
 // ── DELETE /:id ───────────────────────────────────────────────────────────────
 
 router.delete(
@@ -812,10 +1042,20 @@ async function syncLeadStatus(leadId: string) {
 const opportunitySchema = z.object({
   listingId: z.string().optional().nullable(),
   counterpartLeadId: z.string().optional().nullable(),
+  leadPropertyId: z.string().optional().nullable(),
+  // Off-platform stock — a Batumi studio on propgrp.com, another agency's
+  // listing, a private sale. Clients buy these, so the CRM has to record them.
+  externalTitle: z.string().max(200).optional().nullable(),
+  externalUrl: z.string().url().max(500).optional().nullable().or(z.literal('')),
   stage: z.enum(STAGES).default('SUGGESTED'),
   matchScore: z.number().int().min(0).max(100).optional().nullable(),
   viewingAt: z.string().optional().nullable(),
   feedback: z.string().max(2000).optional().nullable(),
+  // What it sold for and what we made. Commission is USD so a book quoted in
+  // mixed currencies still adds up.
+  soldPrice: z.number().min(0).optional().nullable(),
+  soldCurrency: z.enum(['USD', 'LBP']).optional(),
+  commissionUsd: z.number().min(0).optional().nullable(),
 });
 
 // POST /:id/opportunities — shortlist a property (or a counterpart client)
@@ -829,8 +1069,8 @@ router.post(
     if (!lead) { sendNotFound(res, 'Lead'); return; }
 
     const data = opportunitySchema.parse(req.body);
-    if (!data.listingId && !data.counterpartLeadId) {
-      sendError(res, 400, 'Provide a listingId or a counterpartLeadId');
+    if (!data.listingId && !data.counterpartLeadId && !data.leadPropertyId && !data.externalTitle) {
+      sendError(res, 400, 'Say what this is: a listing, a client, a seller property, or an external property');
       return;
     }
 
@@ -869,6 +1109,12 @@ const opportunityUpdateSchema = z.object({
   viewingAt: z.string().optional().nullable(),
   rejectionReason: z.enum(REJECTION_REASONS).optional().nullable(),
   feedback: z.string().max(2000).optional().nullable(),
+  // Recorded when the deal closes.
+  soldPrice: z.number().min(0).optional().nullable(),
+  soldCurrency: z.enum(['USD', 'LBP']).optional(),
+  commissionUsd: z.number().min(0).optional().nullable(),
+  externalTitle: z.string().max(200).optional().nullable(),
+  externalUrl: z.string().url().max(500).optional().nullable().or(z.literal('')),
 });
 
 router.patch(
@@ -890,6 +1136,15 @@ router.patch(
     // Stamp when the viewing actually happened, so "awaiting feedback" is real.
     if (data.stage === 'VIEWED' && !existing.viewedAt) patch.viewedAt = new Date();
 
+    if (data.soldPrice !== undefined) patch.soldPrice = data.soldPrice;
+    if (data.soldCurrency !== undefined) patch.soldCurrency = data.soldCurrency;
+    if (data.commissionUsd !== undefined) patch.commissionUsd = data.commissionUsd;
+    if (data.externalTitle !== undefined) patch.externalTitle = data.externalTitle;
+    if (data.externalUrl !== undefined) patch.externalUrl = data.externalUrl || null;
+    // Date the close, so earnings can be grouped by period.
+    if (data.stage === 'WON' && !existing.closedAt) patch.closedAt = new Date();
+    if (data.stage && data.stage !== 'WON') patch.closedAt = null;
+
     const opportunity = await prisma.leadOpportunity.update({ where: { id: req.params.oid }, data: patch });
 
     await syncLeadStatus(existing.leadId);
@@ -901,6 +1156,7 @@ router.patch(
       include: {
         contacts: { orderBy: { contactedAt: 'desc' } },
         opportunities: { orderBy: { updatedAt: 'desc' } },
+        properties: { orderBy: { createdAt: 'desc' } },
       },
     });
     sendSuccess(
