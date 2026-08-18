@@ -23,6 +23,12 @@ RUN NODE_ENV=development pnpm install --frozen-lockfile
 COPY apps/backend ./apps/backend
 COPY packages/db ./packages/db
 
+# One-off maintenance and migration scripts, placed INSIDE the backend
+# workspace on purpose: Node resolves modules from the script's own directory,
+# and pnpm's strict layout means a script sitting at /app/scripts cannot see
+# @prisma/client. From here it resolves normally.
+COPY scripts ./apps/backend/scripts
+
 # Generate Prisma client
 RUN pnpm --filter @propgroup/db run db:generate
 
