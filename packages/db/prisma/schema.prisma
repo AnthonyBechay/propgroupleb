@@ -1587,6 +1587,56 @@ enum RejectionReason {
   OTHER
 }
 
+// An investment opportunity we resell — currently Georgia stock listed on
+// propgrp.com.
+//
+// Lebanese buyers get matched against live listings on this site. Georgia
+// investors had nothing to be matched against at all, because that inventory
+// lives on another domain, so the CRM could store their phone number and
+// nothing else. This is the minimum mirror of that stock needed to answer
+// "what can I offer this client" without leaving the CRM.
+model InvestmentProduct {
+  id     String     @id @default(cuid())
+  market LeadMarket @default(GEORGIA)
+
+  name      String  // "Orbi City Batumi"
+  developer String?
+  city      String? // Batumi, Tbilisi
+  region    String? // GE_* region key, matching Lead.regions
+
+  unitKinds UnitKind[]
+  priceFrom Float?
+  priceTo   Float?
+  currency  Currency @default(USD)
+
+  // What makes it an *investment* rather than a home — the questions a Georgia
+  // buyer actually asks first.
+  expectedYield Float?    // annual rental yield, %
+  handoverAt    DateTime? // off-plan completion
+  paymentPlan   String?   // "30% down, 24 months interest free"
+
+  // Where the client can see it — the propgrp.com listing.
+  url    String?
+  images String[]
+
+  notes  String?
+  status InvestmentProductStatus @default(AVAILABLE)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([market])
+  @@index([status])
+  @@map("investment_products")
+}
+
+enum InvestmentProductStatus {
+  AVAILABLE
+  LIMITED   // nearly sold out — worth telling the client
+  SOLD_OUT
+  PAUSED
+}
+
 // A property a seller/landlord client has on the market.
 //
 // A seller's own fields (areas, budget, unitKinds) describe *one* thing, which
@@ -1646,6 +1696,7 @@ model LeadOpportunity {
   listingId         String? // a live listing on our site
   counterpartLeadId String? // another client (a seller/landlord in the CRM)
   leadPropertyId    String? // a specific property a seller client has on offer
+  productId         String? // a Georgia investment opportunity we resell
 
   // Off-platform stock: a Batumi studio on propgrp.com, another agency's
   // listing, a private sale. Clients buy these too, and a CRM that can't

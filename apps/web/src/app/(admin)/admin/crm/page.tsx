@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   UserSearch, Plus, Search, Loader2, Phone, MessageCircle, Mail, Clock,
   CalendarPlus, X, LayoutGrid, List, Download, Upload, MapPin,
-  MessageSquareWarning, Sparkles, Target, DollarSign,
+  MessageSquareWarning, Sparkles, Target, DollarSign, Sun, Globe, BarChart3,
 } from 'lucide-react'
 import { normalizeApiUrl } from '@/lib/utils/api-url'
 import { useAuth } from '@/contexts/AuthContext'
@@ -13,16 +13,28 @@ import { LeadFormModal } from './LeadFormModal'
 import { LeadBoard } from './LeadBoard'
 import { ImportModal } from './ImportModal'
 import { BookViewingModal } from './BookViewingModal'
+import { TodayView } from './TodayView'
+import { InvestmentCatalogue } from './InvestmentCatalogue'
 import {
   type Lead, type LeadMarket, type LeadStatus, type LeadType,
   STATUS_META, TYPE_LABELS, MARKET_META, formatLastContact, formatPlanned,
   isWaitingOnUs, hasAwaitingFeedback, SUB_STATUS_META,
 } from './types'
 
+interface ChannelRow {
+  source: string
+  leads: number
+  won: number
+  commissionUsd: number
+  conversionPct: number
+  commissionPerLead: number
+}
+
 interface Earnings {
   totalCommissionUsd: number
   buyerSide: { count: number; commissionUsd: number }
   sellerSide: { count: number; commissionUsd: number }
+  bySource: ChannelRow[]
 }
 
 interface Stats {
@@ -32,14 +44,14 @@ interface Stats {
   byStatus: Record<string, number>
 }
 
-type View = 'board' | 'list'
+type View = 'today' | 'board' | 'list'
 
 export default function CrmPage() {
   const apiUrl = normalizeApiUrl(process.env.NEXT_PUBLIC_API_URL || '')
   const [leads, setLeads] = useState<Lead[]>([])
   const [stats, setStats] = useState<Stats | null>(null)
   const [loading, setLoading] = useState(true)
-  const [view, setView] = useState<View>('board')
+  const [view, setView] = useState<View>('today')
   const [market, setMarket] = useState<'all' | LeadMarket>('all')
   const [search, setSearch] = useState('')
   const [focus, setFocus] = useState<'none' | 'planned' | 'feedback' | 'options' | 'untapped'>('none')
@@ -54,6 +66,8 @@ export default function CrmPage() {
   const [creating, setCreating] = useState(false)
   const [importing, setImporting] = useState(false)
   const [bookingFor, setBookingFor] = useState<Lead | null>(null)
+  const [catalogue, setCatalogue] = useState(false)
+  const [showChannels, setShowChannels] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -170,7 +184,7 @@ export default function CrmPage() {
       {/* One row: what needs attention on the left, actions on the right. The
           page title used to eat a whole row saying what the sidebar says. */}
       <div className="flex items-center justify-between gap-3 flex-wrap">
-        <div className="flex gap-2 flex-wrap">
+        <div className={`flex gap-2 flex-wrap ${view === 'today' ? 'invisible pointer-events-none' : ''}`}>
           <FocusChip
             active={focus === 'planned'} count={counts.planned}
             onClick={() => setFocus((f) => (f === 'planned' ? 'none' : 'planned'))}
@@ -213,6 +227,13 @@ export default function CrmPage() {
             className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-slate-200 bg-white text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
           >
             {exporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />} Export
+          </button>
+          <button
+            onClick={() => setCatalogue(true)}
+            title="Georgia opportunities we resell"
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-slate-200 bg-white text-sm font-medium text-slate-700 hover:bg-slate-50"
+          >
+            <Globe className="h-4 w-4" /> 🇬🇪 Catalogue
           </button>
           <button
             onClick={() => setImporting(true)}
@@ -275,8 +296,15 @@ export default function CrmPage() {
 
         <div className="flex gap-1 bg-slate-100 rounded-lg p-1">
           <button
+            onClick={() => setView('today')}
+            title="Today — what needs you now"
+            className={`px-2 py-1.5 rounded-md transition-all inline-flex items-center gap-1 text-sm font-medium ${view === 'today' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-900'}`}
+          >
+            <Sun className="h-4 w-4" /> Today
+          </button>
+          <button
             onClick={() => setView('board')}
-            title="Board"
+            title="Pipeline board"
             className={`p-1.5 rounded-md transition-all ${view === 'board' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-900'}`}
           >
             <LayoutGrid className="h-4 w-4" />
@@ -292,7 +320,9 @@ export default function CrmPage() {
       </div>
 
       {/* Content */}
-      {loading ? (
+      {view === 'today' ? (
+        <TodayView market={market} onOpen={setOpenId} />
+      ) : loading ? (
         <div className="flex items-center justify-center py-20 text-slate-400"><Loader2 className="h-6 w-6 animate-spin" /></div>
       ) : visible.length === 0 ? (
         <div className="bg-white border rounded-xl p-16 text-center text-slate-400">
@@ -324,6 +354,15 @@ export default function CrmPage() {
           <span className="px-2.5 py-1 rounded-lg bg-white border border-slate-200">
             Archived: <strong className="text-slate-700">{stats?.byStatus?.ARCHIVED ?? 0}</strong>
           </span>
+          {earnings && earnings.bySource?.some((r) => r.leads > 0) && (
+            <button
+              onClick={() => setShowChannels((v) => !v)}
+              className="px-2.5 py-1 rounded-lg bg-white border border-slate-200 hover:bg-slate-50 inline-flex items-center gap-1"
+            >
+              <BarChart3 className="h-3.5 w-3.5" />
+              {showChannels ? 'Hide' : 'Where leads come from'}
+            </button>
+          )}
           {earnings && earnings.totalCommissionUsd > 0 && (
             <span
               className="px-2.5 py-1 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800 inline-flex items-center gap-1"
@@ -337,9 +376,53 @@ export default function CrmPage() {
         </div>
       )}
 
+      {showChannels && earnings && (
+        <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
+          <div className="px-4 py-2.5 border-b border-slate-100">
+            <h3 className="text-sm font-semibold text-slate-800">Where leads come from</h3>
+            <p className="text-[11px] text-slate-400 mt-0.5">
+              Last 12 months. Commission per lead is the number that decides where the ad budget goes.
+            </p>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-slate-50 text-slate-500">
+                <tr>
+                  <th className="text-left font-medium px-4 py-2">Channel</th>
+                  <th className="text-right font-medium px-4 py-2">Leads</th>
+                  <th className="text-right font-medium px-4 py-2">Won</th>
+                  <th className="text-right font-medium px-4 py-2">Conversion</th>
+                  <th className="text-right font-medium px-4 py-2">Commission</th>
+                  <th className="text-right font-medium px-4 py-2">Per lead</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-50">
+                {earnings.bySource.filter((r) => r.leads > 0).map((r) => (
+                  <tr key={r.source} className="hover:bg-slate-50">
+                    <td className="px-4 py-2 font-medium text-slate-800">
+                      {r.source.replace(/_/g, ' ').toLowerCase().replace(/^./, (c) => c.toUpperCase())}
+                    </td>
+                    <td className="px-4 py-2 text-right text-slate-600">{r.leads}</td>
+                    <td className="px-4 py-2 text-right text-slate-600">{r.won}</td>
+                    <td className="px-4 py-2 text-right text-slate-600">{r.conversionPct}%</td>
+                    <td className="px-4 py-2 text-right font-medium text-emerald-700">
+                      {r.commissionUsd > 0 ? `$${r.commissionUsd.toLocaleString()}` : '—'}
+                    </td>
+                    <td className="px-4 py-2 text-right text-slate-500">
+                      {r.commissionPerLead > 0 ? `$${r.commissionPerLead.toLocaleString()}` : '—'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
       {openLead && <LeadDrawer lead={openLead} onClose={() => setOpenId(null)} onChanged={load} />}
       {creating && <LeadFormModal onClose={() => setCreating(false)} onSaved={() => { setCreating(false); load() }} />}
       {importing && <ImportModal onClose={() => setImporting(false)} onImported={load} />}
+      {catalogue && <InvestmentCatalogue onClose={() => setCatalogue(false)} />}
       {bookingFor && (
         <BookViewingModal
           lead={bookingFor}

@@ -158,7 +158,14 @@ function scoreUnitKind(want: string[], have?: string | null): MatchCriterion | n
 /**
  * Budget fit with tolerance — within range is perfect, up to 20% over still
  * scores partially because most asking prices are negotiable.
+ *
+ * Past half as much again it stops being a negotiation and becomes a different
+ * price bracket, so it's fatal: a strong location was otherwise carrying
+ * properties the client plainly cannot afford into the near-miss list (a
+ * $400k villa surfaced for a Georgia investor with a $70k ceiling).
  */
+const AFFORDABILITY_LIMIT = 0.5;
+
 function scoreBudget(min: number | null, max: number | null, price?: number | null): MatchCriterion | null {
   if (min == null && max == null) return null;
   if (price == null) return { label: 'Budget', weight: WEIGHTS.budget, score: 0 };
@@ -171,7 +178,14 @@ function scoreBudget(min: number | null, max: number | null, price?: number | nu
     const over = (price - max) / max;
     if (over <= 0.1) return { label: 'Budget', weight: WEIGHTS.budget, score: 0.7, detail: `${Math.round(over * 100)}% over budget` };
     if (over <= 0.2) return { label: 'Budget', weight: WEIGHTS.budget, score: 0.4, detail: `${Math.round(over * 100)}% over budget` };
-    return { label: 'Budget', weight: WEIGHTS.budget, score: 0, detail: 'Well over budget' };
+    if (over <= AFFORDABILITY_LIMIT) return { label: 'Budget', weight: WEIGHTS.budget, score: 0, detail: `${Math.round(over * 100)}% over budget` };
+    return {
+      label: 'Budget',
+      weight: WEIGHTS.budget,
+      score: 0,
+      fatal: true,
+      detail: `${Math.round(over * 100)}% over budget — out of reach`,
+    };
   }
   return { label: 'Budget', weight: WEIGHTS.budget, score: 1, detail: 'In budget' };
 }
@@ -304,6 +318,49 @@ export function matchPropertyToLead(buyer: any, property: any, seller?: any): Ma
     scoreUnitKind(buyer.unitKinds ?? [], property.kind),
     scoreBudget(buyer.budgetMin ?? null, buyer.budgetMax ?? null, property.askingPrice ?? null),
     scoreBeds(buyer.minBeds ?? null, property.bedrooms ?? null),
+  ]);
+}
+
+/**
+ * How well a Georgia investment opportunity fits an investor.
+ *
+ * Scored differently from a home: an investor picking a Batumi studio cares
+ * about the city, the entry price and the yield, not which street it's on or
+ * how many bedrooms it has. Bedrooms are therefore not scored at all — using
+ * the residential weights here would mark every studio as a bad match for
+ * anyone who mentioned wanting two bedrooms of floor space.
+ */
+export function matchProductToLead(lead: any, product: any): MatchResult {
+  const location = scoreLocation(
+    lead.areas ?? [],
+    lead.regions ?? [],
+    [product.city],
+    product.region,
+  );
+
+  // A product offers several unit kinds; score against the best one.
+  const kinds: string[] = product.unitKinds ?? [];
+  const wants: string[] = lead.unitKinds ?? [];
+  let kindCriterion: MatchCriterion | null = null;
+  if (wants.length) {
+    if (kinds.length === 0) {
+      kindCriterion = { label: 'Type', weight: WEIGHTS.unitKind, score: 0, detail: 'Unit types not listed' };
+    } else {
+      kindCriterion = kinds
+        .map((k) => scoreUnitKind(wants, k))
+        .filter(Boolean)
+        .sort((a, b) => (b as MatchCriterion).score - (a as MatchCriterion).score)[0] as MatchCriterion;
+    }
+  }
+
+  // Entry price is what matters — a project starting under their ceiling works
+  // even if the penthouses in it don't.
+  const entryPrice = product.priceFrom ?? product.priceTo ?? null;
+
+  return finalize([
+    location,
+    kindCriterion,
+    scoreBudget(lead.budgetMin ?? null, lead.budgetMax ?? null, entryPrice),
   ]);
 }
 

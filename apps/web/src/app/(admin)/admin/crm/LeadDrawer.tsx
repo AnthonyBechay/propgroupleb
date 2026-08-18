@@ -18,6 +18,7 @@ import {
 import { OpportunityList } from './OpportunityList'
 import { SellerProperties } from './SellerProperties'
 import { DealPanel } from './DealPanel'
+import { ShareShortlistModal } from './ShareShortlistModal'
 import { useAuth } from '@/contexts/AuthContext'
 import { listingRef } from '@/lib/reference'
 
@@ -113,6 +114,7 @@ export function LeadDrawer({ lead, onClose, onChanged }: { lead: Lead; onClose: 
   // Four tabs instead of one long scroll — the drawer holds requirements,
   // conversation, stock, matches and history, which is too much for one column.
   const [tab, setTab] = useState<TabKey>('overview')
+  const [sharing, setSharing] = useState(false)
 
   const { user } = useAuth()
   // Presentation only: the server strips these fields for roles that may not
@@ -308,6 +310,15 @@ export function LeadDrawer({ lead, onClose, onChanged }: { lead: Lead; onClose: 
               <a href={`mailto:${l.email}`} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-sm text-slate-700 hover:bg-slate-100">
                 <Mail className="h-3.5 w-3.5" /> Email
               </a>
+            )}
+            {(l.opportunities?.length ?? 0) > 0 && (
+              <button
+                onClick={() => setSharing(true)}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 text-white text-sm font-medium hover:bg-emerald-700"
+                title="Send this client their shortlist on WhatsApp"
+              >
+                <Send className="h-3.5 w-3.5" /> Send shortlist
+              </button>
             )}
             <span
               className="ml-auto inline-flex items-center gap-1 text-xs font-medium px-2.5 py-1.5 rounded-lg bg-slate-100 text-slate-600"
@@ -820,6 +831,14 @@ export function LeadDrawer({ lead, onClose, onChanged }: { lead: Lead; onClose: 
           )}
         </div>
       </aside>
+
+      {sharing && (
+        <ShareShortlistModal
+          lead={l}
+          siteUrl={typeof window !== 'undefined' ? window.location.origin : ''}
+          onClose={() => setSharing(false)}
+        />
+      )}
 
       {editing && (
         <LeadFormModal
