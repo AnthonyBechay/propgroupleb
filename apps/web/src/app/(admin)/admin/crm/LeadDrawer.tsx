@@ -17,7 +17,23 @@ import {
 } from './types'
 import { OpportunityList } from './OpportunityList'
 import { SellerProperties } from './SellerProperties'
+import { DealPanel } from './DealPanel'
+import { useAuth } from '@/contexts/AuthContext'
 import { listingRef } from '@/lib/reference'
+
+type TabKey = 'overview' | 'activity' | 'deals' | 'matches'
+
+/**
+ * The drawer holds requirements, the conversation, the client's stock, live
+ * matches and the full history — too much for one column. Tabs keep each job
+ * on one screen instead of making the broker scroll to find anything.
+ */
+const TABS: Array<{ key: TabKey; label: string }> = [
+  { key: 'overview', label: 'Overview' },
+  { key: 'activity', label: 'Activity' },
+  { key: 'deals', label: 'Properties & deals' },
+  { key: 'matches', label: 'Matches' },
+]
 
 /** Date presets, as an <input type="date"> value. */
 const inDays = (n: number) => () => {
@@ -94,6 +110,14 @@ export function LeadDrawer({ lead, onClose, onChanged }: { lead: Lead; onClose: 
   const [extTitle, setExtTitle] = useState('')
   const [extUrl, setExtUrl] = useState('')
   const [showExternal, setShowExternal] = useState(false)
+  // Four tabs instead of one long scroll — the drawer holds requirements,
+  // conversation, stock, matches and history, which is too much for one column.
+  const [tab, setTab] = useState<TabKey>('overview')
+
+  const { user } = useAuth()
+  // Presentation only: the server strips these fields for roles that may not
+  // see them, so hiding here just avoids empty boxes.
+  const canSeeMoney = user?.role === 'ADMIN' || user?.role === 'SUPER_ADMIN'
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -335,7 +359,34 @@ export function LeadDrawer({ lead, onClose, onChanged }: { lead: Lead; onClose: 
           </div>
         </div>
 
+        {/* Tab bar */}
+        <div className="sticky top-[132px] z-10 bg-slate-50 border-b border-slate-200 px-5">
+          <nav className="flex gap-1 -mb-px">
+            {TABS.map((t) => (
+              <button
+                key={t.key}
+                onClick={() => setTab(t.key)}
+                className={`px-3 py-2 text-xs font-semibold border-b-2 transition-colors ${
+                  tab === t.key
+                    ? 'border-slate-800 text-slate-900'
+                    : 'border-transparent text-slate-400 hover:text-slate-700'
+                }`}
+              >
+                {t.label}
+                {t.key === 'deals' && (l.properties?.length ?? 0) > 0 && (
+                  <span className="ml-1 text-slate-400 font-normal">({l.properties!.length})</span>
+                )}
+                {t.key === 'matches' && strongMatches.length > 0 && (
+                  <span className="ml-1 text-emerald-600 font-normal">({strongMatches.length})</span>
+                )}
+              </button>
+            ))}
+          </nav>
+        </div>
+
         <div className="p-5 space-y-4">
+          {tab === 'overview' && (
+          <>
           {/* Requirement summary */}
           <section className="bg-white border border-slate-200 rounded-xl p-4">
             <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Looking for</p>
@@ -369,6 +420,11 @@ export function LeadDrawer({ lead, onClose, onChanged }: { lead: Lead; onClose: 
             ))}
           </section>
 
+          </>
+          )}
+
+          {tab === 'activity' && (
+          <>
           {/* Log a contact */}
           <section className="bg-white border border-slate-200 rounded-xl p-4 space-y-3">
             <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Log a contact</p>
@@ -488,6 +544,13 @@ export function LeadDrawer({ lead, onClose, onChanged }: { lead: Lead; onClose: 
             )}
           </section>
 
+          </>
+          )}
+
+          {tab === 'deals' && (
+          <>
+          <DealPanel lead={l} canSeeMoney={canSeeMoney} onChanged={() => { load(); onChanged() }} />
+
           {isSupply && (
             <SellerProperties
               leadId={l.id}
@@ -544,6 +607,11 @@ export function LeadDrawer({ lead, onClose, onChanged }: { lead: Lead; onClose: 
             </section>
           )}
 
+          </>
+          )}
+
+          {tab === 'matches' && (
+          <>
           {/* What we've shown them, and how it went */}
           <section className="bg-white border border-slate-200 rounded-xl p-4">
             <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3 flex items-center gap-1.5">
@@ -722,6 +790,11 @@ export function LeadDrawer({ lead, onClose, onChanged }: { lead: Lead; onClose: 
           </section>
           )}
 
+          </>
+          )}
+
+          {tab === 'activity' && (
+          <>
           {/* History */}
           <section className="bg-white border border-slate-200 rounded-xl p-4">
             <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3 flex items-center gap-1.5">
@@ -743,6 +816,8 @@ export function LeadDrawer({ lead, onClose, onChanged }: { lead: Lead; onClose: 
               </ol>
             )}
           </section>
+          </>
+          )}
         </div>
       </aside>
 

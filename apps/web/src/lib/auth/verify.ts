@@ -5,7 +5,7 @@ import { normalizeApiUrl } from '@/lib/utils/api-url'
 export interface AuthUser {
   id: string
   email: string
-  role: 'USER' | 'ADMIN' | 'SUPER_ADMIN'
+  role: 'USER' | 'AGENT' | 'CRM_MANAGER' | 'ADMIN' | 'SUPER_ADMIN'
   isActive: boolean
   bannedAt?: Date | null
 }

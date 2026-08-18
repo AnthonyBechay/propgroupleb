@@ -53,7 +53,7 @@ function LoginForm() {
           return
         }
 
-        if (user.role === 'SUPER_ADMIN' || user.role === 'ADMIN') {
+        if (user.role === 'SUPER_ADMIN' || user.role === 'ADMIN' || user.role === 'CRM_MANAGER') {
           router.push('/admin')
         } else {
           router.push(next)

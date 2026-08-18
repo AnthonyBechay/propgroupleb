@@ -126,6 +126,8 @@ export function UserManagementTable({ users, currentUserId }: UserManagementTabl
         return 'bg-purple-100 text-purple-800'
       case 'ADMIN':
         return 'bg-blue-100 text-blue-800'
+      case 'CRM_MANAGER':
+        return 'bg-emerald-100 text-emerald-800'
       default:
         return 'bg-gray-100 text-gray-800'
     }

@@ -4,10 +4,16 @@ import { createContext, useContext, useEffect, useRef, useState } from 'react'
 import { apiClient } from '@/lib/api/client'
 import { ApiResponse, User } from '@/lib/types/api'
 
+/**
+ * CRM_MANAGER runs the CRM but never sees the office's commission — the API
+ * strips those fields for them, so the UI only needs to avoid empty boxes.
+ */
+export type AuthRole = 'USER' | 'AGENT' | 'CRM_MANAGER' | 'ADMIN' | 'SUPER_ADMIN'
+
 export interface AuthUser {
   id: string
   email: string
-  role: 'USER' | 'ADMIN' | 'SUPER_ADMIN'
+  role: AuthRole
   isActive: boolean
   bannedAt?: Date | null
   emailVerifiedAt?: Date | null
@@ -39,7 +45,7 @@ function toAuthUser(u: User): AuthUser {
   return {
     id: u.id,
     email: u.email,
-    role: u.role as 'USER' | 'ADMIN' | 'SUPER_ADMIN',
+    role: u.role as AuthRole,
     isActive: u.isActive,
     bannedAt: undefined,
     emailVerifiedAt: undefined,

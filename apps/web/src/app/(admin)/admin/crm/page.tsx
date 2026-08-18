@@ -7,6 +7,7 @@ import {
   MessageSquareWarning, Sparkles, Target, DollarSign,
 } from 'lucide-react'
 import { normalizeApiUrl } from '@/lib/utils/api-url'
+import { useAuth } from '@/contexts/AuthContext'
 import { LeadDrawer } from './LeadDrawer'
 import { LeadFormModal } from './LeadFormModal'
 import { LeadBoard } from './LeadBoard'
@@ -45,6 +46,9 @@ export default function CrmPage() {
   // leadId -> number of matches nobody has shortlisted yet (computed server-side)
   const [untapped, setUntapped] = useState<Record<string, number>>({})
   const [earnings, setEarnings] = useState<Earnings | null>(null)
+  const { user } = useAuth()
+  // A CRM_MANAGER gets 403 from /earnings by design — don't even ask.
+  const canSeeMoney = user?.role === 'ADMIN' || user?.role === 'SUPER_ADMIN'
   const [typeFilter, setTypeFilter] = useState<'all' | LeadType>('all')
   const [openId, setOpenId] = useState<string | null>(null)
   const [creating, setCreating] = useState(false)
@@ -64,16 +68,18 @@ export default function CrmPage() {
         fetch(`${apiUrl}/api/crm?${p}`, { credentials: 'include', cache: 'no-store' }),
         fetch(`${apiUrl}/api/crm/stats`, { credentials: 'include', cache: 'no-store' }),
         fetch(`${apiUrl}/api/crm/untapped`, { credentials: 'include', cache: 'no-store' }),
-        fetch(`${apiUrl}/api/crm/earnings?months=12`, { credentials: 'include', cache: 'no-store' }),
+        canSeeMoney
+          ? fetch(`${apiUrl}/api/crm/earnings?months=12`, { credentials: 'include', cache: 'no-store' })
+          : Promise.resolve(null),
       ])
       if (listRes.ok) setLeads((await listRes.json()).data ?? [])
       if (statsRes.ok) setStats((await statsRes.json()).data ?? null)
       if (untappedRes.ok) setUntapped((await untappedRes.json()).data?.counts ?? {})
-      if (earnRes.ok) setEarnings((await earnRes.json()).data ?? null)
+      if (earnRes?.ok) setEarnings((await earnRes.json()).data ?? null)
     } finally {
       setLoading(false)
     }
-  }, [apiUrl, market, search])
+  }, [apiUrl, market, search, canSeeMoney])
 
   useEffect(() => {
     const t = setTimeout(load, search ? 350 : 0)

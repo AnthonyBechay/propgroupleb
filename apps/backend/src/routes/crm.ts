@@ -1,7 +1,7 @@
 import express, { type Request, type Response, type Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '@propgroup/db';
-import { authenticateToken, requireAdmin, logAdminAction } from '../middleware/auth.js';
+import { authenticateToken, requireAdmin, requireCrm, canSeeMoney, redactMoney, logAdminAction } from '../middleware/auth.js';
 import { asyncHandler } from '../utils/errors.js';
 import { sendSuccess, sendCreated, sendPaginated, sendNotFound, sendError } from '../utils/response.js';
 import { parsePagination, buildPaginationResponse } from '../utils/pagination.js';
@@ -16,6 +16,21 @@ import { deriveLeadStatus, needsNewOptions, rejectionInsights } from '../utils/l
 // ─────────────────────────────────────────────────────────────────────────────
 
 const router: Router = express.Router();
+
+/**
+ * Commission never leaves the building for a CRM_MANAGER.
+ *
+ * Done once here rather than at 24 call sites, because the failure mode of
+ * "one endpoint forgot" is a salary figure in someone's network tab. The check
+ * runs at send time, not now — `authenticateToken` hasn't populated req.user
+ * yet at middleware-registration time.
+ */
+router.use((req: Request, res: Response, next) => {
+  const json = res.json.bind(res);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  res.json = (body: any) => json(redactMoney(req, body));
+  next();
+});
 
 const UNIT_KINDS = ['APARTMENT', 'STUDIO', 'DUPLEX', 'PENTHOUSE', 'VILLA', 'TOWNHOUSE', 'SHOP', 'OFFICE', 'SHOWROOM', 'WAREHOUSE', 'RESTAURANT', 'CLINIC', 'WHOLE_BUILDING', 'LAND_PARCEL', 'STORAGE', 'PARKING'] as const;
 const LEAD_TYPES = ['BUYER', 'SELLER', 'RENTER', 'LANDLORD', 'INVESTOR'] as const;
@@ -179,7 +194,7 @@ async function hydrateOpportunities(opportunities: any[]): Promise<any[]> {
 router.get(
   '/',
   authenticateToken,
-  requireAdmin,
+  requireCrm,
   asyncHandler(async (req: Request, res: Response) => {
     const { page, limit, skip } = parsePagination(req.query as Record<string, string>);
     const q = req.query as Record<string, string>;
@@ -244,7 +259,7 @@ router.get(
 router.get(
   '/stats',
   authenticateToken,
-  requireAdmin,
+  requireCrm,
   asyncHandler(async (_req: Request, res: Response) => {
     const openStatuses = { notIn: ['WON', 'LOST', 'ARCHIVED'] as string[] };
     // "Due" now means a follow-up someone actually planned, not a date invented
@@ -273,6 +288,7 @@ router.get(
 router.get(
   '/earnings',
   authenticateToken,
+  // The office's takings — ADMIN and above only.
   requireAdmin,
   asyncHandler(async (req: Request, res: Response) => {
     const q = req.query as Record<string, string>;
@@ -348,7 +364,7 @@ router.get(
 router.get(
   '/untapped',
   authenticateToken,
-  requireAdmin,
+  requireCrm,
   asyncHandler(async (req: Request, res: Response) => {
     const q = req.query as Record<string, string>;
     // Only strong matches count here. A badge reading "40 to explore" is a
@@ -440,7 +456,7 @@ router.get(
 router.get(
   '/agenda',
   authenticateToken,
-  requireAdmin,
+  requireCrm,
   asyncHandler(async (req: Request, res: Response) => {
     const q = req.query as Record<string, string>;
     const marketWhere = q.market && MARKETS.includes(q.market as never) ? { market: q.market as never } : {};
@@ -492,7 +508,7 @@ function csvCell(v: unknown): string {
 router.get(
   '/export.csv',
   authenticateToken,
-  requireAdmin,
+  requireCrm,
   asyncHandler(async (req: Request, res: Response) => {
     const q = req.query as Record<string, string>;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -534,7 +550,7 @@ router.get(
 router.get(
   '/:id',
   authenticateToken,
-  requireAdmin,
+  requireCrm,
   asyncHandler(async (req: Request, res: Response) => {
     const lead = await prisma.lead.findUnique({
       where: { id: req.params.id },
@@ -561,7 +577,7 @@ router.get(
 router.get(
   '/:id/matches',
   authenticateToken,
-  requireAdmin,
+  requireCrm,
   asyncHandler(async (req: Request, res: Response) => {
     const lead = await prisma.lead.findUnique({ where: { id: req.params.id } });
     if (!lead) { sendNotFound(res, 'Lead'); return; }
@@ -618,7 +634,7 @@ router.get(
 router.get(
   '/:id/lead-matches',
   authenticateToken,
-  requireAdmin,
+  requireCrm,
   asyncHandler(async (req: Request, res: Response) => {
     // When this lead is the supply side, its own properties are what gets
     // scored, so they have to be loaded here too.
@@ -682,7 +698,7 @@ router.get(
 router.post(
   '/',
   authenticateToken,
-  requireAdmin,
+  requireCrm,
   asyncHandler(async (req: Request, res: Response) => {
     const authReq = req as AuthenticatedRequest;
     const data = leadSchema.parse(req.body);
@@ -702,7 +718,7 @@ router.post(
 router.put(
   '/:id',
   authenticateToken,
-  requireAdmin,
+  requireCrm,
   asyncHandler(async (req: Request, res: Response) => {
     const authReq = req as AuthenticatedRequest;
     const existing = await prisma.lead.findUnique({ where: { id: req.params.id }, select: { id: true } });
@@ -755,7 +771,7 @@ const contactSchema = z.object({
 router.post(
   '/:id/contact',
   authenticateToken,
-  requireAdmin,
+  requireCrm,
   asyncHandler(async (req: Request, res: Response) => {
     const authReq = req as AuthenticatedRequest;
     const lead = await prisma.lead.findUnique({ where: { id: req.params.id } });
@@ -813,7 +829,7 @@ const noteSchema = z.object({ body: z.string().min(1).max(4000) });
 router.post(
   '/:id/note',
   authenticateToken,
-  requireAdmin,
+  requireCrm,
   asyncHandler(async (req: Request, res: Response) => {
     const authReq = req as AuthenticatedRequest;
     const lead = await prisma.lead.findUnique({ where: { id: req.params.id }, select: { id: true } });
@@ -860,7 +876,7 @@ const leadPropertySchema = z.object({
 router.post(
   '/:id/properties',
   authenticateToken,
-  requireAdmin,
+  requireCrm,
   asyncHandler(async (req: Request, res: Response) => {
     const authReq = req as AuthenticatedRequest;
     const lead = await prisma.lead.findUnique({ where: { id: req.params.id }, select: { id: true } });
@@ -884,7 +900,7 @@ router.post(
 router.patch(
   '/properties/:pid',
   authenticateToken,
-  requireAdmin,
+  requireCrm,
   asyncHandler(async (req: Request, res: Response) => {
     const authReq = req as AuthenticatedRequest;
     const existing = await prisma.leadProperty.findUnique({ where: { id: req.params.pid } });
@@ -908,7 +924,7 @@ router.patch(
 router.delete(
   '/properties/:pid',
   authenticateToken,
-  requireAdmin,
+  requireCrm,
   asyncHandler(async (req: Request, res: Response) => {
     const authReq = req as AuthenticatedRequest;
     const existing = await prisma.leadProperty.findUnique({ where: { id: req.params.pid } });
@@ -924,7 +940,7 @@ router.delete(
 router.delete(
   '/:id',
   authenticateToken,
-  requireAdmin,
+  requireCrm,
   asyncHandler(async (req: Request, res: Response) => {
     const authReq = req as AuthenticatedRequest;
     const existing = await prisma.lead.findUnique({ where: { id: req.params.id }, select: { id: true, name: true } });
@@ -943,7 +959,7 @@ router.delete(
 router.post(
   '/from-inquiry/:inquiryId',
   authenticateToken,
-  requireAdmin,
+  requireCrm,
   asyncHandler(async (req: Request, res: Response) => {
     const authReq = req as AuthenticatedRequest;
     const inquiry = await prisma.propertyInquiry.findUnique({
@@ -1062,7 +1078,7 @@ const opportunitySchema = z.object({
 router.post(
   '/:id/opportunities',
   authenticateToken,
-  requireAdmin,
+  requireCrm,
   asyncHandler(async (req: Request, res: Response) => {
     const authReq = req as AuthenticatedRequest;
     const lead = await prisma.lead.findUnique({ where: { id: req.params.id }, select: { id: true } });
@@ -1115,12 +1131,14 @@ const opportunityUpdateSchema = z.object({
   commissionUsd: z.number().min(0).optional().nullable(),
   externalTitle: z.string().max(200).optional().nullable(),
   externalUrl: z.string().url().max(500).optional().nullable().or(z.literal('')),
+  // Deals get recorded days after they close, so the date must be settable.
+  closedAt: z.string().optional().nullable(),
 });
 
 router.patch(
   '/opportunities/:oid',
   authenticateToken,
-  requireAdmin,
+  requireCrm,
   asyncHandler(async (req: Request, res: Response) => {
     const authReq = req as AuthenticatedRequest;
     const existing = await prisma.leadOpportunity.findUnique({ where: { id: req.params.oid } });
@@ -1141,8 +1159,10 @@ router.patch(
     if (data.commissionUsd !== undefined) patch.commissionUsd = data.commissionUsd;
     if (data.externalTitle !== undefined) patch.externalTitle = data.externalTitle;
     if (data.externalUrl !== undefined) patch.externalUrl = data.externalUrl || null;
-    // Date the close, so earnings can be grouped by period.
-    if (data.stage === 'WON' && !existing.closedAt) patch.closedAt = new Date();
+    // Date the close, so earnings can be grouped by period. An explicit date
+    // always wins — deals are usually entered days after they actually closed.
+    if (data.closedAt !== undefined) patch.closedAt = data.closedAt ? new Date(data.closedAt) : null;
+    else if (data.stage === 'WON' && !existing.closedAt) patch.closedAt = new Date();
     if (data.stage && data.stage !== 'WON') patch.closedAt = null;
 
     const opportunity = await prisma.leadOpportunity.update({ where: { id: req.params.oid }, data: patch });
@@ -1171,7 +1191,7 @@ router.patch(
 router.delete(
   '/opportunities/:oid',
   authenticateToken,
-  requireAdmin,
+  requireCrm,
   asyncHandler(async (req: Request, res: Response) => {
     const authReq = req as AuthenticatedRequest;
     const existing = await prisma.leadOpportunity.findUnique({ where: { id: req.params.oid } });
@@ -1189,7 +1209,7 @@ router.delete(
 router.post(
   '/import',
   authenticateToken,
-  requireAdmin,
+  requireCrm,
   asyncHandler(async (req: Request, res: Response) => {
     const authReq = req as AuthenticatedRequest;
     const rows = z.array(leadSchema).max(500).parse(req.body?.leads ?? []);

@@ -113,7 +113,7 @@ export async function deleteUser(userId: string) {
   }
 }
 
-export async function inviteAdmin(email: string, role: 'ADMIN' | 'SUPER_ADMIN') {
+export async function inviteAdmin(email: string, role: 'CRM_MANAGER' | 'ADMIN' | 'SUPER_ADMIN') {
   const currentUser = await getCurrentUser()
   
   if (!currentUser || currentUser.role !== 'SUPER_ADMIN') {

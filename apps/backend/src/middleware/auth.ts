@@ -173,6 +173,51 @@ export const requireSuperAdmin = requireRole('SUPER_ADMIN');
 export const requireAgent = requireRole('AGENT', 'ADMIN', 'SUPER_ADMIN');
 
 /**
+ * Who may work the CRM. CRM_MANAGER runs the whole pipeline but never sees the
+ * office's commission — see `canSeeMoney`.
+ */
+export const requireCrm = requireRole('CRM_MANAGER', 'ADMIN', 'SUPER_ADMIN');
+
+/**
+ * May this user see what the office earns?
+ *
+ * Enforced on the way OUT of the API, not in the UI. Hiding a number in React
+ * still ships it in the JSON, and the network tab is one keystroke away.
+ */
+export function canSeeMoney(req: Request): boolean {
+  const role = (req as AuthenticatedRequest).user?.role;
+  return role === 'ADMIN' || role === 'SUPER_ADMIN';
+}
+
+/** Commission fields, removed for roles that may not see them. */
+const MONEY_FIELDS = ['commissionUsd', 'soldPrice', 'soldCurrency'] as const;
+
+/**
+ * Strip commission from anything on its way to a CRM_MANAGER. Walks arrays and
+ * nested objects so it catches money on opportunities and properties inside a
+ * lead payload, not just at the top level.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function redactMoney<T>(req: Request, payload: T): T {
+  if (canSeeMoney(req)) return payload;
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const walk = (value: any): any => {
+    if (Array.isArray(value)) return value.map(walk);
+    if (value && typeof value === 'object' && !(value instanceof Date)) {
+      const out: Record<string, unknown> = {};
+      for (const [k, v] of Object.entries(value)) {
+        if ((MONEY_FIELDS as readonly string[]).includes(k)) continue;
+        out[k] = walk(v);
+      }
+      return out;
+    }
+    return value;
+  };
+  return walk(payload) as T;
+}
+
+/**
  * Log an admin action to the audit log.
  */
 export async function logAdminAction(

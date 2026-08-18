@@ -168,6 +168,10 @@ enum InvestmentGoal {
 enum Role {
   USER
   AGENT
+  // Runs the CRM day to day — every client, property and deal — but the
+  // office's commission figures stay hidden. For staff who need the full
+  // pipeline without seeing what the business earns.
+  CRM_MANAGER
   ADMIN
   SUPER_ADMIN
 }

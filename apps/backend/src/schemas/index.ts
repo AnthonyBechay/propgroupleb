@@ -218,7 +218,7 @@ export const fxRateSchema = z.object({
 // ─── Shared ───────────────────────────────────────────────────────────────────
 
 export const updateRoleSchema = z.object({
-  role: z.enum(['USER', 'AGENT', 'ADMIN', 'SUPER_ADMIN']),
+  role: z.enum(['USER', 'AGENT', 'CRM_MANAGER', 'ADMIN', 'SUPER_ADMIN']),
 });
 
 export const banUserSchema = z.object({
@@ -227,7 +227,7 @@ export const banUserSchema = z.object({
 
 export const inviteAdminSchema = z.object({
   email: z.string().email('Invalid email address'),
-  role: z.enum(['AGENT', 'ADMIN', 'SUPER_ADMIN']),
+  role: z.enum(['AGENT', 'CRM_MANAGER', 'ADMIN', 'SUPER_ADMIN']),
 });
 
 export const inquirySchema = z.object({

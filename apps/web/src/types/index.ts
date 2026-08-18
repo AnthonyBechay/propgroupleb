@@ -42,6 +42,8 @@ export enum InvestmentGoal {
 export enum Role {
   USER = 'USER',
   AGENT = 'AGENT',
+  /** Runs the CRM; the office's commission figures stay hidden from them. */
+  CRM_MANAGER = 'CRM_MANAGER',
   ADMIN = 'ADMIN',
   SUPER_ADMIN = 'SUPER_ADMIN',
 }

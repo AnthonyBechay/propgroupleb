@@ -4,7 +4,10 @@ import { redirect } from 'next/navigation'
 import { cookies } from 'next/headers'
 import { normalizeApiUrl } from '@/lib/utils/api-url'
 
-export type UserRole = 'USER' | 'ADMIN' | 'SUPER_ADMIN'
+export type UserRole = 'USER' | 'AGENT' | 'CRM_MANAGER' | 'ADMIN' | 'SUPER_ADMIN'
+
+/** Roles allowed into the admin area. */
+const ADMIN_ROLES: UserRole[] = ['CRM_MANAGER', 'ADMIN', 'SUPER_ADMIN']
 
 export interface AuthUser {
   id: string
@@ -73,9 +76,9 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
  */
 export async function isAdmin(): Promise<boolean> {
   const user = await getCurrentUser()
-  return user !== null && 
-         (user.role === 'ADMIN' || user.role === 'SUPER_ADMIN') && 
-         user.isActive && 
+  return user !== null &&
+         ADMIN_ROLES.includes(user.role) &&
+         user.isActive &&
          !user.bannedAt
 }
 

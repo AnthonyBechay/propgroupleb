@@ -34,7 +34,7 @@ import { UserPlus, Send, Shield } from 'lucide-react'
 
 const inviteSchema = z.object({
   email: z.string().email('Invalid email address'),
-  role: z.enum(['ADMIN', 'SUPER_ADMIN']),
+  role: z.enum(['CRM_MANAGER', 'ADMIN', 'SUPER_ADMIN']),
 })
 
 type InviteFormData = z.infer<typeof inviteSchema>
@@ -140,6 +140,17 @@ export function InviteAdminModal({ children, currentUserId }: InviteAdminModalPr
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
+                      <SelectItem value="CRM_MANAGER">
+                        <div className="flex items-center gap-2">
+                          <Shield className="h-4 w-4 text-emerald-600" />
+                          <div>
+                            <div className="font-medium">CRM Manager</div>
+                            <div className="text-xs text-slate-500">
+                              Runs the client pipeline — commission figures stay hidden
+                            </div>
+                          </div>
+                        </div>
+                      </SelectItem>
                       <SelectItem value="ADMIN">
                         <div className="flex items-center gap-2">
                           <Shield className="h-4 w-4 text-blue-600" />

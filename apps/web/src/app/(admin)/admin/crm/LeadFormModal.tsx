@@ -3,7 +3,10 @@
 import { useState } from 'react'
 import { X, Loader2, Save } from 'lucide-react'
 import { normalizeApiUrl } from '@/lib/utils/api-url'
-import { type Lead, type LeadType, UNIT_KINDS, UNIT_KIND_LABELS, TYPE_LABELS, TYPE_META, isSupplyType } from './types'
+import {
+  type Lead, type LeadType, UNIT_KINDS, UNIT_KIND_LABELS, TYPE_LABELS, TYPE_META,
+  isSupplyType, SUB_STATUS_META, subStatusesFor,
+} from './types'
 import { LocationPicker } from './LocationPicker'
 import type { Market } from '@/lib/crm-locations'
 
@@ -37,6 +40,8 @@ export function LeadFormModal({ lead, onClose, onSaved }: { lead?: Lead; onClose
     currency: lead?.currency ?? 'USD',
     lastContactAt: lead?.lastContactAt ? lead.lastContactAt.slice(0, 10) : new Date().toISOString().slice(0, 10),
     nextContactAt: lead?.nextContactAt?.slice(0, 10) ?? '',
+    nextContactNote: lead?.nextContactNote ?? '',
+    subStatus: lead?.subStatus ?? '',
     notes: lead?.notes ?? '',
   })
   const set = (k: keyof typeof f, v: unknown) => setF((p) => ({ ...p, [k]: v }))
@@ -75,6 +80,10 @@ export function LeadFormModal({ lead, onClose, onSaved }: { lead?: Lead; onClose
         currency: f.currency,
         lastContactAt: f.lastContactAt || null,
         nextContactAt: f.nextContactAt ? new Date(f.nextContactAt).toISOString() : null,
+        nextContactNote: f.nextContactNote.trim() || null,
+        // NEEDS_OPTIONS is derived from the shortlist, so it's never sent from
+        // here — the server would reject it anyway.
+        subStatus: f.subStatus || null,
         notes: f.notes.trim() || null,
       }
       const res = await fetch(`${apiUrl}/api/crm${isEdit ? `/${lead!.id}` : ''}`, {
@@ -196,6 +205,27 @@ export function LeadFormModal({ lead, onClose, onSaved }: { lead?: Lead; onClose
             </div>
           </div>
 
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className={lbl}>WhatsApp</label>
+              <input
+                value={f.whatsapp}
+                onChange={(e) => set('whatsapp', e.target.value)}
+                className={inp}
+                placeholder="Leave blank to use the phone number"
+              />
+            </div>
+            <div>
+              <label className={lbl}>Waiting on</label>
+              <select value={f.subStatus} onChange={(e) => set('subStatus', e.target.value)} className={inp}>
+                <option value="">Not set</option>
+                {subStatusesFor(f.type as LeadType).map((k) => (
+                  <option key={k} value={k}>{SUB_STATUS_META[k].label}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
           <div>
             <label className={lbl}>Asking for</label>
             <input
@@ -298,7 +328,13 @@ export function LeadFormModal({ lead, onClose, onSaved }: { lead?: Lead; onClose
             <div>
               <label className={lbl}>Plan a follow-up</label>
               <input type="date" value={f.nextContactAt} onChange={(e) => set('nextContactAt', e.target.value)} className={inp} />
-              <p className="text-[11px] text-slate-400 mt-1">Optional. Only dates you set here appear as follow-ups.</p>
+              <input
+                value={f.nextContactNote}
+                onChange={(e) => set('nextContactNote', e.target.value)}
+                className={`${inp} mt-1.5`}
+                placeholder="What for? (optional)"
+              />
+              <p className="text-[11px] text-slate-400 mt-1">Only dates you set here appear as follow-ups.</p>
             </div>
           </div>
 
