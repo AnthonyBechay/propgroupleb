@@ -365,6 +365,77 @@ router.post(
   })
 );
 
+// ── Unit options — the finish / payment choices a buyer picks between ────────
+// White-frame vs turnkey, each with its own price per m² and payment plan.
+// Imported Georgian projects rely on these, and until now they could only be
+// managed through the legacy /api/properties route.
+
+const optionSchema = z.object({
+  name: z.string().min(1).max(120),
+  // Required in the schema — an option without a price per m² can't be quoted.
+  pricePerSqm: z.number().min(0),
+  currency: z.enum(['USD', 'LBP']).default('USD'),
+  initialPayment: z.number().min(0).max(100).optional().nullable(),
+  description: z.string().max(2000).optional().nullable(),
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  paymentPlanDetails: z.any().optional().nullable(),
+});
+
+router.post(
+  '/:id/units/:unitId/options',
+  authenticateToken,
+  requireAdmin,
+  asyncHandler(async (req: Request, res: Response) => {
+    const authReq = req as AuthenticatedRequest;
+    const unit = await prisma.unit.findFirst({
+      where: { id: req.params.unitId, buildingId: req.params.id },
+      select: { id: true },
+    });
+    if (!unit) { sendNotFound(res, 'Unit'); return; }
+
+    const data = optionSchema.parse(req.body);
+    const option = await prisma.unitOption.create({ data: { ...data, unitId: unit.id } });
+    await logAdminAction('CREATE_UNIT_OPTION', 'unit', unit.id, { name: option.name }, authReq);
+    sendCreated(res, option, 'Option added');
+  })
+);
+
+router.put(
+  '/:id/units/:unitId/options/:optionId',
+  authenticateToken,
+  requireAdmin,
+  asyncHandler(async (req: Request, res: Response) => {
+    const authReq = req as AuthenticatedRequest;
+    const existing = await prisma.unitOption.findFirst({
+      where: { id: req.params.optionId, unitId: req.params.unitId },
+      select: { id: true },
+    });
+    if (!existing) { sendNotFound(res, 'Option'); return; }
+
+    const data = optionSchema.partial().parse(req.body);
+    const option = await prisma.unitOption.update({ where: { id: existing.id }, data });
+    await logAdminAction('UPDATE_UNIT_OPTION', 'unit', req.params.unitId, { name: option.name }, authReq);
+    sendSuccess(res, option, 'Option updated');
+  })
+);
+
+router.delete(
+  '/:id/units/:unitId/options/:optionId',
+  authenticateToken,
+  requireAdmin,
+  asyncHandler(async (req: Request, res: Response) => {
+    const authReq = req as AuthenticatedRequest;
+    const existing = await prisma.unitOption.findFirst({
+      where: { id: req.params.optionId, unitId: req.params.unitId },
+      select: { id: true },
+    });
+    if (!existing) { sendNotFound(res, 'Option'); return; }
+    await prisma.unitOption.delete({ where: { id: existing.id } });
+    await logAdminAction('DELETE_UNIT_OPTION', 'unit', req.params.unitId, {}, authReq);
+    sendSuccess(res, { id: existing.id }, 'Option removed');
+  })
+);
+
 // ── PUT /:id — update building (admin) ────────────────────────────────────────
 
 router.put(

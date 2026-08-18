@@ -117,13 +117,18 @@ async function main() {
   }
 
   h1('4 · Shape of the data');
-  const withUnits = await q(
-    ge,
-    `SELECT COUNT(DISTINCT "propertyId")::int AS n FROM "units"`
-  );
-  const geProps = await count(ge, 'properties');
-  row('properties that have units (become projects)', withUnits[0]?.n ?? 0);
-  row('properties with no units (become standalone)', geProps - (withUnits[0]?.n ?? 0));
+  // A property becomes a PROJECT only with more than one unit; one unit (or
+  // none) is a standalone. Counting "has any units" conflated the two.
+  const byUnitCount = await q(ge, `
+    SELECT CASE WHEN c > 1 THEN 'project' ELSE 'standalone' END AS shape, COUNT(*)::int AS n
+      FROM (SELECT p."id", COUNT(u."id")::int AS c
+              FROM "properties" p LEFT JOIN "units" u ON u."propertyId" = p."id"
+             GROUP BY p."id") t
+     GROUP BY 1`);
+  for (const r of byUnitCount) row(`becomes a ${r.shape}`, r.n);
+  row('unit rows to import', await count(ge, 'units'));
+  row('unit options to import', await count(ge, 'unit_options'));
+  row('developers to import', await count(ge, 'developers'));
 
   // Every Georgia property carries its own price; Lebanon puts price on a
   // listing, so each property becomes one building + one listing.
@@ -153,6 +158,14 @@ async function main() {
     }
   }
   for (const [host, n] of [...hosts.entries()].sort((a, b) => b[1] - a[1])) row(host, n);
+
+  // /api/files/<key> URLs are the danger: this app treats that path as its own
+  // and would rewrite them onto the Lebanon bucket, where the key doesn't
+  // exist. The importer re-points them at the Georgia CDN.
+  const proxied = imgs.filter((i) => /\/api\/files\//.test(i.url)).length;
+  if (proxied > 0) {
+    row('served via /api/files/ → re-pointed on import', proxied);
+  }
   console.log(
     '\n  Absolute URLs on a host you keep serving need no migration — the rows\n' +
     '  carry over and the images keep loading from where they already live.'

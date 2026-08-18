@@ -10,6 +10,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { normalizeApiUrl, normalizeFileUrl } from '@/lib/utils/api-url'
 import { ALL_PROPERTY_KINDS, typeLabel, typeDef } from '@/lib/property-types'
+import { UnitOptions } from './UnitOptions'
 import { unitRef, buildingRefOf } from '@/lib/reference'
 
 // ── constants ─────────────────────────────────────────────────────────────────
@@ -1140,6 +1141,16 @@ export function UnitsManager({ buildingId, buildingImages = [] }: { buildingId: 
                       onSave={f => handleUpdateUnit(unit.id, f)}
                       onCancel={() => setExpanded(null)}
                       saving={saving}
+                    />
+
+                    {/* Finish / payment options — how off-plan projects are
+                        actually priced, and what the Georgia import carries. */}
+                    <UnitOptions
+                      buildingId={buildingId}
+                      unitId={unit.id}
+                      options={unit.options ?? []}
+                      areaSqm={unit.areaSqm}
+                      onChanged={fetchUnits}
                     />
                   </div>
                 )}
