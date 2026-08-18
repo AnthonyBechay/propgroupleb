@@ -18,6 +18,12 @@ enum Currency {
 
 enum Country {
   LEBANON
+  // The group also sells Georgian stock (propgrp.com) and has listed Cypriot
+  // and Greek units in the past. Kept in step with the Georgia system so its
+  // rows can be imported without losing where the property actually is.
+  GEORGIA
+  CYPRUS
+  GREECE
 }
 
 // Building-level kind
@@ -421,6 +427,12 @@ model Building {
   hasGarden     Boolean @default(false)
   hasSecurity   Boolean @default(false)
   hasRooftop    Boolean @default(false)
+  // Present in the Georgia system and meaningful for international stock.
+  hasCentralAC  Boolean @default(false)
+
+  availableFrom DateTime?
+  reservedUntil DateTime?
+  soldAt        DateTime?
 
   // Status / marketing
   // Short human reference quoted by clients ("PG-1042"). Unique, never reused.
@@ -508,6 +520,9 @@ model BuildingInvestmentData {
   downPaymentPercentage Float?
   paymentPlan           String?
   paymentPlanDetails    Json?
+  // Residency-by-investment — the first question an international buyer asks.
+  isGoldenVisaEligible Boolean @default(false)
+  goldenVisaMinAmount  Float?
   installmentYears      Int?
 
   completionDate      DateTime?
@@ -1585,6 +1600,83 @@ enum RejectionReason {
   BOUGHT_ELSEWHERE
   UNAVAILABLE   // sold/rented to someone else
   OTHER
+}
+
+// Provenance for rows brought in from the Georgia system.
+//
+// Doing three jobs at once: it makes the import idempotent (a second run skips
+// what it already created), reversible (delete every target in a batch and the
+// database is back where it started), and auditable (which propgrp.com row did
+// this building come from). Kept out of the domain models so Building/Unit
+// stay clean.
+model ImportedRecord {
+  id String @id @default(cuid())
+
+  batch        String // "georgia-2026-08-05"
+  sourceSystem String // "propgrp"
+  sourceTable  String // "properties"
+  sourceId     String
+  targetTable  String // "buildings"
+  targetId     String
+
+  createdAt DateTime @default(now())
+
+  @@unique([sourceSystem, sourceTable, sourceId, targetTable])
+  @@index([batch])
+  @@map("imported_records")
+}
+
+// An inbound WhatsApp message from a number we don't recognise.
+//
+// Auto-creating a client from every inbound message is how a CRM becomes
+// unusable: a work number receives suppliers, family, wrong numbers and spam
+// alongside real enquiries. Unknown senders land here instead, and only become
+// clients when a person says so. Messages from numbers we already know skip
+// this entirely and go straight onto that client's timeline.
+model InboundMessage {
+  id      String @id @default(cuid())
+  channel InboundChannel @default(WHATSAPP)
+
+  // Sender identity as the platform reports it.
+  waId        String
+  profileName String?
+  body        String
+
+  status InboundStatus @default(PENDING)
+
+  // Set once triaged into the CRM, so the thread can be followed.
+  leadId String?
+
+  receivedAt DateTime @default(now())
+  handledAt  DateTime?
+  handledBy  String?
+
+  @@index([status, receivedAt])
+  @@index([waId])
+  @@map("inbound_messages")
+}
+
+enum InboundChannel {
+  WHATSAPP
+}
+
+enum InboundStatus {
+  PENDING   // waiting for someone to look at it
+  ADDED     // became a client
+  IGNORED   // not business — dismissed
+  BLOCKED   // never ask about this number again
+}
+
+// Numbers whose messages we never want to see again — suppliers, spam, the
+// landlord of the office. Kept separately from the messages so the block
+// survives clearing the inbox.
+model BlockedSender {
+  id        String   @id @default(cuid())
+  waId      String   @unique
+  label     String?
+  createdAt DateTime @default(now())
+
+  @@map("blocked_senders")
 }
 
 // An investment opportunity we resell — currently Georgia stock listed on

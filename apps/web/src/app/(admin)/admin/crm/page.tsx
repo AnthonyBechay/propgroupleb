@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   UserSearch, Plus, Search, Loader2, Phone, MessageCircle, Mail, Clock,
   CalendarPlus, X, LayoutGrid, List, Download, Upload, MapPin,
-  MessageSquareWarning, Sparkles, Target, DollarSign, Sun, Globe, BarChart3,
+  MessageSquareWarning, Sparkles, Target, DollarSign, Sun, Globe, BarChart3, Inbox,
 } from 'lucide-react'
 import { normalizeApiUrl } from '@/lib/utils/api-url'
 import { useAuth } from '@/contexts/AuthContext'
@@ -15,6 +15,7 @@ import { ImportModal } from './ImportModal'
 import { BookViewingModal } from './BookViewingModal'
 import { TodayView } from './TodayView'
 import { InvestmentCatalogue } from './InvestmentCatalogue'
+import { InboxView } from './InboxView'
 import {
   type Lead, type LeadMarket, type LeadStatus, type LeadType,
   STATUS_META, TYPE_LABELS, MARKET_META, formatLastContact, formatPlanned,
@@ -44,7 +45,7 @@ interface Stats {
   byStatus: Record<string, number>
 }
 
-type View = 'today' | 'board' | 'list'
+type View = 'today' | 'inbox' | 'board' | 'list'
 
 export default function CrmPage() {
   const apiUrl = normalizeApiUrl(process.env.NEXT_PUBLIC_API_URL || '')
@@ -68,6 +69,9 @@ export default function CrmPage() {
   const [bookingFor, setBookingFor] = useState<Lead | null>(null)
   const [catalogue, setCatalogue] = useState(false)
   const [showChannels, setShowChannels] = useState(false)
+  // Unread count drives the tab badge — an inbox you can't see is an inbox
+  // nobody empties.
+  const [inboxCount, setInboxCount] = useState(0)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -78,18 +82,20 @@ export default function CrmPage() {
       if (market !== 'all') p.set('market', market)
       if (search.trim()) p.set('search', search.trim())
 
-      const [listRes, statsRes, untappedRes, earnRes] = await Promise.all([
+      const [listRes, statsRes, untappedRes, earnRes, inboxRes] = await Promise.all([
         fetch(`${apiUrl}/api/crm?${p}`, { credentials: 'include', cache: 'no-store' }),
         fetch(`${apiUrl}/api/crm/stats`, { credentials: 'include', cache: 'no-store' }),
         fetch(`${apiUrl}/api/crm/untapped`, { credentials: 'include', cache: 'no-store' }),
         canSeeMoney
           ? fetch(`${apiUrl}/api/crm/earnings?months=12`, { credentials: 'include', cache: 'no-store' })
           : Promise.resolve(null),
+        fetch(`${apiUrl}/api/crm/inbox`, { credentials: 'include', cache: 'no-store' }),
       ])
       if (listRes.ok) setLeads((await listRes.json()).data ?? [])
       if (statsRes.ok) setStats((await statsRes.json()).data ?? null)
       if (untappedRes.ok) setUntapped((await untappedRes.json()).data?.counts ?? {})
       if (earnRes?.ok) setEarnings((await earnRes.json()).data ?? null)
+      if (inboxRes.ok) setInboxCount((await inboxRes.json()).data?.pending ?? 0)
     } finally {
       setLoading(false)
     }
@@ -184,7 +190,7 @@ export default function CrmPage() {
       {/* One row: what needs attention on the left, actions on the right. The
           page title used to eat a whole row saying what the sidebar says. */}
       <div className="flex items-center justify-between gap-3 flex-wrap">
-        <div className={`flex gap-2 flex-wrap ${view === 'today' ? 'invisible pointer-events-none' : ''}`}>
+        <div className={`flex gap-2 flex-wrap ${view === 'today' || view === 'inbox' ? 'invisible pointer-events-none' : ''}`}>
           <FocusChip
             active={focus === 'planned'} count={counts.planned}
             onClick={() => setFocus((f) => (f === 'planned' ? 'none' : 'planned'))}
@@ -303,6 +309,18 @@ export default function CrmPage() {
             <Sun className="h-4 w-4" /> Today
           </button>
           <button
+            onClick={() => setView('inbox')}
+            title="WhatsApp from numbers not in the CRM"
+            className={`px-2 py-1.5 rounded-md transition-all inline-flex items-center gap-1 text-sm font-medium ${view === 'inbox' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-900'}`}
+          >
+            <Inbox className="h-4 w-4" />
+            {inboxCount > 0 && (
+              <span className="inline-flex items-center justify-center min-w-[16px] h-4 px-1 rounded-full bg-emerald-500 text-white text-[10px] font-bold">
+                {inboxCount}
+              </span>
+            )}
+          </button>
+          <button
             onClick={() => setView('board')}
             title="Pipeline board"
             className={`p-1.5 rounded-md transition-all ${view === 'board' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-900'}`}
@@ -322,6 +340,8 @@ export default function CrmPage() {
       {/* Content */}
       {view === 'today' ? (
         <TodayView market={market} onOpen={setOpenId} />
+      ) : view === 'inbox' ? (
+        <InboxView onOpenLead={(id) => { load(); setOpenId(id) }} />
       ) : loading ? (
         <div className="flex items-center justify-center py-20 text-slate-400"><Loader2 className="h-6 w-6 animate-spin" /></div>
       ) : visible.length === 0 ? (

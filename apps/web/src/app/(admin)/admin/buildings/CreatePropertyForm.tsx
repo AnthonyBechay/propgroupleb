@@ -19,6 +19,7 @@ const RESIDENTIAL_AMENITIES = [
   { key: 'hasPool', label: 'Pool' }, { key: 'hasGym', label: 'Gym' },
   { key: 'hasConcierge', label: 'Concierge' }, { key: 'hasGarden', label: 'Garden' },
   { key: 'hasRooftop', label: 'Rooftop' },
+  { key: 'hasCentralAC', label: 'Central A/C' },
 ] as const
 const DOC_TYPES = ['FLOOR_PLAN', 'BROCHURE', 'CONTRACT', 'LEGAL_DOCUMENT', 'CERTIFICATE', 'OTHER']
 const DOC_TYPE_LABELS: Record<string, string> = {
@@ -48,6 +49,7 @@ export function CreatePropertyForm() {
     locationUrl: '', builtYear: '', totalFloors: '', parkingSpaces: '',
     hasGenerator: false, hasElevator: false, hasPool: false, hasGym: false, hasConcierge: false,
     hasSecurity: false, hasGarden: false, hasRooftop: false, hasSolarPower: false,
+    hasCentralAC: false,
     videoUrl: '', highlightedFeatures: [] as string[],
     metaTitle: '', metaDescription: '',
     images: [] as string[],
@@ -126,7 +128,7 @@ export function CreatePropertyForm() {
         title: f.title, neighborhood: f.neighborhood, city: f.city, caza: f.caza, mohafazat: f.mohafazat,
         kind: f.kind, status: f.status, totalFloors: f.totalFloors, builtYear: f.builtYear,
         hasGenerator: f.hasGenerator, hasElevator: f.hasElevator, hasPool: f.hasPool, hasGym: f.hasGym,
-        hasConcierge: f.hasConcierge, hasSecurity: f.hasSecurity, hasGarden: f.hasGarden, hasRooftop: f.hasRooftop, hasSolarPower: f.hasSolarPower,
+        hasConcierge: f.hasConcierge, hasSecurity: f.hasSecurity, hasGarden: f.hasGarden, hasRooftop: f.hasRooftop, hasSolarPower: f.hasSolarPower, hasCentralAC: f.hasCentralAC,
         highlightedFeatures: f.highlightedFeatures, description: f.description || f.shortDescription,
       }
       const res = await fetch(`${apiUrl}/api/ai-seo/generate`, {
@@ -171,7 +173,7 @@ export function CreatePropertyForm() {
           totalFloors: showBuildingSections && f.totalFloors !== '' ? parseInt(f.totalFloors) : null,
           parkingSpaces: showBuildingSections && f.parkingSpaces !== '' ? parseInt(f.parkingSpaces) : null,
           hasGenerator: showBuildingSections && f.hasGenerator, hasElevator: showBuildingSections && f.hasElevator, hasPool: showBuildingSections && f.hasPool, hasGym: showBuildingSections && f.hasGym,
-          hasConcierge: showBuildingSections && f.hasConcierge, hasSecurity: showBuildingSections && f.hasSecurity, hasGarden: showBuildingSections && f.hasGarden, hasRooftop: showBuildingSections && f.hasRooftop, hasSolarPower: showBuildingSections && f.hasSolarPower,
+          hasConcierge: showBuildingSections && f.hasConcierge, hasSecurity: showBuildingSections && f.hasSecurity, hasGarden: showBuildingSections && f.hasGarden, hasRooftop: showBuildingSections && f.hasRooftop, hasSolarPower: showBuildingSections && f.hasSolarPower, hasCentralAC: showBuildingSections && f.hasCentralAC,
           videoUrl: f.videoUrl || null, highlightedFeatures: f.highlightedFeatures,
           paymentPlans: paymentPlans.length ? paymentPlans : null,
           metaTitle: f.metaTitle || null, metaDescription: f.metaDescription || null, images: f.images,

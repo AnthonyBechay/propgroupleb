@@ -88,6 +88,11 @@ export const buildingSchema = z.object({
   hasGarden: z.boolean().optional(),
   hasSecurity: z.boolean().optional(),
   hasRooftop: z.boolean().optional(),
+  // International stock (imported from the Georgia system) uses these.
+  hasCentralAC: z.boolean().optional(),
+  availableFrom: z.string().optional().nullable(),
+  reservedUntil: z.string().optional().nullable(),
+  soldAt: z.string().optional().nullable(),
 
   status: z.enum(['OFF_PLAN', 'NEW_BUILD', 'RESALE']).default('RESALE'),
   visibility: z.enum(['PUBLIC', 'ELITE_ONLY', 'HIDDEN']).default('PUBLIC'),

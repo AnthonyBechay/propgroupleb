@@ -429,7 +429,20 @@
       "Bash(DATABASE_URL=\"postgresql://postgres:test@localhost:55434/crmtest\" npx prisma db push --skip-generate --accept-data-loss)",
       "Bash(DATABASE_URL=\"postgresql://postgres:test@localhost:55435/crm2\" npx prisma db push --skip-generate --accept-data-loss)",
       "Bash(DATABASE_URL=\"postgresql://postgres:test@localhost:55436/crm3\" npx prisma db push --skip-generate --accept-data-loss)",
-      "Bash(DATABASE_URL=\"postgresql://postgres:test@localhost:55437/ga\" npx prisma db push --skip-generate --accept-data-loss)"
+      "Bash(DATABASE_URL=\"postgresql://postgres:test@localhost:55437/ga\" npx prisma db push --skip-generate --accept-data-loss)",
+      "Bash(DATABASE_URL=\"postgresql://postgres:test@localhost:55438/inbox\" npx prisma db push --skip-generate --accept-data-loss)",
+      "Read(//Users/anthonybechay/development/**)",
+      "Read(//Users/anthonybechay/development/propgroup/**)",
+      "Bash(awk '{print $2}')",
+      "Bash(DATABASE_URL=\"postgresql://postgres:t@localhost:55440/lb\" npx prisma db push --skip-generate --accept-data-loss)",
+      "Bash(DATABASE_URL=\"postgresql://postgres:t@localhost:55441/ge\" npx prisma db push --skip-generate --accept-data-loss)",
+      "Bash(GEORGIA_DATABASE_URL=\"postgresql://postgres:t@localhost:55441/ge\" DATABASE_URL=\"postgresql://postgres:t@localhost:55440/lb\" npx tsx ../../scripts/analyse-merge.ts)",
+      "Bash(GEORGIA_DATABASE_URL=\"postgresql://postgres:t@localhost:55441/ge\" DATABASE_URL=\"postgresql://postgres:t@localhost:55440/lb\" IMPORT_BATCH=\"test-batch\" npx tsx ../../scripts/import-georgia.ts --dry-run)",
+      "Bash(GEORGIA_DATABASE_URL=\"postgresql://postgres:t@localhost:55441/ge\" DATABASE_URL=\"postgresql://postgres:t@localhost:55440/lb\" IMPORT_BATCH=\"test-batch\" npx tsx ../../scripts/import-georgia.ts)",
+      "Bash(awk '{print $1}')",
+      "Bash(DATABASE_URL=\"postgresql://postgres:t@localhost:55440/lb\" npx tsx ../../scripts/import-georgia.ts --undo test-batch)",
+      "Bash(GEORGIA_DATABASE_URL=\"postgresql://postgres:t@localhost:55441/ge\" DATABASE_URL=\"postgresql://postgres:t@localhost:55440/lb\" IMPORT_BATCH=\"t1\" npx tsx ../../scripts/import-georgia.ts)",
+      "Bash(DATABASE_URL=\"postgresql://postgres:t@localhost:55440/lb\" npx tsx ../../scripts/import-georgia.ts --undo t1)"
     ],
     "deny": [],
     "ask": []

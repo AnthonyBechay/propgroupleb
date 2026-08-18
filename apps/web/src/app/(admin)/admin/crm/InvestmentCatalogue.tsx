@@ -7,6 +7,7 @@ import {
 import { normalizeApiUrl } from '@/lib/utils/api-url'
 import { ALL_PROPERTY_KINDS, typeLabel } from '@/lib/property-types'
 import { GEORGIA_REGION_LABEL } from '@/lib/crm-locations'
+import { Upload } from 'lucide-react'
 
 /**
  * The Georgia stock we resell.
@@ -51,6 +52,8 @@ export function InvestmentCatalogue({ onClose }: { onClose: () => void }) {
   const [loading, setLoading] = useState(true)
   const [editing, setEditing] = useState<InvestmentProduct | 'new' | null>(null)
   const [busy, setBusy] = useState(false)
+  const [importing, setImporting] = useState(false)
+  const [importMsg, setImportMsg] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -83,6 +86,104 @@ export function InvestmentCatalogue({ onClose }: { onClose: () => void }) {
     load()
   }
 
+  /**
+   * Bulk load from a propgrp.com export. Columns are matched by name so the
+   * sheet doesn't have to be reshaped — only "name" is required.
+   */
+  async function importCsv(file: File) {
+    setImporting(true)
+    setImportMsg(null)
+    try {
+      const text = (await file.text()).replace(/^\ufeff/, '')
+      const lines = text.split(/\r?\n/).filter((l) => l.trim())
+      if (lines.length < 2) { setImportMsg('That file has no data rows.'); return }
+
+      const split = (line: string) => {
+        const out: string[] = []
+        let cur = '', q = false
+        for (let i = 0; i < line.length; i++) {
+          const c = line[i]
+          if (c === '"') { if (q && line[i + 1] === '"') { cur += '"'; i++ } else q = !q }
+          else if (c === ',' && !q) { out.push(cur); cur = '' }
+          else cur += c
+        }
+        out.push(cur)
+        return out.map((v) => v.trim())
+      }
+
+      const field = (h: string): string | null => {
+        const k = h.toLowerCase().replace(/[^a-z]/g, '')
+        if (k.includes('name') || k.includes('project') || k.includes('title')) return 'name'
+        if (k.includes('developer') || k.includes('builder')) return 'developer'
+        if (k.includes('city') || k.includes('location')) return 'city'
+        if (k.includes('type') || k.includes('unit')) return 'unitKinds'
+        if (k.includes('pricefrom') || k === 'price' || k.includes('from') || k.includes('startingprice')) return 'priceFrom'
+        if (k.includes('priceto') || k.includes('maxprice')) return 'priceTo'
+        if (k.includes('yield') || k.includes('roi') || k.includes('return')) return 'expectedYield'
+        if (k.includes('handover') || k.includes('delivery') || k.includes('completion')) return 'handoverAt'
+        if (k.includes('payment') || k.includes('plan') || k.includes('installment')) return 'paymentPlan'
+        if (k.includes('url') || k.includes('link')) return 'url'
+        if (k.includes('status')) return 'status'
+        if (k.includes('note') || k.includes('description')) return 'notes'
+        return null
+      }
+
+      const headers = split(lines[0]).map(field)
+      if (!headers.includes('name')) {
+        setImportMsg('Could not find a project name column. Check the header row.')
+        return
+      }
+
+      const KIND_WORDS: Array<[RegExp, string]> = [
+        [/studio/i, 'STUDIO'], [/apart|flat/i, 'APARTMENT'], [/villa/i, 'VILLA'],
+        [/penthouse/i, 'PENTHOUSE'], [/duplex/i, 'DUPLEX'], [/townhouse/i, 'TOWNHOUSE'],
+        [/office/i, 'OFFICE'], [/shop|retail/i, 'SHOP'], [/hotel|aparthotel/i, 'APARTMENT'],
+      ]
+      const num = (v: string) => {
+        const n = Number(String(v || '').replace(/[^0-9.]/g, ''))
+        return Number.isFinite(n) && n > 0 ? n : null
+      }
+
+      let ok = 0, failed = 0
+      for (const line of lines.slice(1)) {
+        const cells = split(line)
+        const rec: Record<string, string> = {}
+        headers.forEach((f, i) => { if (f) rec[f] = cells[i] ?? '' })
+        if (!rec.name?.trim()) continue
+
+        const blob = `${rec.unitKinds ?? ''} ${rec.name}`
+        const kinds = Array.from(new Set(KIND_WORDS.filter(([re]) => re.test(blob)).map(([, k]) => k)))
+        const handover = rec.handoverAt ? new Date(rec.handoverAt) : null
+
+        const body = {
+          market: 'GEORGIA',
+          name: rec.name.trim(),
+          developer: rec.developer?.trim() || null,
+          city: rec.city?.trim() || null,
+          unitKinds: kinds,
+          priceFrom: num(rec.priceFrom),
+          priceTo: num(rec.priceTo),
+          expectedYield: num(rec.expectedYield),
+          handoverAt: handover && !Number.isNaN(+handover) ? handover.toISOString() : null,
+          paymentPlan: rec.paymentPlan?.trim() || null,
+          url: rec.url?.trim() || null,
+          notes: rec.notes?.trim() || null,
+          status: /sold/i.test(rec.status ?? '') ? 'SOLD_OUT'
+            : /limit|few/i.test(rec.status ?? '') ? 'LIMITED' : 'AVAILABLE',
+        }
+        const res = await fetch(`${apiUrl}/api/crm/products`, {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        })
+        if (res.ok) ok++; else failed++
+      }
+      setImportMsg(`${ok} imported${failed ? `, ${failed} skipped` : ''}.`)
+      await load()
+    } finally { setImporting(false) }
+  }
+
   const live = items.filter((p) => p.status === 'AVAILABLE' || p.status === 'LIMITED')
 
   return (
@@ -99,6 +200,14 @@ export function InvestmentCatalogue({ onClose }: { onClose: () => void }) {
             </p>
           </div>
           <div className="flex items-center gap-2 shrink-0">
+            <label className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 text-sm font-medium text-slate-700 hover:bg-slate-50 cursor-pointer">
+              {importing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+              Import CSV
+              <input
+                type="file" accept=".csv,text/csv" className="hidden"
+                onChange={(e) => { const f = e.target.files?.[0]; if (f) importCsv(f); e.target.value = '' }}
+              />
+            </label>
             <button
               onClick={() => setEditing('new')}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 text-white text-sm font-medium hover:bg-slate-700"
@@ -112,6 +221,9 @@ export function InvestmentCatalogue({ onClose }: { onClose: () => void }) {
         </div>
 
         <div className="flex-1 overflow-y-auto p-5 space-y-2">
+          {importMsg && (
+            <p className="text-sm text-slate-700 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2">{importMsg}</p>
+          )}
           {editing && (
             <ProductForm
               initial={editing === 'new' ? undefined : editing}

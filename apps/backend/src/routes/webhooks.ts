@@ -2,7 +2,7 @@ import express, { type Request, type Response, type Router } from 'express';
 import crypto from 'node:crypto';
 import { asyncHandler } from '../utils/errors.js';
 import { logger } from '../utils/logger.js';
-import { upsertInboundLead, logInboundMessage } from '../services/lead-intake.service.js';
+import { upsertInboundLead, logInboundMessage, findLeadByWhatsApp, isBlockedSender, queueInbound } from '../services/lead-intake.service.js';
 
 /**
  * Meta webhooks — WhatsApp Business and Facebook Lead Ads.
@@ -137,15 +137,20 @@ async function handleWhatsApp(body: any): Promise<void> {
           msg.interactive?.button_reply?.title ??
           `[${msg.type ?? 'message'}]`;
 
-        const { lead, created } = await upsertInboundLead({
-          waId,
-          name: profileByWaId.get(waId) ?? null,
-          phone: `+${waId}`,
-          message: text.slice(0, 2000),
-          source: 'WHATSAPP',
-        });
-        await logInboundMessage(lead.id, text);
-        logger.info('WhatsApp message handled', { leadId: lead.id, newClient: created });
+        // Muted numbers are dropped on the floor — no client, no inbox entry.
+        if (await isBlockedSender(waId)) continue;
+
+        // A number we already know goes straight onto that client's timeline.
+        const known = await findLeadByWhatsApp(waId);
+        if (known) {
+          await logInboundMessage(known.id, text);
+          logger.info('WhatsApp message logged on existing client', { leadId: known.id });
+          continue;
+        }
+
+        // Everyone else waits in the inbox for a person to decide. This is the
+        // difference between a CRM and a copy of your phone's message list.
+        await queueInbound(waId, text, profileByWaId.get(waId));
       }
     }
   }

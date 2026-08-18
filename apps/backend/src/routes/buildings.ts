@@ -10,6 +10,7 @@ import { BUILDING_LIST_INCLUDE, BUILDING_DETAIL_INCLUDE } from '../utils/prisma-
 import { deleteFile, extractKeyFromUrl } from '../services/upload.service.js';
 import type { AuthenticatedRequest } from '../types/index.js';
 import { nextBuildingRef, nextUnitRef, normalizeRef, looksLikeRef, buildingRefOf } from '../utils/reference.js';
+import { publicCountryFilter } from '../utils/market.js';
 
 /** Best-effort delete a batch of file URLs from R2. Failures are logged but do not throw. */
 async function purgeFileUrls(urls: string[]): Promise<void> {
@@ -84,6 +85,11 @@ const buildingSchema = z.object({
   hasGarden: z.boolean().optional(),
   hasSecurity: z.boolean().optional(),
   hasRooftop: z.boolean().optional(),
+  // International stock (imported from the Georgia system) uses these.
+  hasCentralAC: z.boolean().optional(),
+  availableFrom: z.string().optional().nullable(),
+  reservedUntil: z.string().optional().nullable(),
+  soldAt: z.string().optional().nullable(),
   status: z.enum(['OFF_PLAN', 'NEW_BUILD', 'RESALE']).optional(),
   source: z.enum(['ADMIN', 'OWNER']).optional(),
   visibility: z.enum(['PUBLIC', 'ELITE_ONLY', 'HIDDEN']).optional(),
@@ -154,6 +160,11 @@ router.get(
     } else if (!visibility) {
       where.visibility = 'PUBLIC';
     }
+
+    // One database, two websites: a property belongs to whichever market its
+    // country says. Admin passes country=all to see the whole book.
+    const country = publicCountryFilter(req);
+    if (country) where.country = country;
 
     if (kind) where.kind = kind;
     if (mohafazat) where.mohafazat = { contains: mohafazat, mode: 'insensitive' };
@@ -296,6 +307,9 @@ router.post(
         youtubeUrls: data.youtubeUrls ?? [],
         highlightedFeatures: data.highlightedFeatures ?? [],
         featuredUntil: data.featuredUntil ? new Date(data.featuredUntil) : undefined,
+        availableFrom: data.availableFrom ? new Date(data.availableFrom) : undefined,
+        reservedUntil: data.reservedUntil ? new Date(data.reservedUntil) : undefined,
+        soldAt: data.soldAt ? new Date(data.soldAt) : undefined,
         publishedAt: new Date(),
       };
       return tx.building.create({ data: createData });

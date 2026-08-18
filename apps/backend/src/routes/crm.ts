@@ -405,6 +405,145 @@ router.get(
   })
 );
 
+// ── Inbox — WhatsApp from numbers we don't recognise ─────────────────────────
+// Nothing here is a client yet. That's the point: a work number receives
+// suppliers, family and wrong numbers, and a CRM that swallows all of them
+// stops being worth opening.
+
+router.get(
+  '/inbox',
+  authenticateToken,
+  requireCrm,
+  asyncHandler(async (req: Request, res: Response) => {
+    const q = req.query as Record<string, string>;
+    const status = q.status === 'all' ? undefined : (q.status || 'PENDING');
+
+    const messages = await prisma.inboundMessage.findMany({
+      where: status ? { status: status as never } : {},
+      orderBy: { receivedAt: 'desc' },
+      take: 200,
+    });
+
+    // Several messages from one number are one conversation, not several
+    // decisions — collapse them so triage is per person.
+    const threads = new Map<string, { waId: string; profileName: string | null; messages: typeof messages; latestAt: Date }>();
+    for (const m of messages) {
+      const t = threads.get(m.waId);
+      if (t) t.messages.push(m);
+      else threads.set(m.waId, { waId: m.waId, profileName: m.profileName, messages: [m], latestAt: m.receivedAt });
+    }
+
+    sendSuccess(res, {
+      threads: Array.from(threads.values()).sort((a, b) => +b.latestAt - +a.latestAt),
+      pending: await prisma.inboundMessage.count({ where: { status: 'PENDING' } }),
+    });
+  })
+);
+
+const triageSchema = z.object({
+  waId: z.string().min(4).max(30),
+  action: z.enum(['ADD', 'IGNORE', 'BLOCK']),
+  // Only for ADD — everything else is a dismissal.
+  name: z.string().max(120).optional().nullable(),
+  market: z.enum(MARKETS).optional(),
+  type: z.enum(LEAD_TYPES).optional(),
+  label: z.string().max(120).optional().nullable(),
+});
+
+router.post(
+  '/inbox/triage',
+  authenticateToken,
+  requireCrm,
+  asyncHandler(async (req: Request, res: Response) => {
+    const authReq = req as AuthenticatedRequest;
+    const data = triageSchema.parse(req.body);
+
+    const pending = await prisma.inboundMessage.findMany({
+      where: { waId: data.waId, status: 'PENDING' },
+      orderBy: { receivedAt: 'asc' },
+    });
+    if (pending.length === 0) { sendNotFound(res, 'Conversation'); return; }
+
+    if (data.action === 'BLOCK') {
+      await prisma.blockedSender.upsert({
+        where: { waId: data.waId },
+        create: { waId: data.waId, label: data.label || pending[0].profileName || null },
+        update: { label: data.label || undefined },
+      });
+    }
+
+    if (data.action !== 'ADD') {
+      await prisma.inboundMessage.updateMany({
+        where: { waId: data.waId, status: 'PENDING' },
+        data: {
+          status: data.action === 'BLOCK' ? 'BLOCKED' : 'IGNORED',
+          handledAt: new Date(),
+          handledBy: authReq.user?.id ?? null,
+        },
+      });
+      await logAdminAction(`INBOX_${data.action}`, 'inbound', data.waId, {}, authReq);
+      sendSuccess(res, { waId: data.waId, action: data.action }, 'Done');
+      return;
+    }
+
+    // Becoming a client: the whole conversation moves onto their timeline, so
+    // nothing said before they were in the CRM is lost.
+    const lead = await prisma.lead.create({
+      data: {
+        market: data.market ?? 'LEBANON',
+        type: data.type ?? 'BUYER',
+        status: 'ACTIVE',
+        subStatus: 'AWAITING_REPLY',
+        source: 'WHATSAPP',
+        name: (data.name || pending[0].profileName || `WhatsApp ${data.waId}`).trim(),
+        phone: `+${data.waId}`,
+        whatsapp: `+${data.waId}`,
+        waId: data.waId,
+        notes: pending[0].body,
+        contactIntervalDays: 3,
+        createdBy: authReq.user?.id ?? null,
+      },
+    });
+
+    await prisma.leadContact.createMany({
+      data: pending.map((m) => ({
+        leadId: lead.id,
+        channel: 'WHATSAPP' as const,
+        body: m.body,
+        outcome: 'Inbound',
+        contactedAt: m.receivedAt,
+      })),
+    });
+
+    await prisma.inboundMessage.updateMany({
+      where: { waId: data.waId, status: 'PENDING' },
+      data: { status: 'ADDED', leadId: lead.id, handledAt: new Date(), handledBy: authReq.user?.id ?? null },
+    });
+
+    await logAdminAction('INBOX_ADD', 'lead', lead.id, { waId: data.waId }, authReq);
+    sendCreated(res, lead, 'Client added from WhatsApp');
+  })
+);
+
+router.get(
+  '/inbox/blocked',
+  authenticateToken,
+  requireCrm,
+  asyncHandler(async (_req: Request, res: Response) => {
+    sendSuccess(res, await prisma.blockedSender.findMany({ orderBy: { createdAt: 'desc' }, take: 200 }));
+  })
+);
+
+router.delete(
+  '/inbox/blocked/:waId',
+  authenticateToken,
+  requireCrm,
+  asyncHandler(async (req: Request, res: Response) => {
+    await prisma.blockedSender.deleteMany({ where: { waId: req.params.waId } });
+    sendSuccess(res, { waId: req.params.waId }, 'Unblocked');
+  })
+);
+
 // ── Investment products — Georgia stock we resell ────────────────────────────
 
 const productSchema = z.object({

@@ -312,6 +312,10 @@ export interface Building {
   hasConcierge: boolean;
   hasSolarPower: boolean;
   hasRooftop: boolean;
+  hasCentralAC?: boolean;
+  availableFrom?: string | null;
+  reservedUntil?: string | null;
+  soldAt?: string | null;
   hasGarden: boolean;
   investmentData?: BuildingInvestmentData | null;
   developer?: Developer | null;

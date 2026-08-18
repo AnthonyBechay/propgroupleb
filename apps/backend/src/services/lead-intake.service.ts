@@ -28,6 +28,60 @@ function phoneMatches(stored: string | null, e164: string): boolean {
   return e164.endsWith(a) || a.endsWith(e164);
 }
 
+/**
+ * Find the client this WhatsApp number already belongs to, without creating
+ * anything. Returns null for a number we've never seen.
+ */
+export async function findLeadByWhatsApp(waIdRaw: string): Promise<any | null> {
+  const waId = normalisePhone(waIdRaw);
+  if (!waId) return null;
+
+  const byWa = await prisma.lead.findUnique({ where: { waId } });
+  if (byWa) return byWa;
+
+  // Same suffix comparison as the upsert path: a client typed in as 03212385
+  // is the same person as WhatsApp's 9613212385.
+  const tail = waId.slice(-7);
+  const candidates = await prisma.lead.findMany({
+    where: { OR: [{ phone: { contains: tail } }, { whatsapp: { contains: tail } }] },
+    take: 20,
+  });
+  const hit = candidates.find(
+    (c: any) => phoneMatches(c.phone, waId) || phoneMatches(c.whatsapp, waId)
+  );
+  if (hit && !hit.waId) {
+    // Remember it so the next message is an exact match.
+    await prisma.lead.update({ where: { id: hit.id }, data: { waId } });
+  }
+  return hit ?? null;
+}
+
+/** Has this number been muted? */
+export async function isBlockedSender(waIdRaw: string): Promise<boolean> {
+  const waId = normalisePhone(waIdRaw);
+  if (!waId) return false;
+  return Boolean(await prisma.blockedSender.findUnique({ where: { waId } }));
+}
+
+/**
+ * Park a message from an unknown number for a human to triage.
+ *
+ * Deliberately does NOT create a client. A work number receives suppliers,
+ * family and wrong numbers; auto-creating from all of them is how the pipeline
+ * stops being worth trusting.
+ */
+export async function queueInbound(
+  waIdRaw: string,
+  body: string,
+  profileName?: string | null
+): Promise<void> {
+  const waId = normalisePhone(waIdRaw) ?? waIdRaw;
+  await prisma.inboundMessage.create({
+    data: { waId, profileName: profileName || null, body: body.slice(0, 4000) },
+  });
+  logger.info('Inbound message queued for triage', { waId });
+}
+
 export interface InboundLead {
   /** WhatsApp id (digits, E.164 without +) when the source is WhatsApp. */
   waId?: string | null;

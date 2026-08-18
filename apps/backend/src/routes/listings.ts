@@ -10,6 +10,7 @@ import { LISTING_CARD_INCLUDE } from '../utils/prisma-includes.js';
 import type { AuthenticatedRequest } from '../types/index.js';
 import { logger } from '../utils/logger.js';
 import { normalizeRef, looksLikeRef, buildingRefOf, isUnitRef } from '../utils/reference.js';
+import { publicCountryFilter } from '../utils/market.js';
 import {
   syncUnitLifecycleFromListing,
   TERMINAL_LIFECYCLES,
@@ -156,6 +157,20 @@ router.get(
       where.status = q.status ?? 'ACTIVE';
     } else {
       if (q.status && q.status !== 'all') where.status = q.status;
+    }
+
+    // A listing sits in a market via its property. Scoping here is what lets
+    // one backend serve propgrouplb.com and propgrp.com without either showing
+    // the other's stock.
+    // Composed with AND, not OR: the free-text search below also assigns
+    // where.OR, and an OR here would be silently overwritten by it — which
+    // would leak Lebanese stock into a search on the Georgia site.
+    const country = publicCountryFilter(req);
+    if (country) {
+      where.AND = [
+        ...(Array.isArray(where.AND) ? where.AND : []),
+        { OR: [{ building: { country } }, { unit: { building: { country } } }] },
+      ];
     }
 
     if (q.intent) where.intent = q.intent;

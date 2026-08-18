@@ -76,6 +76,7 @@ export function BuildingForm({ initialData, buildingId, embedded }: Props) {
     hasSecurity: initialData?.hasSecurity ?? false,
     hasGarden: initialData?.hasGarden ?? false,
     hasRooftop: initialData?.hasRooftop ?? false,
+    hasCentralAC: initialData?.hasCentralAC ?? false,
     hasSolarPower: initialData?.hasSolarPower ?? false,
     images: (initialData?.images ?? []) as string[],
     videoUrl: initialData?.videoUrl ?? '',
@@ -219,6 +220,7 @@ export function BuildingForm({ initialData, buildingId, embedded }: Props) {
       hasSecurity: form.hasSecurity,
       hasGarden: form.hasGarden,
       hasRooftop: form.hasRooftop,
+      hasCentralAC: form.hasCentralAC,
       hasSolarPower: form.hasSolarPower,
       images: form.images,
       videoUrl: form.videoUrl || null,
@@ -336,6 +338,7 @@ export function BuildingForm({ initialData, buildingId, embedded }: Props) {
     { key: 'hasConcierge', label: 'Concierge' },
     { key: 'hasGarden', label: 'Garden' },
     { key: 'hasRooftop', label: 'Rooftop' },
+    { key: 'hasCentralAC', label: 'Central A/C' },
   ] as const
   // A warehouse or shop has no pool or gym — only offer what's plausible.
   const AMENITIES = hasResidentialUnit
