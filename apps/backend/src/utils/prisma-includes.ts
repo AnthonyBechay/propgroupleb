@@ -84,6 +84,7 @@ export const UNIT_LIST_INCLUDE = {
       title: true,
       slug: true,
       ref: true,
+      country: true,
       city: true,
       caza: true,
       mohafazat: true,
@@ -127,6 +128,7 @@ export const LISTING_CARD_INCLUDE = {
       title: true,
       slug: true,
       ref: true, // clients quote this back to us
+      country: true, // decides which of the two websites shows it
       city: true,
       caza: true,
       mohafazat: true, // card location fallback when city/caza are empty

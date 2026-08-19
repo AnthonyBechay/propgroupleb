@@ -24,8 +24,13 @@ interface LocationGuide {
   _count?: { properties: number }
 }
 
+// Both websites are managed from here, so guides exist for both markets.
+// Lebanon guides show on propgrouplb.com; the rest on propgrp.com.
 const COUNTRIES = [
-  { value: 'LEBANON', label: 'Lebanon' },
+  { value: 'LEBANON', label: '🇱🇧 Lebanon' },
+  { value: 'GEORGIA', label: '🇬🇪 Georgia' },
+  { value: 'CYPRUS', label: '🇨🇾 Cyprus' },
+  { value: 'GREECE', label: '🇬🇷 Greece' },
 ]
 
 const EMPTY_FORM = {

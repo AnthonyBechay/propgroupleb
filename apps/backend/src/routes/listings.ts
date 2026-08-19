@@ -108,6 +108,7 @@ const LISTING_DETAIL_INCLUDE = {
       latitude: true,
       longitude: true,
       ref: true,
+      country: true,
       _count: { select: { units: true } },
     },
   },

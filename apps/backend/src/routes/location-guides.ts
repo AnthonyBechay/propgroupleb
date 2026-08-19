@@ -8,7 +8,8 @@ import type { AuthenticatedRequest } from '../types/index.js';
 
 const router: Router = express.Router();
 
-const COUNTRIES = ['LEBANON'] as const;
+// One back office, two websites — guides exist for every market we sell.
+const COUNTRIES = ['LEBANON', 'GEORGIA', 'CYPRUS', 'GREECE'] as const;
 
 const locationGuideSchema = z.object({
   title: z.string().min(1, 'Title is required').max(200),

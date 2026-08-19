@@ -38,6 +38,7 @@ router.get(
       buildingStats,
       inquiryStatusStats,
       buildingStatusStats,
+      buildingsByCountry,
     ] = await Promise.all([
       prisma.user.count(),
       prisma.building.count(),
@@ -83,13 +84,25 @@ router.get(
       prisma.building.groupBy({ by: ['city'], _count: { city: true } }),
       prisma.propertyInquiry.groupBy({ by: ['status'], _count: { status: true } }),
       prisma.building.groupBy({ by: ['status'], _count: { status: true } }),
+      // Which website each property belongs to — the headline number now that
+      // one back office serves both.
+      prisma.building.groupBy({ by: ['country'], _count: { _all: true } }),
     ]);
 
     sendSuccess(res, {
       overview: { totalUsers, totalBuildings, totalInquiries, totalFavorites, totalContactMessages, totalDocuments },
       trends: { newUsersThisWeek, newInquiriesThisWeek, newUsersThisMonth, newInquiriesThisMonth },
       recent: { users: recentUsers, inquiries: recentInquiries, buildings: recentBuildings, contacts: recentContacts },
-      statistics: { usersByRole: userStats, buildingsByCity: buildingStats, inquiriesByStatus: inquiryStatusStats, buildingsByStatus: buildingStatusStats },
+      statistics: {
+        usersByRole: userStats,
+        buildingsByCity: buildingStats,
+        inquiriesByStatus: inquiryStatusStats,
+        buildingsByStatus: buildingStatusStats,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        buildingsByCountry: (buildingsByCountry as any[]).map((r) => ({
+          country: r.country, count: r._count._all,
+        })),
+      },
     });
   })
 );

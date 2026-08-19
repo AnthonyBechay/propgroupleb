@@ -25,6 +25,7 @@ import Link from 'next/link'
 import { apiClient } from '@/lib/api/client'
 import { normalizeApiUrl } from '@/lib/utils/api-url'
 import { listingRef, refMatches } from '@/lib/reference'
+import { type MarketScope, MARKET_OPTIONS, countryFlag, inMarket } from '@/lib/market'
 
 const INTENT_COLORS: Record<string, string> = {
   FOR_SALE: 'bg-emerald-100 text-emerald-800',
@@ -58,6 +59,8 @@ export default function AdminListingsPage() {
   const [statusFilter, setStatusFilter] = useState('all')
   const [buildingFilter, setBuildingFilter] = useState(initialBuildingId)
   const [cazaFilter, setCazaFilter] = useState('all')
+  // Both websites are managed from here, so the list mixes their stock.
+  const [market, setMarket] = useState<MarketScope>('all')
   const [groupBy, setGroupBy] = useState<'none' | 'building' | 'caza'>('none')
   const [sort, setSort] = useState<'newest' | 'priceDesc' | 'priceAsc' | 'caza'>('newest')
   const [buildings, setBuildings] = useState<any[]>([])
@@ -94,7 +97,11 @@ export default function AdminListingsPage() {
   // Cazas present in the current result set, for the location filter.
   const cazas = Array.from(new Set(listings.map(cazaOf).filter(c => c !== '—'))).sort()
 
+  /** A listing sits in a market via whichever property it belongs to. */
+  const countryOf = (l: any) => l.building?.country ?? l.unit?.building?.country ?? 'LEBANON'
+
   const filtered = listings.filter(l => {
+    if (!inMarket(countryOf(l), market)) return false
     if (buildingFilter !== 'all') {
       const listingBuildingId = l.building?.id ?? l.unit?.buildingId ?? null
       if (listingBuildingId !== buildingFilter) return false
@@ -171,6 +178,16 @@ export default function AdminListingsPage() {
             className="pl-9"
           />
         </div>
+        <Select value={market} onValueChange={(v) => setMarket(v as MarketScope)}>
+          <SelectTrigger className="w-[150px]">
+            <SelectValue placeholder="All markets" />
+          </SelectTrigger>
+          <SelectContent>
+            {MARKET_OPTIONS.map((m) => (
+              <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
         <Select value={buildingFilter} onValueChange={setBuildingFilter}>
           <SelectTrigger className="w-[180px]">
             <Building2 className="h-3.5 w-3.5 mr-1.5 text-slate-400 shrink-0" />
@@ -294,6 +311,11 @@ export default function AdminListingsPage() {
                   <TableCell>
                     <div>
                       <div className="flex items-center gap-1.5">
+                        {countryOf(l) !== 'LEBANON' && (
+                          <span className="shrink-0 text-[11px]" title={`${countryOf(l)} — shows on propgrp.com`}>
+                            {countryFlag(countryOf(l))}
+                          </span>
+                        )}
                         {listingRef(l) && (
                           <span className="shrink-0 font-mono text-[10px] font-semibold text-slate-500 bg-slate-100 border border-slate-200 rounded px-1.5 py-0.5">
                             {listingRef(l)}

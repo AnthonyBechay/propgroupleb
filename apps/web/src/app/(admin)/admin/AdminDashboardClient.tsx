@@ -2,6 +2,7 @@
 
 import { useAuth } from '@/contexts/AuthContext'
 import { useEffect, useState } from 'react'
+import { countryFlag, siteFor } from '@/lib/market'
 import {
   Building2,
   Users,
@@ -44,6 +45,8 @@ interface DashboardData {
     buildingsByCity: Array<{ city: string | null; _count: { city: number } }>
     inquiriesByStatus: Array<{ status: string; _count: { status: number } }>
     buildingsByStatus: Array<{ status: string; _count: { status: number } }>
+    /** Which website each property belongs to. */
+    buildingsByCountry?: Array<{ country: string; count: number }>
   }
 }
 
@@ -176,6 +179,24 @@ export function AdminDashboardClient() {
               Buildings by City
             </h3>
             <div className="space-y-2">
+              {/* Which site the stock sits on — the first thing to know now
+                  that one admin serves both websites. */}
+              {(statistics.buildingsByCountry ?? []).length > 1 && (
+                <div className="mb-4 pb-4 border-b border-slate-100">
+                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">By website</p>
+                  <div className="space-y-1.5">
+                    {(statistics.buildingsByCountry ?? []).map((r) => (
+                      <div key={r.country} className="flex items-center justify-between text-sm">
+                        <span className="text-slate-600">
+                          {countryFlag(r.country)} {siteFor(r.country)}
+                        </span>
+                        <span className="font-semibold text-slate-900">{r.count}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {(statistics.buildingsByCity ?? []).length === 0 ? (
                 <p className="text-xs text-slate-400">No buildings yet</p>
               ) : (
