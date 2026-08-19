@@ -65,7 +65,7 @@ export default function AdminListingsPage() {
   // Load building list once for the filter dropdown
   useEffect(() => {
     const apiUrl = normalizeApiUrl(process.env.NEXT_PUBLIC_API_URL || '')
-    fetch(`${apiUrl}/api/buildings?limit=200&visibility=all`, { credentials: 'include' })
+    fetch(`${apiUrl}/api/buildings?limit=200&visibility=all&country=all`, { credentials: 'include' })
       .then(r => r.json())
       .then(d => setBuildings(d.data ?? []))
       .catch(() => {})
@@ -73,7 +73,8 @@ export default function AdminListingsPage() {
 
   useEffect(() => {
     setLoading(true)
-    const params: Record<string, string> = { limit: '200' }
+    // The admin manages both markets, so it asks for both.
+    const params: Record<string, string> = { limit: '200', country: 'all' }
     if (intentFilter !== 'all') params.intent = intentFilter
     if (statusFilter !== 'all') params.status = statusFilter
     // When 'all', don't pass status — the backend admin branch returns everything

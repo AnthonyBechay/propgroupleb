@@ -84,6 +84,8 @@ export function BuildingsAdminClient({ initialBuildings }: Props) {
   const [kindFilter, setKindFilter] = useState<string>('all')
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [sourceFilter, setSourceFilter] = useState<string>('all')
+  // One admin holds both markets now, so it needs a way to look at one.
+  const [marketFilter, setMarketFilter] = useState<string>('all')
   const [sort, setSort] = useState<SortKey>('newest')
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [busy, setBusy] = useState(false)
@@ -109,7 +111,11 @@ export function BuildingsAdminClient({ initialBuildings }: Props) {
       const matchKind = kindFilter === 'all' || b.kind === kindFilter
       const matchStatus = statusFilter === 'all' || b.status === statusFilter
       const matchSource = sourceFilter === 'all' || (b.source ?? 'ADMIN') === sourceFilter
-      return matchSearch && matchKind && matchStatus && matchSource
+      const country = b.country ?? 'LEBANON'
+      const matchMarket =
+        marketFilter === 'all' ||
+        (marketFilter === 'LEBANON' ? country === 'LEBANON' : country !== 'LEBANON')
+      return matchSearch && matchKind && matchStatus && matchSource && matchMarket
     })
     const time = (b: any) => new Date(b.createdAt ?? 0).getTime()
     out.sort((a, b) => {
@@ -122,7 +128,7 @@ export function BuildingsAdminClient({ initialBuildings }: Props) {
       }
     })
     return out
-  }, [buildings, search, kindFilter, statusFilter, sourceFilter, sort])
+  }, [buildings, search, kindFilter, statusFilter, sourceFilter, marketFilter, sort])
 
   // Only keep selections that are still visible under the current filters.
   const visibleSelected = useMemo(
@@ -211,6 +217,14 @@ export function BuildingsAdminClient({ initialBuildings }: Props) {
             className="pl-9"
           />
         </div>
+        <Select value={marketFilter} onValueChange={setMarketFilter}>
+          <SelectTrigger className="w-[150px]"><SelectValue placeholder="All markets" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All markets</SelectItem>
+            <SelectItem value="LEBANON">🇱🇧 Lebanon</SelectItem>
+            <SelectItem value="INTERNATIONAL">🌍 International</SelectItem>
+          </SelectContent>
+        </Select>
         <Select value={sourceFilter} onValueChange={setSourceFilter}>
           <SelectTrigger className="w-[150px]"><SelectValue placeholder="All sources" /></SelectTrigger>
           <SelectContent>
@@ -337,6 +351,11 @@ export function BuildingsAdminClient({ initialBuildings }: Props) {
                         )}
                         <div className="min-w-0">
                           <div className="flex items-center gap-1.5">
+                            {b.country && b.country !== 'LEBANON' && (
+                              <span className="shrink-0 text-[11px]" title={b.country}>
+                                {b.country === 'GEORGIA' ? '🇬🇪' : '🌍'}
+                              </span>
+                            )}
                             {b.ref && (
                               <span className="shrink-0 font-mono text-[10px] font-semibold text-slate-500 bg-slate-100 border border-slate-200 rounded px-1.5 py-0.5">
                                 {b.ref}

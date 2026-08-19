@@ -48,5 +48,14 @@ export function publicCountryFilter(
   const asked = String(req.query.country ?? '').toUpperCase();
   if (asked === 'ALL') return undefined;
   if ((COUNTRIES as readonly string[]).includes(asked)) return asked as MarketCountry;
+
+  // One back office for both markets: a signed-in admin sees everything unless
+  // they narrow it themselves. Scoping the admin to this deployment's country
+  // is what hid the imported Georgian stock from /admin/buildings, and every
+  // future admin screen would have had to remember to opt out.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const role = (req as any).user?.role;
+  if (role && ['ADMIN', 'SUPER_ADMIN', 'CRM_MANAGER'].includes(role)) return undefined;
+
   return siteScope() === 'INTERNATIONAL' ? { not: 'LEBANON' } : 'LEBANON';
 }

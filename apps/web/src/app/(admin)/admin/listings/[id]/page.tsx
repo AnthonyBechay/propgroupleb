@@ -20,7 +20,7 @@ export default async function EditListingPage({ params }: Props) {
   try {
     const [listingRes, buildingsRes] = await Promise.all([
       fetch(`${apiUrl}/api/listings/${id}`, { headers, cache: 'no-store' }),
-      fetch(`${apiUrl}/api/buildings?limit=200&visibility=all`, { headers, cache: 'no-store' }),
+      fetch(`${apiUrl}/api/buildings?limit=200&visibility=all&country=all`, { headers, cache: 'no-store' }),
     ])
     if (listingRes.ok) {
       const data = await listingRes.json()

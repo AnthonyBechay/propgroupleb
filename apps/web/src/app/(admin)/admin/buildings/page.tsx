@@ -7,7 +7,7 @@ export default async function AdminBuildingsPage() {
   let buildings: any[] = []
 
   try {
-    const res = await fetch(`${apiUrl}/api/buildings?limit=200&visibility=all`, { cache: 'no-store' })
+    const res = await fetch(`${apiUrl}/api/buildings?limit=200&visibility=all&country=all`, { cache: 'no-store' })
     if (res.ok) {
       const d = await res.json()
       buildings = d.data ?? []

@@ -16,7 +16,7 @@ export default async function NewListingPage({ searchParams }: Props) {
 
   let buildings: any[] = []
   try {
-    const res = await fetch(`${apiUrl}/api/buildings?limit=200&visibility=all`, { headers, cache: 'no-store' })
+    const res = await fetch(`${apiUrl}/api/buildings?limit=200&visibility=all&country=all`, { headers, cache: 'no-store' })
     if (res.ok) {
       const data = await res.json()
       buildings = data.data ?? []
