@@ -89,6 +89,9 @@ interface Preview {
 }
 const previews: Preview[] = [];
 
+/** Accounts that would be created, so their roles can be reviewed first. */
+const incomingUsers: Array<{ email: string; role: string }> = [];
+
 /**
  * Convert a Georgia backend-proxy file URL to its public CDN form.
  *
@@ -210,7 +213,12 @@ async function run() {
       continue;
     }
 
-    if (DRY) { userMap.set(u.id, `dry-${u.id}`); stats.users++; continue; }
+    if (DRY) {
+      userMap.set(u.id, `dry-${u.id}`);
+      incomingUsers.push({ email: u.email, role: u.role });
+      stats.users++;
+      continue;
+    }
     const created = await lb.user.create({
       data: {
         email: u.email.toLowerCase(),
@@ -398,7 +406,8 @@ async function run() {
       stats.listings += p.price && p.price > 0 ? 1 : 0;
       stats.investment += hasInv ? 1 : 0;
       stats.documents += docCount;
-      rewrittenUrls += proxied;
+      // NOTE: fixUrls() ran when buildingData was built above and has already
+      // counted these, so don't add them again.
       continue;
     }
 
@@ -564,6 +573,16 @@ async function run() {
     log('\n  Adjustments made:');
     for (const n of notes.slice(0, 20)) log(`    • ${n}`);
     if (notes.length > 20) log(`    …and ${notes.length - 20} more`);
+  }
+
+  if (DRY && incomingUsers.length) {
+    h1('Accounts that would be created');
+    for (const u of incomingUsers) {
+      const privileged = ['ADMIN', 'SUPER_ADMIN', 'CRM_MANAGER'].includes(u.role);
+      log(`  ${u.email.padEnd(38)} ${u.role}${privileged ? '   ← gains access to this admin' : ''}`);
+    }
+    log('\n  Privileged roles carry over as-is. Downgrade any you do not want in');
+    log('  the unified back office — an ADMIN here also sees the CRM.');
   }
 
   if (DRY && previews.length) {
