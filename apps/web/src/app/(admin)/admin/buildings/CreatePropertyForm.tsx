@@ -45,6 +45,7 @@ export function CreatePropertyForm() {
   const [f, setF] = useState({
     title: '', kind: 'STANDALONE', status: 'NEW_BUILD', visibility: 'PUBLIC', featured: false,
     shortDescription: '', description: '',
+    country: 'LEBANON',
     mohafazat: '', caza: '', city: '', neighborhood: '', address: '',
     locationUrl: '', builtYear: '', totalFloors: '', parkingSpaces: '',
     hasGenerator: false, hasElevator: false, hasPool: false, hasGym: false, hasConcierge: false,
@@ -151,7 +152,11 @@ export function CreatePropertyForm() {
   async function submit(e: React.FormEvent) {
     e.preventDefault()
     if (!f.title.trim()) { setError('Property title is required'); return }
-    if (!isKnownLocation({ city: f.city, neighborhood: f.neighborhood })) { setError('Pick a valid location from the search list before saving'); return }
+    // The curated gazetteer only covers Lebanon; other markets take free text.
+    if (f.country === 'LEBANON' && !isKnownLocation({ city: f.city, neighborhood: f.neighborhood })) {
+      setError('Pick a valid location from the search list before saving'); return
+    }
+    if (f.country !== 'LEBANON' && !f.city.trim()) { setError('Enter a city before saving'); return }
     const perSqm = f.priceMode === 'PER_SQM'
     const area = f.areaSqm !== '' ? Number(f.areaSqm) : 0
     const totalPrice = perSqm ? (Number(f.price) || 0) * area : (Number(f.price) || 0)
@@ -167,6 +172,7 @@ export function CreatePropertyForm() {
         body: JSON.stringify({
           title: f.title.trim(), kind: f.kind, status: f.status, visibility: f.visibility, featured: f.featured,
           shortDescription: f.shortDescription || null, description: f.description || null,
+          country: f.country,
           mohafazat: f.mohafazat || null, caza: f.caza || null, city: f.city || null,
           neighborhood: f.neighborhood || null, address: f.address || null, locationUrl: f.locationUrl || null,
           builtYear: showBuildingSections && f.builtYear !== '' ? parseInt(f.builtYear) : null,
@@ -311,8 +317,24 @@ export function CreatePropertyForm() {
 
         {/* Location */}
         <div className="bg-white border rounded-xl p-6 space-y-4">
-          <h2 className="font-semibold text-slate-900">Location</h2>
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <h2 className="font-semibold text-slate-900">Location</h2>
+            <label className="flex items-center gap-2 text-sm">
+              <span className="text-slate-500">Market</span>
+              <select
+                value={f.country}
+                onChange={(e) => setF(p => ({ ...p, country: e.target.value, mohafazat: '', caza: '' }))}
+                className="px-2.5 py-1.5 border border-slate-300 rounded-lg text-sm bg-white"
+              >
+                <option value="LEBANON">🇱🇧 Lebanon — propgrouplb.com</option>
+                <option value="GEORGIA">🇬🇪 Georgia — propgrp.com</option>
+                <option value="CYPRUS">🇨🇾 Cyprus — propgrp.com</option>
+                <option value="GREECE">🇬🇷 Greece — propgrp.com</option>
+              </select>
+            </label>
+          </div>
           <LocationFields
+            country={f.country}
             value={{ mohafazat: f.mohafazat, caza: f.caza, city: f.city, neighborhood: f.neighborhood }}
             onChange={(patch) => setF(p => ({ ...p, ...patch }))}
           />

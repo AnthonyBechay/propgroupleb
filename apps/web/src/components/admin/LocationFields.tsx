@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { Search, MapPin, X, Check, AlertTriangle } from 'lucide-react'
 import { searchLocations, isKnownLocation, MOHAFAZAT_LABEL, type LebanonLocation } from '@/lib/lebanon-locations'
+import { GEORGIA_AREAS } from '@/lib/crm-locations'
 
 export interface LocationValue {
   mohafazat: string
@@ -19,9 +20,26 @@ export interface LocationValue {
  * forcing the admin to re-pick a valid one. Validity is also enforced on submit
  * via `isKnownLocation` in the parent forms.
  */
-export function LocationFields({ value, onChange }: { value: LocationValue; onChange: (patch: Partial<LocationValue>) => void }) {
+export function LocationFields({
+  value,
+  onChange,
+  country = 'LEBANON',
+}: {
+  value: LocationValue
+  onChange: (patch: Partial<LocationValue>) => void
+  /** Which market the property is in — decides how location is captured. */
+  country?: string
+}) {
   const [q, setQ] = useState('')
   const [results, setResults] = useState<LebanonLocation[]>([])
+
+  // Outside Lebanon there is no curated gazetteer, and mohafazat/caza are
+  // meaningless — a Batumi tower has neither. Locking those markets to the
+  // Lebanese list made every imported Georgian property unsavable, so they get
+  // a suggest-but-allow-anything field instead.
+  if (country !== 'LEBANON') {
+    return <InternationalLocation value={value} onChange={onChange} country={country} />
+  }
 
   const onQuery = (v: string) => { setQ(v); setResults(searchLocations(v)) }
   const pick = (l: LebanonLocation) => {
@@ -99,6 +117,81 @@ export function LocationFields({ value, onChange }: { value: LocationValue; onCh
           </p>
         )}
       </div>
+    </div>
+  )
+}
+
+/**
+ * Location capture outside Lebanon.
+ *
+ * We curate a gazetteer for Lebanon because the team sells there daily and a
+ * typo splits a neighbourhood in two. For resold international stock we don't
+ * have that — and never will for every country — so this suggests the cities
+ * we know and accepts anything else. `mohafazat` and `caza` stay empty: they
+ * are Lebanese administrative divisions and mean nothing in Batumi.
+ */
+function InternationalLocation({
+  value,
+  onChange,
+  country,
+}: {
+  value: LocationValue
+  onChange: (patch: Partial<LocationValue>) => void
+  country: string
+}) {
+  // Cities we already sell in, offered as a datalist rather than a hard list.
+  const known = Array.from(
+    new Set(
+      GEORGIA_AREAS.map((a) => a.city ?? a.name).filter(Boolean) as string[]
+    )
+  ).sort()
+
+  const label = 'block text-sm font-medium text-slate-700 mb-1'
+  const input =
+    'w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-slate-900/15'
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-start gap-2 rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 text-xs text-sky-800">
+        <MapPin className="w-4 h-4 mt-0.5 shrink-0" />
+        <p>
+          This property is in <strong>{country.charAt(0) + country.slice(1).toLowerCase()}</strong>, so it
+          appears on propgrp.com. Type the city and district freely — the Lebanese
+          region/district list doesn&apos;t apply here.
+        </p>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+          <label className={label}>City</label>
+          <input
+            list="intl-cities"
+            value={value.city}
+            onChange={(e) => onChange({ city: e.target.value, mohafazat: '', caza: '' })}
+            className={input}
+            placeholder="Batumi"
+          />
+          <datalist id="intl-cities">
+            {known.map((c) => <option key={c} value={c} />)}
+          </datalist>
+        </div>
+        <div>
+          <label className={label}>District / area</label>
+          <input
+            value={value.neighborhood}
+            onChange={(e) => onChange({ neighborhood: e.target.value })}
+            className={input}
+            placeholder="Old Boulevard, Gonio…"
+          />
+        </div>
+      </div>
+
+      {(value.city || value.neighborhood) && (
+        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-medium">
+          <Check className="w-3.5 h-3.5" />
+          {[value.neighborhood, value.city].filter(Boolean).join(' · ')}
+        </span>
+      )}
     </div>
   )
 }

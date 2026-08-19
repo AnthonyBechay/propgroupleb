@@ -64,6 +64,8 @@ const buildingSchema = z.object({
   title: z.string().min(1, 'Title is required'),
   description: z.string().optional().nullable(),
   shortDescription: z.string().optional().nullable(),
+  // Which market the property belongs to — decides which website shows it.
+  country: z.enum(['LEBANON', 'GEORGIA', 'CYPRUS', 'GREECE']).optional(),
   mohafazat: z.string().optional().nullable(),
   caza: z.string().optional().nullable(),
   city: z.string().optional().nullable(),

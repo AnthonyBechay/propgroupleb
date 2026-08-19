@@ -57,6 +57,9 @@ export function BuildingForm({ initialData, buildingId, embedded }: Props) {
     featured: initialData?.featured ?? false,
     description: initialData?.description ?? '',
     shortDescription: initialData?.shortDescription ?? '',
+    // Which market this property belongs to — decides which website shows it
+    // and how its location is captured.
+    country: initialData?.country ?? 'LEBANON',
     mohafazat: initialData?.mohafazat ?? '',
     caza: initialData?.caza ?? '',
     city: initialData?.city ?? '',
@@ -188,7 +191,14 @@ export function BuildingForm({ initialData, buildingId, embedded }: Props) {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!form.title.trim()) { setError('Title is required'); return }
-    if (!isKnownLocation({ city: form.city, neighborhood: form.neighborhood })) { setError('Pick a valid location from the search list before saving'); return }
+    // The curated gazetteer only covers Lebanon. Enforcing it everywhere made
+    // every imported Batumi property impossible to save.
+    if (form.country === 'LEBANON' && !isKnownLocation({ city: form.city, neighborhood: form.neighborhood })) {
+      setError('Pick a valid location from the search list before saving'); return
+    }
+    if (form.country !== 'LEBANON' && !form.city.trim()) {
+      setError('Enter a city before saving'); return
+    }
     setSaving(true)
     setError(null)
 
@@ -201,6 +211,7 @@ export function BuildingForm({ initialData, buildingId, embedded }: Props) {
       featured: form.featured,
       description: form.description || null,
       shortDescription: form.shortDescription || null,
+      country: form.country,
       mohafazat: form.mohafazat || null,
       caza: form.caza || null,
       city: form.city || null,
@@ -326,11 +337,19 @@ export function BuildingForm({ initialData, buildingId, embedded }: Props) {
   const inputCls = 'w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400'
   const labelCls = 'block text-sm font-medium text-slate-700 mb-1'
 
+  // A private generator and solar backup are selling points in Lebanon because
+  // mains power isn't reliable. Abroad they're noise on the form — nobody
+  // shopping in Batumi is asking whether the building has its own generator.
+  const isLebanon = form.country === 'LEBANON'
   const SHARED_AMENITIES = [
-    { key: 'hasGenerator', label: 'Generator' },
+    ...(isLebanon
+      ? ([
+          { key: 'hasGenerator', label: 'Generator' },
+          { key: 'hasSolarPower', label: 'Solar Power' },
+        ] as const)
+      : []),
     { key: 'hasElevator', label: 'Elevator' },
     { key: 'hasSecurity', label: 'Security' },
-    { key: 'hasSolarPower', label: 'Solar Power' },
   ] as const
   const RESIDENTIAL_AMENITIES = [
     { key: 'hasPool', label: 'Pool' },
@@ -467,8 +486,29 @@ export function BuildingForm({ initialData, buildingId, embedded }: Props) {
 
         {/* Location */}
         <div className="bg-white border rounded-xl p-6 space-y-4">
-          <h2 className="font-semibold text-slate-900">Location</h2>
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <h2 className="font-semibold text-slate-900">Location</h2>
+            <label className="flex items-center gap-2 text-sm">
+              <span className="text-slate-500">Market</span>
+              <select
+                value={form.country}
+                onChange={(e) => setForm(prev => ({
+                  ...prev,
+                  country: e.target.value,
+                  // Lebanese divisions don't survive a market change.
+                  mohafazat: '', caza: '',
+                }))}
+                className="px-2.5 py-1.5 border border-slate-300 rounded-lg text-sm bg-white"
+              >
+                <option value="LEBANON">🇱🇧 Lebanon — propgrouplb.com</option>
+                <option value="GEORGIA">🇬🇪 Georgia — propgrp.com</option>
+                <option value="CYPRUS">🇨🇾 Cyprus — propgrp.com</option>
+                <option value="GREECE">🇬🇷 Greece — propgrp.com</option>
+              </select>
+            </label>
+          </div>
           <LocationFields
+            country={form.country}
             value={{ mohafazat: form.mohafazat, caza: form.caza, city: form.city, neighborhood: form.neighborhood }}
             onChange={(patch) => setForm(prev => ({ ...prev, ...patch }))}
           />
