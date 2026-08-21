@@ -448,7 +448,9 @@
       "Bash(GEORGIA_DATABASE_URL=\"postgresql://postgres:t@localhost:55441/ge\" DATABASE_URL=\"postgresql://postgres:t@localhost:55440/lb\" IMPORT_BATCH=\"t2\" npx tsx ../../scripts/import-georgia.ts)",
       "Bash(DATABASE_URL=\"postgresql://postgres:t@localhost:55440/lb\" npx tsx ../../scripts/import-georgia.ts --undo t2)",
       "Bash(awk '/GET \\\\/:id\\\\/units — list units/,/^\\\\\\);/' apps/backend/src/routes/buildings.ts)",
-      "Bash(GEORGIA_DATABASE_URL=\"postgresql://postgres:t@localhost:55441/ge\" DATABASE_URL=\"postgresql://postgres:t@localhost:55440/lb\" npx tsx ../../scripts/import-georgia.ts --dry-run)"
+      "Bash(GEORGIA_DATABASE_URL=\"postgresql://postgres:t@localhost:55441/ge\" DATABASE_URL=\"postgresql://postgres:t@localhost:55440/lb\" npx tsx ../../scripts/import-georgia.ts --dry-run)",
+      "Bash(DATABASE_URL=\"postgresql://postgres:t@localhost:55450/ge2\" npx prisma db push --skip-generate --accept-data-loss)",
+      "WebSearch"
     ],
     "deny": [],
     "ask": []

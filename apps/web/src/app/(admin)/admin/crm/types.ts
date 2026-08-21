@@ -43,6 +43,8 @@ export interface Opportunity {
   viewedAt: string | null
   rejectionReason: RejectionReason | null
   feedback: string | null
+  /** Which apartment it turned out to be — "Studio 1204, 12th floor". */
+  soldUnitRef: string | null
   soldPrice: number | null
   soldCurrency: 'USD' | 'LBP'
   commissionUsd: number | null

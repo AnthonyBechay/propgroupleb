@@ -70,6 +70,18 @@ export async function normaliseCrmData(): Promise<void> {
     return `${sellers.length} seller properties seeded`;
   });
 
+  // Everything we broker abroad is sold as a repeatable type — "1 bedroom" in
+  // a development that many clients buy — rather than one specific apartment.
+  // `db push` creates the column but never runs a migration's UPDATE, so the
+  // backfill has to happen here.
+  await once('crm_flag_international_unit_types_v1', async () => {
+    const { count } = await prisma.unit.updateMany({
+      where: { isUnitType: false, building: { country: { not: 'LEBANON' } } },
+      data: { isUnitType: true },
+    });
+    return `${count} international units flagged as repeatable types`;
+  });
+
   // Follow-up dates used to be invented from a 7-day cadence, so every imported
   // client showed up overdue on day one and the team stopped reading the badge.
   // Clear the invented ones; from here on a date only exists if someone set it.

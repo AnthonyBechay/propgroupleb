@@ -152,6 +152,9 @@ export function DealPanel({
                       </span>
                     )}
                   </div>
+                  {d.soldUnitRef && (
+                    <p className="text-xs font-medium text-slate-700 mt-0.5">{d.soldUnitRef}</p>
+                  )}
                   <p className="text-xs text-slate-600 mt-0.5">
                     {d.soldPrice != null
                       ? `Sold for ${d.soldCurrency} ${d.soldPrice.toLocaleString()}`
@@ -208,6 +211,7 @@ function DealForm({
   const [price, setPrice] = useState(initial?.soldPrice?.toString() ?? '')
   const [currency, setCurrency] = useState(initial?.soldCurrency ?? 'USD')
   const [commission, setCommission] = useState(initial?.commissionUsd?.toString() ?? '')
+  const [unitRef, setUnitRef] = useState(initial?.soldUnitRef ?? '')
   const [closedAt, setClosedAt] = useState(
     initial?.closedAt ? initial.closedAt.slice(0, 10) : new Date().toISOString().slice(0, 10)
   )
@@ -236,6 +240,18 @@ function DealForm({
           </label>
         </>
       )}
+
+      {/* In a development we broker, the shortlist item is a type — this is
+          where the actual apartment gets pinned down. */}
+      <label className="block">
+        <span className="text-[11px] text-slate-500">Which apartment did they get?</span>
+        <input
+          value={unitRef}
+          onChange={(e) => setUnitRef(e.target.value)}
+          placeholder="Studio 1204, 12th floor"
+          className={inp}
+        />
+      </label>
 
       <div className="grid grid-cols-3 gap-2">
         <label className="block col-span-2">
@@ -274,6 +290,7 @@ function DealForm({
           onClick={() =>
             onSave({
               ...(allowSubject ? { externalTitle: title || 'Sale', externalUrl: url || null } : {}),
+              soldUnitRef: unitRef.trim() || null,
               soldPrice: price ? Number(price) : null,
               soldCurrency: currency,
               commissionUsd: commission ? Number(commission) : null,

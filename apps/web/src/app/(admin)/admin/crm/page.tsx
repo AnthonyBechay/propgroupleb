@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   UserSearch, Plus, Search, Loader2, Phone, MessageCircle, Mail, Clock,
   CalendarPlus, X, LayoutGrid, List, Download, Upload, MapPin,
-  MessageSquareWarning, Sparkles, Target, DollarSign, Sun, Globe, BarChart3, Inbox,
+  MessageSquareWarning, Sparkles, Target, DollarSign, Sun, Globe, BarChart3, Inbox, Gauge,
 } from 'lucide-react'
 import { normalizeApiUrl } from '@/lib/utils/api-url'
 import { useAuth } from '@/contexts/AuthContext'
@@ -16,6 +16,7 @@ import { BookViewingModal } from './BookViewingModal'
 import { TodayView } from './TodayView'
 import { InvestmentCatalogue } from './InvestmentCatalogue'
 import { InboxView } from './InboxView'
+import { OverviewView } from './OverviewView'
 import {
   type Lead, type LeadMarket, type LeadStatus, type LeadType,
   STATUS_META, TYPE_LABELS, MARKET_META, formatLastContact, formatPlanned,
@@ -45,7 +46,7 @@ interface Stats {
   byStatus: Record<string, number>
 }
 
-type View = 'today' | 'inbox' | 'board' | 'list'
+type View = 'overview' | 'today' | 'inbox' | 'board' | 'list'
 
 export default function CrmPage() {
   const apiUrl = normalizeApiUrl(process.env.NEXT_PUBLIC_API_URL || '')
@@ -190,7 +191,7 @@ export default function CrmPage() {
       {/* One row: what needs attention on the left, actions on the right. The
           page title used to eat a whole row saying what the sidebar says. */}
       <div className="flex items-center justify-between gap-3 flex-wrap">
-        <div className={`flex gap-2 flex-wrap ${view === 'today' || view === 'inbox' ? 'invisible pointer-events-none' : ''}`}>
+        <div className={`flex gap-2 flex-wrap ${['today', 'inbox', 'overview'].includes(view) ? 'invisible pointer-events-none' : ''}`}>
           <FocusChip
             active={focus === 'planned'} count={counts.planned}
             onClick={() => setFocus((f) => (f === 'planned' ? 'none' : 'planned'))}
@@ -302,6 +303,13 @@ export default function CrmPage() {
 
         <div className="flex gap-1 bg-slate-100 rounded-lg p-1">
           <button
+            onClick={() => setView('overview')}
+            title="Overview — how the business is doing"
+            className={`px-2 py-1.5 rounded-md transition-all inline-flex items-center gap-1 text-sm font-medium ${view === 'overview' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-900'}`}
+          >
+            <Gauge className="h-4 w-4" /> Overview
+          </button>
+          <button
             onClick={() => setView('today')}
             title="Today — what needs you now"
             className={`px-2 py-1.5 rounded-md transition-all inline-flex items-center gap-1 text-sm font-medium ${view === 'today' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-900'}`}
@@ -338,7 +346,9 @@ export default function CrmPage() {
       </div>
 
       {/* Content */}
-      {view === 'today' ? (
+      {view === 'overview' ? (
+        <OverviewView onFocus={(v) => setView(v)} />
+      ) : view === 'today' ? (
         <TodayView market={market} onOpen={setOpenId} />
       ) : view === 'inbox' ? (
         <InboxView onOpenLead={(id) => { load(); setOpenId(id) }} />

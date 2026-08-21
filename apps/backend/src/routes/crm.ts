@@ -405,6 +405,99 @@ router.get(
   })
 );
 
+// ── GET /overview — the state of the business in one call ────────────────────
+// Not vanity metrics: every number here is something a broker would act on or
+// answer to. Deliberately one round trip, because the dashboard is the first
+// thing opened in the morning.
+
+router.get(
+  '/overview',
+  authenticateToken,
+  requireCrm,
+  asyncHandler(async (req: Request, res: Response) => {
+    const open = { notIn: ['WON', 'LOST', 'ARCHIVED'] as string[] };
+    const monthStart = new Date();
+    monthStart.setDate(1);
+    monthStart.setHours(0, 0, 0, 0);
+    const cold = new Date();
+    cold.setDate(cold.getDate() - 21);
+
+    const [
+      byStatus, byMarket, byType, bySubStatus,
+      liveDeals, viewingsBooked, feedbackOwed, neverCalled, goingCold,
+      wonThisMonth, inboxPending,
+      projectStock,
+    ] = await Promise.all([
+      prisma.lead.groupBy({ by: ['status'], _count: { _all: true } }),
+      prisma.lead.groupBy({ by: ['market'], _count: { _all: true }, where: { status: open as never } }),
+      prisma.lead.groupBy({ by: ['type'], _count: { _all: true }, where: { status: open as never } }),
+      prisma.lead.groupBy({ by: ['subStatus'], _count: { _all: true }, where: { status: open as never } }),
+
+      // Deals actually in motion — the pipeline that matters this week.
+      prisma.leadOpportunity.count({ where: { stage: { in: ['SHARED', 'VIEWING_BOOKED', 'VIEWED', 'INTERESTED', 'OFFER_MADE'] } } }),
+      prisma.leadOpportunity.count({ where: { stage: 'VIEWING_BOOKED' } }),
+      prisma.leadOpportunity.count({ where: { stage: 'VIEWED' } }),
+      prisma.lead.count({ where: { lastContactAt: null, status: open as never } }),
+      prisma.lead.count({ where: { lastContactAt: { lt: cold }, nextContactAt: null, status: open as never } }),
+
+      prisma.leadOpportunity.count({ where: { stage: 'WON', closedAt: { gte: monthStart } } }),
+      prisma.inboundMessage.count({ where: { status: 'PENDING' } }),
+
+      // Repeatable unit types and how many clients have bought one — the shape
+      // of a development we resell, as opposed to a one-off flat.
+      prisma.unit.findMany({
+        where: { isUnitType: true },
+        select: {
+          id: true, kind: true, name: true,
+          building: { select: { id: true, ref: true, title: true, country: true } },
+          listings: { select: { id: true } },
+        },
+      }),
+    ]);
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const tally = (rows: any[], key: string) =>
+      Object.fromEntries(rows.map((r) => [r[key] ?? 'NONE', r._count._all]));
+
+    // How many clients have closed on each type — the number a broker reports.
+    const listingIds = projectStock.flatMap((u: any) => u.listings.map((l: any) => l.id));
+    const soldByListing = listingIds.length
+      ? await prisma.leadOpportunity.groupBy({
+          by: ['listingId'],
+          where: { stage: 'WON', listingId: { in: listingIds } },
+          _count: { _all: true },
+        })
+      : [];
+    const soldMap = new Map(soldByListing.map((r: any) => [r.listingId, r._count._all]));
+
+    const stock = projectStock
+      .map((u: any) => ({
+        buildingId: u.building?.id,
+        ref: u.building?.ref,
+        title: u.building?.title,
+        country: u.building?.country,
+        kind: u.kind,
+        name: u.name,
+        sold: u.listings.reduce((t: number, l: any) => t + (soldMap.get(l.id) ?? 0), 0),
+      }))
+      .sort((a, b) => b.sold - a.sold);
+
+    sendSuccess(res, {
+      pipeline: tally(byStatus, 'status'),
+      byMarket: tally(byMarket, 'market'),
+      byType: tally(byType, 'type'),
+      waitingOn: tally(bySubStatus, 'subStatus'),
+      inMotion: { liveDeals, viewingsBooked, feedbackOwed },
+      needsAttention: { neverCalled, goingCold, inboxPending },
+      wonThisMonth,
+      projectStock: stock,
+      // Commission is redacted for roles that may not see it, so the shape is
+      // the same for everyone and the UI needs no special case.
+      canSeeMoney: canSeeMoney(req),
+    });
+  })
+);
+
 // ── Inbox — WhatsApp from numbers we don't recognise ─────────────────────────
 // Nothing here is a client yet. That's the point: a work number receives
 // suppliers, family and wrong numbers, and a CRM that swallows all of them
@@ -923,32 +1016,10 @@ router.get(
     // Georgia investors are matched against the investment catalogue rather
     // than this site's listings — that stock lives on propgrp.com, but the CRM
     // still has to be able to answer "what can I offer this client".
-    if (lead.market !== 'LEBANON') {
-      const shown = await prisma.leadOpportunity.findMany({
-        where: { leadId: lead.id, productId: { not: null } },
-        select: { productId: true },
-      });
-      const shownIds = shown.map((o) => o.productId!).filter(Boolean);
-
-      const products = await prisma.investmentProduct.findMany({
-        where: {
-          market: lead.market,
-          status: { in: ['AVAILABLE', 'LIMITED'] as never },
-          ...(shownIds.length ? { id: { notIn: shownIds } } : {}),
-        },
-        take: 200,
-      });
-
-      const min = Number(req.query.minScore ?? MATCH_MIN_SCORE);
-      const ranked = products
-        .map((product) => ({ product, match: matchProductToLead(lead, product) }))
-        .filter((r) => r.match.score >= min)
-        .sort((a, b) => b.match.score - a.match.score)
-        .slice(0, 40);
-
-      sendSuccess(res, ranked);
-      return;
-    }
+    // Georgia stock now lives in this database like everything else, so the
+    // only difference is which country we look in. The separate catalogue is
+    // kept as a fallback for projects nobody has listed here yet.
+    const marketCountry = lead.market === 'GEORGIA' ? { not: 'LEBANON' } : 'LEBANON';
 
     // Never re-suggest something this client has already been shown or ruled
     // out — that's the whole point of tracking opportunities.
@@ -962,7 +1033,14 @@ router.get(
     // scoring is what decides relevance, not a hard SQL filter, so a client
     // still sees near-misses that are worth a phone call.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const where: Record<string, any> = { status: 'ACTIVE', visibility: 'PUBLIC' };
+    const where: Record<string, any> = {
+      status: 'ACTIVE',
+      visibility: 'PUBLIC',
+      OR: [
+        { building: { country: marketCountry } },
+        { unit: { building: { country: marketCountry } } },
+      ],
+    };
     if (seenIds.length) where.id = { notIn: seenIds };
 
     const candidates = await prisma.listing.findMany({
@@ -971,11 +1049,14 @@ router.get(
       orderBy: { createdAt: 'desc' },
       select: {
         id: true, slug: true, headline: true, price: true, currency: true, intent: true,
-        building: { select: { ref: true, title: true, city: true, caza: true, neighborhood: true, mohafazat: true, images: true } },
+        building: { select: { ref: true, title: true, city: true, caza: true, neighborhood: true, mohafazat: true, images: true, country: true, kind: true } },
         unit: {
           select: {
             ref: true, kind: true, bedrooms: true, bathrooms: true, areaSqm: true,
-            building: { select: { ref: true, title: true, city: true, caza: true, neighborhood: true, mohafazat: true, images: true } },
+            // A repeatable type stays matchable no matter how many clients buy
+            // one — we're the broker, not the developer counting stock.
+            isUnitType: true,
+            building: { select: { ref: true, title: true, city: true, caza: true, neighborhood: true, mohafazat: true, images: true, country: true, kind: true } },
           },
         },
       },
@@ -1497,6 +1578,8 @@ const opportunityUpdateSchema = z.object({
   commissionUsd: z.number().min(0).optional().nullable(),
   externalTitle: z.string().max(200).optional().nullable(),
   externalUrl: z.string().url().max(500).optional().nullable().or(z.literal('')),
+  // Which apartment it turned out to be — "Studio 1204, 12th floor".
+  soldUnitRef: z.string().max(200).optional().nullable(),
   // Deals get recorded days after they close, so the date must be settable.
   closedAt: z.string().optional().nullable(),
 });
@@ -1524,6 +1607,7 @@ router.patch(
     if (data.soldCurrency !== undefined) patch.soldCurrency = data.soldCurrency;
     if (data.commissionUsd !== undefined) patch.commissionUsd = data.commissionUsd;
     if (data.externalTitle !== undefined) patch.externalTitle = data.externalTitle;
+    if (data.soldUnitRef !== undefined) patch.soldUnitRef = data.soldUnitRef;
     if (data.externalUrl !== undefined) patch.externalUrl = data.externalUrl || null;
     // Date the close, so earnings can be grouped by period. An explicit date
     // always wins — deals are usually entered days after they actually closed.

@@ -4,7 +4,7 @@ import { prisma } from '@propgroup/db';
 import { authenticateToken, requireAdmin, logAdminAction, optionalAuthenticateToken } from '../middleware/auth.js';
 import { asyncHandler } from '../utils/errors.js';
 import { logger } from '../utils/logger.js';
-import { sendSuccess, sendCreated, sendPaginated, sendNotFound } from '../utils/response.js';
+import { sendSuccess, sendCreated, sendPaginated, sendNotFound, sendError } from '../utils/response.js';
 import { parsePagination, buildPaginationResponse } from '../utils/pagination.js';
 import { BUILDING_LIST_INCLUDE, BUILDING_DETAIL_INCLUDE } from '../utils/prisma-includes.js';
 import { deleteFile, extractKeyFromUrl } from '../services/upload.service.js';
@@ -124,6 +124,10 @@ const unitCreateSchema = z.object({
   bedrooms: z.number().int().optional().nullable(),
   bathrooms: z.number().int().optional().nullable(),
   areaSqm: z.number().optional().nullable(),
+
+  // A repeatable type ("1 bedroom" in a development) rather than one specific
+  // apartment. Types never sell out — we broker them, we don't own the stock.
+  isUnitType: z.boolean().optional(),
   floor: z.number().int().optional().nullable(),
   parkingSpaces: z.number().int().optional().nullable(),
   lifecycle: z.enum(['DRAFT', 'FOR_SALE', 'RESERVED', 'SOLD', 'OWNER_OCCUPIED', 'FOR_RENT', 'RENTED', 'VACANT', 'OFF_MARKET']).optional(),
@@ -517,9 +521,24 @@ router.post(
     const authReq = req as AuthenticatedRequest;
     const existing = await prisma.building.findUnique({
       where: { id: req.params.id },
-      select: { id: true, title: true, units: { select: { id: true } } },
+      select: {
+        id: true, title: true,
+        units: { select: { id: true, isUnitType: true } },
+      },
     });
     if (!existing) { sendNotFound(res, 'Building'); return; }
+
+    // A development we broker is never "sold" — its unit types are templates
+    // many clients buy, and closing them would take the project away from every
+    // other client mid-conversation.
+    if (existing.units.some((u) => u.isUnitType)) {
+      sendError(
+        res,
+        400,
+        'This property has repeatable unit types, so it can’t be marked sold. Close the individual deals in the CRM instead.'
+      );
+      return;
+    }
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const result = await prisma.$transaction(async (tx: any) => {

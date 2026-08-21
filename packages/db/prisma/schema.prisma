@@ -582,6 +582,15 @@ model Unit {
   areaSqm       Float?
   floor         Int?
   parkingSpaces Int?   @default(0)
+
+  // Is this a repeatable type rather than one specific apartment?
+  //
+  // A Lebanese flat is a thing: it sells once and it's gone. In a Georgian
+  // development we resell, "1 bedroom" is a template — many clients buy one,
+  // and we're the broker, not the developer, so we don't know or track how many
+  // exist. A type never sells out and never leaves the matcher; which actual
+  // apartment a client ended up with is recorded on the deal instead.
+  isUnitType Boolean @default(false)
   furnishing    FurnishingStatus?
   ownership     OwnershipType?
   views         String[] // SEA, MOUNTAIN, CITY, GARDEN, STREET
@@ -1804,6 +1813,10 @@ model LeadOpportunity {
   viewedAt        DateTime?
   rejectionReason RejectionReason?
   feedback        String? // what the client actually said
+
+  // Which apartment this actually turned out to be — "Studio 1204, 12th floor".
+  // Only meaningful when the deal was against a repeatable unit type.
+  soldUnitRef String?
 
   // The money, recorded once on the opportunity that actually closed.
   // commissionUsd is normalised to USD so totals mean something.

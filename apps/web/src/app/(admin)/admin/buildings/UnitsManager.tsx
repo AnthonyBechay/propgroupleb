@@ -66,6 +66,7 @@ function formatPrice(price: number, currency: string) {
 const EMPTY_UNIT = {
   kind: 'APARTMENT', name: '', unitNumber: '', floor: '',
   bedrooms: '', bathrooms: '', areaSqm: '', lifecycle: 'VACANT',
+  isUnitType: false,
   images: [] as string[],
 }
 type UnitFormState = typeof EMPTY_UNIT
@@ -83,6 +84,7 @@ function buildUnitPayload(f: UnitFormState) {
     bedrooms:  bedsOk && f.bedrooms  !== '' ? Number(f.bedrooms)  : null,
     bathrooms: bathsOk && f.bathrooms !== '' ? Number(f.bathrooms) : null,
     areaSqm:   f.areaSqm   !== '' ? Number(f.areaSqm)   : null,
+    isUnitType: f.isUnitType,
     lifecycle: f.lifecycle || undefined,
     images:    f.images,
   }
@@ -100,7 +102,7 @@ function UnitFormPanel({
   saving: boolean
 }) {
   const [f, setF] = useState<UnitFormState>(initial)
-  const set = (k: keyof UnitFormState, v: string) => setF(p => ({ ...p, [k]: v }))
+  const set = (k: keyof UnitFormState, v: string | boolean) => setF(p => ({ ...p, [k]: v }))
   const inp = 'w-full px-3 py-2 border border-zinc-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-sky-600/15 focus:border-sky-500 bg-white'
   const lbl = 'block text-xs font-medium text-zinc-600 mb-1'
   // Only show fields that make sense for the chosen unit type.
@@ -214,6 +216,29 @@ function UnitFormPanel({
         <div>
           <label className={lbl}>{f.kind === 'LAND_PARCEL' ? 'Land area (m²)' : 'Area (m²)'}</label>
           <input type="number" min="0" value={f.areaSqm} onChange={e => set('areaSqm', e.target.value)} placeholder="120" className={inp} />
+        </div>
+        {/* A development we resell offers "1 bedroom" as a template many
+            clients buy. We're the broker, not the developer, so there's no
+            stock count — just a flag that it repeats. */}
+        <div className="sm:col-span-2">
+          <label className="flex items-start gap-2.5 rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2.5 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={f.isUnitType}
+              onChange={e => set('isUnitType', e.target.checked)}
+              className="mt-0.5 h-4 w-4 rounded border-zinc-300"
+            />
+            <span>
+              <span className="block text-sm font-medium text-zinc-800">
+                This is a unit type, not one specific apartment
+              </span>
+              <span className="block text-[11px] text-zinc-500 mt-0.5">
+                For developments where you sell the same &ldquo;1 bedroom&rdquo; to many clients.
+                It stays available to everyone, and you record which apartment each
+                client actually got when the deal closes.
+              </span>
+            </span>
+          </label>
         </div>
         <div>
           <label className={lbl}>Lifecycle</label>
@@ -1048,6 +1073,11 @@ export function UnitsManager({ buildingId, buildingImages = [] }: { buildingId: 
                       {unit.bedrooms != null && (
                         <span className="flex items-center gap-1"><Bed className="h-3 w-3" /> {unit.bedrooms} BR</span>
                       )}
+                      {unit.isUnitType && (
+                        <span className="flex items-center gap-1 font-medium text-sky-700">
+                          Unit type · repeatable
+                        </span>
+                      )}
                       {unit.areaSqm != null && (
                         <span className="flex items-center gap-1"><Square className="h-3 w-3" /> {unit.areaSqm} m²</span>
                       )}
@@ -1132,6 +1162,7 @@ export function UnitsManager({ buildingId, buildingImages = [] }: { buildingId: 
                         bedrooms:   unit.bedrooms != null ? String(unit.bedrooms) : '',
                         bathrooms:  unit.bathrooms != null ? String(unit.bathrooms) : '',
                         areaSqm:    unit.areaSqm != null ? String(unit.areaSqm) : '',
+                        isUnitType: !!unit.isUnitType,
                         lifecycle:  unit.lifecycle ?? 'VACANT',
                         images:     unit.images ?? [],
                       }}

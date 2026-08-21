@@ -234,6 +234,15 @@ export function matchListingToLead(lead: any, listing: any): MatchResult {
   const building = listing.building ?? listing.unit?.building;
   const unit = listing.unit;
 
+  /**
+   * Someone buying a Batumi studio for yield has no bedroom requirement — they
+   * care about entry price, city and return. Scoring them on bedrooms marked
+   * every studio a bad match for anyone who'd mentioned wanting two bedrooms of
+   * floor space, which is exactly the stock they came for.
+   */
+  const isInvestor =
+    lead.type === 'INVESTOR' || (building?.country && building.country !== 'LEBANON');
+
   // Buying and renting are different transactions, not adjacent preferences —
   // showing a rental to a buyer wastes both their time and yours.
   const wantIntent = lead.type === 'RENTER' ? 'FOR_RENT' : 'FOR_SALE';
@@ -257,7 +266,7 @@ export function matchListingToLead(lead: any, listing: any): MatchResult {
     ),
     scoreUnitKind(lead.unitKinds ?? [], unit?.kind),
     scoreBudget(lead.budgetMin ?? null, lead.budgetMax ?? null, listing.price != null ? Number(listing.price) : null),
-    scoreBeds(lead.minBeds ?? null, unit?.bedrooms),
+    isInvestor ? null : scoreBeds(lead.minBeds ?? null, unit?.bedrooms),
     intentCriterion,
   ]);
 }
