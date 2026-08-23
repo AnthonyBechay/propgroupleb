@@ -1528,10 +1528,6 @@ model Lead {
   userId    String? // registered user this lead corresponds to
   listingId String? // a specific listing they asked about
 
-  // External identities, so an inbound WhatsApp message or Lead Ads submission
-  // lands on the existing client instead of creating a duplicate.
-  waId           String? @unique // WhatsApp phone-number id (digits, E.164 without +)
-  externalLeadId String? @unique // Facebook leadgen id
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1635,109 +1631,6 @@ model ImportedRecord {
   @@map("imported_records")
 }
 
-// An inbound WhatsApp message from a number we don't recognise.
-//
-// Auto-creating a client from every inbound message is how a CRM becomes
-// unusable: a work number receives suppliers, family, wrong numbers and spam
-// alongside real enquiries. Unknown senders land here instead, and only become
-// clients when a person says so. Messages from numbers we already know skip
-// this entirely and go straight onto that client's timeline.
-model InboundMessage {
-  id      String @id @default(cuid())
-  channel InboundChannel @default(WHATSAPP)
-
-  // Sender identity as the platform reports it.
-  waId        String
-  profileName String?
-  body        String
-
-  status InboundStatus @default(PENDING)
-
-  // Set once triaged into the CRM, so the thread can be followed.
-  leadId String?
-
-  receivedAt DateTime @default(now())
-  handledAt  DateTime?
-  handledBy  String?
-
-  @@index([status, receivedAt])
-  @@index([waId])
-  @@map("inbound_messages")
-}
-
-enum InboundChannel {
-  WHATSAPP
-}
-
-enum InboundStatus {
-  PENDING   // waiting for someone to look at it
-  ADDED     // became a client
-  IGNORED   // not business — dismissed
-  BLOCKED   // never ask about this number again
-}
-
-// Numbers whose messages we never want to see again — suppliers, spam, the
-// landlord of the office. Kept separately from the messages so the block
-// survives clearing the inbox.
-model BlockedSender {
-  id        String   @id @default(cuid())
-  waId      String   @unique
-  label     String?
-  createdAt DateTime @default(now())
-
-  @@map("blocked_senders")
-}
-
-// An investment opportunity we resell — currently Georgia stock listed on
-// propgrp.com.
-//
-// Lebanese buyers get matched against live listings on this site. Georgia
-// investors had nothing to be matched against at all, because that inventory
-// lives on another domain, so the CRM could store their phone number and
-// nothing else. This is the minimum mirror of that stock needed to answer
-// "what can I offer this client" without leaving the CRM.
-model InvestmentProduct {
-  id     String     @id @default(cuid())
-  market LeadMarket @default(GEORGIA)
-
-  name      String  // "Orbi City Batumi"
-  developer String?
-  city      String? // Batumi, Tbilisi
-  region    String? // GE_* region key, matching Lead.regions
-
-  unitKinds UnitKind[]
-  priceFrom Float?
-  priceTo   Float?
-  currency  Currency @default(USD)
-
-  // What makes it an *investment* rather than a home — the questions a Georgia
-  // buyer actually asks first.
-  expectedYield Float?    // annual rental yield, %
-  handoverAt    DateTime? // off-plan completion
-  paymentPlan   String?   // "30% down, 24 months interest free"
-
-  // Where the client can see it — the propgrp.com listing.
-  url    String?
-  images String[]
-
-  notes  String?
-  status InvestmentProductStatus @default(AVAILABLE)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([market])
-  @@index([status])
-  @@map("investment_products")
-}
-
-enum InvestmentProductStatus {
-  AVAILABLE
-  LIMITED   // nearly sold out — worth telling the client
-  SOLD_OUT
-  PAUSED
-}
-
 // A property a seller/landlord client has on the market.
 //
 // A seller's own fields (areas, budget, unitKinds) describe *one* thing, which
@@ -1797,7 +1690,6 @@ model LeadOpportunity {
   listingId         String? // a live listing on our site
   counterpartLeadId String? // another client (a seller/landlord in the CRM)
   leadPropertyId    String? // a specific property a seller client has on offer
-  productId         String? // a Georgia investment opportunity we resell
 
   // Off-platform stock: a Batumi studio on propgrp.com, another agency's
   // listing, a private sale. Clients buy these too, and a CRM that can't

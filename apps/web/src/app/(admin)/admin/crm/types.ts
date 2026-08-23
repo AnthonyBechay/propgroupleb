@@ -170,6 +170,27 @@ export interface Lead {
   contacts?: LeadContact[]
   opportunities?: Opportunity[]
   properties?: LeadProperty[]
+  /** Closed purchases, summarised by the list endpoint for the directory. */
+  deals?: Array<{
+    id: string
+    ref: string | null
+    title: string
+    country: string | null
+    unitRef: string | null
+    soldPrice: number | null
+    soldCurrency: 'USD' | 'LBP'
+    commissionUsd: number | null
+    closedAt: string | null
+  }>
+  /** A seller's own stock that has sold. */
+  soldProperties?: Array<{
+    id: string
+    title: string | null
+    kind: string
+    soldPrice: number | null
+    commissionUsd: number | null
+    soldAt: string | null
+  }>
   insights?: Array<{ reason: string; count: number; advice: string }>
   needsNewOptions?: boolean
   _count?: { contacts: number }

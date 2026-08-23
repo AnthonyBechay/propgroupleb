@@ -6,7 +6,7 @@ import { asyncHandler } from '../utils/errors.js';
 import { sendSuccess, sendCreated, sendPaginated, sendNotFound, sendError } from '../utils/response.js';
 import { parsePagination, buildPaginationResponse } from '../utils/pagination.js';
 import type { AuthenticatedRequest } from '../types/index.js';
-import { matchListingToLead, matchLeadToLead, matchProductToLead, SUPPLY_TYPES, DEMAND_TYPES, MATCH_MIN_SCORE, STRONG_MATCH_SCORE, PAIRABLE_STATUSES } from '../utils/lead-matching.js';
+import { matchListingToLead, matchLeadToLead, SUPPLY_TYPES, DEMAND_TYPES, MATCH_MIN_SCORE, STRONG_MATCH_SCORE, PAIRABLE_STATUSES } from '../utils/lead-matching.js';
 import { deriveLeadStatus, needsNewOptions, rejectionInsights } from '../utils/lead-pipeline.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -128,12 +128,6 @@ async function hydrateOpportunities(opportunities: any[]): Promise<any[]> {
     : [];
   const propertyById = new Map(properties.map((p: any) => [p.id, p]));
 
-  const productIds = opportunities.map((o) => o.productId).filter(Boolean) as string[];
-  const products = productIds.length
-    ? await prisma.investmentProduct.findMany({ where: { id: { in: productIds } } })
-    : [];
-  const productById = new Map(products.map((p: any) => [p.id, p]));
-
   const [listings, leads] = await Promise.all([
     listingIds.length
       ? prisma.listing.findMany({
@@ -165,19 +159,10 @@ async function hydrateOpportunities(opportunities: any[]): Promise<any[]> {
     const listing = o.listingId ? listingById.get(o.listingId) : null;
     const counterpart = o.counterpartLeadId ? leadById.get(o.counterpartLeadId) : null;
     const property = o.leadPropertyId ? propertyById.get(o.leadPropertyId) : null;
-    const product = o.productId ? productById.get(o.productId) : null;
     const b = listing?.building ?? listing?.unit?.building;
     return {
       ...o,
-      subject: product
-        ? {
-            kind: 'INVESTMENT',
-            title: product.name,
-            subtitle: [product.city, product.developer].filter(Boolean).join(' · ') || null,
-            url: product.url,
-            id: product.id,
-          }
-        : property
+      subject: property
         ? {
             kind: 'SELLER_PROPERTY',
             title: property.title || `${property.kind} — ${property.lead?.name ?? 'seller'}`,
@@ -257,7 +242,16 @@ router.get(
           opportunities: {
             select: {
               id: true, stage: true, viewingAt: true, listingId: true,
-              counterpartLeadId: true, matchScore: true,
+              counterpartLeadId: true, matchScore: true, leadPropertyId: true,
+              // What they actually bought, for the client directory.
+              soldUnitRef: true, soldPrice: true, soldCurrency: true,
+              commissionUsd: true, closedAt: true, externalTitle: true,
+            },
+          },
+          properties: {
+            select: {
+              id: true, kind: true, title: true, status: true,
+              soldPrice: true, commissionUsd: true, soldAt: true,
             },
           },
         },
@@ -265,7 +259,57 @@ router.get(
       prisma.lead.count({ where }),
     ]);
 
-    sendPaginated(res, items, buildPaginationResponse(page, limit, total));
+    // Name whatever each closed deal was against, so the directory can say
+    // "bought PG-1042" instead of "1 deal". Done in one query for the whole
+    // page rather than per row.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const wonIds = (items as any[])
+      .flatMap((l) => l.opportunities.filter((o: any) => o.stage === 'WON'))
+      .map((o: any) => o.listingId)
+      .filter(Boolean) as string[];
+
+    const soldListings = wonIds.length
+      ? await prisma.listing.findMany({
+          where: { id: { in: wonIds } },
+          select: {
+            id: true, headline: true,
+            building: { select: { ref: true, title: true, country: true } },
+            unit: { select: { ref: true, building: { select: { ref: true, title: true, country: true } } } },
+          },
+        })
+      : [];
+    const byId = new Map(soldListings.map((l: any) => [l.id, l]));
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const withDeals = (items as any[]).map((l) => ({
+      ...l,
+      deals: l.opportunities
+        .filter((o: any) => o.stage === 'WON')
+        .map((o: any) => {
+          const li = o.listingId ? byId.get(o.listingId) : null;
+          const b = li?.building ?? li?.unit?.building;
+          return {
+            id: o.id,
+            ref: li?.unit?.ref ?? li?.building?.ref ?? null,
+            title: li?.headline || b?.title || o.externalTitle || 'Deal',
+            country: b?.country ?? null,
+            unitRef: o.soldUnitRef,
+            soldPrice: o.soldPrice,
+            soldCurrency: o.soldCurrency,
+            commissionUsd: o.commissionUsd,
+            closedAt: o.closedAt,
+          };
+        }),
+      // A seller's own stock that has sold.
+      soldProperties: (l.properties ?? [])
+        .filter((p: any) => p.status === 'SOLD')
+        .map((p: any) => ({
+          id: p.id, title: p.title, kind: p.kind,
+          soldPrice: p.soldPrice, commissionUsd: p.commissionUsd, soldAt: p.soldAt,
+        })),
+    }));
+
+    sendPaginated(res, withDeals, buildPaginationResponse(page, limit, total));
   })
 );
 
@@ -425,7 +469,7 @@ router.get(
     const [
       byStatus, byMarket, byType, bySubStatus,
       liveDeals, viewingsBooked, feedbackOwed, neverCalled, goingCold,
-      wonThisMonth, inboxPending,
+      wonThisMonth,
       projectStock,
     ] = await Promise.all([
       prisma.lead.groupBy({ by: ['status'], _count: { _all: true } }),
@@ -441,7 +485,6 @@ router.get(
       prisma.lead.count({ where: { lastContactAt: { lt: cold }, nextContactAt: null, status: open as never } }),
 
       prisma.leadOpportunity.count({ where: { stage: 'WON', closedAt: { gte: monthStart } } }),
-      prisma.inboundMessage.count({ where: { status: 'PENDING' } }),
 
       // Repeatable unit types and how many clients have bought one — the shape
       // of a development we resell, as opposed to a one-off flat.
@@ -488,245 +531,13 @@ router.get(
       byType: tally(byType, 'type'),
       waitingOn: tally(bySubStatus, 'subStatus'),
       inMotion: { liveDeals, viewingsBooked, feedbackOwed },
-      needsAttention: { neverCalled, goingCold, inboxPending },
+      needsAttention: { neverCalled, goingCold },
       wonThisMonth,
       projectStock: stock,
       // Commission is redacted for roles that may not see it, so the shape is
       // the same for everyone and the UI needs no special case.
       canSeeMoney: canSeeMoney(req),
     });
-  })
-);
-
-// ── Inbox — WhatsApp from numbers we don't recognise ─────────────────────────
-// Nothing here is a client yet. That's the point: a work number receives
-// suppliers, family and wrong numbers, and a CRM that swallows all of them
-// stops being worth opening.
-
-router.get(
-  '/inbox',
-  authenticateToken,
-  requireCrm,
-  asyncHandler(async (req: Request, res: Response) => {
-    const q = req.query as Record<string, string>;
-    const status = q.status === 'all' ? undefined : (q.status || 'PENDING');
-
-    const messages = await prisma.inboundMessage.findMany({
-      where: status ? { status: status as never } : {},
-      orderBy: { receivedAt: 'desc' },
-      take: 200,
-    });
-
-    // Several messages from one number are one conversation, not several
-    // decisions — collapse them so triage is per person.
-    const threads = new Map<string, { waId: string; profileName: string | null; messages: typeof messages; latestAt: Date }>();
-    for (const m of messages) {
-      const t = threads.get(m.waId);
-      if (t) t.messages.push(m);
-      else threads.set(m.waId, { waId: m.waId, profileName: m.profileName, messages: [m], latestAt: m.receivedAt });
-    }
-
-    sendSuccess(res, {
-      threads: Array.from(threads.values()).sort((a, b) => +b.latestAt - +a.latestAt),
-      pending: await prisma.inboundMessage.count({ where: { status: 'PENDING' } }),
-    });
-  })
-);
-
-const triageSchema = z.object({
-  waId: z.string().min(4).max(30),
-  action: z.enum(['ADD', 'IGNORE', 'BLOCK']),
-  // Only for ADD — everything else is a dismissal.
-  name: z.string().max(120).optional().nullable(),
-  market: z.enum(MARKETS).optional(),
-  type: z.enum(LEAD_TYPES).optional(),
-  label: z.string().max(120).optional().nullable(),
-});
-
-router.post(
-  '/inbox/triage',
-  authenticateToken,
-  requireCrm,
-  asyncHandler(async (req: Request, res: Response) => {
-    const authReq = req as AuthenticatedRequest;
-    const data = triageSchema.parse(req.body);
-
-    const pending = await prisma.inboundMessage.findMany({
-      where: { waId: data.waId, status: 'PENDING' },
-      orderBy: { receivedAt: 'asc' },
-    });
-    if (pending.length === 0) { sendNotFound(res, 'Conversation'); return; }
-
-    if (data.action === 'BLOCK') {
-      await prisma.blockedSender.upsert({
-        where: { waId: data.waId },
-        create: { waId: data.waId, label: data.label || pending[0].profileName || null },
-        update: { label: data.label || undefined },
-      });
-    }
-
-    if (data.action !== 'ADD') {
-      await prisma.inboundMessage.updateMany({
-        where: { waId: data.waId, status: 'PENDING' },
-        data: {
-          status: data.action === 'BLOCK' ? 'BLOCKED' : 'IGNORED',
-          handledAt: new Date(),
-          handledBy: authReq.user?.id ?? null,
-        },
-      });
-      await logAdminAction(`INBOX_${data.action}`, 'inbound', data.waId, {}, authReq);
-      sendSuccess(res, { waId: data.waId, action: data.action }, 'Done');
-      return;
-    }
-
-    // Becoming a client: the whole conversation moves onto their timeline, so
-    // nothing said before they were in the CRM is lost.
-    const lead = await prisma.lead.create({
-      data: {
-        market: data.market ?? 'LEBANON',
-        type: data.type ?? 'BUYER',
-        status: 'ACTIVE',
-        subStatus: 'AWAITING_REPLY',
-        source: 'WHATSAPP',
-        name: (data.name || pending[0].profileName || `WhatsApp ${data.waId}`).trim(),
-        phone: `+${data.waId}`,
-        whatsapp: `+${data.waId}`,
-        waId: data.waId,
-        notes: pending[0].body,
-        contactIntervalDays: 3,
-        createdBy: authReq.user?.id ?? null,
-      },
-    });
-
-    await prisma.leadContact.createMany({
-      data: pending.map((m) => ({
-        leadId: lead.id,
-        channel: 'WHATSAPP' as const,
-        body: m.body,
-        outcome: 'Inbound',
-        contactedAt: m.receivedAt,
-      })),
-    });
-
-    await prisma.inboundMessage.updateMany({
-      where: { waId: data.waId, status: 'PENDING' },
-      data: { status: 'ADDED', leadId: lead.id, handledAt: new Date(), handledBy: authReq.user?.id ?? null },
-    });
-
-    await logAdminAction('INBOX_ADD', 'lead', lead.id, { waId: data.waId }, authReq);
-    sendCreated(res, lead, 'Client added from WhatsApp');
-  })
-);
-
-router.get(
-  '/inbox/blocked',
-  authenticateToken,
-  requireCrm,
-  asyncHandler(async (_req: Request, res: Response) => {
-    sendSuccess(res, await prisma.blockedSender.findMany({ orderBy: { createdAt: 'desc' }, take: 200 }));
-  })
-);
-
-router.delete(
-  '/inbox/blocked/:waId',
-  authenticateToken,
-  requireCrm,
-  asyncHandler(async (req: Request, res: Response) => {
-    await prisma.blockedSender.deleteMany({ where: { waId: req.params.waId } });
-    sendSuccess(res, { waId: req.params.waId }, 'Unblocked');
-  })
-);
-
-// ── Investment products — Georgia stock we resell ────────────────────────────
-
-const productSchema = z.object({
-  market: z.enum(MARKETS).default('GEORGIA'),
-  name: z.string().min(2).max(160),
-  developer: z.string().max(120).optional().nullable(),
-  city: z.string().max(80).optional().nullable(),
-  region: z.string().max(50).optional().nullable(),
-  unitKinds: z.array(z.enum(UNIT_KINDS)).default([]),
-  priceFrom: z.number().min(0).optional().nullable(),
-  priceTo: z.number().min(0).optional().nullable(),
-  currency: z.enum(['USD', 'LBP']).default('USD'),
-  expectedYield: z.number().min(0).max(100).optional().nullable(),
-  handoverAt: z.string().optional().nullable(),
-  paymentPlan: z.string().max(300).optional().nullable(),
-  url: z.string().url().max(500).optional().nullable().or(z.literal('')),
-  images: z.array(z.string().max(500)).default([]),
-  notes: z.string().max(2000).optional().nullable(),
-  status: z.enum(['AVAILABLE', 'LIMITED', 'SOLD_OUT', 'PAUSED']).default('AVAILABLE'),
-});
-
-router.get(
-  '/products',
-  authenticateToken,
-  requireCrm,
-  asyncHandler(async (req: Request, res: Response) => {
-    const q = req.query as Record<string, string>;
-    const products = await prisma.investmentProduct.findMany({
-      where: {
-        ...(q.market && MARKETS.includes(q.market as never) ? { market: q.market as never } : {}),
-        ...(q.status ? { status: q.status as never } : {}),
-      },
-      orderBy: [{ status: 'asc' }, { name: 'asc' }],
-      take: 300,
-    });
-    sendSuccess(res, products);
-  })
-);
-
-router.post(
-  '/products',
-  authenticateToken,
-  requireCrm,
-  asyncHandler(async (req: Request, res: Response) => {
-    const authReq = req as AuthenticatedRequest;
-    const data = productSchema.parse(req.body);
-    const product = await prisma.investmentProduct.create({
-      data: {
-        ...data,
-        url: data.url || null,
-        handoverAt: data.handoverAt ? new Date(data.handoverAt) : null,
-      },
-    });
-    await logAdminAction('CREATE_INVESTMENT_PRODUCT', 'product', product.id, { name: product.name }, authReq);
-    sendCreated(res, product, 'Opportunity added');
-  })
-);
-
-router.patch(
-  '/products/:pid',
-  authenticateToken,
-  requireCrm,
-  asyncHandler(async (req: Request, res: Response) => {
-    const authReq = req as AuthenticatedRequest;
-    const existing = await prisma.investmentProduct.findUnique({ where: { id: req.params.pid } });
-    if (!existing) { sendNotFound(res, 'Opportunity'); return; }
-
-    const data = productSchema.partial().parse(req.body);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const patch: Record<string, any> = { ...data };
-    if (data.url !== undefined) patch.url = data.url || null;
-    if (data.handoverAt !== undefined) patch.handoverAt = data.handoverAt ? new Date(data.handoverAt) : null;
-
-    const product = await prisma.investmentProduct.update({ where: { id: req.params.pid }, data: patch });
-    await logAdminAction('UPDATE_INVESTMENT_PRODUCT', 'product', product.id, { name: product.name }, authReq);
-    sendSuccess(res, product, 'Opportunity updated');
-  })
-);
-
-router.delete(
-  '/products/:pid',
-  authenticateToken,
-  requireCrm,
-  asyncHandler(async (req: Request, res: Response) => {
-    const authReq = req as AuthenticatedRequest;
-    const existing = await prisma.investmentProduct.findUnique({ where: { id: req.params.pid } });
-    if (!existing) { sendNotFound(res, 'Opportunity'); return; }
-    await prisma.investmentProduct.delete({ where: { id: req.params.pid } });
-    await logAdminAction('DELETE_INVESTMENT_PRODUCT', 'product', req.params.pid, { name: existing.name }, authReq);
-    sendSuccess(res, { id: req.params.pid }, 'Opportunity removed');
   })
 );
 
@@ -1505,7 +1316,6 @@ const opportunitySchema = z.object({
   listingId: z.string().optional().nullable(),
   counterpartLeadId: z.string().optional().nullable(),
   leadPropertyId: z.string().optional().nullable(),
-  productId: z.string().optional().nullable(),
   // Off-platform stock — a Batumi studio on propgrp.com, another agency's
   // listing, a private sale. Clients buy these, so the CRM has to record them.
   externalTitle: z.string().max(200).optional().nullable(),
@@ -1532,8 +1342,8 @@ router.post(
     if (!lead) { sendNotFound(res, 'Lead'); return; }
 
     const data = opportunitySchema.parse(req.body);
-    if (!data.listingId && !data.counterpartLeadId && !data.leadPropertyId && !data.productId && !data.externalTitle) {
-      sendError(res, 400, 'Say what this is: a listing, a client, a seller property, a Georgia opportunity, or an external property');
+    if (!data.listingId && !data.counterpartLeadId && !data.leadPropertyId && !data.externalTitle) {
+      sendError(res, 400, 'Say what this is: a listing, a client, a seller property, or an external property');
       return;
     }
 

@@ -331,49 +331,6 @@ export function matchPropertyToLead(buyer: any, property: any, seller?: any): Ma
 }
 
 /**
- * How well a Georgia investment opportunity fits an investor.
- *
- * Scored differently from a home: an investor picking a Batumi studio cares
- * about the city, the entry price and the yield, not which street it's on or
- * how many bedrooms it has. Bedrooms are therefore not scored at all — using
- * the residential weights here would mark every studio as a bad match for
- * anyone who mentioned wanting two bedrooms of floor space.
- */
-export function matchProductToLead(lead: any, product: any): MatchResult {
-  const location = scoreLocation(
-    lead.areas ?? [],
-    lead.regions ?? [],
-    [product.city],
-    product.region,
-  );
-
-  // A product offers several unit kinds; score against the best one.
-  const kinds: string[] = product.unitKinds ?? [];
-  const wants: string[] = lead.unitKinds ?? [];
-  let kindCriterion: MatchCriterion | null = null;
-  if (wants.length) {
-    if (kinds.length === 0) {
-      kindCriterion = { label: 'Type', weight: WEIGHTS.unitKind, score: 0, detail: 'Unit types not listed' };
-    } else {
-      kindCriterion = kinds
-        .map((k) => scoreUnitKind(wants, k))
-        .filter(Boolean)
-        .sort((a, b) => (b as MatchCriterion).score - (a as MatchCriterion).score)[0] as MatchCriterion;
-    }
-  }
-
-  // Entry price is what matters — a project starting under their ceiling works
-  // even if the penthouses in it don't.
-  const entryPrice = product.priceFrom ?? product.priceTo ?? null;
-
-  return finalize([
-    location,
-    kindCriterion,
-    scoreBudget(lead.budgetMin ?? null, lead.budgetMax ?? null, entryPrice),
-  ]);
-}
-
-/**
  * Minimum score for a pairing to be worth showing. Shared by the drawer's match
  * lists AND the "has matches to explore" counter — if these ever diverge, the
  * board shows a match the filter doesn't count (which is exactly what happened

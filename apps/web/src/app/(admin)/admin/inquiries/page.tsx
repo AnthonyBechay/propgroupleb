@@ -7,6 +7,7 @@ import {
   ExternalLink,
   Search,
   Trash2,
+  UserPlus,
   CheckSquare,
   Square,
   Mail,
@@ -423,6 +424,11 @@ export default function AdminInquiriesPage() {
                   {/* Expanded Details */}
                   {isExpanded && (
                     <div className="px-4 pb-4 pt-0 border-t">
+                      {/* The whole point of a CRM is not retyping this. */}
+                      <div className="mt-4">
+                        <AddToCrmButton inquiryId={inq.id} name={inq.name} />
+                      </div>
+
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
                         {/* Contact Info */}
                         <div className="space-y-2">
@@ -632,6 +638,62 @@ export default function AdminInquiriesPage() {
           )}
         </>
       )}
+    </div>
+  )
+}
+
+
+/**
+ * Turn a website enquiry into a CRM client.
+ *
+ * The endpoint existed but nothing called it, so every enquiry was being
+ * retyped by hand — which is exactly the work the CRM is supposed to remove.
+ * Their message comes across as the client's notes, and their name, phone and
+ * the property they asked about all carry over.
+ */
+function AddToCrmButton({ inquiryId, name }: { inquiryId: string; name: string }) {
+  const [state, setState] = useState<'idle' | 'busy' | 'done' | 'error'>('idle')
+  const [message, setMessage] = useState<string | null>(null)
+
+  async function add() {
+    setState('busy')
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/crm/from-inquiry/${inquiryId}`, {
+        method: 'POST',
+        credentials: 'include',
+      })
+      const j = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        // A duplicate is a perfectly normal outcome, not a failure to shout about.
+        setMessage(j.message || j.error || 'Could not add')
+        setState('error')
+        return
+      }
+      setState('done')
+    } catch {
+      setMessage('Network error')
+      setState('error')
+    }
+  }
+
+  if (state === 'done') {
+    return (
+      <span className="inline-flex items-center gap-1.5 text-sm font-medium text-emerald-700">
+        <CheckSquare className="w-4 h-4" /> {name} added to the CRM
+      </span>
+    )
+  }
+
+  return (
+    <div className="flex items-center gap-2 flex-wrap">
+      <button
+        onClick={add}
+        disabled={state === 'busy'}
+        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 text-white text-sm font-medium hover:bg-slate-700 disabled:opacity-50"
+      >
+        <UserPlus className="w-4 h-4" /> Add to CRM
+      </button>
+      {state === 'error' && <span className="text-sm text-red-600">{message}</span>}
     </div>
   )
 }

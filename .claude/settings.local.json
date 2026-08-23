@@ -450,7 +450,11 @@
       "Bash(awk '/GET \\\\/:id\\\\/units — list units/,/^\\\\\\);/' apps/backend/src/routes/buildings.ts)",
       "Bash(GEORGIA_DATABASE_URL=\"postgresql://postgres:t@localhost:55441/ge\" DATABASE_URL=\"postgresql://postgres:t@localhost:55440/lb\" npx tsx ../../scripts/import-georgia.ts --dry-run)",
       "Bash(DATABASE_URL=\"postgresql://postgres:t@localhost:55450/ge2\" npx prisma db push --skip-generate --accept-data-loss)",
-      "WebSearch"
+      "WebSearch",
+      "WebFetch(domain:developers.facebook.com)",
+      "Bash(chmod +x scripts/preview-schema-changes.sh)",
+      "Bash(DATABASE_URL=\"postgresql://postgres:t@localhost:55460/prev\" npx prisma db push --skip-generate --accept-data-loss)",
+      "Bash(DATABASE_URL=\"postgresql://postgres:t@localhost:55460/prev\" npx prisma migrate diff --from-url \"postgresql://postgres:t@localhost:55460/prev\" --to-schema-datamodel prisma/schema.prisma --script)"
     ],
     "deny": [],
     "ask": []

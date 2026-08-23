@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import {
   Loader2, TrendingUp, Users, CalendarCheck, MessageSquareWarning, Zap,
-  Snowflake, Inbox, Building2, Trophy, AlertTriangle,
+  Snowflake, Building2, Trophy, AlertTriangle,
 } from 'lucide-react'
 import { normalizeApiUrl } from '@/lib/utils/api-url'
 import { SUB_STATUS_META, TYPE_LABELS, type LeadSubStatus, type LeadType } from './types'
@@ -24,7 +24,7 @@ interface Overview {
   byType: Record<string, number>
   waitingOn: Record<string, number>
   inMotion: { liveDeals: number; viewingsBooked: number; feedbackOwed: number }
-  needsAttention: { neverCalled: number; goingCold: number; inboxPending: number }
+  needsAttention: { neverCalled: number; goingCold: number }
   wonThisMonth: number
   projectStock: Array<{
     buildingId: string; ref: string | null; title: string; country: string
@@ -32,7 +32,7 @@ interface Overview {
   }>
 }
 
-export function OverviewView({ onFocus }: { onFocus: (view: 'today' | 'inbox' | 'board') => void }) {
+export function OverviewView({ onFocus }: { onFocus: (view: 'today' | 'board') => void }) {
   const apiUrl = normalizeApiUrl(process.env.NEXT_PUBLIC_API_URL || '')
   const [d, setD] = useState<Overview | null>(null)
   const [loading, setLoading] = useState(true)
@@ -56,7 +56,7 @@ export function OverviewView({ onFocus }: { onFocus: (view: 'today' | 'inbox' | 
     .reduce((t, [, n]) => t + n, 0)
 
   const attention =
-    d.needsAttention.neverCalled + d.needsAttention.goingCold + d.needsAttention.inboxPending
+    d.needsAttention.neverCalled + d.needsAttention.goingCold
 
   return (
     <div className="space-y-3">
@@ -79,7 +79,7 @@ export function OverviewView({ onFocus }: { onFocus: (view: 'today' | 'inbox' | 
         />
         <Stat
           label="Needs attention" value={attention}
-          hint={attention === 0 ? 'all clear' : 'uncalled, cold or unread'}
+          hint={attention === 0 ? 'all clear' : 'uncalled or going cold'}
           icon={<AlertTriangle className="h-4 w-4" />}
           tone={attention > 0 ? 'red' : 'slate'}
           onClick={() => onFocus('today')}
@@ -100,10 +100,6 @@ export function OverviewView({ onFocus }: { onFocus: (view: 'today' | 'inbox' | 
           <Row
             label="Viewing feedback owed" value={d.inMotion.feedbackOwed}
             icon={<MessageSquareWarning className="h-3.5 w-3.5 text-amber-600" />} onClick={() => onFocus('today')}
-          />
-          <Row
-            label="Unread WhatsApp" value={d.needsAttention.inboxPending}
-            icon={<Inbox className="h-3.5 w-3.5 text-emerald-600" />} onClick={() => onFocus('inbox')}
           />
         </Panel>
 

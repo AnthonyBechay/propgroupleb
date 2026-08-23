@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   UserSearch, Plus, Search, Loader2, Phone, MessageCircle, Mail, Clock,
   CalendarPlus, X, LayoutGrid, List, Download, Upload, MapPin,
-  MessageSquareWarning, Sparkles, Target, DollarSign, Sun, Globe, BarChart3, Inbox, Gauge,
+  MessageSquareWarning, Sparkles, Target, DollarSign, Sun, BarChart3, Gauge,
 } from 'lucide-react'
 import { normalizeApiUrl } from '@/lib/utils/api-url'
 import { useAuth } from '@/contexts/AuthContext'
@@ -14,9 +14,8 @@ import { LeadBoard } from './LeadBoard'
 import { ImportModal } from './ImportModal'
 import { BookViewingModal } from './BookViewingModal'
 import { TodayView } from './TodayView'
-import { InvestmentCatalogue } from './InvestmentCatalogue'
-import { InboxView } from './InboxView'
 import { OverviewView } from './OverviewView'
+import { ClientDirectory } from './ClientDirectory'
 import {
   type Lead, type LeadMarket, type LeadStatus, type LeadType,
   STATUS_META, TYPE_LABELS, MARKET_META, formatLastContact, formatPlanned,
@@ -46,7 +45,7 @@ interface Stats {
   byStatus: Record<string, number>
 }
 
-type View = 'overview' | 'today' | 'inbox' | 'board' | 'list'
+type View = 'overview' | 'today' | 'board' | 'list'
 
 export default function CrmPage() {
   const apiUrl = normalizeApiUrl(process.env.NEXT_PUBLIC_API_URL || '')
@@ -68,11 +67,7 @@ export default function CrmPage() {
   const [creating, setCreating] = useState(false)
   const [importing, setImporting] = useState(false)
   const [bookingFor, setBookingFor] = useState<Lead | null>(null)
-  const [catalogue, setCatalogue] = useState(false)
   const [showChannels, setShowChannels] = useState(false)
-  // Unread count drives the tab badge — an inbox you can't see is an inbox
-  // nobody empties.
-  const [inboxCount, setInboxCount] = useState(0)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -83,20 +78,18 @@ export default function CrmPage() {
       if (market !== 'all') p.set('market', market)
       if (search.trim()) p.set('search', search.trim())
 
-      const [listRes, statsRes, untappedRes, earnRes, inboxRes] = await Promise.all([
+      const [listRes, statsRes, untappedRes, earnRes] = await Promise.all([
         fetch(`${apiUrl}/api/crm?${p}`, { credentials: 'include', cache: 'no-store' }),
         fetch(`${apiUrl}/api/crm/stats`, { credentials: 'include', cache: 'no-store' }),
         fetch(`${apiUrl}/api/crm/untapped`, { credentials: 'include', cache: 'no-store' }),
         canSeeMoney
           ? fetch(`${apiUrl}/api/crm/earnings?months=12`, { credentials: 'include', cache: 'no-store' })
           : Promise.resolve(null),
-        fetch(`${apiUrl}/api/crm/inbox`, { credentials: 'include', cache: 'no-store' }),
       ])
       if (listRes.ok) setLeads((await listRes.json()).data ?? [])
       if (statsRes.ok) setStats((await statsRes.json()).data ?? null)
       if (untappedRes.ok) setUntapped((await untappedRes.json()).data?.counts ?? {})
       if (earnRes?.ok) setEarnings((await earnRes.json()).data ?? null)
-      if (inboxRes.ok) setInboxCount((await inboxRes.json()).data?.pending ?? 0)
     } finally {
       setLoading(false)
     }
@@ -191,7 +184,7 @@ export default function CrmPage() {
       {/* One row: what needs attention on the left, actions on the right. The
           page title used to eat a whole row saying what the sidebar says. */}
       <div className="flex items-center justify-between gap-3 flex-wrap">
-        <div className={`flex gap-2 flex-wrap ${['today', 'inbox', 'overview'].includes(view) ? 'invisible pointer-events-none' : ''}`}>
+        <div className={`flex gap-2 flex-wrap ${['today', 'overview'].includes(view) ? 'invisible pointer-events-none' : ''}`}>
           <FocusChip
             active={focus === 'planned'} count={counts.planned}
             onClick={() => setFocus((f) => (f === 'planned' ? 'none' : 'planned'))}
@@ -234,13 +227,6 @@ export default function CrmPage() {
             className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-slate-200 bg-white text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
           >
             {exporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />} Export
-          </button>
-          <button
-            onClick={() => setCatalogue(true)}
-            title="Georgia opportunities we resell"
-            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-slate-200 bg-white text-sm font-medium text-slate-700 hover:bg-slate-50"
-          >
-            <Globe className="h-4 w-4" /> 🇬🇪 Catalogue
           </button>
           <button
             onClick={() => setImporting(true)}
@@ -317,18 +303,6 @@ export default function CrmPage() {
             <Sun className="h-4 w-4" /> Today
           </button>
           <button
-            onClick={() => setView('inbox')}
-            title="WhatsApp from numbers not in the CRM"
-            className={`px-2 py-1.5 rounded-md transition-all inline-flex items-center gap-1 text-sm font-medium ${view === 'inbox' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-900'}`}
-          >
-            <Inbox className="h-4 w-4" />
-            {inboxCount > 0 && (
-              <span className="inline-flex items-center justify-center min-w-[16px] h-4 px-1 rounded-full bg-emerald-500 text-white text-[10px] font-bold">
-                {inboxCount}
-              </span>
-            )}
-          </button>
-          <button
             onClick={() => setView('board')}
             title="Pipeline board"
             className={`p-1.5 rounded-md transition-all ${view === 'board' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-900'}`}
@@ -337,7 +311,7 @@ export default function CrmPage() {
           </button>
           <button
             onClick={() => setView('list')}
-            title="List"
+            title="All clients"
             className={`p-1.5 rounded-md transition-all ${view === 'list' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-900'}`}
           >
             <List className="h-4 w-4" />
@@ -350,8 +324,6 @@ export default function CrmPage() {
         <OverviewView onFocus={(v) => setView(v)} />
       ) : view === 'today' ? (
         <TodayView market={market} onOpen={setOpenId} />
-      ) : view === 'inbox' ? (
-        <InboxView onOpenLead={(id) => { load(); setOpenId(id) }} />
       ) : loading ? (
         <div className="flex items-center justify-center py-20 text-slate-400"><Loader2 className="h-6 w-6 animate-spin" /></div>
       ) : visible.length === 0 ? (
@@ -372,7 +344,7 @@ export default function CrmPage() {
           untapped={untapped}
         />
       ) : (
-        <ListView leads={visible} onOpen={setOpenId} />
+        <ClientDirectory leads={visible} canSeeMoney={canSeeMoney} onOpen={setOpenId} />
       )}
 
       {/* Closed deals summary — off-board so the pipeline stays focused */}
@@ -452,7 +424,6 @@ export default function CrmPage() {
       {openLead && <LeadDrawer lead={openLead} onClose={() => setOpenId(null)} onChanged={load} />}
       {creating && <LeadFormModal onClose={() => setCreating(false)} onSaved={() => { setCreating(false); load() }} />}
       {importing && <ImportModal onClose={() => setImporting(false)} onImported={load} />}
-      {catalogue && <InvestmentCatalogue onClose={() => setCatalogue(false)} />}
       {bookingFor && (
         <BookViewingModal
           lead={bookingFor}
@@ -501,89 +472,3 @@ function FocusChip({
   )
 }
 
-/** Dense table-style view for scanning or bulk work. */
-function ListView({ leads, onOpen }: { leads: Lead[]; onOpen: (id: string) => void }) {
-  return (
-    <div className="space-y-2">
-      {leads.map((l) => {
-        const last = formatLastContact(l.lastContactAt)
-        const planned = formatPlanned(l.nextContactAt)
-        const sub = l.subStatus ? SUB_STATUS_META[l.subStatus] : null
-        const meta = STATUS_META[l.status]
-        const where = l.areas.join(', ')
-        const phone = l.whatsapp || l.phone
-        return (
-          <div
-            key={l.id}
-            onClick={() => onOpen(l.id)}
-            className="bg-white border border-slate-200 rounded-xl p-3 cursor-pointer hover:bg-slate-50 transition-colors"
-          >
-            <div className="flex items-start gap-3 flex-wrap sm:flex-nowrap">
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="font-semibold text-slate-900">{l.name}</span>
-                  <span className={`px-2 py-0.5 rounded text-xs font-medium ${meta.cls}`}>{meta.label}</span>
-                  <span className={`px-2 py-0.5 rounded text-xs font-medium ${MARKET_META[l.market].cls}`}>{MARKET_META[l.market].label}</span>
-                  <span className="text-xs text-slate-400">{TYPE_LABELS[l.type]}</span>
-                  {sub && (
-                    <span className={`px-2 py-0.5 rounded text-xs font-medium border ${sub.cls}`}>{sub.label}</span>
-                  )}
-                </div>
-                <p className="text-sm text-slate-700 mt-1">
-                  {l.askingFor || l.unitKinds.join(', ') || '—'}
-                  {(l.budgetMin || l.budgetMax) && (
-                    <span className="text-slate-500">
-                      {' '}· {l.currency} {(l.budgetMin ?? 0).toLocaleString()}–{l.budgetMax ? l.budgetMax.toLocaleString() : '∞'}
-                    </span>
-                  )}
-                </p>
-                {where && (
-                  <p className="text-xs text-slate-400 mt-0.5 inline-flex items-center gap-1">
-                    <MapPin className="h-3 w-3" />{where}
-                  </p>
-                )}
-              </div>
-
-              <div className="flex items-center gap-2 shrink-0" onClick={(e) => e.stopPropagation()}>
-                <span
-                  className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-lg ${
-                    last.stale ? 'bg-slate-100 text-slate-600' : 'bg-slate-50 text-slate-500'
-                  }`}
-                  title={l.lastContactAt ? `Last contact ${new Date(l.lastContactAt).toLocaleDateString()}` : 'No contact logged yet'}
-                >
-                  <Clock className="h-3.5 w-3.5" />{last.text}
-                </span>
-                {planned && (
-                  <span
-                    className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-lg ${
-                      planned.due ? 'bg-sky-50 text-sky-700' : 'bg-slate-50 text-slate-500'
-                    }`}
-                    title={l.nextContactNote || 'Planned follow-up'}
-                  >
-                    <CalendarPlus className="h-3.5 w-3.5" />{planned.text}
-                  </span>
-                )}
-                {l.phone && (
-                  <>
-                    <a href={`tel:${l.phone}`} title={l.phone} className="p-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-100">
-                      <Phone className="h-3.5 w-3.5" />
-                    </a>
-                    <a href={`https://wa.me/${(phone ?? '').replace(/[^0-9]/g, '')}`} target="_blank" rel="noopener noreferrer"
-                       className="p-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-100">
-                      <MessageCircle className="h-3.5 w-3.5" />
-                    </a>
-                  </>
-                )}
-                {l.email && (
-                  <a href={`mailto:${l.email}`} className="p-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-100">
-                    <Mail className="h-3.5 w-3.5" />
-                  </a>
-                )}
-              </div>
-            </div>
-          </div>
-        )
-      })}
-    </div>
-  )
-}
