@@ -280,7 +280,8 @@ export const BOARD_COLUMNS: BoardColumn[] = [
 
 /** Which column a lead belongs in. */
 export function columnOf(lead: Lead): string {
-  // An untouched lead still needs working, so it sits with the active ones.
+  // An untouched lead still needs working, so it sits with the active ones —
+  // and so does a past client who's looking again.
   if (lead.status === 'ACTIVE' || lead.status === 'NEW') {
     return isSupplyType(lead.type) ? 'ACTIVE_SUPPLY' : 'ACTIVE_DEMAND'
   }
@@ -312,11 +313,31 @@ export const STATUS_META: Record<LeadStatus, { label: string; cls: string }> = {
   ARCHIVED:    { label: 'Parked',       cls: 'bg-slate-100 text-slate-500' },
 }
 
-/** Has this client already bought or sold with us? */
-export function isPastClient(lead: Lead): boolean {
+/** Has this client bought or sold with us at some point? */
+export function hasClosedBefore(lead: Lead): boolean {
   return lead.status === 'WON'
     || (lead.deals?.length ?? 0) > 0
     || (lead.soldProperties?.length ?? 0) > 0
+}
+
+/** Is something in motion for them right now? */
+export function hasLiveDeal(lead: Lead): boolean {
+  return (lead.opportunities ?? []).some((o) => LIVE_STAGES.includes(o.stage))
+}
+
+/**
+ * A past client is someone who bought or sold and isn't looking right now.
+ *
+ * The moment you shortlist something new for them they belong back in
+ * "working with" — filing a live deal under "past" is how it gets forgotten.
+ */
+export function isPastClient(lead: Lead): boolean {
+  return hasClosedBefore(lead) && !hasLiveDeal(lead)
+}
+
+/** Bought before and looking again — worth flagging, they're the easy ones. */
+export function isReturningClient(lead: Lead): boolean {
+  return hasClosedBefore(lead) && hasLiveDeal(lead)
 }
 
 /**

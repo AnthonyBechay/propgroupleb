@@ -38,11 +38,24 @@ One database and one admin serve two public sites:
 | propgrouplb.com | `Building.country = LEBANON` |
 | propgrp.com | everything that **isn't** Lebanon (Georgia today; Cyprus/Greece exist in the enum) |
 
-- `SITE_SCOPE` env var decides which a deployment serves. Unset = Lebanon, so the
-  existing site is unaffected. Set `SITE_SCOPE=INTERNATIONAL` on propgrp.com.
-- `apps/backend/src/utils/market.ts` owns this. Public list endpoints call
-  `publicCountryFilter(req)`; **a signed-in admin sees every market by default**,
-  which is what makes one back office work.
+**Both frontends call this backend.** propgrp.com runs in its own container but
+against this API and database, including its admin. So market scope is decided
+**per request, never per process** — an env var would be wrong for one of the
+two sites whatever value it held.
+
+`apps/backend/src/utils/market.ts` owns it. `publicCountryFilter(req)` resolves,
+in order:
+
+1. `?country=` — explicit, and `?country=all` lifts the scope
+2. **`X-Site-Scope: INTERNATIONAL`** header — the contract for propgrp.com. Works
+   from the browser *and* from its server-side rendering, which an Origin-only
+   scheme gets wrong: a Next.js server fetch sends no Origin header.
+3. `Origin`/`Referer` matched against `INTERNATIONAL_ORIGINS` (default `propgrp.com`)
+4. `SITE_SCOPE` env — last resort, correct only when a deployment serves one market
+
+**A signed-in admin sees every market regardless**, which is what makes one back
+office work. Add propgrp.com to `ALLOWED_ORIGINS`; auth cookies already use
+`SameSite=None; Secure` in production, so cross-site login works.
 - International is defined as "not Lebanon", never a fixed list — adding a
   country must never require a code change.
 - Georgian stock lives in the same `Building`/`Unit`/`Listing` tables. There is
@@ -78,6 +91,13 @@ Vocabulary rules, learned the hard way:
 
 - A client's status describes a **relationship**, not a deal. `WON` renders as
   **"Past client"** — you win a transaction, you don't win a person.
+- **A live deal outranks a historical win.** Someone viewing their second
+  property is not a past client. `deriveLeadStatus` checks live stages *before*
+  WON for exactly this reason; the other order filed returning clients under
+  "bought / sold" while a viewing sat booked for tomorrow.
+- A past client **reactivates automatically** when you shortlist something new —
+  keeping them is the point. `ARCHIVED` is excluded, because parking someone is
+  itself a deliberate act.
 - Deal stages (viewing, negotiating) belong to the **opportunity**, because one
   client can be viewing one property and negotiating another.
 - There are **four intents**: buying, selling, looking to rent, renting out.

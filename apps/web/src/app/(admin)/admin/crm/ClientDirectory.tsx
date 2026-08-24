@@ -7,7 +7,7 @@ import {
 } from 'lucide-react'
 import {
   type Lead, type LeadType, TYPE_LABELS, TYPE_META, STATUS_META,
-  formatLastContact, isSupplyType, isPastClient,
+  formatLastContact, isSupplyType, isPastClient, isReturningClient, hasClosedBefore,
 } from './types'
 import { countryFlag } from '@/lib/market'
 
@@ -161,6 +161,11 @@ function ClientRow({
             <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${TYPE_META[l.type].chip}`}>
               {TYPE_LABELS[l.type as LeadType]}
             </span>
+            {isReturningClient(l) && (
+              <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-emerald-600 text-white">
+                Returning
+              </span>
+            )}
             {l.isInvestor && (
               <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-700 border border-indigo-200">
                 Investor

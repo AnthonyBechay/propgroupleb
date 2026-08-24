@@ -3,44 +3,73 @@ import type { Request } from 'express';
 /**
  * Which market a request is about.
  *
- * One admin, one database, two public websites:
+ * One backend and one database serve two public websites:
  *
  *   propgrouplb.com   Lebanese real estate
- *   propgrp.com       everything else — Georgia today, Cyprus/Greece if they
- *                     come back
+ *   propgrp.com       everything else — Georgia today, Cyprus/Greece if they come back
  *
- * A property belongs to a site by its `country`, and that is what decides where
- * it appears — not its visibility, which only says whether it is live at all.
- * Without this, publishing an imported Georgian tower would put it on the
- * Lebanese site.
+ * A property belongs to a site by its `country`. Visibility only says whether
+ * it is live at all; `country` says where it appears.
+ *
+ * This is decided **per request, not per process**. An env var would be wrong
+ * the moment both sites call the same backend — whichever value it held, the
+ * other site would be served the wrong market's stock.
  */
 
 export const COUNTRIES = ['LEBANON', 'GEORGIA', 'CYPRUS', 'GREECE'] as const;
 export type MarketCountry = (typeof COUNTRIES)[number];
 
-/** The two audiences. Deliberately not one-country-per-site: the international
- *  site sells whatever isn't Lebanon, so adding a country never needs a deploy. */
+/** The two audiences. International is "not Lebanon", never a fixed list, so
+ *  adding a country never needs a deploy. */
 export type SiteScope = 'LEBANON' | 'INTERNATIONAL';
 
-/**
- * Which site this deployment is.
- *
- * Set SITE_SCOPE=INTERNATIONAL on the propgrp.com deployment. Left unset it
- * means Lebanon, so the existing site behaves exactly as it does today.
- */
-export function siteScope(): SiteScope {
+/** Hosts that serve the international site, for the Origin/Referer fallback. */
+function internationalHosts(): string[] {
+  return (process.env.INTERNATIONAL_ORIGINS ?? 'propgrp.com')
+    .split(',')
+    .map((h) => h.trim().toLowerCase().replace(/^https?:\/\//, '').replace(/\/.*$/, ''))
+    .filter(Boolean);
+}
+
+/** Fallback for requests that declare nothing at all. */
+export function defaultScope(): SiteScope {
   return (process.env.SITE_SCOPE ?? '').toUpperCase() === 'INTERNATIONAL'
     ? 'INTERNATIONAL'
     : 'LEBANON';
 }
 
 /**
- * A Prisma `country` filter for a public request, or undefined for everything.
+ * Which site is asking.
  *
- * `?country=` targets one country and `?country=all` lifts the scope for the
- * admin — which is the whole point of a single back office. Anything
- * unrecognised falls back to this site's own scope rather than leaking the
- * other market's stock.
+ * Checked in order of reliability:
+ *
+ *  1. `X-Site-Scope` header — the contract for the other frontend. Works from a
+ *     browser *and* from its server-side rendering, which is the case an
+ *     Origin-only scheme gets wrong: a Next.js server fetch sends no Origin.
+ *  2. Origin / Referer — covers a browser call where nobody set the header.
+ *  3. SITE_SCOPE env — the last resort, and correct when a deployment really
+ *     does serve one market.
+ */
+export function requestScope(req: Request): SiteScope {
+  const declared = String(req.get('x-site-scope') ?? '').toUpperCase();
+  if (declared === 'INTERNATIONAL' || declared === 'LEBANON') return declared;
+
+  const origin = req.get('origin') ?? req.get('referer') ?? '';
+  if (origin) {
+    const host = origin.toLowerCase().replace(/^https?:\/\//, '').replace(/[/:].*$/, '');
+    if (internationalHosts().some((h) => host === h || host.endsWith(`.${h}`))) {
+      return 'INTERNATIONAL';
+    }
+  }
+
+  return defaultScope();
+}
+
+/**
+ * The Prisma `country` filter for a public request, or undefined for everything.
+ *
+ * `?country=` targets one country and `?country=all` lifts the scope, which is
+ * what the shared admin uses.
  */
 export function publicCountryFilter(
   req: Request
@@ -50,12 +79,12 @@ export function publicCountryFilter(
   if ((COUNTRIES as readonly string[]).includes(asked)) return asked as MarketCountry;
 
   // One back office for both markets: a signed-in admin sees everything unless
-  // they narrow it themselves. Scoping the admin to this deployment's country
-  // is what hid the imported Georgian stock from /admin/buildings, and every
-  // future admin screen would have had to remember to opt out.
+  // they narrow it themselves. Scoping the admin to a single country is what
+  // hid imported Georgian stock from /admin/buildings, and every future admin
+  // screen would have had to remember to opt out.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const role = (req as any).user?.role;
   if (role && ['ADMIN', 'SUPER_ADMIN', 'CRM_MANAGER'].includes(role)) return undefined;
 
-  return siteScope() === 'INTERNATIONAL' ? { not: 'LEBANON' } : 'LEBANON';
+  return requestScope(req) === 'INTERNATIONAL' ? { not: 'LEBANON' } : 'LEBANON';
 }

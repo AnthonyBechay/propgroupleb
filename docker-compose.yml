@@ -43,12 +43,16 @@ services:
       RESEND_API_KEY: ${RESEND_API_KEY:-}
       FROM_EMAIL: ${FROM_EMAIL:-}
       ADMIN_EMAIL: ${ADMIN_EMAIL:-}
-      # SITE_SCOPE — which market this deployment's PUBLIC pages serve.
-      #   unset / LEBANON   propgrouplb.com — Lebanese property only
-      #   INTERNATIONAL     propgrp.com — everything that isn't Lebanon
-      # The admin always sees both regardless; this only scopes public listings,
-      # so leaving it unset keeps propgrouplb.com behaving exactly as it does.
+      # Market scope is resolved PER REQUEST, not from this variable — both
+      # frontends call this one backend, so a process-wide value would be wrong
+      # for one of them. propgrp.com identifies itself with an
+      # `X-Site-Scope: INTERNATIONAL` header (or a matching Origin).
+      #
+      # SITE_SCOPE is only the fallback for a request that declares nothing.
       SITE_SCOPE: ${SITE_SCOPE:-LEBANON}
+      # Hosts treated as the international site when a request has no header
+      # but does have an Origin. Comma-separated, no scheme.
+      INTERNATIONAL_ORIGINS: ${INTERNATIONAL_ORIGINS:-propgrp.com}
       # SESSION_DAYS — how long a login lasts before re-authentication.
       SESSION_DAYS: ${SESSION_DAYS:-14}
     volumes:

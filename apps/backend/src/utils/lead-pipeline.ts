@@ -27,17 +27,29 @@ export function deriveLeadStatus(
   currentStatus: string,
   opportunities: Array<{ stage: string }>,
 ): string | null {
-  // Terminal relationship states are the team's call, not ours.
-  if (['WON', 'LOST', 'ARCHIVED'].includes(currentStatus)) return null;
-
   const stages = opportunities.map((o) => o.stage);
+  const hasLive = stages.some((s) => LIVE_STAGES.includes(s as OpportunityStage));
 
-  if (stages.includes('WON')) return 'WON';
+  // Terminal states are the team's call, not ours — with one exception. A past
+  // client who comes back is the whole point of keeping them: shortlisting
+  // something new for them is a deliberate act, and leaving them filed under
+  // "past client" while a live deal runs would hide the work. ARCHIVED is
+  // excluded because parking someone is itself deliberate.
+  if (currentStatus === 'WON' || currentStatus === 'LOST') {
+    return hasLive ? 'ACTIVE' : null;
+  }
+  if (currentStatus === 'ARCHIVED') return null;
+
+  // A live deal outranks a historical win. Someone viewing their second
+  // property is not a past client, whatever they bought last year — and
+  // checking WON first hid exactly that: the board filed them under
+  // "bought / sold" while a viewing was booked for tomorrow.
   if (stages.includes('OFFER_MADE') || stages.includes('INTERESTED')) return 'NEGOTIATING';
   if (stages.includes('VIEWING_BOOKED')) return 'VIEWING';
+  if (hasLive) return 'ACTIVE';
 
-  // Anything else in flight (shared, viewed-awaiting-feedback) = actively working.
-  if (stages.some((s) => LIVE_STAGES.includes(s as OpportunityStage))) return 'ACTIVE';
+  // Nothing in flight, but they closed something: they're a past client.
+  if (stages.includes('WON')) return 'WON';
 
   // No live deals. A client we've already engaged goes back to searching rather
   // than sitting in a stage that no longer reflects anything.
