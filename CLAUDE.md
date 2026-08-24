@@ -108,6 +108,13 @@ Vocabulary rules, learned the hard way:
   we broker stock, we don't own it. Which apartment a client actually got is
   recorded on the deal (`LeadOpportunity.soldUnitRef`).
 
+- **`Lead.market` is a preference, not a wall.** It ranks a client's matches;
+  it never hides the other market. A Georgian investor asking about a Beirut
+  apartment is an ordinary conversation, and the CRM used to make it
+  impossible — `/matches` filtered candidates by the client's market, so no
+  Lebanese property could ever be shortlisted for them. Narrowing is now
+  explicit and per-request (`?country=`).
+
 Matching (`apps/backend/src/utils/lead-matching.ts`) scores on independent
 criteria, but some misses are **fatal** rather than weighted: a different
 property family, the wrong deal type, 2+ bedrooms short, or >50% over budget.
@@ -213,6 +220,7 @@ When generating new share links, always go through the `ShareToken` table. Don't
 - ❌ Reference `docs/` or `COOLIFY_DEPLOYMENT.md` — both deleted.
 - ❌ Write a data migration as SQL only — deployment uses `db push` and will never run it. Add a `once(...)` step in `utils/crm-bootstrap.ts`.
 - ❌ Scope an admin query to one market. Admins see every country; only public pages are scoped.
+- ❌ Filter a client's matches by their `market`. It ranks, it doesn't exclude.
 - ❌ Add a fifth client "type". The four intents are fixed; anything else is a flag on the client.
 - ❌ Put a deal stage on the client. Viewing/negotiating belong to the opportunity — a client can be at different stages on different properties.
 - ❌ Assume a `Building`'s local `buildingSchema` in `routes/buildings.ts` is the shared one in `schemas/index.ts`. It shadows it; adding a field to the wrong one fails silently.

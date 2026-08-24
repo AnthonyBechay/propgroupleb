@@ -107,7 +107,17 @@ export function LeadFormModal({ lead, onClose, onSaved }: { lead?: Lead; onClose
     }
   }
 
-  const inp = 'w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-slate-900/10'
+  /** A titled group of fields. The form was one flat wall of twenty inputs. */
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <section className="space-y-3">
+      <h3 className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">{title}</h3>
+      {children}
+    </section>
+  )
+}
+
+const inp = 'w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-slate-900/10'
   const lbl = 'block text-xs font-medium text-slate-500 mb-1'
 
   return (
@@ -129,8 +139,34 @@ export function LeadFormModal({ lead, onClose, onSaved }: { lead?: Lead; onClose
         <div className="p-5 space-y-4 overflow-y-auto flex-1">
           {error && <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-3 py-2">{error}</div>}
 
+          <Section title="Who they are">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="sm:col-span-1">
+                <label className={lbl}>Client name *</label>
+                <input value={f.name} onChange={(e) => set('name', e.target.value)} className={inp} placeholder="e.g. Pierre Bassil" required />
+              </div>
+              <div>
+                <label className={lbl}>Phone</label>
+                <input value={f.phone} onChange={(e) => set('phone', e.target.value)} className={inp} placeholder="03212385" />
+              </div>
+              <div>
+                <label className={lbl}>Email</label>
+                <input type="email" value={f.email} onChange={(e) => set('email', e.target.value)} className={inp} placeholder="optional" />
+              </div>
+            </div>
+            <div>
+              <label className={lbl}>WhatsApp</label>
+              <input
+                value={f.whatsapp}
+                onChange={(e) => set('whatsapp', e.target.value)}
+                className={inp}
+                placeholder="Leave blank to use the phone number"
+              />
+            </div>
+          </Section>
+
           {/* Who is this? — the two choices that reshape the rest of the form */}
-          <div className="space-y-3">
+          <Section title="What they're after">
             <div>
               <label className={lbl}>Client type</label>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
@@ -168,7 +204,7 @@ export function LeadFormModal({ lead, onClose, onSaved }: { lead?: Lead; onClose
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div>
-                <label className={lbl}>Market</label>
+                <label className={lbl}>Mainly looking in</label>
                 <select
                   value={f.market}
                   onChange={(e) => setF((p) => ({ ...p, market: e.target.value as Market, regions: [], areas: [] }))}
@@ -177,20 +213,13 @@ export function LeadFormModal({ lead, onClose, onSaved }: { lead?: Lead; onClose
                   <option value="LEBANON">🇱🇧 Lebanon</option>
                   <option value="GEORGIA">🇬🇪 Georgia</option>
                 </select>
+                {/* It ranks matches; it never hides the other market's stock. */}
+                <p className="text-[11px] text-slate-400 mt-1">
+                  Ranks their matches first — you can still show them either market.
+                </p>
               </div>
-              <div>
-                <label className={lbl}>Status</label>
-                <select value={f.status} onChange={(e) => set('status', e.target.value)} className={inp}>
-                  <option value="ACTIVE">Active</option>
-                  <option value="VIEWING">Viewing</option>
-                  <option value="NEGOTIATING">Negotiating</option>
-                  <option value="WON">Won</option>
-                  <option value="LOST">Lost</option>
-                  <option value="ARCHIVED">Archived</option>
-                </select>
-              </div>
-              <div>
-                <label className={lbl}>Source</label>
+              <div className="sm:col-span-2">
+                <label className={lbl}>Where they came from</label>
                 <select value={f.source} onChange={(e) => set('source', e.target.value)} className={inp}>
                   <option value="MANUAL">Manual</option>
                   <option value="PHONE">Phone</option>
@@ -203,43 +232,6 @@ export function LeadFormModal({ lead, onClose, onSaved }: { lead?: Lead; onClose
                 </select>
               </div>
             </div>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <div className="sm:col-span-1">
-              <label className={lbl}>Client name *</label>
-              <input value={f.name} onChange={(e) => set('name', e.target.value)} className={inp} placeholder="e.g. Pierre Bassil" required />
-            </div>
-            <div>
-              <label className={lbl}>Phone</label>
-              <input value={f.phone} onChange={(e) => set('phone', e.target.value)} className={inp} placeholder="03212385" />
-            </div>
-            <div>
-              <label className={lbl}>Email</label>
-              <input type="email" value={f.email} onChange={(e) => set('email', e.target.value)} className={inp} placeholder="optional" />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label className={lbl}>WhatsApp</label>
-              <input
-                value={f.whatsapp}
-                onChange={(e) => set('whatsapp', e.target.value)}
-                className={inp}
-                placeholder="Leave blank to use the phone number"
-              />
-            </div>
-            <div>
-              <label className={lbl}>Waiting on</label>
-              <select value={f.subStatus} onChange={(e) => set('subStatus', e.target.value)} className={inp}>
-                <option value="">Not set</option>
-                {subStatusesFor(f.type as LeadType).map((k) => (
-                  <option key={k} value={k}>{SUB_STATUS_META[k].label}</option>
-                ))}
-              </select>
-            </div>
-          </div>
 
           <div>
             <label className={lbl}>Asking for</label>
@@ -335,7 +327,37 @@ export function LeadFormModal({ lead, onClose, onSaved }: { lead?: Lead; onClose
             </div>
           )}
 
-          <div className="grid grid-cols-2 gap-3">
+          </Section>
+
+          <Section title="Where things stand">
+            <div>
+              <label className={lbl}>Relationship</label>
+              <select value={f.status} onChange={(e) => set('status', e.target.value)} className={inp}>
+                <option value="ACTIVE">Active — working with them</option>
+                <option value="VIEWING">Viewing</option>
+                <option value="NEGOTIATING">Negotiating</option>
+                <option value="WON">Past client — has bought or sold with us</option>
+                <option value="LOST">Went elsewhere</option>
+                <option value="ARCHIVED">Parked — don't surface them for now</option>
+              </select>
+              {/* The board derives this from live deals; setting it by hand is
+                  the exception, so say what it actually means. */}
+              <p className="text-[11px] text-slate-400 mt-1">
+                Usually set for you by their deals. A live deal makes them Active again.
+              </p>
+            </div>
+
+            <div>
+              <label className={lbl}>Waiting on</label>
+              <select value={f.subStatus} onChange={(e) => set('subStatus', e.target.value)} className={inp}>
+                <option value="">Not set</option>
+                {subStatusesFor(f.type as LeadType).map((k) => (
+                  <option key={k} value={k}>{SUB_STATUS_META[k].label}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
             <div>
               <label className={lbl}>Last contact</label>
               <input type="date" value={f.lastContactAt} onChange={(e) => set('lastContactAt', e.target.value)} className={inp} />
@@ -363,6 +385,7 @@ export function LeadFormModal({ lead, onClose, onSaved }: { lead?: Lead; onClose
               placeholder="e.g. Need an apartment in Achrafieh, max $250k, ready to move fast"
             />
           </div>
+          </Section>
         </div>
 
         <div className="px-5 py-4 border-t border-slate-100 flex justify-end gap-2 shrink-0">

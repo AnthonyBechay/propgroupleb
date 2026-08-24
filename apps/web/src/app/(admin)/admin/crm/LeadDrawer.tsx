@@ -23,7 +23,7 @@ import { ShareShortlistModal } from './ShareShortlistModal'
 import { useAuth } from '@/contexts/AuthContext'
 import { listingRef } from '@/lib/reference'
 
-type TabKey = 'overview' | 'activity' | 'deals' | 'matches'
+type TabKey = 'overview' | 'properties' | 'activity' | 'matches'
 
 /**
  * The drawer holds requirements, the conversation, the client's stock, live
@@ -32,9 +32,13 @@ type TabKey = 'overview' | 'activity' | 'deals' | 'matches'
  */
 const TABS: Array<{ key: TabKey; label: string }> = [
   { key: 'overview', label: 'Overview' },
+  // Everything property-shaped about this client in one place: what they're
+  // considering, what they viewed, and what they ended up buying. Splitting the
+  // shortlist into a "Matches" tab meant "Properties & deals" showed no
+  // properties at all.
+  { key: 'properties', label: 'Properties' },
   { key: 'activity', label: 'Activity' },
-  { key: 'deals', label: 'Properties & deals' },
-  { key: 'matches', label: 'Matches' },
+  { key: 'matches', label: 'Find matches' },
 ]
 
 /** Date presets, as an <input type="date"> value. */
@@ -389,8 +393,8 @@ export function LeadDrawer({ lead, onClose, onChanged }: { lead: Lead; onClose: 
                 }`}
               >
                 {t.label}
-                {t.key === 'deals' && (l.properties?.length ?? 0) > 0 && (
-                  <span className="ml-1 text-slate-400 font-normal">({l.properties!.length})</span>
+                {t.key === 'properties' && (l.opportunities?.length ?? 0) > 0 && (
+                  <span className="ml-1 text-slate-400 font-normal">({l.opportunities!.length})</span>
                 )}
                 {t.key === 'matches' && strongMatches.length > 0 && (
                   <span className="ml-1 text-emerald-600 font-normal">({strongMatches.length})</span>
@@ -603,70 +607,7 @@ export function LeadDrawer({ lead, onClose, onChanged }: { lead: Lead; onClose: 
           </>
           )}
 
-          {tab === 'deals' && (
-          <>
-          <DealPanel lead={l} canSeeMoney={canSeeMoney} onChanged={() => { load(); onChanged() }} />
-
-          {isSupply && (
-            <SellerProperties
-              leadId={l.id}
-              properties={l.properties ?? []}
-              onChanged={() => { load(); onChanged() }}
-            />
-          )}
-
-          {!isSupply && (
-            <section className="bg-white border border-slate-200 rounded-xl p-4">
-              <div className="flex items-center justify-between gap-2">
-                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide flex items-center gap-1.5">
-                  <Globe className="h-3.5 w-3.5" /> Bought elsewhere
-                </p>
-                <button
-                  onClick={() => setShowExternal((v) => !v)}
-                  className="inline-flex items-center gap-1 text-xs font-medium text-slate-600 hover:text-slate-900"
-                >
-                  <Plus className="h-3.5 w-3.5" /> Add
-                </button>
-              </div>
-              <p className="text-[11px] text-slate-400 mt-1">
-                A property we don&apos;t list — a Batumi studio on propgrp.com, another agency&apos;s
-                stock. Track it here so the deal and the commission still count.
-              </p>
-              {showExternal && (
-                <div className="mt-2 space-y-2">
-                  <input
-                    value={extTitle}
-                    onChange={(e) => setExtTitle(e.target.value)}
-                    placeholder="Studio, Orbi City Batumi"
-                    className="w-full px-2 py-1.5 border border-slate-200 rounded-lg text-sm"
-                  />
-                  <input
-                    value={extUrl}
-                    onChange={(e) => setExtUrl(e.target.value)}
-                    placeholder="https://propgrp.com/… (optional)"
-                    className="w-full px-2 py-1.5 border border-slate-200 rounded-lg text-sm"
-                  />
-                  <div className="flex justify-end gap-2">
-                    <button onClick={() => setShowExternal(false)} className="px-3 py-1.5 text-xs text-slate-600 rounded hover:bg-slate-100">
-                      Cancel
-                    </button>
-                    <button
-                      onClick={addExternal}
-                      disabled={busy || !extTitle.trim()}
-                      className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-semibold text-white bg-slate-800 rounded hover:bg-slate-700 disabled:opacity-50"
-                    >
-                      {busy && <Loader2 className="h-3.5 w-3.5 animate-spin" />} Track it
-                    </button>
-                  </div>
-                </div>
-              )}
-            </section>
-          )}
-
-          </>
-          )}
-
-          {tab === 'matches' && (
+          {tab === 'properties' && (
           <>
           {/* What we've shown them, and how it went */}
           <section className="bg-white border border-slate-200 rounded-xl p-4">
@@ -713,6 +654,22 @@ export function LeadDrawer({ lead, onClose, onChanged }: { lead: Lead; onClose: 
             />
           </section>
 
+          <DealPanel lead={l} canSeeMoney={canSeeMoney} onChanged={() => { load(); onChanged() }} />
+
+          {isSupply && (
+            <SellerProperties
+              leadId={l.id}
+              properties={l.properties ?? []}
+              onChanged={() => { load(); onChanged() }}
+            />
+          )}
+
+
+          </>
+          )}
+
+          {tab === 'matches' && (
+          <>
           {/* Client-to-client common ground */}
           <section className="bg-white border border-slate-200 rounded-xl p-4">
             <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3 flex items-center gap-1.5">

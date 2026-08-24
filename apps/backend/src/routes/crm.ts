@@ -830,10 +830,15 @@ router.get(
     // Georgia investors are matched against the investment catalogue rather
     // than this site's listings — that stock lives on propgrp.com, but the CRM
     // still has to be able to answer "what can I offer this client".
-    // Georgia stock now lives in this database like everything else, so the
-    // only difference is which country we look in. The separate catalogue is
-    // kept as a fallback for projects nobody has listed here yet.
-    const marketCountry = lead.market === 'GEORGIA' ? { not: 'LEBANON' } : 'LEBANON';
+    // A client's market is a preference, not a wall. A Georgian investor who
+    // asks about a Beirut apartment is an ordinary conversation, and refusing
+    // to show it because of a field on their record is the CRM getting in the
+    // way. `?country=` narrows deliberately; otherwise everything is eligible
+    // and their own market simply ranks first.
+    const askedCountry = String(req.query.country ?? '').toUpperCase();
+    const narrowTo = ['LEBANON', 'GEORGIA', 'CYPRUS', 'GREECE'].includes(askedCountry)
+      ? askedCountry
+      : null;
 
     // Never re-suggest something this client has already been shown or ruled
     // out — that's the whole point of tracking opportunities.
@@ -850,10 +855,14 @@ router.get(
     const where: Record<string, any> = {
       status: 'ACTIVE',
       visibility: 'PUBLIC',
-      OR: [
-        { building: { country: marketCountry } },
-        { unit: { building: { country: marketCountry } } },
-      ],
+      ...(narrowTo
+        ? {
+            OR: [
+              { building: { country: narrowTo as never } },
+              { unit: { building: { country: narrowTo as never } } },
+            ],
+          }
+        : {}),
     };
     if (seenIds.length) where.id = { notIn: seenIds };
 
@@ -877,10 +886,20 @@ router.get(
     });
 
     const MIN_SCORE = Number(req.query.minScore ?? MATCH_MIN_SCORE);
+    // Their own market ranks first on a tie, but never excludes the other.
+    const homeCountry = lead.market === 'GEORGIA' ? null : 'LEBANON';
+    const sameMarket = (l: any) => {
+      const c = l.building?.country ?? l.unit?.building?.country ?? 'LEBANON';
+      return homeCountry ? c === homeCountry : c !== 'LEBANON';
+    };
+
     const scored = candidates
       .map((listing) => ({ listing, match: matchListingToLead(lead, listing) }))
       .filter((r) => r.match.score >= MIN_SCORE)
-      .sort((a, b) => b.match.score - a.match.score)
+      .sort((a, b) =>
+        b.match.score - a.match.score ||
+        Number(sameMarket(b.listing)) - Number(sameMarket(a.listing))
+      )
       .slice(0, 20);
 
     sendSuccess(res, scored);

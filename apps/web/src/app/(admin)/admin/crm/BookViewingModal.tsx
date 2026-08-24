@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { X, Loader2, CalendarCheck, Building2, Handshake, Search, Check } from 'lucide-react'
 import { normalizeApiUrl } from '@/lib/utils/api-url'
+import { countryFlag } from '@/lib/market'
 import { type Lead, type Opportunity, isSupplyType, LIVE_STAGES } from './types'
 
 /**
@@ -24,6 +25,8 @@ interface Candidate {
   subtitle: string | null
   ref?: string | null
   score?: number | null
+  /** Which market it sits in — both are offered now, so it has to be visible. */
+  country?: string | null
   /** Present when this pairing already exists as an opportunity. */
   opportunityId?: string
   alreadyBooked?: boolean
@@ -110,6 +113,7 @@ export function BookViewingModal({
               title: li.headline || b?.title || 'Property',
               subtitle: [b?.city, b?.caza].filter(Boolean).join(', ') || null,
               ref: li.unit?.ref ?? li.building?.ref ?? null,
+              country: b?.country ?? null,
               score: r.match?.score ?? null,
             }
           })
@@ -236,6 +240,7 @@ export function BookViewingModal({
                           ? <Handshake className="h-3.5 w-3.5 text-slate-400 shrink-0" />
                           : <Building2 className="h-3.5 w-3.5 text-slate-400 shrink-0" />}
                         {c.ref && <span className="font-mono text-[10px] font-semibold text-slate-500 shrink-0">{c.ref}</span>}
+                        {c.country && <span className="text-[11px] shrink-0">{countryFlag(c.country)}</span>}
                         <span className="text-sm font-medium text-slate-900 truncate">{c.title}</span>
                         {c.score != null && (
                           <span className="ml-auto shrink-0 text-[10px] font-bold text-slate-400">{c.score}%</span>
