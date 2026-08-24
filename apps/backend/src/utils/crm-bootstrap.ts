@@ -82,6 +82,18 @@ export async function normaliseCrmData(): Promise<void> {
     return `${count} international units flagged as repeatable types`;
   });
 
+  // An investor is a buyer with a motive, not a fifth kind of client. `db push`
+  // creates the column but never runs a migration's UPDATE, so the fold happens
+  // here. The INVESTOR enum value stays — Postgres can't drop one — but nothing
+  // offers it any more.
+  await once('crm_investor_is_a_flag_v1', async () => {
+    const { count } = await prisma.lead.updateMany({
+      where: { type: 'INVESTOR' as never },
+      data: { type: 'BUYER' as never, isInvestor: true },
+    });
+    return `${count} investors folded into buyers`;
+  });
+
   // Follow-up dates used to be invented from a 7-day cadence, so every imported
   // client showed up overdue on day one and the team stopped reading the badge.
   // Clear the invented ones; from here on a date only exists if someone set it.

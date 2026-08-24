@@ -43,6 +43,8 @@ const CHANNELS = ['CALL', 'WHATSAPP', 'EMAIL', 'MEETING', 'VIEWING', 'NOTE'] as 
 const leadSchema = z.object({
   market: z.enum(MARKETS).default('LEBANON'),
   type: z.enum(LEAD_TYPES).default('BUYER'),
+  // An investor is a buyer with a different motive, not a fifth type.
+  isInvestor: z.boolean().optional(),
   status: z.enum(LEAD_STATUSES).default('ACTIVE'),
   subStatus: z.enum(SUB_STATUSES).optional().nullable(),
   source: z.enum(LEAD_SOURCES).default('MANUAL'),
@@ -81,6 +83,7 @@ function toLeadData(data: z.infer<typeof leadSchema>): Record<string, any> {
   return {
     market: data.market,
     type: data.type,
+    isInvestor: data.isInvestor ?? false,
     status: data.status,
     source: data.source,
     name: data.name.trim(),

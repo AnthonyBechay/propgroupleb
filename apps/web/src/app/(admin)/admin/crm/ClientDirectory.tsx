@@ -7,7 +7,7 @@ import {
 } from 'lucide-react'
 import {
   type Lead, type LeadType, TYPE_LABELS, TYPE_META, STATUS_META,
-  formatLastContact, isSupplyType,
+  formatLastContact, isSupplyType, isPastClient,
 } from './types'
 import { countryFlag } from '@/lib/market'
 
@@ -30,7 +30,8 @@ export function ClientDirectory({
 }) {
   const [q, setQ] = useState('')
   const [side, setSide] = useState<'all' | 'demand' | 'supply'>('all')
-  const [onlyClosed, setOnlyClosed] = useState(false)
+  // Working with them now, or someone who already bought? Two different jobs.
+  const [group, setGroup] = useState<'active' | 'past' | 'all'>('active')
 
   const rows = useMemo(() => {
     const needle = q.trim().toLowerCase()
@@ -40,7 +41,10 @@ export function ClientDirectory({
           const supply = isSupplyType(l.type)
           if (side === 'supply' ? !supply : supply) return false
         }
-        if (onlyClosed && (l.deals?.length ?? 0) + (l.soldProperties?.length ?? 0) === 0) return false
+        if (group !== 'all') {
+          const past = isPastClient(l)
+          if (group === 'past' ? !past : past) return false
+        }
         if (!needle) return true
         // Searching a directory means name, number, area, or what they wanted.
         return [
@@ -52,11 +56,10 @@ export function ClientDirectory({
           .some((v) => String(v).toLowerCase().includes(needle))
       })
       .sort((a, b) => a.name.localeCompare(b.name))
-  }, [leads, q, side, onlyClosed])
+  }, [leads, q, side, group])
 
-  const closedCount = leads.filter(
-    (l) => (l.deals?.length ?? 0) + (l.soldProperties?.length ?? 0) > 0
-  ).length
+  const pastCount = leads.filter(isPastClient).length
+  const activeCount = leads.length - pastCount
 
   return (
     <div className="space-y-3">
@@ -74,9 +77,9 @@ export function ClientDirectory({
 
         <div className="flex gap-1 bg-slate-100 rounded-lg p-1">
           {([
-            ['all', `Everyone (${leads.length})`],
-            ['demand', 'Buyers'],
-            ['supply', 'Sellers'],
+            ['all', 'Any intent'],
+            ['demand', 'Buying / renting'],
+            ['supply', 'Selling / letting'],
           ] as const).map(([v, label]) => (
             <button
               key={v}
@@ -90,23 +93,36 @@ export function ClientDirectory({
           ))}
         </div>
 
-        <button
-          onClick={() => setOnlyClosed((v) => !v)}
-          className={`inline-flex items-center gap-1.5 h-9 px-3 rounded-lg text-sm font-medium border transition-colors ${
-            onlyClosed
-              ? 'bg-emerald-600 text-white border-emerald-600'
-              : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
-          }`}
-        >
-          <CheckCircle2 className="h-4 w-4" /> Bought or sold ({closedCount})
-        </button>
+        {/* The primary split: people you're working with vs people who already
+            bought. Mixing them is what made everyone look "active". */}
+        <div className="flex gap-1 bg-slate-100 rounded-lg p-1">
+          {([
+            ['active', `Working with (${activeCount})`],
+            ['past', `Past clients (${pastCount})`],
+            ['all', 'Everyone'],
+          ] as const).map(([v, label]) => (
+            <button
+              key={v}
+              onClick={() => setGroup(v)}
+              className={`px-2.5 py-1.5 rounded-md text-sm font-medium transition-all ${
+                group === v ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {rows.length === 0 ? (
         <div className="bg-white border border-slate-200 rounded-xl p-16 text-center">
           <Users className="h-10 w-10 mx-auto text-slate-200 mb-2" />
           <p className="text-sm text-slate-500">
-            {q ? `Nobody matches “${q}”.` : 'No clients yet.'}
+            {q
+            ? `Nobody matches “${q}”.`
+            : group === 'past'
+              ? 'Nobody has bought or sold with you yet.'
+              : 'No active clients.'}
           </p>
         </div>
       ) : (
@@ -145,6 +161,11 @@ function ClientRow({
             <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${TYPE_META[l.type].chip}`}>
               {TYPE_LABELS[l.type as LeadType]}
             </span>
+            {l.isInvestor && (
+              <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-700 border border-indigo-200">
+                Investor
+              </span>
+            )}
             <span className="text-[11px]">{countryFlag(l.market === 'GEORGIA' ? 'GEORGIA' : 'LEBANON')}</span>
             <span className={`text-[10px] px-1.5 py-0.5 rounded ${STATUS_META[l.status].cls}`}>
               {STATUS_META[l.status].label}

@@ -145,6 +145,8 @@ export interface Lead {
   type: LeadType
   status: LeadStatus
   subStatus: LeadSubStatus | null
+  /** A buyer chasing yield rather than a home. */
+  isInvestor?: boolean
   source: LeadSource
   name: string
   phone: string | null
@@ -269,7 +271,11 @@ export const BOARD_COLUMNS: BoardColumn[] = [
   },
   { key: 'VIEWING', label: 'Viewing', status: 'VIEWING', hint: 'Viewing booked', accent: 'bg-violet-500' },
   { key: 'NEGOTIATING', label: 'Negotiating', status: 'NEGOTIATING', hint: 'Offer on the table', accent: 'bg-amber-600' },
-  { key: 'WON', label: 'Won', status: 'WON', hint: `Closed in the last ${WON_WINDOW_MONTHS} months`, accent: 'bg-green-600' },
+  {
+    key: 'WON', label: 'Bought / sold', status: 'WON',
+    hint: `Closed in the last ${WON_WINDOW_MONTHS} months — then they move to Past clients`,
+    accent: 'bg-slate-800',
+  },
 ]
 
 /** Which column a lead belongs in. */
@@ -287,19 +293,47 @@ export function acceptsDrop(column: BoardColumn, lead: Lead): boolean {
   return column.side === (isSupplyType(lead.type) ? 'supply' : 'demand')
 }
 
+/**
+ * How a client reads on screen.
+ *
+ * The labels describe a *relationship*, not a deal. "Won" is what you say
+ * about a transaction; about a person you say they're a client — someone who
+ * bought or sold with you and is worth keeping in touch with. Viewing and
+ * Negotiating describe where one specific deal has got to, which is why they
+ * live on the deal and only surface on the board.
+ */
 export const STATUS_META: Record<LeadStatus, { label: string; cls: string }> = {
-  NEW:         { label: 'New',         cls: 'bg-sky-100 text-sky-700' },
-  ACTIVE:      { label: 'Active',      cls: 'bg-emerald-100 text-emerald-700' },
-  VIEWING:     { label: 'Viewing',     cls: 'bg-violet-100 text-violet-700' },
-  NEGOTIATING: { label: 'Negotiating', cls: 'bg-amber-100 text-amber-800' },
-  WON:         { label: 'Won',         cls: 'bg-green-600 text-white' },
-  LOST:        { label: 'Lost',        cls: 'bg-red-100 text-red-600' },
-  ARCHIVED:    { label: 'Archived',    cls: 'bg-slate-100 text-slate-500' },
+  NEW:         { label: 'Active',       cls: 'bg-emerald-100 text-emerald-700' },
+  ACTIVE:      { label: 'Active',       cls: 'bg-emerald-100 text-emerald-700' },
+  VIEWING:     { label: 'Viewing',      cls: 'bg-violet-100 text-violet-700' },
+  NEGOTIATING: { label: 'Negotiating',  cls: 'bg-amber-100 text-amber-800' },
+  WON:         { label: 'Past client',  cls: 'bg-slate-800 text-white' },
+  LOST:        { label: 'Went elsewhere', cls: 'bg-red-50 text-red-600' },
+  ARCHIVED:    { label: 'Parked',       cls: 'bg-slate-100 text-slate-500' },
 }
 
-export const TYPE_LABELS: Record<LeadType, string> = {
-  BUYER: 'Buyer', SELLER: 'Seller', RENTER: 'Renter', LANDLORD: 'Landlord', INVESTOR: 'Investor',
+/** Has this client already bought or sold with us? */
+export function isPastClient(lead: Lead): boolean {
+  return lead.status === 'WON'
+    || (lead.deals?.length ?? 0) > 0
+    || (lead.soldProperties?.length ?? 0) > 0
 }
+
+/**
+ * The four things a client can be here to do. Anything else is detail about
+ * them, not a category beside these — an investor is a buyer with a motive.
+ */
+export const TYPE_LABELS: Record<LeadType, string> = {
+  BUYER: 'Buying',
+  SELLER: 'Selling',
+  RENTER: 'Looking to rent',
+  LANDLORD: 'Renting out',
+  // Legacy: existing rows were migrated to BUYER + isInvestor.
+  INVESTOR: 'Buying',
+}
+
+/** The four intents offered in forms and filters. */
+export const INTENT_TYPES: LeadType[] = ['BUYER', 'SELLER', 'RENTER', 'LANDLORD']
 
 /** Clients who HAVE a property to offer (supply side). */
 export const SUPPLY_TYPES: LeadType[] = ['SELLER', 'LANDLORD']
@@ -372,14 +406,21 @@ export function formatPlanned(iso: string | null): { text: string; due: boolean 
   return { text: new Date(iso as string).toLocaleDateString(undefined, { day: 'numeric', month: 'short' }), due: false }
 }
 
+/**
+ * Why an active client hasn't closed yet.
+ *
+ * Deliberately short. Eight options meant nobody set one; the four that
+ * actually change what you do next are kept, and the rest belong in a note.
+ */
 export const SUB_STATUS_META: Record<LeadSubStatus, { label: string; cls: string; forSide?: 'supply' | 'demand' }> = {
-  SEARCHING:       { label: 'Searching',        cls: 'bg-sky-50 text-sky-700 border-sky-200' },
-  AWAITING_REPLY:  { label: 'Awaiting reply',   cls: 'bg-slate-100 text-slate-600 border-slate-200' },
-  NEEDS_OPTIONS:   { label: 'Needs new options',cls: 'bg-indigo-50 text-indigo-700 border-indigo-200' },
-  BUDGET_MISMATCH: { label: 'Budget too low',   cls: 'bg-rose-50 text-rose-700 border-rose-200' },
-  FINANCING:       { label: 'Arranging finance',cls: 'bg-violet-50 text-violet-700 border-violet-200' },
-  PAUSED:          { label: 'Paused',           cls: 'bg-slate-100 text-slate-500 border-slate-200' },
-  DOCS_PENDING:    { label: 'Waiting on papers',cls: 'bg-amber-50 text-amber-800 border-amber-200', forSide: 'supply' },
+  SEARCHING:       { label: 'Still looking',     cls: 'bg-sky-50 text-sky-700 border-sky-200' },
+  AWAITING_REPLY:  { label: 'Waiting on them',   cls: 'bg-slate-100 text-slate-600 border-slate-200' },
+  NEEDS_OPTIONS:   { label: 'Needs new options', cls: 'bg-indigo-50 text-indigo-700 border-indigo-200' },
+  PAUSED:          { label: 'Paused',            cls: 'bg-slate-100 text-slate-500 border-slate-200' },
+  // Kept so existing rows still render, but no longer offered.
+  BUDGET_MISMATCH: { label: 'Budget too low',    cls: 'bg-rose-50 text-rose-700 border-rose-200' },
+  FINANCING:       { label: 'Arranging finance', cls: 'bg-violet-50 text-violet-700 border-violet-200' },
+  DOCS_PENDING:    { label: 'Waiting on papers', cls: 'bg-amber-50 text-amber-800 border-amber-200', forSide: 'supply' },
   PRICE_REVIEW:    { label: 'Price needs review',cls: 'bg-orange-50 text-orange-800 border-orange-200', forSide: 'supply' },
 }
 
@@ -388,8 +429,7 @@ export const SUB_STATUS_META: Record<LeadSubStatus, { label: string; cls: string
  * means "everything we showed him is ruled out", which only his shortlist can
  * establish, so the server sets and clears it.
  */
-export const MANUAL_SUB_STATUSES = (Object.keys(SUB_STATUS_META) as LeadSubStatus[])
-  .filter((k) => k !== 'NEEDS_OPTIONS')
+export const MANUAL_SUB_STATUSES: LeadSubStatus[] = ['SEARCHING', 'AWAITING_REPLY', 'PAUSED']
 
 /** Sub-statuses worth offering for this client's side of the deal. */
 export function subStatusesFor(type: LeadType): LeadSubStatus[] {

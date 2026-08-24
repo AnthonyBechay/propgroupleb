@@ -5,7 +5,7 @@ import { X, Loader2, Save } from 'lucide-react'
 import { normalizeApiUrl } from '@/lib/utils/api-url'
 import {
   type Lead, type LeadType, UNIT_KINDS, UNIT_KIND_LABELS, TYPE_LABELS, TYPE_META,
-  isSupplyType, SUB_STATUS_META, subStatusesFor,
+  isSupplyType, SUB_STATUS_META, subStatusesFor, INTENT_TYPES,
 } from './types'
 import { LocationPicker } from './LocationPicker'
 import type { Market } from '@/lib/crm-locations'
@@ -24,6 +24,7 @@ export function LeadFormModal({ lead, onClose, onSaved }: { lead?: Lead; onClose
   const [f, setF] = useState({
     market: lead?.market ?? 'LEBANON',
     type: lead?.type ?? 'BUYER',
+    isInvestor: lead?.isInvestor ?? false,
     status: lead?.status ?? 'ACTIVE',
     source: lead?.source ?? 'MANUAL',
     name: lead?.name ?? '',
@@ -65,6 +66,7 @@ export function LeadFormModal({ lead, onClose, onSaved }: { lead?: Lead; onClose
     try {
       const payload = {
         market: f.market, type: f.type, status: f.status, source: f.source,
+        isInvestor: f.isInvestor,
         name: f.name.trim(),
         phone: f.phone.trim() || null,
         email: f.email.trim() || '',
@@ -131,8 +133,8 @@ export function LeadFormModal({ lead, onClose, onSaved }: { lead?: Lead; onClose
           <div className="space-y-3">
             <div>
               <label className={lbl}>Client type</label>
-              <div className="grid grid-cols-3 sm:grid-cols-5 gap-1.5">
-                {(['BUYER', 'RENTER', 'INVESTOR', 'SELLER', 'LANDLORD'] as const).map((t) => {
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
+                {INTENT_TYPES.map((t) => {
                   const on = f.type === t
                   const meta = TYPE_META[t]
                   return (
@@ -150,6 +152,19 @@ export function LeadFormModal({ lead, onClose, onSaved }: { lead?: Lead; onClose
                 })}
               </div>
             </div>
+
+            {/* An investor is a buyer with a motive, not a fifth category. */}
+            {!isSupply && (
+              <label className="flex items-center gap-2 text-sm text-slate-700">
+                <input
+                  type="checkbox"
+                  checked={f.isInvestor}
+                  onChange={(e) => set('isInvestor', e.target.checked)}
+                  className="h-4 w-4 rounded border-slate-300"
+                />
+                Buying for investment / yield, not to live in
+              </label>
+            )}
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div>

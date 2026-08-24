@@ -14,6 +14,7 @@ import {
   type Lead, type LeadContact, type Opportunity, STATUS_META, TYPE_LABELS, MARKET_META,
   UNIT_KIND_LABELS, formatLastContact, formatPlanned, REJECTION_LABELS, isSupplyType,
   SUB_STATUS_META, subStatusesFor, type LeadSubStatus, STRONG_MATCH_SCORE,
+  isPastClient, LIVE_STAGES,
 } from './types'
 import { OpportunityList } from './OpportunityList'
 import { SellerProperties } from './SellerProperties'
@@ -262,6 +263,10 @@ export function LeadDrawer({ lead, onClose, onChanged }: { lead: Lead; onClose: 
   // Strong fits vs. worth-a-call near misses — brokers want both, but clearly separated.
   const strongMatches = matches.filter((m) => m.match.score >= STRONG_MATCH_SCORE)
   const nearMatches = matches.filter((m) => m.match.score < STRONG_MATCH_SCORE)
+  // Closed deals lead the drawer; live ones decide whether they're still working.
+  const closed = (l.opportunities ?? []).filter((o) => o.stage === 'WON')
+  const live = (l.opportunities ?? []).filter((o) => LIVE_STAGES.includes(o.stage)).length
+
   const lastContact = formatLastContact(l.lastContactAt)
   const planned = formatPlanned(l.nextContactAt)
   const where = [l.areas.join(', '), l.regions.map(regionLabel).join(', ')].filter(Boolean).join(' · ')
@@ -398,9 +403,49 @@ export function LeadDrawer({ lead, onClose, onChanged }: { lead: Lead; onClose: 
         <div className="p-5 space-y-4">
           {tab === 'overview' && (
           <>
+          {/* What they already bought or sold, first.
+              Opening a client who closed months ago and being shown what they
+              were once looking for is backwards — the deal is the headline. */}
+          {closed.length > 0 && (
+            <section className="bg-slate-900 text-white rounded-xl p-4">
+              <p className="text-[11px] font-semibold text-white/50 uppercase tracking-wide mb-2">
+                {isSupply ? 'Sold with us' : 'Bought with us'}
+              </p>
+              <ul className="space-y-2">
+                {closed.map((o) => (
+                  <li key={o.id}>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      {o.subject?.ref && (
+                        <span className="font-mono text-[10px] font-semibold text-white/60">{o.subject.ref}</span>
+                      )}
+                      <span className="text-sm font-semibold">
+                        {o.subject?.title ?? o.externalTitle ?? 'Property'}
+                      </span>
+                    </div>
+                    {o.soldUnitRef && <p className="text-xs text-white/70 mt-0.5">{o.soldUnitRef}</p>}
+                    <p className="text-xs text-white/50 mt-0.5">
+                      {o.closedAt
+                        ? new Date(o.closedAt).toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' })
+                        : 'date not recorded'}
+                      {canSeeMoney && o.soldPrice != null && ` · ${o.soldCurrency} ${o.soldPrice.toLocaleString()}`}
+                    </p>
+                  </li>
+                ))}
+              </ul>
+              {live === 0 && (
+                <p className="text-[11px] text-white/50 mt-3 pt-3 border-t border-white/10">
+                  Nothing else in progress. They stay on your books — ring them when
+                  something suits.
+                </p>
+              )}
+            </section>
+          )}
+
           {/* Requirement summary */}
           <section className="bg-white border border-slate-200 rounded-xl p-4">
-            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Looking for</p>
+            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">
+              {closed.length > 0 ? 'What they were after' : 'Looking for'}
+            </p>
             <p className="text-sm text-slate-800">
               {l.askingFor || l.unitKinds.map((k) => UNIT_KIND_LABELS[k] ?? k).join(', ') || '—'}
             </p>

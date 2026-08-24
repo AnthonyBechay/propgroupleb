@@ -265,12 +265,11 @@ export default function CrmPage() {
           onChange={(e) => setTypeFilter(e.target.value as typeof typeFilter)}
           className="h-9 px-2.5 rounded-lg border border-slate-200 bg-white text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-900/10"
         >
-          <option value="all">All types</option>
-          <option value="BUYER">Buyers</option>
-          <option value="SELLER">Sellers</option>
-          <option value="RENTER">Renters</option>
-          <option value="LANDLORD">Landlords</option>
-          <option value="INVESTOR">Investors</option>
+          <option value="all">Any intent</option>
+          <option value="BUYER">Buying</option>
+          <option value="SELLER">Selling</option>
+          <option value="RENTER">Looking to rent</option>
+          <option value="LANDLORD">Renting out</option>
         </select>
 
         <div className="flex gap-1 bg-slate-100 rounded-lg p-1">

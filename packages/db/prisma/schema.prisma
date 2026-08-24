@@ -1482,7 +1482,14 @@ enum ContactChannel {
 model Lead {
   id     String     @id @default(cuid())
   market LeadMarket @default(LEBANON)
-  type   LeadType   @default(BUYER)
+
+  // What they're here to do. Four intents, no more: buying, selling, looking
+  // to rent, renting out. "Investor" was a fifth type, but an investor IS a
+  // buyer — one with a different motive — so it's a flag, not a category.
+  type LeadType @default(BUYER)
+
+  // A buyer chasing yield rather than a home. Changes what you show them.
+  isInvestor Boolean @default(false)
   status LeadStatus @default(ACTIVE)
   source LeadSource @default(MANUAL)
 

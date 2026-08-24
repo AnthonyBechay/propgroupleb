@@ -289,15 +289,25 @@ async function startServer() {
     await prisma.$queryRaw`SELECT 1`;
     logger.info('Database connected');
 
-    // Deployment uses `prisma db push`, which never runs migration SQL, so the
-    // reference-code sequence and backfill have to be established here.
+    // Deployment uses `prisma db push`, which creates columns but never runs a
+    // migration's data statements — so anything that has to *change rows* runs
+    // here instead.
+    //
+    // Each step gets its own guard on purpose: sharing one meant a failure in
+    // the first silently skipped the second, and reported the wrong thing as
+    // broken. Neither blocks startup — the site works without either.
     try {
       await ensureReferenceCodes();
-      await normaliseCrmData();
       logger.info('Reference codes ready');
     } catch (err) {
-      // Never block startup over this — the site works without codes.
       logger.error('Could not initialise reference codes', { error: (err as Error).message });
+    }
+
+    try {
+      await normaliseCrmData();
+      logger.info('CRM data normalised');
+    } catch (err) {
+      logger.error('Could not normalise CRM data', { error: (err as Error).message });
     }
 
     const server = app.listen(PORT, () => {

@@ -14,8 +14,6 @@ ALTER TYPE "LeadSource" ADD VALUE IF NOT EXISTS 'FACEBOOK_AD';
 
 ALTER TABLE "leads" ADD COLUMN "subStatus" "LeadSubStatus";
 ALTER TABLE "leads" ADD COLUMN "nextContactNote" TEXT;
-ALTER TABLE "leads" ADD COLUMN "waId" TEXT;
-ALTER TABLE "leads" ADD COLUMN "externalLeadId" TEXT;
 
 ALTER TABLE "leads" ALTER COLUMN "status" SET DEFAULT 'ACTIVE';
 
@@ -29,6 +27,4 @@ UPDATE "leads" SET "nextContactAt" = NULL
  WHERE "nextContactAt" IS NOT NULL
    AND "status" NOT IN ('WON', 'LOST', 'ARCHIVED');
 
-CREATE UNIQUE INDEX "leads_waId_key" ON "leads"("waId");
-CREATE UNIQUE INDEX "leads_externalLeadId_key" ON "leads"("externalLeadId");
 CREATE INDEX "leads_subStatus_idx" ON "leads"("subStatus");

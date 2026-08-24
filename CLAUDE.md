@@ -25,7 +25,74 @@ Context for Claude (and human contributors) extending this codebase. Keep this f
 - **Storage**: Cloudflare R2, proxied through `/api/files/*` on the backend.
 - **Email**: Resend (optional — feature-gated on `RESEND_API_KEY`).
 - **AI**: Anthropic SDK for property search conversation (feature-gated on `ANTHROPIC_API_KEY`).
-- **Focus**: Lebanon real estate. This instance should not include Georgia/Batumi/Tbilisi copy.
+- **Focus**: one back office, two public websites. See **Markets** below.
+
+---
+
+## Markets (read before touching any public query)
+
+One database and one admin serve two public sites:
+
+| Site | Shows |
+|---|---|
+| propgrouplb.com | `Building.country = LEBANON` |
+| propgrp.com | everything that **isn't** Lebanon (Georgia today; Cyprus/Greece exist in the enum) |
+
+- `SITE_SCOPE` env var decides which a deployment serves. Unset = Lebanon, so the
+  existing site is unaffected. Set `SITE_SCOPE=INTERNATIONAL` on propgrp.com.
+- `apps/backend/src/utils/market.ts` owns this. Public list endpoints call
+  `publicCountryFilter(req)`; **a signed-in admin sees every market by default**,
+  which is what makes one back office work.
+- International is defined as "not Lebanon", never a fixed list — adding a
+  country must never require a code change.
+- Georgian stock lives in the same `Building`/`Unit`/`Listing` tables. There is
+  no separate catalogue (one existed; it was removed as duplication).
+- Location capture branches by country in `components/admin/LocationFields.tsx`:
+  Lebanon uses the curated gazetteer (`lib/lebanon-locations.ts`), Georgia uses
+  `GEORGIA_AREAS` from `lib/crm-locations.ts`. `mohafazat`/`caza` are Lebanese
+  administrative divisions and stay null abroad.
+
+---
+
+## Reference codes
+
+Human codes clients quote back over WhatsApp. `apps/backend/src/utils/reference.ts`.
+
+- `PG-1042` a property · `PG-1042-2` a unit inside it.
+- **One prefix on purpose.** Property type is mutable; a code must not be. The
+  type badge sits next to the code anyway.
+- A single-unit property shows just `PG-1042` — the `-1` adds nothing. The
+  suffix appears only where several units must be told apart.
+- Numbers come from a Postgres sequence, so a deleted code is never reissued.
+- Listings have **no code of their own** — a listing shows the code of whatever
+  it sells (`lib/reference.ts` on the web side).
+
+---
+
+## CRM (`apps/web/src/app/(admin)/admin/crm/**`)
+
+Four views: **Overview** (state of the business), **Today** (what needs you now),
+**Board** (pipeline), **All clients** (directory). Plus a drawer per client.
+
+Vocabulary rules, learned the hard way:
+
+- A client's status describes a **relationship**, not a deal. `WON` renders as
+  **"Past client"** — you win a transaction, you don't win a person.
+- Deal stages (viewing, negotiating) belong to the **opportunity**, because one
+  client can be viewing one property and negotiating another.
+- There are **four intents**: buying, selling, looking to rent, renting out.
+  An investor is a **buyer with a flag** (`Lead.isInvestor`), not a fifth type.
+  `INVESTOR` remains in the DB enum only because Postgres can't drop a value.
+- `Unit.isUnitType` marks a repeatable template ("1 bedroom" in a development
+  many clients buy) rather than one specific apartment. Types never sell out —
+  we broker stock, we don't own it. Which apartment a client actually got is
+  recorded on the deal (`LeadOpportunity.soldUnitRef`).
+
+Matching (`apps/backend/src/utils/lead-matching.ts`) scores on independent
+criteria, but some misses are **fatal** rather than weighted: a different
+property family, the wrong deal type, 2+ bedrooms short, or >50% over budget.
+A strong location must never carry a property the client cannot use or afford.
+Bedrooms aren't scored for investors or international stock.
 
 ---
 
@@ -124,6 +191,11 @@ When generating new share links, always go through the `ShareToken` table. Don't
 - ❌ Hardcode `http://localhost:3001` for file URLs in production code paths.
 - ❌ Reference `SESSION_SECRET` — it was removed.
 - ❌ Reference `docs/` or `COOLIFY_DEPLOYMENT.md` — both deleted.
+- ❌ Write a data migration as SQL only — deployment uses `db push` and will never run it. Add a `once(...)` step in `utils/crm-bootstrap.ts`.
+- ❌ Scope an admin query to one market. Admins see every country; only public pages are scoped.
+- ❌ Add a fifth client "type". The four intents are fixed; anything else is a flag on the client.
+- ❌ Put a deal stage on the client. Viewing/negotiating belong to the opportunity — a client can be at different stages on different properties.
+- ❌ Assume a `Building`'s local `buildingSchema` in `routes/buildings.ts` is the shared one in `schemas/index.ts`. It shadows it; adding a field to the wrong one fails silently.
 
 ---
 
@@ -136,8 +208,11 @@ When generating new share links, always go through the `ShareToken` table. Don't
 - PKCE for Google OAuth
 - Portfolio page real data integration
 - Field-level encryption for PII
-- Webhook system for external integrations
 - Wire up reserved Prisma models (Transaction, Notification, Message, …) when those features land
+- **propgrp.com still runs on its own codebase and database.** The unified back office holds its data; pointing that frontend at this API is unfinished. Options: a compatibility layer exposing the old `Property` shape, or updating that frontend to `/api/listings`.
+- Mobile: the CRM board is horizontally-scrolling 228px columns — poor on a phone. Today and the client directory are fine.
+- No duplicate detection when adding a client by hand.
+- WhatsApp/Meta intake was built and then removed at the owner's request. If it returns, note that Coexistence (app + API on one number) requires Embedded Signup and Tech Provider status — a business cannot self-onboard its own number.
 
 ---
 
@@ -146,4 +221,50 @@ When generating new share links, always go through the `ShareToken` table. Don't
 - `pnpm install` auto-runs `prisma generate` via the `postinstall` hook in `packages/db` — no manual step needed on fresh clones or after schema changes.
 - `pnpm build` runs `scripts/build.js`: packages first (config → db), then backend, then web.
 - Dockerfiles for both apps live alongside their code (`apps/backend/Dockerfile`, `apps/web/Dockerfile`). Root `docker-compose.yml` wires them for Coolify-style deploys.
-- Split deploys (Vercel + Render, etc.) work too — set env vars in the host panel, that's it.
+- `apps/backend/Dockerfile` copies `scripts/` into `apps/backend/scripts` **on purpose** — Node resolves modules from a script's own directory, and pnpm's strict layout means a script at `/app/scripts` cannot see `@prisma/client`.
+
+### Deployment runs `prisma db push`, not `migrate deploy`
+
+This is the single most important thing to know before changing the schema.
+
+- `db push --accept-data-loss` syncs columns to `schema.prisma` on every boot. It
+  **drops anything the schema no longer declares**, and it **never runs a
+  migration file**.
+- So every sequence, backfill or data change lives in a boot routine instead:
+  `utils/reference.ts` (`ensureReferenceCodes`) and `utils/crm-bootstrap.ts`
+  (`normaliseCrmData`). Each step is guarded by a `SystemSetting` marker so it
+  applies exactly once, and each has its own try/catch so one failure can't
+  silently skip the next.
+- **Adding a data migration means adding a `once(...)` step**, not just a
+  migration file. A migration file alone will never run.
+- Before deploying anything that removes a field, preview it:
+  ```
+  docker exec <backend> sh -c 'cd /app/apps/backend && sh scripts/preview-schema-changes.sh'
+  ```
+  It prints the exact SQL and changes nothing. Read every `DROP` before pushing.
+### The `migrations/` folder does NOT reproduce the database
+
+Verified, not assumed: `prisma migrate deploy` against an empty database fails
+at `20260615000001_organizations` with *relation "buildings" does not exist*.
+**No migration ever creates `buildings`** — the whole Building/Unit/Listing
+model arrived through `db push`. The folder is a partial changelog, not a
+runnable history, and several files describe columns that were later removed.
+
+Treat migration files as documentation of intent. The schema of record is
+`schema.prisma`; the data of record is production.
+
+Switching to `migrate deploy` therefore needs a **squash**, not a resolve:
+
+```
+# 1. generate one baseline from the current schema
+npx prisma migrate diff --from-empty \
+  --to-schema-datamodel prisma/schema.prisma --script > baseline.sql
+# 2. put it in a single migrations/<timestamp>_baseline/migration.sql
+#    and archive everything older
+# 3. on production, mark it as already applied
+npx prisma migrate resolve --applied <timestamp>_baseline
+# 4. change the compose command to `prisma migrate deploy`
+```
+
+Worth doing when there's a quiet week. Until then, the boot routines above are
+the only reliable way to change data.

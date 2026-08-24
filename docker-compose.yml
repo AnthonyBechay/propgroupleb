@@ -43,6 +43,14 @@ services:
       RESEND_API_KEY: ${RESEND_API_KEY:-}
       FROM_EMAIL: ${FROM_EMAIL:-}
       ADMIN_EMAIL: ${ADMIN_EMAIL:-}
+      # SITE_SCOPE — which market this deployment's PUBLIC pages serve.
+      #   unset / LEBANON   propgrouplb.com — Lebanese property only
+      #   INTERNATIONAL     propgrp.com — everything that isn't Lebanon
+      # The admin always sees both regardless; this only scopes public listings,
+      # so leaving it unset keeps propgrouplb.com behaving exactly as it does.
+      SITE_SCOPE: ${SITE_SCOPE:-LEBANON}
+      # SESSION_DAYS — how long a login lasts before re-authentication.
+      SESSION_DAYS: ${SESSION_DAYS:-14}
     volumes:
       - backend_uploads:/app/apps/backend/uploads
     networks:
@@ -53,11 +61,21 @@ services:
       timeout: 10s
       retries: 10
       start_period: 120s
-    # `prisma db push` syncs the schema to the database without requiring
-    # committed migration files — correct for a fresh deployment where no
-    # migration history exists. When you later create a real migration baseline
-    # (`prisma migrate dev --name init`), switch this back to:
-    #   cd packages/db && npx prisma migrate deploy && cd /app && node apps/backend/dist/index.js
+    # `prisma db push` syncs the schema on every boot. It creates and drops
+    # columns to match schema.prisma, but it NEVER runs a migration file — so
+    # sequences, backfills and any data change live in the boot routines
+    # (utils/reference.ts, utils/crm-bootstrap.ts) instead, each guarded so it
+    # applies exactly once.
+    #
+    # `--accept-data-loss` lets it drop what the schema no longer declares.
+    # Before deploying a release that removes anything, preview it:
+    #   docker exec <backend> sh -c 'cd /app/apps/backend && sh scripts/preview-schema-changes.sh'
+    # That prints the SQL and changes nothing.
+    #
+    # Do NOT switch this to `migrate deploy` without squashing first: the
+    # migrations folder cannot rebuild the database (nothing in it creates the
+    # `buildings` table — that model arrived via db push). See CLAUDE.md,
+    # "The migrations/ folder does NOT reproduce the database".
     command: ["sh", "-c", "cd packages/db && npx prisma db push --skip-generate --accept-data-loss && cd /app && node apps/backend/dist/index.js"]
 
   web:
