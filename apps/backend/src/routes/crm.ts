@@ -1351,6 +1351,10 @@ const opportunitySchema = z.object({
   soldPrice: z.number().min(0).optional().nullable(),
   soldCurrency: z.enum(['USD', 'LBP']).optional(),
   commissionUsd: z.number().min(0).optional().nullable(),
+  // Which apartment it turned out to be, and when it actually closed. A sale
+  // is usually entered days later, so the date has to be settable.
+  soldUnitRef: z.string().max(200).optional().nullable(),
+  closedAt: z.string().optional().nullable(),
 });
 
 // POST /:id/opportunities — shortlist a property (or a counterpart client)
@@ -1376,17 +1380,55 @@ router.post(
         ...(data.listingId ? { listingId: data.listingId } : { counterpartLeadId: data.counterpartLeadId }),
       },
     });
-    if (existing) { sendSuccess(res, existing, 'Already on the shortlist'); return; }
+    if (existing) {
+      // Recording a sale against something already shortlisted must update it,
+      // not silently return the untouched row and lose the figures.
+      if (data.stage === 'WON') {
+        const closed = await prisma.leadOpportunity.update({
+          where: { id: existing.id },
+          data: {
+            stage: 'WON',
+            soldPrice: data.soldPrice ?? existing.soldPrice,
+            soldCurrency: data.soldCurrency ?? existing.soldCurrency,
+            commissionUsd: data.commissionUsd ?? existing.commissionUsd,
+            soldUnitRef: data.soldUnitRef || existing.soldUnitRef,
+            closedAt: data.closedAt ? new Date(data.closedAt) : (existing.closedAt ?? new Date()),
+          },
+        });
+        await syncLeadStatus(lead.id);
+        await logAdminAction('CLOSE_OPPORTUNITY', 'lead', lead.id, { opportunityId: closed.id }, authReq);
+        sendSuccess(res, closed, 'Sale recorded');
+        return;
+      }
+      sendSuccess(res, existing, 'Already on the shortlist');
+      return;
+    }
 
     const opportunity = await prisma.leadOpportunity.create({
       data: {
         leadId: lead.id,
         listingId: data.listingId || null,
         counterpartLeadId: data.counterpartLeadId || null,
+        leadPropertyId: data.leadPropertyId || null,
+        // The schema has always accepted these; the create silently dropped
+        // them, so "record a sale" saved a blank opportunity — no title, no
+        // price, no commission. Everything the caller sends is persisted.
+        externalTitle: data.externalTitle || null,
+        externalUrl: data.externalUrl || null,
         stage: data.stage,
         matchScore: data.matchScore ?? null,
         viewingAt: data.viewingAt ? new Date(data.viewingAt) : null,
         feedback: data.feedback || null,
+        soldPrice: data.soldPrice ?? null,
+        soldCurrency: data.soldCurrency ?? 'USD',
+        commissionUsd: data.commissionUsd ?? null,
+        soldUnitRef: data.soldUnitRef || null,
+        // A closed deal always has a date: the one given, else today.
+        closedAt: data.closedAt
+          ? new Date(data.closedAt)
+          : data.stage === 'WON'
+            ? new Date()
+            : null,
         createdBy: authReq.user?.id ?? null,
       },
     });

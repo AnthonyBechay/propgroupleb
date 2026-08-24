@@ -147,7 +147,11 @@ router.get(
     const { page, limit, skip } = parsePagination(req.query as Record<string, string>);
     const q = req.query as Record<string, string>;
     const authReq = req as AuthenticatedRequest;
-    const isAdmin = authReq.user && ['ADMIN', 'SUPER_ADMIN'].includes(authReq.user.role);
+    // CRM staff search this endpoint to record a sale, which means finding
+    // stock that is no longer ACTIVE. They're signed-in staff, so they get the
+    // same view as an admin rather than the public one.
+    const isAdmin =
+      authReq.user && ['ADMIN', 'SUPER_ADMIN', 'CRM_MANAGER'].includes(authReq.user.role);
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const where: Record<string, any> = {};
@@ -155,7 +159,8 @@ router.get(
     // Public callers always see only PUBLIC listings; admins may pass status filter
     if (!isAdmin) {
       where.visibility = 'PUBLIC';
-      where.status = q.status ?? 'ACTIVE';
+      // Public callers never lift this — a sold listing is not public stock.
+      where.status = q.status && q.status !== 'all' ? q.status : 'ACTIVE';
     } else {
       if (q.status && q.status !== 'all') where.status = q.status;
     }

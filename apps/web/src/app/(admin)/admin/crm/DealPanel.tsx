@@ -1,8 +1,9 @@
 'use client'
 
-import { useState } from 'react'
-import { Loader2, DollarSign, Pencil, Check, X, Plus, Globe } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import { Loader2, DollarSign, Pencil, Check, X, Plus, Globe, Search } from 'lucide-react'
 import { normalizeApiUrl } from '@/lib/utils/api-url'
+import { countryFlag } from '@/lib/market'
 import { type Lead, type Opportunity, LIVE_STAGES } from './types'
 
 /**
@@ -210,6 +211,46 @@ export function DealPanel({
   )
 }
 
+/** What the client bought, whichever way it was identified. */
+type Picked = {
+  kind: 'opportunity' | 'listing' | 'external'
+  id: string
+  label: string
+  ref?: string | null
+  country?: string | null
+  sub?: string | null
+}
+
+function subjectLabel(o: Opportunity): string {
+  return o.subject?.title ?? o.externalTitle ?? 'Shortlisted property'
+}
+
+/** One selectable property in the picker. */
+function PickRow({
+  label, ref_, country, sub, onPick,
+}: {
+  label: string
+  ref_?: string | null
+  country?: string | null
+  sub?: string | null
+  onPick: () => void
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onPick}
+      className="w-full text-left rounded-lg border border-slate-200 px-2.5 py-1.5 hover:bg-slate-50 transition-colors"
+    >
+      <span className="flex items-center gap-2">
+        {ref_ && <span className="font-mono text-[10px] font-semibold text-slate-500 shrink-0">{ref_}</span>}
+        {country && <span className="text-[11px] shrink-0">{countryFlag(country)}</span>}
+        <span className="text-sm text-slate-800 truncate">{label}</span>
+      </span>
+      {sub && <span className="block text-[11px] text-slate-400 truncate">{sub}</span>}
+    </button>
+  )
+}
+
 const inp = 'w-full px-2 py-1.5 border border-slate-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-slate-900/10'
 
 /** Editable sale figures. Every field can be corrected later. */
@@ -224,8 +265,53 @@ function DealForm({
   /** What's already on their shortlist — the likely answer. */
   shortlist?: Opportunity[]
 }) {
-  // null = "something else", which falls back to typing a name.
-  const [pickedId, setPickedId] = useState<string | null>(shortlist[0]?.id ?? null)
+  const apiUrl = normalizeApiUrl(process.env.NEXT_PUBLIC_API_URL || '')
+  // What they bought. Either an opportunity already on their shortlist, or any
+  // listing in the catalogue, or — last resort — a name they type.
+  const [picked, setPicked] = useState<Picked | null>(
+    shortlist[0] ? { kind: 'opportunity', id: shortlist[0].id, label: subjectLabel(shortlist[0]) } : null
+  )
+  const [q, setQ] = useState('')
+  const [results, setResults] = useState<Picked[]>([])
+  const [searching, setSearching] = useState(false)
+  const seq = useRef(0)
+
+  // Searching the whole catalogue, not just their shortlist — most sales are
+  // for something nobody remembered to shortlist first.
+  useEffect(() => {
+    const needle = q.trim()
+    if (needle.length < 2) { setResults([]); return }
+    const mine = ++seq.current
+    const t = setTimeout(async () => {
+      setSearching(true)
+      try {
+        const res = await fetch(
+          `${apiUrl}/api/listings?search=${encodeURIComponent(needle)}&limit=8&status=all`,
+          { credentials: 'include', cache: 'no-store' }
+        )
+        const j = await res.json().catch(() => ({}))
+        if (mine !== seq.current) return
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const rows: any[] = j.data?.items ?? j.data ?? j.items ?? []
+        setResults(
+          rows.map((li) => {
+            const b = li.building ?? li.unit?.building
+            return {
+              kind: 'listing' as const,
+              id: li.id,
+              label: li.headline || b?.title || 'Property',
+              ref: li.unit?.ref ?? b?.ref ?? null,
+              country: b?.country ?? null,
+              sub: [b?.city, b?.caza].filter(Boolean).join(', ') || null,
+            }
+          })
+        )
+      } finally {
+        if (mine === seq.current) setSearching(false)
+      }
+    }, 250)
+    return () => clearTimeout(t)
+  }, [q, apiUrl])
   const [title, setTitle] = useState(initial?.externalTitle ?? '')
   const [url, setUrl] = useState(initial?.externalUrl ?? '')
   const [price, setPrice] = useState(initial?.soldPrice?.toString() ?? '')
@@ -242,43 +328,76 @@ function DealForm({
         <>
           <div>
             <span className="text-[11px] text-slate-500">What did they buy?</span>
-            <div className="mt-1 space-y-1">
-              {shortlist.map((o) => (
+
+            {picked ? (
+              <div className="mt-1 flex items-center gap-2 rounded-lg border border-emerald-400 bg-emerald-50 px-2.5 py-2">
+                <Check className="h-4 w-4 text-emerald-600 shrink-0" />
+                <span className="text-sm text-slate-800 truncate flex-1">{picked.label}</span>
                 <button
-                  key={o.id}
                   type="button"
-                  onClick={() => setPickedId(o.id)}
-                  className={`w-full text-left flex items-center gap-2 rounded-lg border px-2.5 py-1.5 transition-colors ${
-                    pickedId === o.id
-                      ? 'border-emerald-400 bg-emerald-50'
-                      : 'border-slate-200 hover:bg-slate-50'
-                  }`}
+                  onClick={() => { setPicked(null); setQ('') }}
+                  className="text-[11px] font-medium text-slate-500 hover:text-slate-900 shrink-0"
                 >
-                  {o.subject?.ref && (
-                    <span className="font-mono text-[10px] font-semibold text-slate-500">{o.subject.ref}</span>
-                  )}
-                  <span className="text-sm text-slate-800 truncate flex-1">
-                    {o.subject?.title ?? 'Shortlisted property'}
-                  </span>
-                  {pickedId === o.id && <Check className="h-4 w-4 text-emerald-600 shrink-0" />}
+                  Change
                 </button>
-              ))}
-              <button
-                type="button"
-                onClick={() => setPickedId(null)}
-                className={`w-full text-left rounded-lg border px-2.5 py-1.5 text-sm transition-colors ${
-                  pickedId === null
-                    ? 'border-emerald-400 bg-emerald-50 text-slate-800'
-                    : 'border-slate-200 text-slate-500 hover:bg-slate-50'
-                }`}
-              >
-                Something else — not on their shortlist
-              </button>
-            </div>
+              </div>
+            ) : (
+              <>
+                <div className="relative mt-1">
+                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
+                  <input
+                    value={q}
+                    onChange={(e) => setQ(e.target.value)}
+                    placeholder="Search any project, apartment or ref — e.g. Orbi City, PG-1042"
+                    className={`${inp} pl-8`}
+                  />
+                  {searching && (
+                    <Loader2 className="absolute right-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 animate-spin text-slate-400" />
+                  )}
+                </div>
+
+                <div className="mt-1 space-y-1 max-h-52 overflow-y-auto">
+                  {/* Their shortlist stays one tap away until they start typing. */}
+                  {q.trim().length < 2 &&
+                    shortlist.map((o) => (
+                      <PickRow
+                        key={o.id}
+                        label={subjectLabel(o)}
+                        ref_={o.subject?.ref ?? null}
+                        sub="On their shortlist"
+                        onPick={() => setPicked({ kind: 'opportunity', id: o.id, label: subjectLabel(o) })}
+                      />
+                    ))}
+
+                  {results.map((r) => (
+                    <PickRow
+                      key={r.id}
+                      label={r.label}
+                      ref_={r.ref ?? null}
+                      country={r.country}
+                      sub={r.sub ?? null}
+                      onPick={() => setPicked(r)}
+                    />
+                  ))}
+
+                  {q.trim().length >= 2 && !searching && results.length === 0 && (
+                    <p className="text-xs text-slate-400 px-1 py-1.5">Nothing matches “{q.trim()}”.</p>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={() => setPicked({ kind: 'external', id: '', label: 'Not in the system' })}
+                    className="w-full text-left rounded-lg border border-dashed border-slate-200 px-2.5 py-1.5 text-sm text-slate-500 hover:bg-slate-50"
+                  >
+                    Not in the system — type it instead
+                  </button>
+                </div>
+              </>
+            )}
           </div>
 
-          {/* Only asked for when it genuinely isn't in the system. */}
-          {pickedId === null && (
+      {/* Only asked for when it genuinely isn't in the system. */}
+          {picked?.kind === 'external' && (
             <>
               <label className="block">
                 <span className="text-[11px] text-slate-500">What was it?</span>
@@ -353,8 +472,12 @@ function DealForm({
             onSave({
               // Picking from the shortlist closes THAT deal instead of inventing
               // a second, unconnected one beside it.
-              ...(allowSubject && pickedId ? { opportunityId: pickedId } : {}),
-              ...(allowSubject && !pickedId
+              // Closing something already shortlisted patches THAT deal;
+              // a catalogue pick creates one against the real listing; only a
+              // genuine off-platform sale falls back to free text.
+              ...(allowSubject && picked?.kind === 'opportunity' ? { opportunityId: picked.id } : {}),
+              ...(allowSubject && picked?.kind === 'listing' ? { listingId: picked.id } : {}),
+              ...(allowSubject && picked?.kind === 'external'
                 ? { externalTitle: title || 'Sale', externalUrl: url || null }
                 : {}),
               soldUnitRef: unitRef.trim() || null,
