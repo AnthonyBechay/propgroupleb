@@ -5,7 +5,7 @@ import { usePathname } from 'next/navigation'
 import { track } from '@/lib/analytics'
 
 // Paths we don't track as marketing page views (admin/portal are internal).
-const IGNORED_PREFIXES = ['/admin', '/portal', '/auth', '/setup', '/unauthorized']
+const IGNORED_PREFIXES = ['/admin', '/portal', '/auth', '/unauthorized']
 
 /**
  * Fires a `page_view` event on every client navigation (mounted once at the

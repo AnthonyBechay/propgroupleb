@@ -63,7 +63,8 @@ const nextConfig: NextConfig = {
     // Tree-shake icon/UI packages even behind grouped imports
     // `import { A, B, C } from 'lucide-react'`. Cuts ~30-50KB first-load JS
     // on heavy icon users (property cards, admin tables).
-    optimizePackageImports: ['lucide-react', 'date-fns'],
+    // (date-fns used to be listed here; nothing has imported it for a while.)
+    optimizePackageImports: ['lucide-react'],
   },
   // Enable strict mode for better debugging
   reactStrictMode: true,

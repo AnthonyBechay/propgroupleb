@@ -164,6 +164,44 @@ app.use(
   })
 );
 
+// ── CSRF: same-origin guard on state-changing requests ───────────────────────
+// The auth cookie is `SameSite=None` in production, because the API and the two
+// public sites live on different hosts — so the browser attaches it to
+// cross-site requests as well. CORS does not close that: a plain <form> POST is
+// a "simple request", it is sent with no preflight, and an attacker never needs
+// to read the response to have already caused the write. Browsers do always
+// send `Origin` on those, so rejecting an unrecognised one is enough.
+//
+// A request with no Origin at all is left alone: that is server-to-server
+// traffic (propgrp.com's SSR, health checks, curl), which cannot be a browser
+// forging a logged-in user's cookie.
+app.use((req, res, next) => {
+  if (req.method === 'GET' || req.method === 'HEAD' || req.method === 'OPTIONS') {
+    next();
+    return;
+  }
+
+  const origin = req.headers.origin;
+  if (!origin || allowedOrigins.includes(origin)) {
+    next();
+    return;
+  }
+
+  if (
+    process.env.NODE_ENV !== 'production' &&
+    /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)
+  ) {
+    next();
+    return;
+  }
+
+  logger.warn('Rejected cross-origin write', { origin, method: req.method, path: req.originalUrl });
+  res.status(403).json({
+    error: 'Forbidden',
+    message: 'Cross-origin request rejected',
+  });
+});
+
 // Rate limiting
 // `max` is per-IP per-window. 200 was tight enough that a single visitor
 // browsing ~5 properties with the CDN bypassed (image proxy + RSC chunks all
@@ -184,9 +222,27 @@ const authLimiter = rateLimit({
   legacyHeaders: false,
 });
 
+// Anything that sends mail or burns model credits on behalf of an anonymous
+// caller gets its own bucket. The general limiter is sized for a person
+// browsing properties; it is far too generous for an endpoint that costs money
+// or lands in someone's inbox.
+const expensiveLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
 app.use('/api/', generalLimiter);
 app.use('/api/auth/login', authLimiter);
 app.use('/api/auth/register', authLimiter);
+// Password reset was the one unmetered path into the mail provider: 1000
+// requests/15min per IP is an email-bombing budget, not a rate limit.
+app.use('/api/auth/forgot-password', authLimiter);
+app.use('/api/auth/reset-password', authLimiter);
+// Public AI search calls Anthropic per request — unmetered, that is somebody
+// else's bill.
+app.use('/api/ai-search', expensiveLimiter);
 
 // Initialize Passport (JWT-only, no sessions)
 app.use(passport.initialize());

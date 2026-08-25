@@ -202,6 +202,9 @@ export const USER_ADMIN_SELECT = {
       favoriteProperties: true,
       propertyInquiries: true,
       managedBuildings: true,
+      // The admin table shows this one; without it the cell read
+      // "undefined properties" for every row.
+      ownedProperties: true,
     },
   },
 } as const;

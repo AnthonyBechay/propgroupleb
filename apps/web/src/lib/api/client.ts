@@ -305,63 +305,10 @@ class ApiClient {
     return this.request('/api/portfolio/stats');
   }
 
-  // Users endpoints (admin)
-  async getUsers(params?: {
-    page?: number;
-    limit?: number;
-    role?: string;
-    search?: string;
-    isActive?: boolean;
-  }) {
-    const searchParams = new URLSearchParams();
-    if (params) {
-      Object.entries(params).forEach(([key, value]) => {
-        if (value !== undefined) {
-          searchParams.append(key, value.toString());
-        }
-      });
-    }
-    
-    const queryString = searchParams.toString();
-    return this.request(`/api/users${queryString ? `?${queryString}` : ''}`);
-  }
-
-  async getUser(id: string) {
-    return this.request(`/api/users/${id}`);
-  }
-
-  async updateUserRole(id: string, role: string) {
-    return this.request(`/api/users/${id}/role`, {
-      method: 'PUT',
-      body: JSON.stringify({ role }),
-    });
-  }
-
-  async banUser(id: string, reason: string) {
-    return this.request(`/api/users/${id}/ban`, {
-      method: 'POST',
-      body: JSON.stringify({ reason }),
-    });
-  }
-
-  async unbanUser(id: string) {
-    return this.request(`/api/users/${id}/unban`, {
-      method: 'POST',
-    });
-  }
-
-  async deleteUser(id: string) {
-    return this.request(`/api/users/${id}`, {
-      method: 'DELETE',
-    });
-  }
-
-  async inviteAdmin(email: string, role: string) {
-    return this.request('/api/users/invite', {
-      method: 'POST',
-      body: JSON.stringify({ email, role }),
-    });
-  }
+  // User administration (create / edit / password / role / ban / delete) lives
+  // in `lib/api/users.ts`, next to the screen that uses it and properly typed.
+  // The duplicates that used to sit here were reachable only through the
+  // deleted server actions, and `/api/users/invite` no longer exists.
 
   // Admin endpoints
   async getAdminStats() {
@@ -385,13 +332,6 @@ class ApiClient {
     
     const queryString = searchParams.toString();
     return this.request(`/api/admin/audit-logs${queryString ? `?${queryString}` : ''}`);
-  }
-
-  async createSuperAdmin(email: string, password: string) {
-    return this.request('/api/admin/create-super-admin', {
-      method: 'POST',
-      body: JSON.stringify({ email, password }),
-    });
   }
 
   async getSystemHealth() {

@@ -1,7 +1,7 @@
 import express, { type Request, type Response, type Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '@propgroup/db';
-import { authenticateToken, requireAdmin, requireCrm, canSeeMoney, redactMoney, logAdminAction } from '../middleware/auth.js';
+import { authenticateToken, requireAdmin, requireCrm, canSeeMoney, redactMoney, stripMoneyInput, logAdminAction } from '../middleware/auth.js';
 import { asyncHandler } from '../utils/errors.js';
 import { sendSuccess, sendCreated, sendPaginated, sendNotFound, sendError } from '../utils/response.js';
 import { parsePagination, buildPaginationResponse } from '../utils/pagination.js';
@@ -819,8 +819,14 @@ router.get(
 
 function csvCell(v: unknown): string {
   if (v === null || v === undefined) return '';
-  const s = String(v);
-  return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  let s = String(v);
+  // Neutralise spreadsheet formula injection. A client name saved as
+  // `=HYPERLINK(...)` or `+cmd|...` is a live formula the moment someone opens
+  // the export in Excel, and this file is full of attacker-supplied text —
+  // every inquiry form on the public site lands in it. The leading tab keeps
+  // the value readable while making the cell inert.
+  if (/^[=+\-@\t\r]/.test(s)) s = `\t${s}`;
+  return /[",\n\r\t]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
 }
 
 router.get(
@@ -1243,7 +1249,7 @@ router.post(
     const lead = await prisma.lead.findUnique({ where: { id: req.params.id }, select: { id: true } });
     if (!lead) { sendNotFound(res, 'Lead'); return; }
 
-    const data = leadPropertySchema.parse(req.body);
+    const data = leadPropertySchema.parse(stripMoneyInput(req, req.body ?? {}));
     const property = await prisma.leadProperty.create({
       data: {
         ...data,
@@ -1267,7 +1273,7 @@ router.patch(
     const existing = await prisma.leadProperty.findUnique({ where: { id: req.params.pid } });
     if (!existing) { sendNotFound(res, 'Property'); return; }
 
-    const data = leadPropertySchema.partial().parse(req.body);
+    const data = leadPropertySchema.partial().parse(stripMoneyInput(req, req.body ?? {}));
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const patch: Record<string, any> = { ...data };
     if (data.externalUrl !== undefined) patch.externalUrl = data.externalUrl || null;
@@ -1474,7 +1480,7 @@ router.post(
     const lead = await prisma.lead.findUnique({ where: { id: req.params.id }, select: { id: true } });
     if (!lead) { sendNotFound(res, 'Lead'); return; }
 
-    const data = opportunitySchema.parse(req.body);
+    const data = opportunitySchema.parse(stripMoneyInput(req, req.body ?? {}));
     if (!data.listingId && !data.counterpartLeadId && !data.leadPropertyId && !data.externalTitle) {
       sendError(res, 400, 'Say what this is: a listing, a client, a seller property, or an external property');
       return;
@@ -1574,7 +1580,7 @@ router.patch(
     const existing = await prisma.leadOpportunity.findUnique({ where: { id: req.params.oid } });
     if (!existing) { sendNotFound(res, 'Opportunity'); return; }
 
-    const data = opportunityUpdateSchema.parse(req.body);
+    const data = opportunityUpdateSchema.parse(stripMoneyInput(req, req.body ?? {}));
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const patch: Record<string, any> = {};
     if (data.stage) patch.stage = data.stage;

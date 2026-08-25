@@ -91,8 +91,28 @@ router.get(
   })
 );
 
-// ── GET /:id — detail (public if FOR_SALE|FOR_RENT, else admin) ───────────────
+// ── GET /mine — units the signed-in user owns ─────────────────────────────────
+// Registered ABOVE `/:id`. Express matches in registration order, so while this
+// sat at the bottom of the file every request for it was answered by the
+// single-unit handler looking up a unit whose id is the literal string "mine".
+router.get(
+  '/mine',
+  authenticateToken,
+  asyncHandler(async (req: Request, res: Response) => {
+    const authReq = req as AuthenticatedRequest;
+    const units = await prisma.unit.findMany({
+      where: { ownerUserId: authReq.user.id },
+      include: {
+        building: { select: { id: true, title: true, city: true, caza: true, mohafazat: true, images: true, slug: true } },
+        listings: { where: { status: { notIn: ['ARCHIVED'] } }, select: { id: true, slug: true, intent: true, status: true, price: true, currency: true } },
+      },
+      orderBy: { updatedAt: 'desc' },
+    });
+    sendSuccess(res, units);
+  })
+);
 
+// ── GET /:id — detail (public if FOR_SALE|FOR_RENT, else admin) ───────────────
 router.get(
   '/:id',
   asyncHandler(async (req: Request, res: Response) => {
@@ -283,24 +303,6 @@ router.delete(
 
     await logAdminAction('DELETE_UNIT', 'unit', req.params.id, { buildingId: existing.buildingId }, authReq);
     sendSuccess(res, null, 'Unit deleted successfully');
-  })
-);
-
-// ── GET /mine — units assigned to the current user (their portfolio) ──────────
-router.get(
-  '/mine',
-  authenticateToken,
-  asyncHandler(async (req: Request, res: Response) => {
-    const authReq = req as AuthenticatedRequest;
-    const units = await prisma.unit.findMany({
-      where: { ownerUserId: authReq.user.id },
-      include: {
-        building: { select: { id: true, title: true, city: true, caza: true, mohafazat: true, images: true, slug: true } },
-        listings: { where: { status: { notIn: ['ARCHIVED'] } }, select: { id: true, slug: true, intent: true, status: true, price: true, currency: true } },
-      },
-      orderBy: { updatedAt: 'desc' },
-    });
-    sendSuccess(res, units);
   })
 );
 

@@ -40,7 +40,7 @@ export default function AISearchPage() {
         <div className="container mx-auto px-4">
           <div className="max-w-3xl mx-auto">
             <h2 className="text-lg font-bold text-slate-900 text-center mb-6">How It Works</h2>
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
               {[
                 { step: '1', title: 'Describe', desc: 'Type what you want in plain English' },
                 { step: '2', title: 'AI Filters', desc: 'Our AI extracts search criteria' },

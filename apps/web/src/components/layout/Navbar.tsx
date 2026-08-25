@@ -5,6 +5,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname } from 'next/navigation'
 import { useAuth } from '@/contexts/AuthContext'
+import { canAccessAdmin, adminHomeFor } from '@/lib/permissions'
 import { AuthModal } from '@/components/auth/AuthModal'
 import { Button } from '@/components/ui/button'
 import {
@@ -44,6 +45,16 @@ export function Navbar() {
     setIsProfileDropdownOpen(false)
   }, [pathname])
 
+  // With the menu open the page behind it must not scroll: on a phone the
+  // panel is taller than the viewport, and scrolling "the menu" was scrolling
+  // the page underneath instead.
+  useEffect(() => {
+    if (!isMenuOpen) return
+    const previous = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => { document.body.style.overflow = previous }
+  }, [isMenuOpen])
+
   const isActive = (path: string) => pathname === path
 
   const profileLinks = [
@@ -68,11 +79,15 @@ export function Navbar() {
               className="transform group-hover:scale-110 transition-all duration-300"
               priority
             />
-            <div>
-              <span className="font-bold text-xl text-slate-900 block leading-tight">
+            <div className="min-w-0">
+              <span className="font-bold text-lg sm:text-xl text-slate-900 block leading-tight">
                 PropGroup
               </span>
-              <span className="text-xs text-slate-500">Lebanon Real Estate</span>
+              {/* The strapline is the first thing to go when space is tight —
+                  it is decoration, the wordmark is not. */}
+              <span className="hidden sm:block text-xs text-slate-500 truncate">
+                Lebanon Real Estate
+              </span>
             </div>
           </Link>
 
@@ -166,9 +181,10 @@ export function Navbar() {
                   </Link>
                 )}
 
-                {/* Admin Button for Admin/Super Admin users */}
-                {(user.role === 'ADMIN' || user.role === 'SUPER_ADMIN') && !pathname.startsWith('/admin') && (
-                  <Link href="/admin">
+                {/* Back office. A CRM_MANAGER belongs here too — it just lands
+                    on the CRM rather than the dashboard. */}
+                {canAccessAdmin(user.role) && !pathname.startsWith('/admin') && (
+                  <Link href={adminHomeFor(user.role)}>
                     <Button size="sm" variant="outline" className="border-slate-300 text-slate-900 hover:bg-slate-100">
                       <Shield className="w-4 h-4 mr-2" />
                       Admin Panel
@@ -198,9 +214,8 @@ export function Navbar() {
           <div className="lg:hidden">
             <Button
               variant="ghost"
-              size="sm"
               onClick={() => setIsMenuOpen(!isMenuOpen)}
-              className="p-2"
+              className="h-11 w-11 p-0"
               aria-label={isMenuOpen ? 'Close menu' : 'Open menu'}
               aria-expanded={isMenuOpen}
               aria-controls="mobile-navigation"
@@ -214,10 +229,12 @@ export function Navbar() {
         <div
           id="mobile-navigation"
           className={`lg:hidden transition-all duration-300 ease-in-out ${
-            isMenuOpen ? 'max-h-screen opacity-100' : 'max-h-0 opacity-0 overflow-hidden'
+            isMenuOpen
+              ? 'max-h-[calc(100dvh-4rem)] overflow-y-auto overscroll-contain opacity-100'
+              : 'max-h-0 opacity-0 overflow-hidden'
           }`}
         >
-          <div className="py-4 space-y-1 border-t border-slate-200">
+          <div className="py-4 space-y-1 border-t border-slate-200 pg-safe-bottom">
             <MobileNavLink
               href="/"
               icon={<Home className="w-4 h-4" />}
@@ -275,18 +292,25 @@ export function Navbar() {
                     </div>
                   </div>
                   {!pathname.startsWith('/portal') && !pathname.startsWith('/admin') && (
-                    <Link href="/portal/dashboard" onClick={() => setIsMenuOpen(false)}>
-                      <Button variant="outline" size="sm" className="w-full border-slate-300 text-slate-900">
+                    <Link href="/portal/dashboard" onClick={() => setIsMenuOpen(false)} className="block">
+                      <Button variant="outline" className="w-full min-h-11 border-slate-300 text-slate-900">
                         <LayoutDashboard className="w-4 h-4 mr-2" />
                         My Portal
+                      </Button>
+                    </Link>
+                  )}
+                  {canAccessAdmin(user.role) && !pathname.startsWith('/admin') && (
+                    <Link href={adminHomeFor(user.role)} onClick={() => setIsMenuOpen(false)} className="block">
+                      <Button className="w-full min-h-11 bg-zinc-900 text-white hover:bg-zinc-800">
+                        <Shield className="w-4 h-4 mr-2" />
+                        Admin Panel
                       </Button>
                     </Link>
                   )}
                   <Button
                     onClick={signOut}
                     variant="outline"
-                    size="sm"
-                    className="w-full"
+                    className="w-full min-h-11"
                   >
                     <LogOut className="w-4 h-4 mr-2" />
                     Sign Out
@@ -294,7 +318,7 @@ export function Navbar() {
                 </div>
               ) : (
                 <AuthModal>
-                  <Button size="sm" className="w-full bg-sky-600 hover:bg-sky-700 text-white">
+                  <Button className="w-full min-h-11 bg-sky-600 hover:bg-sky-700 text-white">
                     <Sparkles className="w-4 h-4 mr-2" />
                     Sign In / Get Started
                   </Button>

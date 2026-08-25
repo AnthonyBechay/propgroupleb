@@ -225,6 +225,23 @@ export function redactMoney<T>(req: Request, payload: T): T {
 }
 
 /**
+ * Drop money fields from an INBOUND body when the caller may not see them.
+ *
+ * A role that cannot read the commission must not be able to write it either.
+ * Two reasons, and the second is the one that actually bit us: a writable field
+ * is a read oracle (set 1, watch a total move), and the CRM's deal forms post
+ * every field they render — so a CRM_MANAGER saving an otherwise unrelated edit
+ * on a closed deal posted `commissionUsd: null` and silently erased the figure
+ * an admin had recorded.
+ */
+export function stripMoneyInput<T extends Record<string, unknown>>(req: Request, body: T): T {
+  if (canSeeMoney(req)) return body;
+  const out = { ...body };
+  for (const field of MONEY_FIELDS) delete out[field];
+  return out;
+}
+
+/**
  * Log an admin action to the audit log.
  */
 export async function logAdminAction(

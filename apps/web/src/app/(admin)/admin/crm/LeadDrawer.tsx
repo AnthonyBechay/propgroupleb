@@ -19,6 +19,7 @@ import { SellerProperties } from './SellerProperties'
 import { DealPanel } from './DealPanel'
 import { ShareShortlistModal } from './ShareShortlistModal'
 import { useAuth } from '@/contexts/AuthContext'
+import { canSeeMoney as canSeeMoneyFor } from '@/lib/permissions'
 import { listingRef } from '@/lib/reference'
 
 type TabKey = 'overview' | 'properties' | 'activity' | 'matches'
@@ -122,7 +123,7 @@ export function LeadDrawer({ lead, onClose, onChanged }: { lead: Lead; onClose: 
   const { user } = useAuth()
   // Presentation only: the server strips these fields for roles that may not
   // see them, so hiding here just avoids empty boxes.
-  const canSeeMoney = user?.role === 'ADMIN' || user?.role === 'SUPER_ADMIN'
+  const canSeeMoney = canSeeMoneyFor(user?.role)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -701,6 +702,7 @@ export function LeadDrawer({ lead, onClose, onChanged }: { lead: Lead; onClose: 
                 subtitle: o.subject?.subtitle ?? undefined,
                 isClient: o.subject?.kind === 'CLIENT' || !!o.counterpartLeadId,
               })}
+              canSeeMoney={canSeeMoney}
               onChanged={() => { load(); onChanged() }}
             />
           </section>
@@ -711,6 +713,7 @@ export function LeadDrawer({ lead, onClose, onChanged }: { lead: Lead; onClose: 
             <SellerProperties
               leadId={l.id}
               properties={l.properties ?? []}
+              canSeeMoney={canSeeMoney}
               onChanged={() => { load(); onChanged() }}
             />
           )}

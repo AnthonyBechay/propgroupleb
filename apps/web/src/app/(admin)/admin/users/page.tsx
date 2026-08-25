@@ -1,66 +1,90 @@
 'use client'
 
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Activity, Loader2, Search, Shield, UserPlus } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
-import { useEffect, useState } from 'react'
 import { UserManagementTable } from '@/components/admin/UserManagementTable'
-import { InviteAdminModal } from '@/components/admin/InviteAdminModal'
-import { Button } from '@/components/ui/button'
-import { UserPlus, Shield, Activity, Loader2 } from 'lucide-react'
+import { UserFormModal } from '@/components/admin/UserFormModal'
+import { listUsers, type ManagedUser } from '@/lib/api/users'
 import { normalizeApiUrl } from '@/lib/utils/api-url'
+import { ASSIGNABLE_ROLES, ROLE_LABELS, isSuperAdmin, type Role } from '@/lib/permissions'
 
-const API_BASE_URL = normalizeApiUrl(process.env.NEXT_PUBLIC_API_URL)
+const API = normalizeApiUrl(process.env.NEXT_PUBLIC_API_URL)
 
-export default function SuperAdminUsersPage() {
-  const { user } = useAuth()
-  const [users, setUsers] = useState<any[]>([])
-  const [recentActions, setRecentActions] = useState<any[]>([])
+interface AuditEntry {
+  id: string
+  action: string
+  targetType: string
+  targetId?: string | null
+  createdAt: string
+  admin?: { firstName?: string | null; lastName?: string | null; email?: string | null }
+}
+
+type Dialog =
+  | { mode: 'create' }
+  | { mode: 'edit'; user: ManagedUser }
+  | { mode: 'password'; user: ManagedUser }
+  | null
+
+export default function AdminUsersPage() {
+  const { user: currentUser } = useAuth()
+  const [users, setUsers] = useState<ManagedUser[]>([])
+  const [audit, setAudit] = useState<AuditEntry[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [dialog, setDialog] = useState<Dialog>(null)
+  const [query, setQuery] = useState('')
+  const [roleFilter, setRoleFilter] = useState<'all' | Role>('all')
 
-  useEffect(() => {
-    async function fetchData() {
-      try {
-        // Call backend directly so auth cookies are sent to the correct domain
-        const [usersRes, actionsRes] = await Promise.all([
-          fetch(`${API_BASE_URL}/api/users?limit=100`, {
-            credentials: 'include',
-            headers: { 'Content-Type': 'application/json' },
-          }),
-          fetch(`${API_BASE_URL}/api/admin/audit-logs?limit=10`, {
-            credentials: 'include',
-            headers: { 'Content-Type': 'application/json' },
-          }),
-        ])
+  const canManage = isSuperAdmin(currentUser?.role)
 
-        if (usersRes.ok) {
-          const usersData = await usersRes.json()
-          setUsers(usersData.data || [])
-        } else {
-          const errData = await usersRes.json().catch(() => ({}))
-          setError(errData.message || errData.error || `Failed to load users (${usersRes.status})`)
-        }
-
-        if (actionsRes.ok) {
-          const actionsData = await actionsRes.json()
-          setRecentActions(actionsData.data || [])
-        }
-      } catch (err: any) {
-        console.error('Error fetching users:', err)
-        setError(err.message || 'Network error')
-      } finally {
-        setLoading(false)
-      }
+  const load = useCallback(async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const [people, logs] = await Promise.all([
+        listUsers(200),
+        // The audit list is a nice-to-have; a failure here must not blank the
+        // page the operator actually came for.
+        fetch(`${API}/api/admin/audit-logs?limit=10`, { credentials: 'include', cache: 'no-store' })
+          .then((r) => (r.ok ? r.json() : { data: [] }))
+          .catch(() => ({ data: [] })),
+      ])
+      setUsers(people ?? [])
+      setAudit(logs.data ?? [])
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load users')
+    } finally {
+      setLoading(false)
     }
-
-    fetchData()
   }, [])
+
+  useEffect(() => { load() }, [load])
+
+  const visible = useMemo(() => {
+    const needle = query.trim().toLowerCase()
+    return users.filter((u) => {
+      if (roleFilter !== 'all' && u.role !== roleFilter) return false
+      if (!needle) return true
+      return [u.email, u.firstName, u.lastName].filter(Boolean).some((v) =>
+        String(v).toLowerCase().includes(needle)
+      )
+    })
+  }, [users, query, roleFilter])
+
+  const counts = useMemo(() => ({
+    total: users.length,
+    staff: users.filter((u) => u.role === 'ADMIN' || u.role === 'SUPER_ADMIN').length,
+    crm: users.filter((u) => u.role === 'CRM_MANAGER').length,
+    banned: users.filter((u) => u.bannedAt).length,
+  }), [users])
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-[400px]">
+      <div className="flex min-h-[400px] items-center justify-center">
         <div className="text-center">
-          <Loader2 className="h-8 w-8 animate-spin text-blue-600 mx-auto mb-4" />
-          <p className="text-gray-600">Loading users...</p>
+          <Loader2 className="mx-auto mb-4 h-8 w-8 animate-spin text-zinc-700" />
+          <p className="text-slate-500">Loading users…</p>
         </div>
       </div>
     )
@@ -68,16 +92,16 @@ export default function SuperAdminUsersPage() {
 
   if (error) {
     return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <div className="text-center max-w-md">
-          <Shield className="h-12 w-12 text-red-400 mx-auto mb-4" />
-          <h3 className="text-lg font-semibold text-gray-900 mb-2">Failed to load users</h3>
-          <p className="text-gray-500 text-sm mb-4">{error}</p>
+      <div className="flex min-h-[400px] items-center justify-center px-4">
+        <div className="max-w-md text-center">
+          <Shield className="mx-auto mb-4 h-12 w-12 text-red-400" />
+          <h2 className="mb-2 text-lg font-semibold text-slate-900">Couldn&apos;t load users</h2>
+          <p className="mb-4 text-sm text-slate-500">{error}</p>
           <button
-            onClick={() => window.location.reload()}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm"
+            onClick={load}
+            className="min-h-11 rounded-lg bg-zinc-900 px-4 text-sm font-semibold text-white hover:bg-zinc-800"
           >
-            Try Again
+            Try again
           </button>
         </div>
       </div>
@@ -85,118 +109,124 @@ export default function SuperAdminUsersPage() {
   }
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="sm:flex sm:items-center">
-        <div className="sm:flex-auto">
-          <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-            <Shield className="h-6 w-6 text-purple-600" />
-            User & Admin Management
+    <div className="space-y-5">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h1 className="flex items-center gap-2 text-xl font-bold text-slate-900 sm:text-2xl">
+            <Shield className="h-6 w-6 shrink-0 text-zinc-700" />
+            Users &amp; access
           </h1>
-          <p className="mt-2 text-sm text-gray-700">
-            Manage all users, admins, and their permissions.
+          <p className="mt-1 text-sm text-slate-600">
+            Create accounts, set passwords, and decide what each person can reach.
           </p>
         </div>
-        <div className="mt-4 sm:ml-16 sm:mt-0 sm:flex-none">
-          <InviteAdminModal currentUserId={user?.id || ''}>
-            <Button className="bg-purple-600 hover:bg-purple-700">
-              <UserPlus className="h-4 w-4 mr-2" />
-              Invite Admin
-            </Button>
-          </InviteAdminModal>
-        </div>
+        {canManage && (
+          <button
+            onClick={() => setDialog({ mode: 'create' })}
+            className="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-lg bg-zinc-900 px-4 text-sm font-semibold text-white hover:bg-zinc-800 sm:flex-none"
+          >
+            <UserPlus className="h-4 w-4" />
+            Create user
+          </button>
+        )}
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="bg-white p-6 rounded-lg shadow">
-          <div className="text-sm text-gray-600">Total Users</div>
-          <div className="text-2xl font-bold">
-            {users.length}
-          </div>
-        </div>
-        <div className="bg-white p-6 rounded-lg shadow">
-          <div className="text-sm text-gray-600">Admins</div>
-          <div className="text-2xl font-bold text-blue-600">
-            {users.filter((u: any) => u.role === 'ADMIN' || u.role === 'SUPER_ADMIN').length}
-          </div>
-        </div>
-        <div className="bg-white p-6 rounded-lg shadow">
-          <div className="text-sm text-gray-600">Agents</div>
-          <div className="text-2xl font-bold text-purple-600">
-            {users.filter((u: any) => u.role === 'AGENT').length}
-          </div>
-        </div>
-        <div className="bg-white p-6 rounded-lg shadow">
-          <div className="text-sm text-gray-600">Banned Users</div>
-          <div className="text-2xl font-bold text-red-600">
-            {users.filter((u: any) => u.bannedAt).length}
-          </div>
-        </div>
+      {!canManage && (
+        <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+          You can view accounts here, but only a super admin can create users or change roles.
+        </p>
+      )}
+
+      {/* 2-up on a phone rather than a single stacked column — four one-number
+          tiles at full width push everything else below the fold. */}
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <Stat label="Total users" value={counts.total} />
+        <Stat label="Admins" value={counts.staff} tone="text-blue-600" />
+        <Stat label="CRM managers" value={counts.crm} tone="text-emerald-600" />
+        <Stat label="Banned" value={counts.banned} tone="text-red-600" />
       </div>
 
-      {/* User Management Table */}
-      <div className="bg-white shadow-sm rounded-lg">
-        <div className="px-6 py-4 border-b border-gray-200">
-          <h2 className="text-lg font-medium text-gray-900">All Users</h2>
+      <div className="flex flex-wrap gap-2">
+        <div className="relative min-w-[200px] flex-1">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search name or email"
+            /* text-base below sm: anything smaller makes iOS Safari zoom the
+               page on focus and never zoom back out. */
+            className="min-h-11 w-full rounded-lg border border-slate-200 bg-white pl-9 pr-3 text-base text-slate-900 focus:outline-none focus:ring-2 focus:ring-zinc-900/10 sm:text-sm"
+          />
+        </div>
+        <select
+          value={roleFilter}
+          onChange={(e) => setRoleFilter(e.target.value as 'all' | Role)}
+          className="min-h-11 rounded-lg border border-slate-200 bg-white px-3 text-base text-slate-900 focus:outline-none focus:ring-2 focus:ring-zinc-900/10 sm:text-sm"
+        >
+          <option value="all">All roles</option>
+          {ASSIGNABLE_ROLES.map((r) => (
+            <option key={r} value={r}>{ROLE_LABELS[r]}</option>
+          ))}
+        </select>
+      </div>
+
+      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+        <div className="border-b border-slate-200 px-4 py-3 sm:px-6">
+          <h2 className="text-base font-medium text-slate-900">
+            {visible.length} {visible.length === 1 ? 'person' : 'people'}
+          </h2>
         </div>
         <UserManagementTable
-          users={users}
-          currentUserId={user?.id || ''}
+          users={visible}
+          currentUserId={currentUser?.id ?? ''}
+          onEdit={(u) => setDialog({ mode: 'edit', user: u })}
+          onSetPassword={(u) => setDialog({ mode: 'password', user: u })}
+          onChanged={load}
         />
       </div>
 
-      {/* Recent Admin Activity */}
-      {recentActions.length > 0 && (
-        <div className="bg-white shadow-sm rounded-lg">
-          <div className="px-6 py-4 border-b border-gray-200">
-            <h2 className="text-lg font-medium text-gray-900 flex items-center gap-2">
-              <Activity className="h-5 w-5" />
-              Recent Admin Activity
+      {audit.length > 0 && (
+        <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+          <div className="border-b border-slate-200 px-4 py-3 sm:px-6">
+            <h2 className="flex items-center gap-2 text-base font-medium text-slate-900">
+              <Activity className="h-4 w-4" /> Recent admin activity
             </h2>
           </div>
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Admin
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Action
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Target
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Date
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {recentActions.map((action: any) => (
-                  <tr key={action.id}>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {action.admin?.firstName} {action.admin?.lastName || action.admin?.email}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm">
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                        {action.action}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {action.targetType} {action.targetId && `(${action.targetId.slice(0, 8)}...)`}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {new Date(action.createdAt).toLocaleString()}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <ul className="divide-y divide-slate-100">
+            {audit.map((entry) => (
+              <li key={entry.id} className="flex flex-wrap items-center gap-x-2 gap-y-1 px-4 py-3 text-sm sm:px-6">
+                <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-700">
+                  {entry.action}
+                </span>
+                <span className="min-w-0 flex-1 truncate text-slate-600">
+                  {entry.admin?.firstName || entry.admin?.email || 'Someone'} · {entry.targetType}
+                </span>
+                <span className="text-xs text-slate-400">
+                  {new Date(entry.createdAt).toLocaleString()}
+                </span>
+              </li>
+            ))}
+          </ul>
         </div>
       )}
+
+      {dialog && (
+        <UserFormModal
+          mode={dialog.mode}
+          user={dialog.mode === 'create' ? null : dialog.user}
+          onClose={() => setDialog(null)}
+          onSaved={load}
+        />
+      )}
+    </div>
+  )
+}
+
+function Stat({ label, value, tone = 'text-slate-900' }: { label: string; value: number; tone?: string }) {
+  return (
+    <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+      <div className="text-xs text-slate-500 sm:text-sm">{label}</div>
+      <div className={`text-2xl font-bold ${tone}`}>{value}</div>
     </div>
   )
 }

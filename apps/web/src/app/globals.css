@@ -128,6 +128,33 @@
 
   html {
     scroll-behavior: smooth;
+    /* iOS Safari inflates text in landscape unless told not to. */
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+  }
+
+  /* ── Phones ──────────────────────────────────────────────────────────────
+     iOS Safari zooms the entire page in whenever it focuses a form control
+     whose font is under 16px, and it never zooms back out. Most of this app's
+     inputs are `text-sm` (14px), so every admin form, every filter box and the
+     login page jumped and then had to be pinched back. `max(16px, …)` raises
+     only the ones that would trigger it and leaves anything already larger
+     alone. Above 768px the original sizes apply untouched. */
+  @media (max-width: 767px) {
+    input:not([type='checkbox']):not([type='radio']),
+    select,
+    textarea {
+      font-size: max(16px, 1em);
+    }
+  }
+
+  /* A tap that lands on a button shouldn't also select the label text, and
+     the grey flash Android draws over every tap makes custom buttons look
+     broken. Text content keeps normal selection. */
+  button,
+  [role='button'],
+  a {
+    -webkit-tap-highlight-color: transparent;
   }
 
   ::-webkit-scrollbar {
@@ -147,6 +174,31 @@
   ::-webkit-scrollbar-thumb:hover {
     background-color: hsl(var(--muted-foreground) / 0.5);
   }
+}
+
+/* Declared with `@utility`, not as plain classes inside `@layer utilities`.
+   Tailwind v4 can only build variants (`lg:`, `max-lg:`, `hover:`) for
+   utilities it knows about; hand-written CSS in a layer is invisible to it, so
+   `lg:pg-scroll-x` silently generated nothing at all. The `pg-` classes in
+   design-system.css have the same limitation — if you need a variant on one,
+   move it here first. */
+
+/* Horizontal scrollers (the CRM board, wide admin tables) get momentum and snap
+   on touch, and stop rubber-banding the whole page when they hit the end. */
+@utility pg-scroll-x {
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+  scroll-snap-type: x proximity;
+}
+
+@utility pg-snap-start {
+  scroll-snap-align: start;
+}
+
+/* Bottom-of-screen elements must clear the iPhone home indicator. */
+@utility pg-safe-bottom {
+  padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
 }
 
 @layer utilities {

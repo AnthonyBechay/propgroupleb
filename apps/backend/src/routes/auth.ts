@@ -216,7 +216,15 @@ router.put(
     const hashedNew = await bcrypt.hash(newPassword, 12);
     await prisma.user.update({
       where: { id: authReq.user.id },
-      data: { password: hashedNew },
+      data: {
+        password: hashedNew,
+        // Burn any reset link still in flight. Someone who changes their
+        // password because they suspect a compromise expects exactly that; a
+        // live token from an hour ago quietly outranking the new password is
+        // the opposite of what they just did.
+        resetToken: null,
+        resetTokenExpiry: null,
+      },
     });
 
     sendSuccess(res, null, 'Password changed successfully');
@@ -229,6 +237,11 @@ router.post(
   asyncHandler(async (req: Request, res: Response) => {
     const { email } = req.body;
     if (!email) {
+      res.status(400).json({ error: 'Email is required' });
+      return;
+    }
+
+    if (typeof email !== 'string') {
       res.status(400).json({ error: 'Email is required' });
       return;
     }

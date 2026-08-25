@@ -136,6 +136,24 @@ so many closed deals had no figure against them. When none is recorded,
 and **labels it "est."** — never silently. It returns null rather than guess on
 a non-USD price.
 
+### Commission and `CRM_MANAGER`
+
+`redactMoney` strips `commissionUsd` from every `/api/crm` response for a role
+that may not see it (one `res.json` wrapper at the top of the router, not 24
+call sites). `stripMoneyInput` drops it from every **inbound** body for the same
+role, which matters for a second reason: the deal forms post every field they
+render, so a `CRM_MANAGER` saving an unrelated edit on a closed deal used to
+send `commissionUsd: null` and silently erase the figure an admin had recorded.
+
+`GET /api/crm/earnings` is `requireAdmin`, not `requireCrm`.
+
+**`soldPrice` is deliberately still visible to `CRM_MANAGER`** — it is the
+client's number, not the agency's, and somebody running the pipeline has to know
+what a property went for to price the next one. Hiding it once made the role
+unable to do the job it exists for. A determined holder of the role can multiply
+it by a commission rate and get an estimate; that is the accepted trade-off, not
+an oversight.
+
 Moving a deal to `VIEWING_BOOKED` does **not** invent a date. The card shows a
 red "No date set" instead, for the same reason cadence-derived follow-ups were
 ripped out: a date nobody agreed is worse than no date.
@@ -183,6 +201,25 @@ Bedrooms aren't scored for investors or international stock.
 - Use `pg-` prefixed utilities from `src/styles/design-system.css` where available.
 - **Three layouts**: main site (navbar + footer), `/portal/*` (its own sidebar), `/(admin)/admin/*` (sidebar + header). Pick the right one — don't wrap portal/admin pages in the marketing navbar.
 
+### Mobile rules (the admin is used from a phone)
+
+- **Inputs must render at ≥16px below `md`.** iOS Safari zooms the whole page in
+  when it focuses a smaller control and never zooms back out. `globals.css`
+  applies `font-size: max(16px, 1em)` under 768px, so a `text-sm` field is safe;
+  don't undo it with an inline `font-size`.
+- **Tap targets ≥44px** (`min-h-11`) on anything a thumb has to find. Icon-only
+  buttons at `p-1.5` are 28px and get mis-tapped.
+- **One navigation, two presentations.** `Sidebar` renders the desktop rail and
+  the mobile drawer from the same list. It used to be two hand-maintained
+  copies with different colours and different links.
+- **`overflow-hidden` on a table wrapper clips, it doesn't scroll.** Use
+  `pg-scroll-x`, or better, drop columns below a breakpoint and fold what
+  matters into the first cell.
+- **Touch has no HTML5 drag-and-drop.** The CRM board's drag works on desktop
+  only; every card also carries a stage `<select>` below `lg`, and the board
+  shows one column at a time there rather than seven 264px columns in a
+  side-scroller.
+
 ---
 
 ## Caching strategy (important — read before adding any cache layer)
@@ -193,6 +230,15 @@ The app was cleaned up from a round of broken `unstable_cache` usage. The rules 
 - **Portal and admin pages**: dynamic (server-rendered on demand). Don't cache.
 - **No `unstable_cache`** unless you **also** wire up `revalidateTag(...)` at every mutation site. Historically the app had six `unstable_cache` wrappers with typo'd tags (`property-property`, `favorites-user`) that could never be invalidated, silently serving 5–60 min stale data. They were deleted wholesale. If you add one, test invalidation.
 - **Prisma → API → page** is already fast enough. Prefer per-page `revalidate` over per-query caching.
+- **`/market-analysis` and `/portal/market-analysis` render on demand** (no
+  `DATABASE_URL` at build), so their query runs per request. Aggregate in
+  Postgres (`groupBy` / `aggregate`), never by pulling rows into Node — that
+  page used to load every public building and every active listing on every
+  visit to produce three numbers.
+- **There is no `middleware.ts`.** It was a no-op returning `NextResponse.next()`
+  matched against nearly every path, i.e. a 39 kB edge invocation per request
+  that did nothing. Auth is enforced by the layouts and by the API. If you add
+  one back, give it a narrow `matcher` and a reason.
 
 ---
 
@@ -236,6 +282,57 @@ The app was cleaned up from a round of broken `unstable_cache` usage. The rules 
 - Google OAuth: Passport redirects to Google, callback sets the same JWT cookie.
 - **Do not** add `express-session`, `passport.session()`, or `passport-jwt`. They were removed as dead code. JWT extraction happens inline in `authenticateToken`.
 
+### The cookie is `SameSite=None`, so writes are Origin-checked
+
+The API and both sites are different hosts, so the auth cookie has to be
+`SameSite=None` — which means the browser attaches it to *cross-site* requests
+too. CORS does not close that hole: a plain `<form>` POST is a simple request,
+it is sent with no preflight, and an attacker never needs to read the response
+to have already caused the write.
+
+`index.ts` therefore rejects any non-GET request carrying an `Origin` that isn't
+in `ALLOWED_ORIGINS`. Requests with **no** Origin pass — that is server-to-server
+traffic (propgrp.com's SSR, health checks, curl), which cannot be a forged
+browser request. **Adding a new frontend origin means adding it to
+`ALLOWED_ORIGINS`, or every mutation from it 403s.**
+
+## Roles and the back office
+
+Five roles (`Role` in `schema.prisma`). Three reach `/admin`:
+
+| Role | Gets |
+|---|---|
+| `CRM_MANAGER` | `/admin/crm` only. Never commission — see below. |
+| `ADMIN` | The whole back office, commission included. |
+| `SUPER_ADMIN` | …plus creating users, setting passwords, assigning roles. |
+
+`apps/web/src/lib/permissions.ts` is the single source of truth on the frontend
+(`canAccessAdmin`, `canAccessAdminPath`, `canSeeMoney`, `adminHomeFor`); it
+mirrors `middleware/auth.ts` on the backend. `canAccessAdminPath` is an
+**allow-list** of prefixes, so a page added later is invisible to `CRM_MANAGER`
+until somebody decides otherwise.
+
+None of it is a security boundary — the API enforces every rule. It only stops
+the UI offering a door the server will slam.
+
+### Creating users
+
+`POST /api/users` (super admin) creates a working account: email, **password**,
+role. This replaced an `/invite` endpoint that wrote a row with a null password
+— which no login can ever match — and promised a setup email nothing sent.
+`POST /api/users/:id/password` resets one; `PUT /api/users/:id` edits details
+and rights. All three are audited, and none of them ever log the password.
+
+The last active `SUPER_ADMIN` cannot be demoted, deactivated, banned or deleted.
+There is no console to recover from that, and `db push` deploys have no seed
+step that would put one back.
+
+**User admin is called straight from the browser** (`lib/api/users.ts`), not
+through a server action. The server actions that used to do it forwarded to
+`apiClient`, which authenticates with `credentials: 'include'` — a browser-only
+instruction. Inside a server action the fetch carried no cookie at all, so every
+role change, ban and delete reached the API unauthenticated and 401'd.
+
 ---
 
 ## Frontend patterns (`apps/web/src/**`)
@@ -277,6 +374,12 @@ When generating new share links, always go through the `ShareToken` table. Don't
 - ❌ Re-create a kanban keyed on `lead.status`. The board moves deals; a client
   is at several stages at once and a column per person cannot say that.
 - ❌ Show a forecast commission without marking it as one.
+- ❌ Let a role that can't read `commissionUsd` write it. Read and write are one
+  decision (`canSeeMoney`), or a form post quietly wipes the figure.
+- ❌ Hardcode `role === 'ADMIN' || role === 'SUPER_ADMIN'` in a component. Use
+  `lib/permissions.ts`; the inline copies had already drifted apart.
+- ❌ Call the API from a Next server action with `apiClient`. `credentials:
+  'include'` does nothing on the server — the request goes out with no cookie.
 - ❌ Add a fifth client "type". The four intents are fixed; anything else is a flag on the client.
 - ❌ Put a deal stage on the client. Viewing/negotiating belong to the opportunity — a client can be at different stages on different properties.
 - ❌ Assume a `Building`'s local `buildingSchema` in `routes/buildings.ts` is the shared one in `schemas/index.ts`. It shadows it; adding a field to the wrong one fails silently.
@@ -294,7 +397,8 @@ When generating new share links, always go through the `ShareToken` table. Don't
 - Field-level encryption for PII
 - Wire up reserved Prisma models (Transaction, Notification, Message, …) when those features land
 - **propgrp.com still runs on its own codebase and database.** The unified back office holds its data; pointing that frontend at this API is unfinished. Options: a compatibility layer exposing the old `Property` shape, or updating that frontend to `/api/listings`.
-- Mobile: the CRM board is horizontally-scrolling 228px columns — poor on a phone. Today and the client directory are fine.
+- Mobile: the marketing pages, portal and admin have had a responsiveness pass.
+  Not re-checked on a device since — verify on a real phone before trusting it.
 - No duplicate detection when adding a client by hand.
 - WhatsApp/Meta intake was built and then removed at the owner's request. If it returns, note that Coexistence (app + API on one number) requires Embedded Signup and Tech Provider status — a business cannot self-onboard its own number.
 

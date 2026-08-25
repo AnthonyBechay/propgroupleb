@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react'
 import {
   Phone, MessageCircle, Calendar, AlertCircle, Handshake,
-  TrendingUp, Loader2, Check, Plus, X,
+  TrendingUp, Loader2, Check, Plus, X, ChevronRight,
 } from 'lucide-react'
 import {
   type Deal, type OpportunityStage, DEAL_COLUMNS, dealColumnOf, STAGE_LABELS,
@@ -51,6 +51,11 @@ export function DealBoard({
   const [onlyAlerts, setOnlyAlerts] = useState(false)
   const [dragging, setDragging] = useState<string | null>(null)
   const [over, setOver] = useState<string | null>(null)
+  // Below `lg` the board shows one column at a time. Seven 264px columns in a
+  // horizontal scroller is a kanban on paper and a swipe-hunt in practice: on a
+  // 390px screen you can see one and a half of them and you cannot tell where
+  // the pipeline is without scrolling the whole way across.
+  const [mobileColumn, setMobileColumn] = useState<string>(DEAL_COLUMNS[0].key)
 
   const filtered = useMemo(() => {
     const needle = q.trim().toLowerCase()
@@ -123,7 +128,31 @@ export function DealBoard({
         </div>
       </div>
 
-      <div className="flex gap-2.5 overflow-x-auto pb-3">
+      {/* Phone: pick a column, then read it full width. The chips double as the
+          pipeline summary you'd otherwise have to scroll sideways to get. */}
+      <div className="lg:hidden pg-scroll-x -mx-1 flex gap-1.5 px-1 pb-1">
+        {DEAL_COLUMNS.map((col) => {
+          const count = filtered.filter((d) => dealColumnOf(d) === col.key).length
+          const active = mobileColumn === col.key
+          return (
+            <button
+              key={col.key}
+              onClick={() => setMobileColumn(col.key)}
+              className={`pg-snap-start inline-flex min-h-10 shrink-0 items-center gap-1.5 rounded-lg border px-3 text-sm font-medium transition-colors ${
+                active
+                  ? 'border-slate-900 bg-slate-900 text-white'
+                  : 'border-slate-200 bg-white text-slate-600'
+              }`}
+            >
+              <span className={`h-2 w-2 rounded-full ${col.accent}`} />
+              {col.label}
+              <span className={active ? 'text-white/70' : 'text-slate-400'}>{count}</span>
+            </button>
+          )
+        })}
+      </div>
+
+      <div className="flex gap-2.5 pb-3 max-lg:flex-col lg:pg-scroll-x">
         {DEAL_COLUMNS.map((col) => {
           const cards = filtered.filter((d) => dealColumnOf(d) === col.key)
           const value = cards.reduce((t, d) => t + (dealCommission(d)?.usd ?? 0), 0)
@@ -143,11 +172,13 @@ export function DealBoard({
                 if (!deal || dealColumnOf(deal) === col.key) return
                 onMove(id, col.stage)
               }}
-              className={`w-[264px] shrink-0 rounded-xl border transition-colors ${
+              className={`rounded-xl border transition-colors lg:pg-snap-start lg:w-[264px] lg:shrink-0 ${
+                mobileColumn === col.key ? 'max-lg:block' : 'max-lg:hidden'
+              } ${
                 over === col.key ? 'border-slate-900 bg-slate-50' : 'border-slate-200 bg-slate-50/60'
               }`}
             >
-              <div className="p-2.5 border-b border-slate-200">
+              <div className="p-2.5 border-b border-slate-200 max-lg:hidden">
                 <div className="flex items-center gap-1.5">
                   <span className={`h-2 w-2 rounded-full ${col.accent}`} />
                   <span className="text-sm font-semibold text-slate-900">{col.label}</span>
@@ -161,6 +192,8 @@ export function DealBoard({
                 <p className="text-[11px] text-slate-400 mt-0.5">{col.hint}</p>
               </div>
 
+              <p className="px-2.5 pt-2 text-[11px] text-slate-400 lg:hidden">{col.hint}</p>
+
               <div className="p-1.5 space-y-1.5 min-h-[120px]">
                 {cards.map((d) => (
                   <DealCard
@@ -171,6 +204,7 @@ export function DealBoard({
                     onDragStart={() => setDragging(d.id)}
                     onOpenClient={onOpenClient}
                     onSetCommission={onSetCommission}
+                    onMove={onMove}
                     onRemove={onRemoveDeal}
                   />
                 ))}
@@ -197,7 +231,7 @@ export function DealBoard({
 }
 
 function DealCard({
-  deal: d, canSeeMoney, busy, onDragStart, onOpenClient, onSetCommission, onRemove,
+  deal: d, canSeeMoney, busy, onDragStart, onOpenClient, onSetCommission, onMove, onRemove,
 }: {
   deal: Deal
   canSeeMoney: boolean
@@ -205,6 +239,8 @@ function DealCard({
   onDragStart: () => void
   onOpenClient: (leadId: string) => void
   onSetCommission: (dealId: string, usd: number) => void
+  /** Touch has no drag-and-drop, so a phone moves deals with this instead. */
+  onMove: (dealId: string, stage: OpportunityStage) => void
   onRemove: (deal: Deal) => void
 }) {
   const [editing, setEditing] = useState(false)
@@ -313,24 +349,47 @@ function DealCard({
         </div>
       )}
 
+      {/* Moving a deal on a phone. HTML5 drag-and-drop emits no events on touch,
+          so without this the board is read-only on the device it is most often
+          opened on. Desktop keeps dragging and shows the stage as a label. */}
+      <div className="mt-1.5 lg:hidden" onClick={(e) => e.stopPropagation()}>
+        <label className="flex items-center gap-1.5">
+          <span className="sr-only">Stage for {d.subject?.title ?? 'this deal'}</span>
+          <ChevronRight className="h-3 w-3 shrink-0 text-slate-300" />
+          <select
+            value={d.stage}
+            disabled={busy}
+            onChange={(e) => onMove(d.id, e.target.value as OpportunityStage)}
+            className="min-h-9 w-full rounded-md border border-slate-200 bg-white px-1.5 text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-900/10"
+          >
+            {DEAL_COLUMNS.map((c) => (
+              <option key={c.key} value={c.stage}>{c.label}</option>
+            ))}
+          </select>
+        </label>
+      </div>
+
       {/* Reaching them shouldn't need the drawer */}
       <div className="flex items-center gap-1 mt-1.5" onClick={(e) => e.stopPropagation()}>
-        <span className="text-[10px] text-slate-300 flex-1">{STAGE_LABELS[d.stage]}</span>
+        <span className="text-[10px] text-slate-300 flex-1 max-lg:hidden">{STAGE_LABELS[d.stage]}</span>
+        <span className="flex-1 lg:hidden" />
         {d.lead.phone && (
           <a
             href={`tel:${d.lead.phone}`}
-            className="p-1 rounded text-slate-400 hover:text-slate-900 hover:bg-slate-100"
+            aria-label={`Call ${d.lead.name}`}
+            className="flex h-9 w-9 items-center justify-center rounded text-slate-400 hover:bg-slate-100 hover:text-slate-900 lg:h-auto lg:w-auto lg:p-1"
           >
-            <Phone className="h-3 w-3" />
+            <Phone className="h-4 w-4 lg:h-3 lg:w-3" />
           </a>
         )}
         {phone && (
           <a
             href={`https://wa.me/${phone.replace(/[^0-9]/g, '')}`}
             target="_blank" rel="noopener noreferrer"
-            className="p-1 rounded text-slate-400 hover:text-emerald-600 hover:bg-slate-100"
+            aria-label={`WhatsApp ${d.lead.name}`}
+            className="flex h-9 w-9 items-center justify-center rounded text-slate-400 hover:bg-slate-100 hover:text-emerald-600 lg:h-auto lg:w-auto lg:p-1"
           >
-            <MessageCircle className="h-3 w-3" />
+            <MessageCircle className="h-4 w-4 lg:h-3 lg:w-3" />
           </a>
         )}
       </div>

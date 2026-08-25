@@ -8,6 +8,7 @@ import {
 } from 'lucide-react'
 import { normalizeApiUrl } from '@/lib/utils/api-url'
 import { useAuth } from '@/contexts/AuthContext'
+import { canSeeMoney as canSeeMoneyFor } from '@/lib/permissions'
 import { LeadDrawer } from './LeadDrawer'
 import { LeadFormModal } from './LeadFormModal'
 import { DealBoard } from './DealBoard'
@@ -65,7 +66,7 @@ export default function CrmPage() {
   const [earnings, setEarnings] = useState<Earnings | null>(null)
   const { user } = useAuth()
   // A CRM_MANAGER gets 403 from /earnings by design — don't even ask.
-  const canSeeMoney = user?.role === 'ADMIN' || user?.role === 'SUPER_ADMIN'
+  const canSeeMoney = canSeeMoneyFor(user?.role)
   const [typeFilter, setTypeFilter] = useState<'all' | LeadType>('all')
   const [openId, setOpenId] = useState<string | null>(null)
   const [creating, setCreating] = useState(false)
@@ -271,23 +272,23 @@ export default function CrmPage() {
           )}
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <button
             onClick={exportCsv}
             disabled={exporting}
-            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-slate-200 bg-white text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+            className="inline-flex min-h-11 items-center gap-1.5 px-3 rounded-lg border border-slate-200 bg-white text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
           >
             {exporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />} Export
           </button>
           <button
             onClick={() => setImporting(true)}
-            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-slate-200 bg-white text-sm font-medium text-slate-700 hover:bg-slate-50"
+            className="inline-flex min-h-11 items-center gap-1.5 px-3 rounded-lg border border-slate-200 bg-white text-sm font-medium text-slate-700 hover:bg-slate-50"
           >
             <Upload className="h-4 w-4" /> Import
           </button>
           <button
             onClick={() => setCreating(true)}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-slate-800 text-white text-sm font-medium hover:bg-slate-700"
+            className="inline-flex min-h-11 flex-1 items-center justify-center gap-2 px-4 rounded-lg bg-slate-800 text-white text-sm font-medium hover:bg-slate-700 sm:flex-none"
           >
             <Plus className="h-4 w-4" /> Add Client
           </button>
@@ -296,13 +297,13 @@ export default function CrmPage() {
 
       {/* Toolbar: search · type · market · view */}
       <div className="flex gap-2 flex-wrap items-center bg-white border border-slate-200 rounded-xl p-2">
-        <div className="relative flex-1 min-w-[220px]">
+        <div className="relative w-full min-w-[220px] sm:w-auto sm:flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search name, phone, area, notes…"
-            className="w-full h-9 pl-9 pr-8 text-sm rounded-lg border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-slate-900/10"
+            className="w-full min-h-11 sm:min-h-0 sm:h-9 pl-9 pr-8 text-base sm:text-sm rounded-lg border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-slate-900/10"
           />
           {search && (
             <button onClick={() => setSearch('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700">
@@ -314,7 +315,7 @@ export default function CrmPage() {
         <select
           value={typeFilter}
           onChange={(e) => setTypeFilter(e.target.value as typeof typeFilter)}
-          className="h-9 px-2.5 rounded-lg border border-slate-200 bg-white text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-900/10"
+          className="min-h-11 sm:min-h-0 sm:h-9 px-2.5 rounded-lg border border-slate-200 bg-white text-base sm:text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-900/10"
         >
           <option value="all">Any intent</option>
           <option value="BUYER">Buying</option>
@@ -328,7 +329,7 @@ export default function CrmPage() {
             <button
               key={m}
               onClick={() => setMarket(m)}
-              className={`px-2.5 py-1.5 rounded-md text-sm font-medium transition-all ${
+              className={`min-h-10 px-2.5 rounded-md text-sm font-medium transition-all ${
                 market === m ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-900'
               }`}
             >
@@ -341,30 +342,32 @@ export default function CrmPage() {
           <button
             onClick={() => setView('overview')}
             title="Overview — how the business is doing"
-            className={`px-2 py-1.5 rounded-md transition-all inline-flex items-center gap-1 text-sm font-medium ${view === 'overview' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-900'}`}
+            className={`min-h-10 px-2.5 rounded-md transition-all inline-flex items-center gap-1 text-sm font-medium ${view === 'overview' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-900'}`}
           >
             <Gauge className="h-4 w-4" /> Overview
           </button>
           <button
             onClick={() => setView('today')}
             title="Today — what needs you now"
-            className={`px-2 py-1.5 rounded-md transition-all inline-flex items-center gap-1 text-sm font-medium ${view === 'today' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-900'}`}
+            className={`min-h-10 px-2.5 rounded-md transition-all inline-flex items-center gap-1 text-sm font-medium ${view === 'today' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-900'}`}
           >
             <Sun className="h-4 w-4" /> Today
           </button>
           <button
             onClick={() => setView('board')}
             title="Pipeline board"
-            className={`p-1.5 rounded-md transition-all ${view === 'board' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-900'}`}
+            aria-label="Pipeline board"
+            className={`min-h-10 px-2.5 rounded-md transition-all inline-flex items-center gap-1 text-sm font-medium ${view === 'board' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-900'}`}
           >
-            <LayoutGrid className="h-4 w-4" />
+            <LayoutGrid className="h-4 w-4" /> <span className="sm:hidden">Board</span>
           </button>
           <button
             onClick={() => setView('list')}
             title="All clients"
-            className={`p-1.5 rounded-md transition-all ${view === 'list' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-900'}`}
+            aria-label="All clients"
+            className={`min-h-10 px-2.5 rounded-md transition-all inline-flex items-center gap-1 text-sm font-medium ${view === 'list' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-900'}`}
           >
-            <List className="h-4 w-4" />
+            <List className="h-4 w-4" /> <span className="sm:hidden">Clients</span>
           </button>
         </div>
       </div>
@@ -403,7 +406,7 @@ export default function CrmPage() {
 
       {/* Closed deals summary — off-board so the pipeline stays focused */}
       {!loading && view === 'board' && (
-        <div className="flex gap-2 text-xs text-slate-500">
+        <div className="flex flex-wrap gap-2 text-xs text-slate-500">
           <span className="px-2.5 py-1 rounded-lg bg-white border border-slate-200">
             Lost: <strong className="text-slate-700">{stats?.byStatus?.LOST ?? 0}</strong>
           </span>

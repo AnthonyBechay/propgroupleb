@@ -462,15 +462,15 @@ export default function DocumentsPage() {
           )}
         </div>
       ) : (
-        <div className="bg-white rounded-xl border overflow-hidden">
-          <table className="w-full text-sm">
+        <div className="bg-white rounded-xl border pg-scroll-x">
+          <table className="w-full min-w-[22rem] text-sm">
             <thead className="bg-slate-50 border-b">
               <tr>
                 <th className="text-left px-4 py-3 font-medium text-slate-600">Document</th>
                 <th className="text-left px-4 py-3 font-medium text-slate-600">Property</th>
-                <th className="text-left px-4 py-3 font-medium text-slate-600">Type</th>
-                <th className="text-left px-4 py-3 font-medium text-slate-600">Size</th>
-                <th className="text-left px-4 py-3 font-medium text-slate-600">Date</th>
+                <th className="hidden sm:table-cell text-left px-4 py-3 font-medium text-slate-600">Type</th>
+                <th className="hidden lg:table-cell text-left px-4 py-3 font-medium text-slate-600">Size</th>
+                <th className="hidden md:table-cell text-left px-4 py-3 font-medium text-slate-600">Date</th>
                 <th className="text-right px-4 py-3 font-medium text-slate-600">Actions</th>
               </tr>
             </thead>
@@ -482,11 +482,16 @@ export default function DocumentsPage() {
                       <div className="w-8 h-8 bg-slate-100 rounded-lg flex items-center justify-center text-slate-500">
                         {getFileIcon(doc.mimeType)}
                       </div>
-                      <div>
+                      <div className="min-w-0">
                         <p className="font-medium text-slate-900">{doc.title}</p>
                         {doc.description && (
-                          <p className="text-xs text-slate-500 truncate max-w-[200px]">{doc.description}</p>
+                          <p className="max-w-[200px] truncate text-xs text-slate-500">{doc.description}</p>
                         )}
+                        {/* Type and size live in their own columns from `sm` up;
+                            on a phone they ride along here rather than vanish. */}
+                        <p className="text-xs text-slate-400 sm:hidden">
+                          {doc.type.replace(/_/g, ' ')} · {formatFileSize(doc.fileSize)}
+                        </p>
                       </div>
                     </div>
                   </td>
@@ -502,22 +507,22 @@ export default function DocumentsPage() {
                       </p>
                     )}
                   </td>
-                  <td className="px-4 py-3">
+                  <td className="hidden sm:table-cell px-4 py-3">
                     <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${getTypeColor(doc.type)}`}>
                       {doc.type.replace(/_/g, ' ')}
                     </span>
                   </td>
-                  <td className="px-4 py-3 text-slate-500">
+                  <td className="hidden lg:table-cell px-4 py-3 text-slate-500">
                     {formatFileSize(doc.fileSize)}
                   </td>
-                  <td className="px-4 py-3 text-slate-500 whitespace-nowrap">
+                  <td className="hidden md:table-cell px-4 py-3 text-slate-500 whitespace-nowrap">
                     {new Date(doc.createdAt).toLocaleDateString()}
                   </td>
                   <td className="px-4 py-3">
-                    <div className="flex items-center justify-end gap-1">
+                    <div className="flex items-center justify-end gap-0.5">
                       <button
                         onClick={() => startEditing(doc)}
-                        className="p-1.5 rounded-lg text-slate-400 hover:text-amber-700 hover:bg-orange-50 transition-colors"
+                        className="flex h-10 w-10 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-orange-50 hover:text-amber-700 sm:h-9 sm:w-9"
                         title="Edit"
                       >
                         <Pencil className="w-4 h-4" />
@@ -526,7 +531,7 @@ export default function DocumentsPage() {
                         href={normalizeFileUrl(doc.fileUrl)}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="p-1.5 rounded-lg text-slate-400 hover:text-slate-800 hover:bg-slate-100 transition-colors"
+                        className="flex h-10 w-10 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-800 sm:h-9 sm:w-9"
                         title="View"
                       >
                         <ExternalLink className="w-4 h-4" />
@@ -534,14 +539,14 @@ export default function DocumentsPage() {
                       <a
                         href={normalizeFileUrl(doc.fileUrl)}
                         download={`${doc.title}${doc.mimeType ? '.' + doc.mimeType.split('/').pop()?.replace('vnd.openxmlformats-officedocument.wordprocessingml.document', 'docx').replace('vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'xlsx').replace('vnd.ms-excel', 'xls').replace('msword', 'doc').replace('jpeg', 'jpg') : ''}`}
-                        className="p-1.5 rounded-lg text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 transition-colors"
+                        className="flex h-10 w-10 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-emerald-50 hover:text-emerald-600 sm:h-9 sm:w-9"
                         title="Download"
                       >
                         <Download className="w-4 h-4" />
                       </a>
                       <button
                         onClick={() => handleDelete(doc)}
-                        className="p-1.5 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors"
+                        className="flex h-10 w-10 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-red-50 hover:text-red-600 sm:h-9 sm:w-9"
                         title="Delete"
                       >
                         <Trash2 className="w-4 h-4" />

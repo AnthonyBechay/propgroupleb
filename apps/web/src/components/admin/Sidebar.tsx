@@ -22,8 +22,10 @@ import {
   UserSearch,
   Contact,
   Warehouse,
+  X,
 } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
+import { canAccessAdminPath, isSuperAdmin, ROLE_LABELS, type Role } from '@/lib/permissions'
 
 interface NavItem {
   name: string
@@ -77,11 +79,63 @@ const GROUPS: NavGroup[] = [
 
 const STORAGE_KEY = 'admin-nav-open-groups'
 
-export function Sidebar() {
+/**
+ * The back-office nav — one component, two presentations.
+ *
+ * Desktop gets a fixed rail; below `lg` the same markup slides in as a drawer.
+ * They used to be two separate lists in two files with two colour schemes and
+ * two sets of links, which is why the mobile one still offered a page the
+ * desktop one had dropped.
+ */
+export function Sidebar({ open = false, onClose }: { open?: boolean; onClose?: () => void }) {
+  return (
+    <>
+      {/* Desktop rail */}
+      <div className="hidden lg:fixed lg:inset-y-0 lg:z-50 lg:flex lg:w-64 lg:flex-col">
+        <SidebarNav />
+      </div>
+
+      {/* Mobile drawer */}
+      <div
+        className={`lg:hidden fixed inset-0 z-50 transition-opacity duration-200 ${
+          open ? 'opacity-100' : 'pointer-events-none opacity-0'
+        }`}
+        aria-hidden={!open}
+      >
+        <div
+          className="absolute inset-0 bg-black/50"
+          onClick={onClose}
+        />
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="Admin navigation"
+          className={`absolute inset-y-0 left-0 w-[17rem] max-w-[85vw] transition-transform duration-200 ease-out ${
+            open ? 'translate-x-0' : '-translate-x-full'
+          }`}
+        >
+          <SidebarNav onNavigate={onClose} onClose={onClose} />
+        </div>
+      </div>
+    </>
+  )
+}
+
+function SidebarNav({ onNavigate, onClose }: { onNavigate?: () => void; onClose?: () => void }) {
   const pathname = usePathname()
   const { signOut, user } = useAuth()
+  const role = (user?.role ?? 'USER') as Role
 
-  const groupOf = (path: string) => GROUPS.find((g) => g.items.some((i) => path.startsWith(i.href)))?.id
+  // A restricted role sees only what it can actually open. Filtering here (not
+  // just guarding the route) is the difference between a nav that reflects the
+  // job and one that offers five links ending in "Forbidden".
+  const groups = GROUPS
+    .map((g) => ({ ...g, items: g.items.filter((i) => canAccessAdminPath(role, i.href)) }))
+    .filter((g) => g.items.length > 0)
+
+  const showDashboard = canAccessAdminPath(role, '/admin')
+
+  const groupOf = (path: string) => groups.find((g) => g.items.some((i) => path.startsWith(i.href)))?.id
 
   // Start with the active group open; restore the rest from localStorage.
   const [open, setOpen] = useState<string[]>(() => {
@@ -116,8 +170,10 @@ export function Sidebar() {
     })
   }
 
+  // `min-h-11` keeps every row at the ~44px Apple/Android minimum touch target;
+  // at the old `p-2.5` these were 36px and consistently mis-tapped on a phone.
   const linkCls = (active: boolean) =>
-    `group flex gap-x-3 rounded-lg p-2.5 text-sm font-medium leading-6 transition-all ${
+    `group flex min-h-11 items-center gap-x-3 rounded-lg px-2.5 py-2.5 text-sm font-medium leading-6 transition-all ${
       active ? 'bg-zinc-700 text-white' : 'text-zinc-400 hover:text-white hover:bg-zinc-800'
     }`
   const iconCls = (active: boolean) =>
@@ -126,96 +182,107 @@ export function Sidebar() {
   const dashboardActive = pathname === '/admin'
 
   return (
-    <div className="hidden lg:fixed lg:inset-y-0 lg:z-50 lg:flex lg:w-64 lg:flex-col">
-      <div className="flex grow flex-col gap-y-5 overflow-y-auto bg-zinc-900 px-6 pb-4 border-r border-zinc-800">
-        <div className="flex h-16 shrink-0 items-center">
-          <div className="flex items-center space-x-3">
-            <Image src="/logo.png" alt="PropGroup" width={40} height={40} className="brightness-0 invert" />
-            <div>
-              <span className="font-bold text-lg text-white block leading-tight">Admin Panel</span>
-              {user?.role === 'SUPER_ADMIN' && (
-                <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-semibold bg-amber-600 text-white mt-0.5">
-                  Super Admin
-                </span>
-              )}
-              {user?.role === 'ADMIN' && (
-                <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-semibold bg-zinc-600 text-white mt-0.5">
-                  Admin
-                </span>
-              )}
-            </div>
-          </div>
+    <div className="flex h-full grow flex-col gap-y-5 overflow-y-auto overscroll-contain bg-zinc-900 px-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:px-6 border-r border-zinc-800">
+      <div className="flex h-16 shrink-0 items-center gap-3">
+        <Image src="/logo.png" alt="PropGroup" width={40} height={40} className="brightness-0 invert" />
+        <div className="min-w-0 flex-1">
+          <span className="font-bold text-lg text-white block leading-tight">Admin Panel</span>
+          {user?.role && user.role !== 'ADMIN' ? (
+            <span
+              className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-semibold text-white mt-0.5 ${
+                isSuperAdmin(user.role) ? 'bg-amber-600' : 'bg-emerald-700'
+              }`}
+            >
+              {ROLE_LABELS[role] ?? role}
+            </span>
+          ) : (
+            <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-semibold bg-zinc-600 text-white mt-0.5">
+              Admin
+            </span>
+          )}
         </div>
+        {onClose && (
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close navigation"
+            className="lg:hidden -mr-1 flex h-11 w-11 items-center justify-center rounded-lg text-zinc-400 hover:bg-zinc-800 hover:text-white"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        )}
+      </div>
 
-        <nav className="flex flex-1 flex-col">
-          <ul role="list" className="flex flex-1 flex-col gap-y-1">
-            {/* Dashboard — always visible, ungrouped */}
+      <nav className="flex flex-1 flex-col">
+        <ul role="list" className="flex flex-1 flex-col gap-y-1">
+          {showDashboard && (
             <li className="-mx-2">
-              <Link href="/admin" className={linkCls(dashboardActive)}>
+              <Link href="/admin" onClick={onNavigate} className={linkCls(dashboardActive)}>
                 <Home className={iconCls(dashboardActive)} aria-hidden="true" />
                 Dashboard
               </Link>
             </li>
+          )}
 
-            {GROUPS.map((group) => {
-              const isOpen = open.includes(group.id)
-              const hasActive = group.items.some((i) => pathname.startsWith(i.href))
-              return (
-                <li key={group.id} className="-mx-2 mt-2">
-                  <button
-                    type="button"
-                    onClick={() => toggle(group.id)}
-                    aria-expanded={isOpen}
-                    className={`w-full flex items-center gap-x-2 px-2.5 py-1.5 rounded-lg text-xs font-semibold uppercase tracking-wider transition-colors ${
-                      hasActive ? 'text-zinc-200' : 'text-zinc-500 hover:text-zinc-300'
-                    }`}
-                  >
-                    <group.icon className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-                    <span className="flex-1 text-left">{group.label}</span>
-                    <ChevronDown
-                      className={`h-3.5 w-3.5 shrink-0 transition-transform ${isOpen ? '' : '-rotate-90'}`}
-                      aria-hidden="true"
-                    />
-                  </button>
-                  {isOpen && (
-                    <ul role="list" className="mt-1 space-y-1">
-                      {group.items.map((item) => {
-                        const active = pathname === item.href || pathname.startsWith(item.href + '/')
-                        return (
-                          <li key={item.name}>
-                            <Link href={item.href} className={linkCls(active)}>
-                              <item.icon className={iconCls(active)} aria-hidden="true" />
-                              {item.name}
-                            </Link>
-                          </li>
-                        )
-                      })}
-                    </ul>
-                  )}
-                </li>
-              )
-            })}
+          {groups.map((group) => {
+            const isOpen = open.includes(group.id)
+            const hasActive = group.items.some((i) => pathname.startsWith(i.href))
+            return (
+              <li key={group.id} className="-mx-2 mt-2">
+                <button
+                  type="button"
+                  onClick={() => toggle(group.id)}
+                  aria-expanded={isOpen}
+                  className={`w-full flex min-h-9 items-center gap-x-2 px-2.5 py-1.5 rounded-lg text-xs font-semibold uppercase tracking-wider transition-colors ${
+                    hasActive ? 'text-zinc-200' : 'text-zinc-500 hover:text-zinc-300'
+                  }`}
+                >
+                  <group.icon className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                  <span className="flex-1 text-left">{group.label}</span>
+                  <ChevronDown
+                    className={`h-3.5 w-3.5 shrink-0 transition-transform ${isOpen ? '' : '-rotate-90'}`}
+                    aria-hidden="true"
+                  />
+                </button>
+                {isOpen && (
+                  <ul role="list" className="mt-1 space-y-1">
+                    {group.items.map((item) => {
+                      const active = pathname === item.href || pathname.startsWith(item.href + '/')
+                      return (
+                        <li key={item.name}>
+                          <Link href={item.href} onClick={onNavigate} className={linkCls(active)}>
+                            <item.icon className={iconCls(active)} aria-hidden="true" />
+                            {item.name}
+                          </Link>
+                        </li>
+                      )
+                    })}
+                  </ul>
+                )}
+              </li>
+            )
+          })}
 
-            <li className="mt-auto space-y-2 -mx-2 pt-4">
-              <Link
-                href="/"
-                target="_blank"
-                className="group flex w-full gap-x-3 rounded-lg p-2.5 text-sm font-medium leading-6 text-zinc-400 hover:bg-zinc-800 hover:text-white transition-all"
-              >
-                <ArrowLeft className="h-5 w-5 shrink-0 text-zinc-500 group-hover:text-white" aria-hidden="true" />
-                Back to Website
-              </Link>
-              <button
-                onClick={signOut}
-                className="group flex w-full gap-x-3 rounded-lg p-2.5 text-sm font-medium leading-6 text-zinc-400 hover:bg-red-900/30 hover:text-red-400 transition-all"
-              >
-                <LogOut className="h-5 w-5 shrink-0 text-zinc-500 group-hover:text-red-400" aria-hidden="true" />
-                Sign out
-              </button>
-            </li>
-          </ul>
-        </nav>
-      </div>
+          <li className="mt-auto space-y-2 -mx-2 pt-4">
+            <Link
+              href="/"
+              target="_blank"
+              onClick={onNavigate}
+              className="group flex min-h-11 w-full items-center gap-x-3 rounded-lg px-2.5 py-2.5 text-sm font-medium leading-6 text-zinc-400 hover:bg-zinc-800 hover:text-white transition-all"
+            >
+              <ArrowLeft className="h-5 w-5 shrink-0 text-zinc-500 group-hover:text-white" aria-hidden="true" />
+              Back to Website
+            </Link>
+            <button
+              onClick={signOut}
+              className="group flex min-h-11 w-full items-center gap-x-3 rounded-lg px-2.5 py-2.5 text-sm font-medium leading-6 text-zinc-400 hover:bg-red-900/30 hover:text-red-400 transition-all"
+            >
+              <LogOut className="h-5 w-5 shrink-0 text-zinc-500 group-hover:text-red-400" aria-hidden="true" />
+              Sign out
+            </button>
+          </li>
+        </ul>
+      </nav>
     </div>
   )
 }

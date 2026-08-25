@@ -57,8 +57,24 @@ export function RoiCalculatorTool() {
   useEffect(() => {
     const monthlyRate = interestRate / 100 / 12
     const numPayments = loanTerm * 12
-    const payment = loanAmount * (monthlyRate * Math.pow(1 + monthlyRate, numPayments)) /
-                    (Math.pow(1 + monthlyRate, numPayments) - 1)
+
+    // At 0% the amortisation formula is 0/0 — it divides by
+    // ((1+i)^n - 1), which is exactly zero when the rate is. The interest-rate
+    // input allows 0 and interest-free developer instalment plans are ordinary
+    // in off-plan sales, so this is a reachable input, and it rendered a
+    // literal "$NaN" that then poisoned every figure below it.
+    //
+    // Straight-line repayment is the limit of the formula as the rate
+    // approaches zero, and it is already how the projection further down
+    // amortises a 0% loan — the two now agree.
+    const payment =
+      loanAmount <= 0 || numPayments <= 0
+        ? 0
+        : monthlyRate > 0
+          ? (loanAmount * monthlyRate * Math.pow(1 + monthlyRate, numPayments)) /
+            (Math.pow(1 + monthlyRate, numPayments) - 1)
+          : loanAmount / numPayments
+
     setMonthlyPayment(payment)
     setTotalInterest(payment * numPayments - loanAmount)
   }, [loanAmount, interestRate, loanTerm])

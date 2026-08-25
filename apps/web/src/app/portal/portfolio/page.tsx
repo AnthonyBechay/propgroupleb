@@ -22,28 +22,31 @@ export default async function PortfolioPage() {
       })
       const authResult = await verifyAuth(mockReq as unknown as NextRequest)
       if (authResult.authenticated && authResult.user) {
-        favorites = await prisma.favoriteProperty.findMany({
-          where: { userId: authResult.user.id },
-          include: {
-            listing: {
-              include: {
-                building: { select: { id: true, title: true, city: true, mohafazat: true, images: true, status: true, kind: true } },
-                unit: { select: { id: true, name: true, kind: true, bedrooms: true, areaSqm: true } },
+        // Two independent queries — awaited together, so the page costs one
+        // round trip instead of two.
+        ;[favorites, ownedUnits] = await Promise.all([
+          prisma.favoriteProperty.findMany({
+            where: { userId: authResult.user.id },
+            include: {
+              listing: {
+                include: {
+                  building: { select: { id: true, title: true, city: true, mohafazat: true, images: true, status: true, kind: true } },
+                  unit: { select: { id: true, name: true, kind: true, bedrooms: true, areaSqm: true } },
+                },
               },
+              building: { select: { id: true, title: true, city: true, mohafazat: true, images: true, status: true, kind: true } },
             },
-            building: { select: { id: true, title: true, city: true, mohafazat: true, images: true, status: true, kind: true } },
-          },
-          orderBy: { createdAt: 'desc' },
-        })
-
-        // Units an admin has assigned to this user (real owned properties).
-        ownedUnits = await prisma.unit.findMany({
-          where: { ownerUserId: authResult.user.id },
-          include: {
-            building: { select: { id: true, title: true, city: true, mohafazat: true, status: true } },
-          },
-          orderBy: { updatedAt: 'desc' },
-        })
+            orderBy: { createdAt: 'desc' },
+          }),
+          // Units an admin has assigned to this user (real owned properties).
+          prisma.unit.findMany({
+            where: { ownerUserId: authResult.user.id },
+            include: {
+              building: { select: { id: true, title: true, city: true, mohafazat: true, status: true } },
+            },
+            orderBy: { updatedAt: 'desc' },
+          }),
+        ])
       }
     }
   } catch { /* layout handles auth redirect */ }

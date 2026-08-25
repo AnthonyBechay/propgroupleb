@@ -1,13 +1,21 @@
 import { z } from 'zod';
 
+/**
+ * One definition of "strong enough", shared by signup, the self-service change,
+ * and an admin setting someone's password. Three copies of the rule existed and
+ * the admin-side one was the weakest of them.
+ */
+export const passwordRule = z.string()
+  .min(8, 'Password must be at least 8 characters')
+  .max(200, 'Password is too long')
+  .regex(/[A-Z]/, 'Password must contain at least one uppercase letter')
+  .regex(/[0-9]/, 'Password must contain at least one number');
+
 // ─── Auth ────────────────────────────────────────────────────────────────────
 
 export const registerSchema = z.object({
   email: z.string().email('Invalid email address'),
-  password: z.string()
-    .min(8, 'Password must be at least 8 characters')
-    .regex(/[A-Z]/, 'Password must contain at least one uppercase letter')
-    .regex(/[0-9]/, 'Password must contain at least one number'),
+  password: passwordRule,
   firstName: z.string().optional(),
   lastName: z.string().optional(),
   phone: z.string().optional(),
@@ -30,10 +38,7 @@ export const updateProfileSchema = z.object({
 
 export const changePasswordSchema = z.object({
   currentPassword: z.string().min(1, 'Current password is required'),
-  newPassword: z.string()
-    .min(8, 'New password must be at least 8 characters')
-    .regex(/[A-Z]/, 'Password must contain at least one uppercase letter')
-    .regex(/[0-9]/, 'Password must contain at least one number'),
+  newPassword: passwordRule,
 });
 
 // ─── Building ─────────────────────────────────────────────────────────────────
@@ -230,9 +235,43 @@ export const banUserSchema = z.object({
   reason: z.string().min(1, 'Ban reason is required'),
 });
 
-export const inviteAdminSchema = z.object({
-  email: z.string().email('Invalid email address'),
-  role: z.enum(['AGENT', 'CRM_MANAGER', 'ADMIN', 'SUPER_ADMIN']),
+// ─── Admin-side user management ──────────────────────────────────────────────
+
+/** Every role an admin may assign. Same list the frontend picker renders. */
+export const ASSIGNABLE_ROLES = ['USER', 'AGENT', 'CRM_MANAGER', 'ADMIN', 'SUPER_ADMIN'] as const;
+
+/**
+ * Create a working account outright — email, password, role.
+ *
+ * Replaces an invite flow that wrote a null password (which no login can match)
+ * and promised a setup email nothing sent. Setting the password up front is
+ * what makes the account real.
+ */
+export const createUserSchema = z.object({
+  email: z.string().email('Invalid email address').max(160),
+  password: passwordRule,
+  role: z.enum(ASSIGNABLE_ROLES).default('USER'),
+  firstName: z.string().max(80).optional().nullable(),
+  lastName: z.string().max(80).optional().nullable(),
+  phone: z.string().max(40).optional().nullable(),
+  country: z.string().max(80).optional().nullable(),
+  isActive: z.boolean().default(true),
+  agentCommissionRate: z.number().min(0).max(100).optional().nullable(),
+});
+
+/** Edit an existing account. Every field optional — this is a PATCH in spirit. */
+export const adminUpdateUserSchema = z.object({
+  firstName: z.string().max(80).optional().nullable(),
+  lastName: z.string().max(80).optional().nullable(),
+  phone: z.string().max(40).optional().nullable(),
+  country: z.string().max(80).optional().nullable(),
+  role: z.enum(ASSIGNABLE_ROLES).optional(),
+  isActive: z.boolean().optional(),
+  agentCommissionRate: z.number().min(0).max(100).optional().nullable(),
+});
+
+export const setPasswordSchema = z.object({
+  password: passwordRule,
 });
 
 export const inquirySchema = z.object({

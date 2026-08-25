@@ -20,10 +20,13 @@ import {
 export function SellerProperties({
   leadId,
   properties,
+  canSeeMoney,
   onChanged,
 }: {
   leadId: string
   properties: LeadProperty[]
+  /** A CRM_MANAGER records the sale but never the commission — see permissions.ts. */
+  canSeeMoney: boolean
   onChanged: () => void
 }) {
   const apiUrl = normalizeApiUrl(process.env.NEXT_PUBLIC_API_URL || '')
@@ -47,7 +50,7 @@ export function SellerProperties({
 
   const live = properties.filter((p) => p.status !== 'SOLD' && p.status !== 'WITHDRAWN')
   const closed = properties.filter((p) => p.status === 'SOLD' || p.status === 'WITHDRAWN')
-  const earned = closed.reduce((t, p) => t + (p.commissionUsd ?? 0), 0)
+  const earned = canSeeMoney ? closed.reduce((t, p) => t + (p.commissionUsd ?? 0), 0) : 0
 
   return (
     <section className="bg-white border border-slate-200 rounded-xl p-4">
@@ -129,7 +132,7 @@ export function SellerProperties({
                     {sold && (
                       <p className="text-xs text-emerald-700 mt-0.5 font-medium">
                         Sold {p.soldPrice ? `for ${p.currency} ${p.soldPrice.toLocaleString()}` : ''}
-                        {p.commissionUsd ? ` · commission $${p.commissionUsd.toLocaleString()}` : ''}
+                        {canSeeMoney && p.commissionUsd ? ` · commission $${p.commissionUsd.toLocaleString()}` : ''}
                         {p.soldAt ? ` · ${new Date(p.soldAt).toLocaleDateString()}` : ''}
                       </p>
                     )}
@@ -160,6 +163,7 @@ export function SellerProperties({
                   <SaleForm
                     currency={p.currency}
                     defaultPrice={p.askingPrice}
+                    canSeeMoney={canSeeMoney}
                     busy={busy === `properties/${p.id}`}
                     onCancel={() => setSellingId(null)}
                     onSave={async (soldPrice, commissionUsd) => {
@@ -183,10 +187,11 @@ const inp = 'w-full px-2 py-1.5 border border-slate-200 rounded-lg text-sm focus
 
 /** Record what it sold for and what we made. */
 function SaleForm({
-  currency, defaultPrice, busy, onCancel, onSave,
+  currency, defaultPrice, canSeeMoney, busy, onCancel, onSave,
 }: {
   currency: string
   defaultPrice: number | null
+  canSeeMoney: boolean
   busy: boolean
   onCancel: () => void
   onSave: (soldPrice: number | null, commissionUsd: number | null) => void
@@ -196,19 +201,27 @@ function SaleForm({
 
   return (
     <div className="mt-2 pt-2 border-t border-slate-100 space-y-2">
-      <div className="grid grid-cols-2 gap-2">
+      {/* One column when the commission field isn't there to fill the second. */}
+      <div className={`grid gap-2 ${canSeeMoney ? 'grid-cols-1 sm:grid-cols-2' : 'grid-cols-1'}`}>
         <label className="block">
           <span className="text-[11px] text-slate-500">Sold for ({currency})</span>
           <input type="number" min="0" value={price} onChange={(e) => setPrice(e.target.value)} className={inp} />
         </label>
-        <label className="block">
-          <span className="text-[11px] text-slate-500">Our commission (USD)</span>
-          <input type="number" min="0" value={commission} onChange={(e) => setCommission(e.target.value)} className={inp} />
-        </label>
+        {/* Hidden rather than disabled: the API drops the field for this role
+            anyway, and an empty box marked "our commission" tells them the
+            number exists and roughly where it lives. */}
+        {canSeeMoney && (
+          <label className="block">
+            <span className="text-[11px] text-slate-500">Our commission (USD)</span>
+            <input type="number" min="0" value={commission} onChange={(e) => setCommission(e.target.value)} className={inp} />
+          </label>
+        )}
       </div>
-      <p className="text-[10px] text-slate-400">
-        Commission is stored in USD so totals across both markets add up.
-      </p>
+      {canSeeMoney && (
+        <p className="text-[10px] text-slate-400">
+          Commission is stored in USD so totals across both markets add up.
+        </p>
+      )}
       <div className="flex justify-end gap-2">
         <button onClick={onCancel} className="px-2.5 py-1 text-xs text-slate-500 rounded hover:bg-slate-100">
           <X className="h-3.5 w-3.5" />
@@ -264,8 +277,10 @@ function PropertyForm({
           className={inp}
         />
       </label>
-      <div className="grid grid-cols-3 gap-2">
-        <label className="block">
+      {/* Area gets its own row on a phone — at a third of a 320px drawer it
+          held about four characters of "Achrafieh". */}
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+        <label className="col-span-2 block sm:col-span-1">
           <span className="text-[11px] text-slate-500">Areas</span>
           <input value={f.areas} onChange={(e) => set('areas', e.target.value)} placeholder="Achrafieh" className={inp} />
         </label>

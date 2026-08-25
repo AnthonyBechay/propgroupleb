@@ -1,5 +1,5 @@
 import express, { type Request, type Response, type Router } from 'express';
-import { getFileStream, getSignedFileUrl, extractKeyFromUrl } from '../services/upload.service.js';
+import { getFileStream, getSignedFileUrl } from '../services/upload.service.js';
 import { asyncHandler } from '../utils/errors.js';
 import { logger } from '../utils/logger.js';
 import { Readable } from 'stream';

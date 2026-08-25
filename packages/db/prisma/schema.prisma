@@ -738,6 +738,11 @@ model Listing {
   @@index([visibility])
   @@index([slug])
   @@index([createdAt])
+  // The public catalogue query, verbatim: status=ACTIVE + visibility=PUBLIC,
+  // newest first. The three single-column indexes above can only be bitmap-
+  // ANDed and then re-sorted; this one answers it in index order, which is
+  // what every visitor hits on the homepage and on every filter change.
+  @@index([status, visibility, createdAt])
   @@map("listings")
 }
 
