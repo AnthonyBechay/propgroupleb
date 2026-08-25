@@ -7,6 +7,7 @@ import { ArrowLeft, Loader2, Building2, Image as ImageIcon, X, Home, Plus, Spark
 import { normalizeApiUrl, normalizeFileUrl } from '@/lib/utils/api-url'
 import { PaymentPlansEditor, type PaymentPlan } from '@/components/admin/PaymentPlansEditor'
 import { LocationFields } from '@/components/admin/LocationFields'
+import { OwnerPicker, type OwnerRef } from '@/components/admin/OwnerPicker'
 import { isKnownLocation } from '@/lib/lebanon-locations'
 import { PROPERTY_TYPE_GROUPS, typeDef, typeLabel, isResidential } from '@/lib/property-types'
 
@@ -39,6 +40,8 @@ export function CreatePropertyForm() {
   const [uploading, setUploading] = useState(false)
   const [uploadingVideo, setUploadingVideo] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // Whose property this is — linked to a CRM client, or created inline.
+  const [owner, setOwner] = useState<OwnerRef | null>(null)
   const [highlightInput, setHighlightInput] = useState('')
   const [aiLoading, setAiLoading] = useState(false)
 
@@ -171,6 +174,7 @@ export function CreatePropertyForm() {
         method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           title: f.title.trim(), kind: f.kind, status: f.status, visibility: f.visibility, featured: f.featured,
+          ownerLeadId: owner?.id ?? null,
           shortDescription: f.shortDescription || null, description: f.description || null,
           country: f.country,
           mohafazat: f.mohafazat || null, caza: f.caza || null, city: f.city || null,
@@ -268,6 +272,9 @@ export function CreatePropertyForm() {
         <div className="bg-white border rounded-xl p-6 space-y-4">
           <h2 className="font-semibold text-slate-900">Basic Information</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="sm:col-span-2">
+              <OwnerPicker value={owner} onChange={setOwner} />
+            </div>
             <div className="sm:col-span-2">
               <label className={lbl}>Title <span className="text-red-500">*</span></label>
               <input value={f.title} onChange={e => set('title', e.target.value)} className={inp} placeholder="e.g., Elegant Apartment in Verdun" required />

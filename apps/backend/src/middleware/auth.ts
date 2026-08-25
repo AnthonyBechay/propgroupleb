@@ -189,8 +189,15 @@ export function canSeeMoney(req: Request): boolean {
   return role === 'ADMIN' || role === 'SUPER_ADMIN';
 }
 
-/** Commission fields, removed for roles that may not see them. */
-const MONEY_FIELDS = ['commissionUsd', 'soldPrice', 'soldCurrency'] as const;
+/**
+ * What the office earned — the one thing a CRM_MANAGER may not see.
+ *
+ * Deliberately just the commission. The sale price is the client's number, not
+ * the agency's profit, and someone running the pipeline has to know what a
+ * property went for to price the next one. Hiding it made the role unable to do
+ * the job it exists for.
+ */
+const MONEY_FIELDS = ['commissionUsd'] as const;
 
 /**
  * Strip commission from anything on its way to a CRM_MANAGER. Walks arrays and
@@ -230,7 +237,10 @@ export async function logAdminAction(
 ) {
   try {
     const user = (req as AuthenticatedRequest).user;
-    const privileged = ['ADMIN', 'SUPER_ADMIN'];
+    // CRM_MANAGER mutates clients, properties and deals like any admin, so its
+    // actions have to be auditable too. Excluding it left the one restricted
+    // role as the only one whose changes left no trace.
+    const privileged = ['CRM_MANAGER', 'ADMIN', 'SUPER_ADMIN'];
     if (!user || !privileged.includes(user.role)) {
       return;
     }

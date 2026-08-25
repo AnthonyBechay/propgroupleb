@@ -274,6 +274,7 @@ function DealForm({
   const [q, setQ] = useState('')
   const [results, setResults] = useState<Picked[]>([])
   const [searching, setSearching] = useState(false)
+  const [searchError, setSearchError] = useState<string | null>(null)
   const seq = useRef(0)
 
   // Searching the whole catalogue, not just their shortlist — most sales are
@@ -282,13 +283,25 @@ function DealForm({
     const needle = q.trim()
     if (needle.length < 2) { setResults([]); return }
     const mine = ++seq.current
+    // A search that hangs must not spin forever with no explanation.
+    const ctl = new AbortController()
+    const bail = setTimeout(() => ctl.abort(), 12000)
     const t = setTimeout(async () => {
       setSearching(true)
+      setSearchError(null)
       try {
+        // No `status` param: staff callers already get every status, and
+        // `status=all` is meaningless to a role the API treats as public.
         const res = await fetch(
-          `${apiUrl}/api/listings?search=${encodeURIComponent(needle)}&limit=8&status=all`,
-          { credentials: 'include', cache: 'no-store' }
+          `${apiUrl}/api/listings?search=${encodeURIComponent(needle)}&limit=8`,
+          { credentials: 'include', cache: 'no-store', signal: ctl.signal }
         )
+        if (mine !== seq.current) return
+        if (!res.ok) {
+          setSearchError(`Search failed (${res.status})`)
+          setResults([])
+          return
+        }
         const j = await res.json().catch(() => ({}))
         if (mine !== seq.current) return
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -306,11 +319,20 @@ function DealForm({
             }
           })
         )
+      } catch (e) {
+        if (mine !== seq.current) return
+        setResults([])
+        setSearchError(
+          (e as Error)?.name === 'AbortError'
+            ? 'Search timed out — the API did not respond.'
+            : 'Could not reach the API.'
+        )
       } finally {
+        clearTimeout(bail)
         if (mine === seq.current) setSearching(false)
       }
     }, 250)
-    return () => clearTimeout(t)
+    return () => { clearTimeout(t); clearTimeout(bail); ctl.abort() }
   }, [q, apiUrl])
   const [title, setTitle] = useState(initial?.externalTitle ?? '')
   const [url, setUrl] = useState(initial?.externalUrl ?? '')
@@ -380,7 +402,11 @@ function DealForm({
                     />
                   ))}
 
-                  {q.trim().length >= 2 && !searching && results.length === 0 && (
+                  {searchError && (
+                    <p className="text-xs text-red-600 px-1 py-1.5">{searchError}</p>
+                  )}
+
+                  {!searchError && q.trim().length >= 2 && !searching && results.length === 0 && (
                     <p className="text-xs text-slate-400 px-1 py-1.5">Nothing matches “{q.trim()}”.</p>
                   )}
 

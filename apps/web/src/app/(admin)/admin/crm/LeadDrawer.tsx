@@ -3,9 +3,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import {
-  X, Phone, MessageCircle, Mail, Loader2, Send, Pencil, Trash2, Building2,
-  Clock, CalendarPlus, ExternalLink, History, Handshake,
-  ClipboardCheck, Lightbulb, Sparkles, Plus, StickyNote, Globe,
+  X, Phone, MessageCircle, Mail, Loader2, Send, Pencil, Trash2, Building2, Clock, CalendarPlus, ExternalLink, History, Handshake, ClipboardCheck, Lightbulb, Sparkles, Plus, StickyNote, Globe, Home,
 } from 'lucide-react'
 import { normalizeApiUrl, normalizeFileUrl } from '@/lib/utils/api-url'
 import { regionLabel } from '@/lib/crm-locations'
@@ -609,6 +607,35 @@ export function LeadDrawer({ lead, onClose, onChanged }: { lead: Lead; onClose: 
 
           {tab === 'properties' && (
           <>
+          {/* What this client actually owns in the catalogue. Distinct from the
+              shortlist below: that's what they're being shown, this is theirs. */}
+          {(l.ownedBuildings?.length ?? 0) > 0 && (
+            <section className="bg-white border border-slate-200 rounded-xl p-4">
+              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3 flex items-center gap-1.5">
+                <Home className="h-3.5 w-3.5" /> Properties they own
+                <span className="text-slate-400 font-normal normal-case">({l.ownedBuildings!.length})</span>
+              </p>
+              <ul className="space-y-1.5">
+                {l.ownedBuildings!.map((b) => (
+                  <li key={b.id}>
+                    <a
+                      href={`/admin/buildings/${b.id}`}
+                      className="flex items-center gap-2 rounded-lg border border-slate-200 px-2.5 py-2 hover:bg-slate-50 transition-colors"
+                    >
+                      {b.ref && (
+                        <span className="font-mono text-[10px] font-semibold text-slate-500 shrink-0">{b.ref}</span>
+                      )}
+                      <span className="text-sm text-slate-800 truncate flex-1">{b.title}</span>
+                      <span className="text-[11px] text-slate-400 shrink-0">
+                        {[b.city, b.caza].filter(Boolean).join(', ')}
+                      </span>
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+
           {/* What we've shown them, and how it went */}
           <section className="bg-white border border-slate-200 rounded-xl p-4">
             <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3 flex items-center gap-1.5">

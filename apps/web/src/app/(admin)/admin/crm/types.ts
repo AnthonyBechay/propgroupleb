@@ -196,6 +196,20 @@ export interface Lead {
   insights?: Array<{ reason: string; count: number; advice: string }>
   needsNewOptions?: boolean
   _count?: { contacts: number }
+
+  /** Catalogue stock this client owns — the real Building link. */
+  ownedBuildings?: Array<{
+    id: string
+    ref?: string | null
+    title: string
+    slug?: string | null
+    country?: string | null
+    city?: string | null
+    caza?: string | null
+    status?: string | null
+    visibility?: string | null
+    images?: string[]
+  }>
 }
 
 /**

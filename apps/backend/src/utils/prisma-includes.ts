@@ -28,6 +28,11 @@ export const BUILDING_DETAIL_INCLUDE = {
   developer: true,
   locationGuide: true,
   investmentData: true,
+  // Whose property this is. Narrow on purpose — the admin only needs to show
+  // and link the client, not carry their whole pipeline on every property.
+  ownerLead: {
+    select: { id: true, name: true, phone: true, whatsapp: true, email: true, type: true },
+  },
   agent: {
     select: {
       id: true,

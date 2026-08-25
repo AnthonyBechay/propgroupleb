@@ -66,6 +66,8 @@ const buildingSchema = z.object({
   shortDescription: z.string().optional().nullable(),
   // Which market the property belongs to — decides which website shows it.
   country: z.enum(['LEBANON', 'GEORGIA', 'CYPRUS', 'GREECE']).optional(),
+  // Whose property this is, as a CRM client. Empty string clears it.
+  ownerLeadId: z.string().optional().nullable(),
   mohafazat: z.string().optional().nullable(),
   caza: z.string().optional().nullable(),
   city: z.string().optional().nullable(),
@@ -307,6 +309,8 @@ router.post(
       const slug = data.slug || (await generateUniqueSlug(data.title, undefined, tx));
       const createData = {
         ...data,
+        // An empty select is "no owner", not a foreign key of "".
+        ownerLeadId: data.ownerLeadId || null,
         ref: await nextBuildingRef(tx),
         slug,
         images: data.images ?? [],
@@ -461,6 +465,9 @@ router.put(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const updateData: Record<string, any> = { ...data };
     if (data.featuredUntil) updateData.featuredUntil = new Date(data.featuredUntil);
+    // Only touch the owner when the caller actually sent the field, so a
+    // partial update from another screen can't silently unlink it.
+    if ('ownerLeadId' in data) updateData.ownerLeadId = data.ownerLeadId || null;
 
     // Regenerate slug if title changed
     if (data.title && data.title !== existing.title && !data.slug) {

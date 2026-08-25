@@ -7,6 +7,7 @@ import Link from 'next/link'
 import { normalizeApiUrl, normalizeFileUrl } from '@/lib/utils/api-url'
 import { PaymentPlansEditor, type PaymentPlan } from '@/components/admin/PaymentPlansEditor'
 import { LocationFields } from '@/components/admin/LocationFields'
+import { OwnerPicker, type OwnerRef } from '@/components/admin/OwnerPicker'
 import { isKnownLocation } from '@/lib/lebanon-locations'
 import { BuildingDocumentsManager } from '@/components/admin/BuildingDocumentsManager'
 import { showsBuildingSpecs, isResidential, PROPERTY_TYPE_GROUPS, typeLabel } from '@/lib/property-types'
@@ -44,6 +45,16 @@ export function BuildingForm({ initialData, buildingId, embedded }: Props) {
   const [uploadingImages, setUploadingImages] = useState(false)
   const [uploadingVideo, setUploadingVideo] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // Whose property this is. Seeded from the record when editing.
+  const [owner, setOwner] = useState<OwnerRef | null>(
+    initialData?.ownerLead
+      ? {
+          id: initialData.ownerLead.id,
+          name: initialData.ownerLead.name,
+          phone: initialData.ownerLead.phone ?? initialData.ownerLead.whatsapp ?? null,
+        }
+      : null
+  )
   const [highlightInput, setHighlightInput] = useState('')
   const [aiLoading, setAiLoading] = useState(false)
   const [aiError, setAiError] = useState<string | null>(null)
@@ -204,6 +215,7 @@ export function BuildingForm({ initialData, buildingId, embedded }: Props) {
 
     const payload = {
       title: form.title,
+      ownerLeadId: owner?.id ?? null,
       kind: form.kind,
       status: form.status,
       source: form.source,
@@ -401,6 +413,9 @@ export function BuildingForm({ initialData, buildingId, embedded }: Props) {
         <div className="bg-white border rounded-xl p-6 space-y-4">
           <h2 className="font-semibold text-slate-900">Basic Information</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="sm:col-span-2">
+              <OwnerPicker value={owner} onChange={setOwner} />
+            </div>
             <div className="sm:col-span-2">
               <label className={labelCls}>Title <span className="text-red-500">*</span></label>
               <input type="text" value={form.title} onChange={e => setField('title', e.target.value)} className={inputCls} placeholder="e.g., Verdun Residences" required />

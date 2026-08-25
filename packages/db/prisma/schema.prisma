@@ -28,10 +28,10 @@ enum Country {
 
 // Building-level kind
 enum BuildingKind {
-  STANDALONE   // single unit: one apartment, one shop
-  PROJECT      // developer project with many units for sale
-  COMMUNITY    // residential community / compound
-  MIXED_USE    // commercial + residential in same building
+  STANDALONE // single unit: one apartment, one shop
+  PROJECT // developer project with many units for sale
+  COMMUNITY // residential community / compound
+  MIXED_USE // commercial + residential in same building
 }
 
 // Atomic unit kind — what kind of space is this unit
@@ -60,26 +60,26 @@ enum UnitKind {
 
 // Where is a unit in its life
 enum UnitLifecycle {
-  DRAFT          // being set up, not visible
-  FOR_SALE       // listed for purchase
-  RESERVED       // deposit taken, awaiting completion
-  SOLD           // title transferred
+  DRAFT // being set up, not visible
+  FOR_SALE // listed for purchase
+  RESERVED // deposit taken, awaiting completion
+  SOLD // title transferred
   OWNER_OCCUPIED // owner lives / uses it, not rented
-  FOR_RENT       // available to rent
-  RENTED         // active tenancy
-  VACANT         // owned but empty
-  OFF_MARKET     // hidden
+  FOR_RENT // available to rent
+  RENTED // active tenancy
+  VACANT // owned but empty
+  OFF_MARKET // hidden
 }
 
 enum UnitOwnership {
   PLATFORM_SOLD // unit came through a sale on this platform
-  EXTERNAL      // owner registered it; not sold through us
+  EXTERNAL // owner registered it; not sold through us
 }
 
 // Listing polymorphism
 enum ListingSubjectType {
   BUILDING // whole building/project marketed as one
-  UNIT     // single unit marketed individually
+  UNIT // single unit marketed individually
 }
 
 enum ListingIntent {
@@ -116,10 +116,10 @@ enum PropertySource {
 
 // Review cycle for public owner submissions (zero-commission campaign)
 enum SubmissionStatus {
-  PENDING   // just submitted, nobody looked yet
+  PENDING // just submitted, nobody looked yet
   IN_REVIEW // an admin picked it up / contacting the seller
-  APPROVED  // published — a Building/Unit/Listing was created from it
-  REJECTED  // declined (spam, incomplete, out of scope)
+  APPROVED // published — a Building/Unit/Listing was created from it
+  REJECTED // declined (spam, incomplete, out of scope)
 }
 
 enum MembershipTier {
@@ -383,7 +383,7 @@ model FxRate {
   id        String   @id @default(cuid())
   date      DateTime @unique
   usdToLbp  Decimal
-  source    String?  // "admin", "banque_du_liban", "market"
+  source    String? // "admin", "banque_du_liban", "market"
   createdBy String?
   createdAt DateTime @default(now())
 
@@ -396,7 +396,7 @@ model FxRate {
 // A standalone apartment or shop is a Building(STANDALONE) with one Unit.
 // A developer project is a Building(PROJECT) with many Units.
 model Building {
-  id               String      @id @default(cuid())
+  id               String       @id @default(cuid())
   kind             BuildingKind @default(STANDALONE)
   title            String
   description      String?
@@ -436,13 +436,13 @@ model Building {
 
   // Status / marketing
   // Short human reference quoted by clients ("PG-1042"). Unique, never reused.
-  ref         String?   @unique
-  status      PropertyStatus @default(RESALE)
-  source      PropertySource @default(ADMIN) // OWNER when created from a public submission
-  visibility  PropertyVisibility @default(PUBLIC)
-  featured    Boolean   @default(false)
+  ref           String?            @unique
+  status        PropertyStatus     @default(RESALE)
+  source        PropertySource     @default(ADMIN) // OWNER when created from a public submission
+  visibility    PropertyVisibility @default(PUBLIC)
+  featured      Boolean            @default(false)
   featuredUntil DateTime?
-  views       Int       @default(0)
+  views         Int                @default(0)
 
   // Media
   images         String[]
@@ -452,10 +452,10 @@ model Building {
 
   // Payment plans offered (full cash / installments / custom) — array of
   // { name, kind: 'CASH'|'INSTALLMENTS'|'CUSTOM', downPaymentPct?, months?, description? }
-  paymentPlans   Json?
+  paymentPlans Json?
 
   // SEO
-  slug            String?   @unique
+  slug            String? @unique
   metaTitle       String?
   metaDescription String?
 
@@ -479,18 +479,24 @@ model Building {
   locationGuide LocationGuide? @relation(fields: [locationGuideId], references: [id])
   agent         User?          @relation("BuildingAgent", fields: [agentId], references: [id])
 
-  units            Unit[]
-  listings         Listing[]
-  documents        PropertyDocument[]
-  amenities        PropertyAmenity[]
-  tags             PropertyTag[]
-  inquiries        PropertyInquiry[]
-  favorites        FavoriteProperty[]
-  tours            PropertyTour[]
-  offers           PropertyOffer[]
-  reservations     PropertyReservation[]
-  investmentData   BuildingInvestmentData?
-  priceHistory     BuildingPriceHistory[]
+  // Whose property this is. A brokerage sells other people's stock, so the
+  // owner is a CRM client, not a site user. Nullable because plenty of
+  // catalogue stock (a developer's project abroad) has no client behind it.
+  ownerLeadId String?
+  ownerLead   Lead?   @relation("BuildingOwner", fields: [ownerLeadId], references: [id], onDelete: SetNull)
+
+  units          Unit[]
+  listings       Listing[]
+  documents      PropertyDocument[]
+  amenities      PropertyAmenity[]
+  tags           PropertyTag[]
+  inquiries      PropertyInquiry[]
+  favorites      FavoriteProperty[]
+  tours          PropertyTour[]
+  offers         PropertyOffer[]
+  reservations   PropertyReservation[]
+  investmentData BuildingInvestmentData?
+  priceHistory   BuildingPriceHistory[]
 
   @@index([ref])
   @@index([kind])
@@ -502,6 +508,7 @@ model Building {
   @@index([featured])
   @@index([slug])
   @@index([agentId])
+  @@index([ownerLeadId])
   @@index([createdAt])
   @@map("buildings")
 }
@@ -521,15 +528,15 @@ model BuildingInvestmentData {
   paymentPlan           String?
   paymentPlanDetails    Json?
   // Residency-by-investment — the first question an international buyer asks.
-  isGoldenVisaEligible Boolean @default(false)
-  goldenVisaMinAmount  Float?
+  isGoldenVisaEligible  Boolean @default(false)
+  goldenVisaMinAmount   Float?
   installmentYears      Int?
 
   completionDate      DateTime?
   handoverDate        DateTime?
   expectedRentalStart DateTime?
 
-  averageRentPerMonth Float?
+  averageRentPerMonth  Float?
   comparableProperties String[]
 
   mortgageAvailable Boolean @default(false)
@@ -572,8 +579,8 @@ model Unit {
   ref String? @unique
 
   // Identity
-  name       String?  // "2BR Type A", "Shop 3", "Penthouse"
-  unitNumber String?  // "4B", "G-01", "P"
+  name       String? // "2BR Type A", "Shop 3", "Penthouse"
+  unitNumber String? // "4B", "G-01", "P"
   kind       UnitKind @default(APARTMENT)
 
   // Specs
@@ -590,22 +597,22 @@ model Unit {
   // and we're the broker, not the developer, so we don't know or track how many
   // exist. A type never sells out and never leaves the matcher; which actual
   // apartment a client ended up with is recorded on the deal instead.
-  isUnitType Boolean @default(false)
-  furnishing    FurnishingStatus?
-  ownership     OwnershipType?
-  views         String[] // SEA, MOUNTAIN, CITY, GARDEN, STREET
-  features      String[] // BALCONY, MAID_ROOM, ROOFTOP, STORAGE, ...
+  isUnitType Boolean           @default(false)
+  furnishing FurnishingStatus?
+  ownership  OwnershipType?
+  views      String[] // SEA, MOUNTAIN, CITY, GARDEN, STREET
+  features   String[] // BALCONY, MAID_ROOM, ROOFTOP, STORAGE, ...
 
   // Lifecycle & ownership
   lifecycle       UnitLifecycle @default(DRAFT)
   ownershipSource UnitOwnership @default(PLATFORM_SOLD)
 
   // For external units: owner contact
-  ownerName        String?
-  ownerPhone       String?
-  ownerUserId      String?
-  managedByUserId  String?
-  managementNote   String?
+  ownerName           String?
+  ownerPhone          String?
+  ownerUserId         String?
+  managedByUserId     String?
+  managementNote      String?
   managementStartedAt DateTime?
 
   // Sale pricing (set when lifecycle = FOR_SALE/RESERVED/SOLD)
@@ -616,25 +623,25 @@ model Unit {
   soldAt         DateTime?
 
   // Rental pricing (set when lifecycle = FOR_RENT/RENTED)
-  rentAmount     Decimal?
-  rentCurrency   Currency?
-  rentPeriod     RentPeriod?
+  rentAmount   Decimal?
+  rentCurrency Currency?
+  rentPeriod   RentPeriod?
 
   // Generator ampere subscription (for fixed-share electricity split)
   generatorAmpere Int?
 
   // Media
-  images  String[]
-  notes   String?
+  images String[]
+  notes  String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   // Relations
-  building   Building     @relation(fields: [buildingId], references: [id], onDelete: Cascade)
-  options    UnitOption[]
-  listings   Listing[]
-  documents  PropertyDocument[]
+  building     Building           @relation(fields: [buildingId], references: [id], onDelete: Cascade)
+  options      UnitOption[]
+  listings     Listing[]
+  documents    PropertyDocument[]
   priceHistory UnitPriceHistory[]
 
   @@index([ref])
@@ -650,7 +657,7 @@ model UnitPriceHistory {
   unitId    String
   price     Decimal
   currency  Currency @default(USD)
-  field     String   // "askingPrice" | "rentAmount"
+  field     String // "askingPrice" | "rentAmount"
   changedAt DateTime @default(now())
   changedBy String?
   reason    String?
@@ -666,7 +673,7 @@ model UnitOption {
   id     String @id @default(cuid())
   unitId String
 
-  name               String  // "Turnkey", "White Frame", "Black Frame", "Renovated"
+  name               String // "Turnkey", "White Frame", "Black Frame", "Renovated"
   pricePerSqm        Decimal
   currency           Currency @default(USD)
   initialPayment     Decimal?
@@ -691,8 +698,8 @@ model Listing {
   id String @id @default(cuid())
 
   subjectType ListingSubjectType
-  buildingId  String?   // set when subjectType = BUILDING
-  unitId      String?   // set when subjectType = UNIT
+  buildingId  String? // set when subjectType = BUILDING
+  unitId      String? // set when subjectType = UNIT
 
   intent     ListingIntent
   status     ListingStatus      @default(DRAFT)
@@ -700,9 +707,9 @@ model Listing {
 
   // Pricing
   price      Decimal
-  currency   Currency @default(USD)
+  currency   Currency    @default(USD)
   rentPeriod RentPeriod? // only for FOR_RENT
-  negotiable Boolean    @default(false) // price is negotiable
+  negotiable Boolean     @default(false) // price is negotiable
 
   // Marketing
   slug        String   @unique
@@ -710,8 +717,8 @@ model Listing {
   description String?
   highlights  String[]
 
-  publishedAt DateTime?
-  closedAt    DateTime?
+  publishedAt   DateTime?
+  closedAt      DateTime?
   closingReason String?
 
   createdAt DateTime @default(now())
@@ -754,22 +761,22 @@ model FavoriteProperty {
 }
 
 model PropertyInquiry {
-  id         String        @id @default(cuid())
-  userId     String?
-  buildingId String?
-  listingId  String?
+  id            String  @id @default(cuid())
+  userId        String?
+  buildingId    String?
+  listingId     String?
   buildingTitle String?
 
-  name      String
-  email     String
-  phone     String?
-  message   String?
-  status    InquiryStatus @default(NEW)
+  name       String
+  email      String
+  phone      String?
+  message    String?
+  status     InquiryStatus @default(NEW)
   adminNotes String?
   repliedAt  DateTime?
   repliedBy  String?
-  createdAt  DateTime     @default(now())
-  updatedAt  DateTime     @default(now()) @updatedAt
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @default(now()) @updatedAt
 
   user     User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
   building Building? @relation(fields: [buildingId], references: [id], onDelete: SetNull)
@@ -793,19 +800,19 @@ model ContactMessage {
 }
 
 model UserOwnedProperty {
-  id              String   @id @default(cuid())
-  userId          String
-  buildingId      String?
-  unitId          String?
-  customName      String
-  purchasePrice   Decimal
+  id               String   @id @default(cuid())
+  userId           String
+  buildingId       String?
+  unitId           String?
+  customName       String
+  purchasePrice    Decimal
   purchaseCurrency Currency @default(USD)
-  purchaseDate    DateTime
-  initialMortgage Decimal?
-  currentRent     Decimal?
-  notes           String?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  purchaseDate     DateTime
+  initialMortgage  Decimal?
+  currentRent      Decimal?
+  notes            String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -879,7 +886,7 @@ model Subscription {
 // ============================================
 
 model PropertyReservation {
-  id         String @id @default(cuid())
+  id         String  @id @default(cuid())
   buildingId String
   unitId     String?
   userId     String
@@ -1009,7 +1016,7 @@ model PropertyTag {
 // ============================================
 
 model PropertyOffer {
-  id         String @id @default(cuid())
+  id         String  @id @default(cuid())
   buildingId String
   unitId     String?
   userId     String
@@ -1026,7 +1033,7 @@ model PropertyOffer {
   counterAmount Decimal?
   counterTerms  String?
 
-  expiresAt DateTime
+  expiresAt  DateTime
   message    String?
   adminNotes String?
 
@@ -1050,7 +1057,7 @@ model PropertyOffer {
 }
 
 model PropertyTour {
-  id         String @id @default(cuid())
+  id         String  @id @default(cuid())
   buildingId String
   unitId     String?
   userId     String
@@ -1329,13 +1336,13 @@ model ShareToken {
 // anonymous client session id + user agent.
 model AnalyticsEvent {
   id         String   @id @default(cuid())
-  type       String   // page_view | listing_view | listing_click | inquiry_click | phone_click | whatsapp_click | search | favorite
+  type       String // page_view | listing_view | listing_click | inquiry_click | phone_click | whatsapp_click | search | favorite
   path       String?
   listingId  String?
   buildingId String?
   unitId     String?
-  sessionId  String?  // anonymous visitor session (client-generated uuid)
-  userId     String?  // set when the visitor is authenticated
+  sessionId  String? // anonymous visitor session (client-generated uuid)
+  userId     String? // set when the visitor is authenticated
   referrer   String?
   userAgent  String?
   meta       Json?
@@ -1368,8 +1375,8 @@ model PropertySubmission {
   // What they're listing
   title        String
   description  String?
-  extraDetails String?       // optional free-text: extra notes the seller wants to add
-  locationUrl  String?       // optional Google Maps link the seller pastes
+  extraDetails String? // optional free-text: extra notes the seller wants to add
+  locationUrl  String? // optional Google Maps link the seller pastes
   unitKind     UnitKind      @default(APARTMENT)
   intent       ListingIntent @default(FOR_SALE)
   bedrooms     Int?
@@ -1388,17 +1395,17 @@ model PropertySubmission {
   address      String?
 
   // Media uploaded by the seller (proxied R2 URLs)
-  images String[]
-  videos String[]
+  images          String[]
+  videos          String[]
   // Seller has no photos and wants our team to visit and shoot them for free.
-  wantsPhotoVisit Boolean @default(false)
+  wantsPhotoVisit Boolean  @default(false)
 
   // Internal follow-up steps before the property goes on the website
   visited       Boolean @default(false) // our team visited the property
   dataCollected Boolean @default(false) // full details/paperwork gathered
 
   // Review trail
-  adminNotes   String?   // internal — never shown to the seller
+  adminNotes   String? // internal — never shown to the seller
   reviewedById String?
   reviewedAt   DateTime?
   buildingId   String?   @unique // set when approved → the created property
@@ -1429,34 +1436,34 @@ enum LeadType {
 }
 
 enum LeadStatus {
-  NEW         // just captured, nobody worked it yet
-  ACTIVE      // in conversation / actively searching
-  VIEWING     // scheduled or completed viewings
+  NEW // just captured, nobody worked it yet
+  ACTIVE // in conversation / actively searching
+  VIEWING // scheduled or completed viewings
   NEGOTIATING // offer on the table
-  WON         // closed a deal
-  LOST        // went elsewhere / not interested
-  ARCHIVED    // parked, no longer followed up
+  WON // closed a deal
+  LOST // went elsewhere / not interested
+  ARCHIVED // parked, no longer followed up
 }
 
 // Why an active client is still active. LeadStatus says where they are in the
 // pipeline; this says what is actually holding them there, so a card sitting in
 // Active for three weeks explains itself.
 enum LeadSubStatus {
-  SEARCHING       // we're actively sending them options
-  AWAITING_REPLY  // ball is in their court
-  NEEDS_OPTIONS   // everything shown is ruled out — we owe them fresh stock
+  SEARCHING // we're actively sending them options
+  AWAITING_REPLY // ball is in their court
+  NEEDS_OPTIONS // everything shown is ruled out — we owe them fresh stock
   BUDGET_MISMATCH // what they want costs more than they'll pay
-  FINANCING       // arranging a loan / selling something first
-  PAUSED          // asked us to pause (travel, ramadan, waiting on a sale)
-  DOCS_PENDING    // seller side: waiting on papers, deed, authorisation
-  PRICE_REVIEW    // seller side: asking price needs revisiting
+  FINANCING // arranging a loan / selling something first
+  PAUSED // asked us to pause (travel, ramadan, waiting on a sale)
+  DOCS_PENDING // seller side: waiting on papers, deed, authorisation
+  PRICE_REVIEW // seller side: asking price needs revisiting
 }
 
 enum LeadSource {
-  MANUAL      // typed in by the team
-  INQUIRY     // property inquiry form
-  FAVORITE    // saved a property while logged in
-  SUBMISSION  // came through list-your-property
+  MANUAL // typed in by the team
+  INQUIRY // property inquiry form
+  FAVORITE // saved a property while logged in
+  SUBMISSION // came through list-your-property
   REFERRAL
   WHATSAPP
   PHONE
@@ -1489,9 +1496,9 @@ model Lead {
   type LeadType @default(BUYER)
 
   // A buyer chasing yield rather than a home. Changes what you show them.
-  isInvestor Boolean @default(false)
-  status LeadStatus @default(ACTIVE)
-  source LeadSource @default(MANUAL)
+  isInvestor Boolean    @default(false)
+  status     LeadStatus @default(ACTIVE)
+  source     LeadSource @default(MANUAL)
 
   // Nullable = derive it from the pipeline; set = the team overrode it.
   subStatus LeadSubStatus?
@@ -1509,12 +1516,12 @@ model Lead {
   // Locations are picked from the curated per-market catalogue (never free text).
   // A client may name specific areas, or only regions when they're open to a
   // whole region, or both.
-  areas   String[] // ["Achrafieh", "Bouchrieh", "Zalka"]
-  regions String[] // Lebanese mohafazat values, or GE_* for Georgia
-  minBeds Int?
+  areas     String[] // ["Achrafieh", "Bouchrieh", "Zalka"]
+  regions   String[] // Lebanese mohafazat values, or GE_* for Georgia
+  minBeds   Int?
   budgetMin Float?
   budgetMax Float?
-  currency  Currency @default(USD)
+  currency  Currency   @default(USD)
 
   lastContactAt       DateTime?
   contactIntervalDays Int       @default(7)
@@ -1535,7 +1542,6 @@ model Lead {
   userId    String? // registered user this lead corresponds to
   listingId String? // a specific listing they asked about
 
-
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   createdBy String? // admin who added the lead
@@ -1543,6 +1549,10 @@ model Lead {
   contacts      LeadContact[]
   opportunities LeadOpportunity[] @relation("LeadOpportunities")
   properties    LeadProperty[]    @relation("LeadProperties")
+
+  // Catalogue stock this client owns — the real link, as opposed to the
+  // free-text LeadProperty shadow record.
+  ownedBuildings Building[] @relation("BuildingOwner")
 
   @@index([market])
   @@index([status])
@@ -1584,14 +1594,14 @@ model LeadContact {
 // relationship.
 
 enum OpportunityStage {
-  SUGGESTED      // matched by the system, not shown to the client yet
-  SHARED         // sent to the client (WhatsApp/email)
+  SUGGESTED // matched by the system, not shown to the client yet
+  SHARED // sent to the client (WhatsApp/email)
   VIEWING_BOOKED // viewing scheduled
-  VIEWED         // viewing happened — awaiting or has feedback
-  INTERESTED     // liked it, wants to proceed
-  OFFER_MADE     // offer submitted
-  WON            // deal closed on this property
-  REJECTED       // ruled out — never suggest again
+  VIEWED // viewing happened — awaiting or has feedback
+  INTERESTED // liked it, wants to proceed
+  OFFER_MADE // offer submitted
+  WON // deal closed on this property
+  REJECTED // ruled out — never suggest again
 }
 
 // Why a client ruled a property out. Drives smarter future matching.
@@ -1610,7 +1620,7 @@ enum RejectionReason {
   BUILDING_QUALITY
   CHANGED_MIND
   BOUGHT_ELSEWHERE
-  UNAVAILABLE   // sold/rented to someone else
+  UNAVAILABLE // sold/rented to someone else
   OTHER
 }
 
@@ -1648,7 +1658,7 @@ model LeadProperty {
   leadId String
 
   kind        UnitKind @default(APARTMENT)
-  title       String?  // "3BR Achrafieh, 5th floor, sea view"
+  title       String? // "3BR Achrafieh, 5th floor, sea view"
   areas       String[] // curated area names, same catalogue as Lead.areas
   region      String?
   askingPrice Float?
@@ -1720,7 +1730,7 @@ model LeadOpportunity {
   // The money, recorded once on the opportunity that actually closed.
   // commissionUsd is normalised to USD so totals mean something.
   soldPrice     Float?
-  soldCurrency  Currency @default(USD)
+  soldCurrency  Currency  @default(USD)
   commissionUsd Float?
   closedAt      DateTime?
 

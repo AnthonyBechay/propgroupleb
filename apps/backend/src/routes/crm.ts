@@ -803,6 +803,15 @@ router.get(
         contacts: { orderBy: { contactedAt: 'desc' } },
         opportunities: { orderBy: { updatedAt: 'desc' } },
         properties: { orderBy: { createdAt: 'desc' } },
+        // Catalogue stock this client actually owns. Narrow projection — the
+        // drawer lists it, it doesn't render the whole property.
+        ownedBuildings: {
+          orderBy: { createdAt: 'desc' },
+          select: {
+            id: true, ref: true, title: true, slug: true, country: true,
+            city: true, caza: true, status: true, visibility: true, images: true,
+          },
+        },
       },
     });
     if (!lead) { sendNotFound(res, 'Lead'); return; }
