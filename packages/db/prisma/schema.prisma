@@ -1600,6 +1600,11 @@ enum OpportunityStage {
   VIEWED // viewing happened — awaiting or has feedback
   INTERESTED // liked it, wants to proceed
   OFFER_MADE // offer submitted
+  // Agreed and paying. Abroad a sale is a payment plan, not a signing: the
+  // client has reserved the unit and is working through instalments, which can
+  // run for months. Without this they sat in OFFER_MADE (wrong — the offer is
+  // settled) or WON (wrong — the money isn't in).
+  RESERVED
   WON // deal closed on this property
   REJECTED // ruled out — never suggest again
 }

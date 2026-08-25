@@ -1304,11 +1304,33 @@ router.delete(
   requireCrm,
   asyncHandler(async (req: Request, res: Response) => {
     const authReq = req as AuthenticatedRequest;
-    const existing = await prisma.lead.findUnique({ where: { id: req.params.id }, select: { id: true, name: true } });
+    const existing = await prisma.lead.findUnique({
+      where: { id: req.params.id },
+      select: { id: true, name: true, _count: { select: { opportunities: true, properties: true } } },
+    });
     if (!existing) { sendNotFound(res, 'Lead'); return; }
 
+    // Deleting a client cascades to every deal they ever had. That is almost
+    // never what someone means when they click a bin next to one card, so a
+    // client with history has to be deleted deliberately: the caller must say
+    // how much it is about to destroy.
+    const attached = existing._count.opportunities + existing._count.properties;
+    if (attached > 0 && req.query.confirmDeals !== String(existing._count.opportunities)) {
+      sendError(
+        res,
+        409,
+        `${existing.name} has ${existing._count.opportunities} deal(s) and ${existing._count.properties} propert(ies). ` +
+          'Deleting the client deletes all of them. Confirm explicitly to proceed.'
+      );
+      return;
+    }
+
     await prisma.lead.delete({ where: { id: req.params.id } });
-    await logAdminAction('DELETE_LEAD', 'lead', req.params.id, { name: existing.name }, authReq);
+    await logAdminAction(
+      'DELETE_LEAD', 'lead', req.params.id,
+      { name: existing.name, cascadedDeals: existing._count.opportunities },
+      authReq
+    );
     sendSuccess(res, { id: req.params.id }, 'Lead deleted');
   })
 );
@@ -1374,7 +1396,10 @@ router.post(
 // A failed viewing rules out that property and returns the client to the
 // search; it never ends the relationship.
 
-const STAGES = ['SUGGESTED', 'SHARED', 'VIEWING_BOOKED', 'VIEWED', 'INTERESTED', 'OFFER_MADE', 'WON', 'REJECTED'] as const;
+const STAGES = [
+  'SUGGESTED', 'SHARED', 'VIEWING_BOOKED', 'VIEWED',
+  'INTERESTED', 'OFFER_MADE', 'RESERVED', 'WON', 'REJECTED',
+] as const;
 const REJECTION_REASONS = [
   'PRICE_TOO_HIGH', 'TOO_SMALL', 'TOO_BIG', 'LOCATION', 'CONDITION', 'LAYOUT',
   'FLOOR_LEVEL', 'NO_PARKING', 'NOISE', 'NO_VIEW', 'NO_ELEVATOR', 'BUILDING_QUALITY',

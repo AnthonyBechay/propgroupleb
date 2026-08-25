@@ -2,8 +2,8 @@
 
 import { useMemo, useState } from 'react'
 import {
-  Phone, MessageCircle, Calendar, AlertCircle, Search, Handshake,
-  TrendingUp, Loader2, Check, Plus,
+  Phone, MessageCircle, Calendar, AlertCircle, Handshake,
+  TrendingUp, Loader2, Check, Plus, X,
 } from 'lucide-react'
 import {
   type Deal, type OpportunityStage, DEAL_COLUMNS, dealColumnOf, STAGE_LABELS,
@@ -31,6 +31,8 @@ export function DealBoard({
   onOpenClient,
   onSetCommission,
   onNewDeal,
+  onRemoveDeal,
+  search,
 }: {
   deals: Deal[]
   canSeeMoney: boolean
@@ -40,20 +42,32 @@ export function DealBoard({
   onSetCommission: (dealId: string, usd: number) => void
   /** Start a deal: pick the client, then the property. */
   onNewDeal: () => void
+  /** Drop this one deal. Never touches the client. */
+  onRemoveDeal: (deal: Deal) => void
+  /** The page's single search box — the board doesn't own one. */
+  search: string
 }) {
-  const [q, setQ] = useState('')
+  const q = search
+  const [onlyAlerts, setOnlyAlerts] = useState(false)
   const [dragging, setDragging] = useState<string | null>(null)
   const [over, setOver] = useState<string | null>(null)
 
   const filtered = useMemo(() => {
     const needle = q.trim().toLowerCase()
-    if (!needle) return deals
-    return deals.filter((d) =>
-      [d.lead.name, d.lead.phone, d.subject?.title, d.subject?.ref, d.subject?.subtitle]
-        .filter(Boolean)
-        .some((v) => String(v).toLowerCase().includes(needle))
-    )
-  }, [deals, q])
+    let out = deals
+    if (needle) {
+      out = out.filter((d) =>
+        [d.lead.name, d.lead.phone, d.subject?.title, d.subject?.ref, d.subject?.subtitle]
+          .filter(Boolean)
+          .some((v) => String(v).toLowerCase().includes(needle))
+      )
+    }
+    // The one filter a deal board actually needs: what is going wrong.
+    if (onlyAlerts) out = out.filter((d) => dealAlert(d) !== null)
+    return out
+  }, [deals, q, onlyAlerts])
+
+  const alertCount = useMemo(() => deals.filter((d) => dealAlert(d) !== null).length, [deals])
 
   // Money at the top, because "where is the business" is the first question the
   // board is opened to answer.
@@ -68,15 +82,20 @@ export function DealBoard({
   return (
     <div className="space-y-3">
       <div className="flex gap-2 flex-wrap items-center bg-white border border-slate-200 rounded-xl p-2">
-        <div className="relative flex-1 min-w-[220px]">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-          <input
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            placeholder="Client, property or ref…"
-            className="w-full h-9 pl-9 pr-3 text-sm rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-slate-900/10"
-          />
-        </div>
+        <button
+          onClick={() => setOnlyAlerts((v) => !v)}
+          disabled={alertCount === 0}
+          className={`inline-flex items-center gap-1.5 px-3 h-9 rounded-lg text-sm font-medium border transition-colors disabled:opacity-40 ${
+            onlyAlerts
+              ? 'bg-amber-500 text-white border-amber-500'
+              : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+          }`}
+        >
+          <AlertCircle className="h-4 w-4" />
+          Needs attention {alertCount > 0 && <span className="opacity-70">{alertCount}</span>}
+        </button>
+
+        <div className="flex-1" />
 
         <button
           onClick={onNewDeal}
@@ -152,11 +171,12 @@ export function DealBoard({
                     onDragStart={() => setDragging(d.id)}
                     onOpenClient={onOpenClient}
                     onSetCommission={onSetCommission}
+                    onRemove={onRemoveDeal}
                   />
                 ))}
 
                 {cards.length === 0 && (
-                  col.key === 'SUGGESTED' ? (
+                  col.key === 'SUGGESTED' && !q && !onlyAlerts ? (
                     <button
                       onClick={onNewDeal}
                       className="w-full py-6 text-[11px] text-slate-400 hover:text-slate-700 hover:bg-white rounded-lg transition-colors"
@@ -177,7 +197,7 @@ export function DealBoard({
 }
 
 function DealCard({
-  deal: d, canSeeMoney, busy, onDragStart, onOpenClient, onSetCommission,
+  deal: d, canSeeMoney, busy, onDragStart, onOpenClient, onSetCommission, onRemove,
 }: {
   deal: Deal
   canSeeMoney: boolean
@@ -185,6 +205,7 @@ function DealCard({
   onDragStart: () => void
   onOpenClient: (leadId: string) => void
   onSetCommission: (dealId: string, usd: number) => void
+  onRemove: (deal: Deal) => void
 }) {
   const [editing, setEditing] = useState(false)
   const alert = dealAlert(d)
@@ -213,7 +234,18 @@ function DealCard({
         <span className="text-sm font-medium text-slate-900 leading-snug line-clamp-2 flex-1">
           {d.subject?.title ?? 'Property'}
         </span>
-        {busy && <Loader2 className="h-3 w-3 animate-spin text-slate-400 shrink-0 mt-0.5" />}
+        {busy ? (
+          <Loader2 className="h-3 w-3 animate-spin text-slate-400 shrink-0 mt-0.5" />
+        ) : (
+          // Removing THIS deal. The client is never touched from here.
+          <button
+            onClick={(e) => { e.stopPropagation(); onRemove(d) }}
+            className="shrink-0 -mt-0.5 -mr-0.5 p-1 rounded text-slate-300 hover:text-red-600 hover:bg-red-50"
+            title="Remove this deal (keeps the client)"
+          >
+            <X className="h-3 w-3" />
+          </button>
+        )}
       </div>
 
       {d.subject?.subtitle && (

@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react'
 import {
   Phone, MessageCircle, Mail, MapPin, StickyNote, Home, Handshake,
-  Search, Users, CheckCircle2,
+  Users, CheckCircle2,
 } from 'lucide-react'
 import {
   type Lead, type LeadType, TYPE_LABELS, TYPE_META, STATUS_META,
@@ -23,12 +23,15 @@ export function ClientDirectory({
   leads,
   canSeeMoney,
   onOpen,
+  search,
 }: {
   leads: Lead[]
   canSeeMoney: boolean
   onOpen: (id: string) => void
+  /** The page's single search box. The directory doesn't own one. */
+  search: string
 }) {
-  const [q, setQ] = useState('')
+  const q = search
   const [side, setSide] = useState<'all' | 'demand' | 'supply'>('all')
   // Working with them now, or someone who already bought? Two different jobs.
   const [group, setGroup] = useState<'active' | 'past' | 'all'>('active')
@@ -65,16 +68,6 @@ export function ClientDirectory({
     <div className="space-y-3">
       {/* Directory controls — separate from the board's pipeline filters */}
       <div className="flex gap-2 flex-wrap items-center bg-white border border-slate-200 rounded-xl p-2">
-        <div className="relative flex-1 min-w-[220px]">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-          <input
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            placeholder="Name, phone, area, or what they bought…"
-            className="w-full h-9 pl-9 pr-3 text-sm rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-slate-900/10"
-          />
-        </div>
-
         <div className="flex gap-1 bg-slate-100 rounded-lg p-1">
           {([
             ['all', 'Any intent'],

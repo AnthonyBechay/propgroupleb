@@ -12,12 +12,14 @@
 
 export type OpportunityStage =
   | 'SUGGESTED' | 'SHARED' | 'VIEWING_BOOKED' | 'VIEWED'
-  | 'INTERESTED' | 'OFFER_MADE' | 'WON' | 'REJECTED';
+  | 'INTERESTED' | 'OFFER_MADE' | 'RESERVED' | 'WON' | 'REJECTED';
 
 /** Stages that mean the deal is finished, one way or the other. */
 export const CLOSED_STAGES: OpportunityStage[] = ['WON', 'REJECTED'];
 /** Stages where the ball is in the client's court / in motion. */
-export const LIVE_STAGES: OpportunityStage[] = ['SHARED', 'VIEWING_BOOKED', 'VIEWED', 'INTERESTED', 'OFFER_MADE'];
+export const LIVE_STAGES: OpportunityStage[] = [
+  'SHARED', 'VIEWING_BOOKED', 'VIEWED', 'INTERESTED', 'OFFER_MADE', 'RESERVED',
+];
 
 /**
  * The status a lead should have, given its opportunities. Returns null when the
@@ -44,6 +46,8 @@ export function deriveLeadStatus(
   // property is not a past client, whatever they bought last year — and
   // checking WON first hid exactly that: the board filed them under
   // "bought / sold" while a viewing was booked for tomorrow.
+  // Paying outranks negotiating: the price argument is over.
+  if (stages.includes('RESERVED')) return 'NEGOTIATING';
   if (stages.includes('OFFER_MADE') || stages.includes('INTERESTED')) return 'NEGOTIATING';
   if (stages.includes('VIEWING_BOOKED')) return 'VIEWING';
   if (hasLive) return 'ACTIVE';

@@ -15,7 +15,18 @@ import type { Market } from '@/lib/crm-locations'
  * asking for, phone, follow-up, notes) plus structured fields that power
  * matching against live listings.
  */
-export function LeadFormModal({ lead, onClose, onSaved }: { lead?: Lead; onClose: () => void; onSaved: () => void }) {
+export function LeadFormModal({
+  lead, onClose, onSaved, initialName = '', initialSource,
+}: {
+  lead?: Lead
+  onClose: () => void
+  /** Receives the saved client, so a caller mid-flow can carry on with it. */
+  onSaved: (saved?: Lead) => void
+  /** Name typed somewhere else — usually the new-deal picker. */
+  initialName?: string
+  /** Where they came from, when the caller already knows (a WhatsApp message). */
+  initialSource?: string
+}) {
   const apiUrl = normalizeApiUrl(process.env.NEXT_PUBLIC_API_URL || '')
   const isEdit = !!lead
   const [saving, setSaving] = useState(false)
@@ -26,8 +37,8 @@ export function LeadFormModal({ lead, onClose, onSaved }: { lead?: Lead; onClose
     type: lead?.type ?? 'BUYER',
     isInvestor: lead?.isInvestor ?? false,
     status: lead?.status ?? 'ACTIVE',
-    source: lead?.source ?? 'MANUAL',
-    name: lead?.name ?? '',
+    source: lead?.source ?? initialSource ?? 'MANUAL',
+    name: lead?.name ?? initialName,
     phone: lead?.phone ?? '',
     email: lead?.email ?? '',
     whatsapp: lead?.whatsapp ?? '',
@@ -99,7 +110,8 @@ export function LeadFormModal({ lead, onClose, onSaved }: { lead?: Lead; onClose
         setError(j.message || j.error || 'Save failed')
         return
       }
-      onSaved()
+      const saved = (await res.json().catch(() => ({}))).data
+      onSaved(saved)
     } catch {
       setError('Network error')
     } finally {

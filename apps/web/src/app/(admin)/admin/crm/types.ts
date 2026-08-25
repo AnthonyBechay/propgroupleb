@@ -21,7 +21,7 @@ export interface LeadContact {
 
 export type OpportunityStage =
   | 'SUGGESTED' | 'SHARED' | 'VIEWING_BOOKED' | 'VIEWED'
-  | 'INTERESTED' | 'OFFER_MADE' | 'WON' | 'REJECTED'
+  | 'INTERESTED' | 'OFFER_MADE' | 'RESERVED' | 'WON' | 'REJECTED'
 
 export type RejectionReason =
   | 'PRICE_TOO_HIGH' | 'TOO_SMALL' | 'TOO_BIG' | 'LOCATION' | 'CONDITION' | 'LAYOUT'
@@ -111,12 +111,13 @@ export const STRONG_MATCH_SCORE = 70
 export const UNTAPPED_CAP = 9
 
 export const OPPORTUNITY_META: Record<OpportunityStage, { label: string; cls: string; dot: string }> = {
-  SUGGESTED:      { label: 'Shortlisted',   cls: 'bg-slate-100 text-slate-600',   dot: 'bg-slate-400' },
-  SHARED:         { label: 'Sent to client',cls: 'bg-sky-100 text-sky-700',       dot: 'bg-sky-500' },
+  SUGGESTED:      { label: 'Enquiry',       cls: 'bg-slate-100 text-slate-600',   dot: 'bg-slate-400' },
+  SHARED:         { label: 'Details sent',  cls: 'bg-sky-100 text-sky-700',       dot: 'bg-sky-500' },
   VIEWING_BOOKED: { label: 'Viewing booked',cls: 'bg-violet-100 text-violet-700', dot: 'bg-violet-500' },
   VIEWED:         { label: 'Viewed',        cls: 'bg-amber-100 text-amber-800',   dot: 'bg-amber-500' },
   INTERESTED:     { label: 'Interested',    cls: 'bg-emerald-100 text-emerald-700',dot: 'bg-emerald-500' },
   OFFER_MADE:     { label: 'Offer made',    cls: 'bg-indigo-100 text-indigo-700', dot: 'bg-indigo-500' },
+  RESERVED:       { label: 'Reserved / paying', cls: 'bg-teal-100 text-teal-700', dot: 'bg-teal-500' },
   WON:            { label: 'Closed',        cls: 'bg-green-600 text-white',       dot: 'bg-green-600' },
   REJECTED:       { label: 'Ruled out',     cls: 'bg-red-50 text-red-600',        dot: 'bg-red-400' },
 }
@@ -141,7 +142,9 @@ export const REJECTION_LABELS: Record<RejectionReason, string> = {
 }
 
 /** Stages where the deal is still in play. */
-export const LIVE_STAGES: OpportunityStage[] = ['SHARED', 'VIEWING_BOOKED', 'VIEWED', 'INTERESTED', 'OFFER_MADE']
+export const LIVE_STAGES: OpportunityStage[] = [
+  'SHARED', 'VIEWING_BOOKED', 'VIEWED', 'INTERESTED', 'OFFER_MADE', 'RESERVED',
+]
 
 export interface Lead {
   id: string
@@ -531,12 +534,12 @@ export interface DealColumn {
 
 export const DEAL_COLUMNS: DealColumn[] = [
   {
-    key: 'SUGGESTED', label: 'Shortlisted', stage: 'SUGGESTED', stages: ['SUGGESTED'],
-    hint: 'Picked out for them — not sent yet', accent: 'bg-slate-400',
+    key: 'SUGGESTED', label: 'Enquiry', stage: 'SUGGESTED', stages: ['SUGGESTED'],
+    hint: 'They asked about it, or we picked it for them', accent: 'bg-slate-400',
   },
   {
-    key: 'SHARED', label: 'Sent', stage: 'SHARED', stages: ['SHARED'],
-    hint: 'They have seen the details', accent: 'bg-sky-500',
+    key: 'SHARED', label: 'Details sent', stage: 'SHARED', stages: ['SHARED'],
+    hint: 'Photos, price and plans are with them', accent: 'bg-sky-500',
   },
   {
     key: 'VIEWING_BOOKED', label: 'Viewing booked', stage: 'VIEWING_BOOKED', stages: ['VIEWING_BOOKED'],
@@ -549,11 +552,15 @@ export const DEAL_COLUMNS: DealColumn[] = [
   {
     key: 'NEGOTIATING', label: 'Negotiating', stage: 'INTERESTED',
     stages: ['INTERESTED', 'OFFER_MADE'],
-    hint: 'They want it — price is moving', accent: 'bg-amber-500',
+    hint: 'They want it — price is still moving', accent: 'bg-amber-500',
+  },
+  {
+    key: 'RESERVED', label: 'Reserved / paying', stage: 'RESERVED', stages: ['RESERVED'],
+    hint: 'Agreed. Working through the payments.', accent: 'bg-teal-500',
   },
   {
     key: 'WON', label: 'Closed', stage: 'WON', stages: ['WON'],
-    hint: 'Signed. Record what we made.', accent: 'bg-emerald-600',
+    hint: 'Paid in full. Record what we made.', accent: 'bg-emerald-600',
   },
 ]
 
@@ -565,12 +572,13 @@ export function dealColumnOf(deal: Deal): string {
 
 /** How a stage reads on a card. */
 export const STAGE_LABELS: Record<OpportunityStage, string> = {
-  SUGGESTED: 'Shortlisted',
-  SHARED: 'Sent',
+  SUGGESTED: 'Enquiry',
+  SHARED: 'Details sent',
   VIEWING_BOOKED: 'Viewing booked',
   VIEWED: 'Viewed',
   INTERESTED: 'Interested',
   OFFER_MADE: 'Offer made',
+  RESERVED: 'Reserved / paying',
   WON: 'Closed',
   REJECTED: 'Ruled out',
 }
@@ -609,6 +617,7 @@ export function dealAlert(d: Deal): { text: string; tone: 'red' | 'amber' } | nu
     if (at - now < 36e5 * 24) return { text: 'Viewing today', tone: 'amber' }
   }
   if (d.stage === 'VIEWED' && !d.feedback) return { text: 'No feedback yet', tone: 'amber' }
+  if (d.stage === 'RESERVED' && !d.soldPrice) return { text: 'Agreed price not recorded', tone: 'amber' }
   if (d.stage === 'WON' && d.commissionUsd == null) return { text: 'Commission not recorded', tone: 'amber' }
   // A deal nobody has touched in three weeks is quietly dying.
   const idle = (now - new Date(d.updatedAt).getTime()) / 864e5

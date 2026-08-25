@@ -111,6 +111,25 @@ other:
 distinction is real on the deal, but as columns they split one conversation in
 two and left both looking empty.
 
+Columns are named after the conversation, not the schema: **Enquiry → Details
+sent → Viewing booked → Viewed → Negotiating → Reserved / paying → Closed**.
+"Shortlisted" was replaced because it only described half of what lands there —
+most deals start with a client asking about a property, not with us picking one.
+
+**`RESERVED` exists because a sale abroad is a payment plan, not a signing.** A
+Georgian client agrees, reserves the unit and pays instalments for months. That
+sat wrongly in `OFFER_MADE` (the offer is settled) or `WON` (the money isn't
+in). Viewing stages stay empty for those deals, which is correct — there is no
+viewing.
+
+**Deleting a client cascades to every deal they have.** `DELETE /api/crm/:id`
+refuses unless `?confirmDeals=` echoes the exact count, because from a board of
+deals an unlabelled bin reads as "remove this card" — and once did exactly
+that. Removing one deal is `DELETE /opportunities/:oid`, on the card itself.
+
+There is **one search box**, in the page toolbar, passed down as a prop. The
+board and the client directory used to each own another one.
+
 Commission is editable in place on a card. Chasing it through a drawer is why
 so many closed deals had no figure against them. When none is recorded,
 `dealCommission` forecasts from the asking price at `DEFAULT_COMMISSION_RATE`

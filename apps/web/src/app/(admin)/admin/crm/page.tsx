@@ -73,6 +73,8 @@ export default function CrmPage() {
   const [bookingFor, setBookingFor] = useState<Lead | null>(null)
   // Starting a deal is "which client, then which property" — the client step.
   const [pickingClient, setPickingClient] = useState(false)
+  // Carries the name typed in the picker straight into the new-client form.
+  const [prefillName, setPrefillName] = useState('')
   const [showChannels, setShowChannels] = useState(false)
 
   const load = useCallback(async () => {
@@ -154,6 +156,26 @@ export default function CrmPage() {
     }
   }
 
+  /**
+   * Drop one deal. Explicitly scoped to the deal — deleting the client is a
+   * separate, louder action in the drawer.
+   */
+  async function removeDeal(deal: Deal) {
+    const what = deal.subject?.title ?? 'this property'
+    if (!confirm(`Remove ${what} from ${deal.lead.name}'s list?\n\nThe client and their other deals are not affected.`)) return
+    const before = deals
+    setDeals((prev) => prev.filter((d) => d.id !== deal.id))
+    try {
+      const res = await fetch(`${apiUrl}/api/crm/opportunities/${deal.id}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      })
+      if (!res.ok) throw new Error('rejected')
+    } catch {
+      setDeals(before)
+    }
+  }
+
   /** Record what we made, straight from the card. */
   async function setCommission(dealId: string, usd: number) {
     const before = deals
@@ -213,7 +235,7 @@ export default function CrmPage() {
       {/* One row: what needs attention on the left, actions on the right. The
           page title used to eat a whole row saying what the sidebar says. */}
       <div className="flex items-center justify-between gap-3 flex-wrap">
-        <div className={`flex gap-2 flex-wrap ${['today', 'overview'].includes(view) ? 'invisible pointer-events-none' : ''}`}>
+        <div className={`flex gap-2 flex-wrap ${['today', 'overview', 'board'].includes(view) ? 'invisible pointer-events-none' : ''}`}>
           <FocusChip
             active={focus === 'planned'} count={counts.planned}
             onClick={() => setFocus((f) => (f === 'planned' ? 'none' : 'planned'))}
@@ -363,6 +385,8 @@ export default function CrmPage() {
           onOpenClient={setOpenId}
           onSetCommission={setCommission}
           onNewDeal={() => setPickingClient(true)}
+          onRemoveDeal={removeDeal}
+          search={search}
         />
       ) : visible.length === 0 ? (
         <div className="bg-white border rounded-xl p-16 text-center text-slate-400">
@@ -374,7 +398,7 @@ export default function CrmPage() {
             : 'No clients yet. Add one, or import your spreadsheet.'}
         </div>
       ) : (
-        <ClientDirectory leads={visible} canSeeMoney={canSeeMoney} onOpen={setOpenId} />
+        <ClientDirectory leads={visible} canSeeMoney={canSeeMoney} onOpen={setOpenId} search={search} />
       )}
 
       {/* Closed deals summary — off-board so the pipeline stays focused */}
@@ -452,13 +476,27 @@ export default function CrmPage() {
       )}
 
       {openLead && <LeadDrawer lead={openLead} onClose={() => setOpenId(null)} onChanged={load} />}
-      {creating && <LeadFormModal onClose={() => setCreating(false)} onSaved={() => { setCreating(false); load() }} />}
+      {creating && (
+        <LeadFormModal
+          initialName={prefillName}
+          onClose={() => { setCreating(false); setPrefillName('') }}
+          onSaved={(saved) => {
+            setCreating(false)
+            setPrefillName('')
+            load()
+            // Came here from "New deal"? Carry straight on to the property,
+            // instead of dropping the user back on the board to start again.
+            if (prefillName && saved) setBookingFor(saved)
+          }}
+        />
+      )}
       {importing && <ImportModal onClose={() => setImporting(false)} onImported={load} />}
       {pickingClient && (
         <ClientPicker
           leads={leads}
           onClose={() => setPickingClient(false)}
           onPick={(l) => { setPickingClient(false); setBookingFor(l) }}
+          onCreate={(name) => { setPickingClient(false); setPrefillName(name); setCreating(true) }}
         />
       )}
 
@@ -518,11 +556,12 @@ function FocusChip({
  * friction.
  */
 function ClientPicker({
-  leads, onClose, onPick,
+  leads, onClose, onPick, onCreate,
 }: {
   leads: Lead[]
   onClose: () => void
   onPick: (lead: Lead) => void
+  onCreate: (name: string) => void
 }) {
   const [q, setQ] = useState('')
   const rows = useMemo(() => {
@@ -545,6 +584,9 @@ function ClientPicker({
       >
         <div className="p-4 border-b border-slate-100">
           <h2 className="font-semibold text-slate-900">New deal — for which client?</h2>
+          <p className="text-[11px] text-slate-400 mt-0.5">
+            Someone who just messaged you? Add them here, then pick the property.
+          </p>
           <input
             autoFocus
             value={q}
@@ -571,8 +613,18 @@ function ClientPicker({
               )}
             </button>
           ))}
-          {rows.length === 0 && (
-            <p className="text-sm text-slate-400 text-center py-8">Nobody matches “{q.trim()}”.</p>
+          {/* The WhatsApp case: they're not in the CRM yet, and making the user
+              leave this flow to add them is how enquiries get lost. */}
+          <button
+            onClick={() => onCreate(q.trim())}
+            className="w-full text-left inline-flex items-center gap-1.5 rounded-lg border border-dashed border-slate-300 px-3 py-2 text-sm text-slate-600 hover:bg-slate-50"
+          >
+            <Plus className="h-3.5 w-3.5" />
+            {q.trim() ? `Add “${q.trim()}” as a new client` : 'Add someone new'}
+          </button>
+
+          {rows.length === 0 && q.trim() && (
+            <p className="text-sm text-slate-400 text-center py-6">Nobody matches “{q.trim()}”.</p>
           )}
         </div>
       </div>

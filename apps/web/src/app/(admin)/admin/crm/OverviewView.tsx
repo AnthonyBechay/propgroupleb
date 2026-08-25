@@ -32,7 +32,7 @@ interface Overview {
   }>
 }
 
-export function OverviewView({ onFocus }: { onFocus: (view: 'today' | 'board') => void }) {
+export function OverviewView({ onFocus }: { onFocus: (view: 'today' | 'board' | 'list') => void }) {
   const apiUrl = normalizeApiUrl(process.env.NEXT_PUBLIC_API_URL || '')
   const [d, setD] = useState<Overview | null>(null)
   const [loading, setLoading] = useState(true)
@@ -66,16 +66,19 @@ export function OverviewView({ onFocus }: { onFocus: (view: 'today' | 'board') =
           label="Open clients" value={openClients}
           hint={`${d.byMarket.LEBANON ?? 0} 🇱🇧 · ${d.byMarket.GEORGIA ?? 0} 🇬🇪`}
           icon={<Users className="h-4 w-4" />} tone="slate"
+          onClick={() => onFocus('list')}
         />
         <Stat
           label="Deals in motion" value={d.inMotion.liveDeals}
           hint={`${d.inMotion.viewingsBooked} viewing${d.inMotion.viewingsBooked === 1 ? '' : 's'} booked`}
           icon={<TrendingUp className="h-4 w-4" />} tone="sky"
+          onClick={() => onFocus('board')}
         />
         <Stat
           label="Closed this month" value={d.wonThisMonth}
           hint="deals won"
           icon={<Trophy className="h-4 w-4" />} tone="emerald"
+          onClick={() => onFocus('board')}
         />
         <Stat
           label="Needs attention" value={attention}
@@ -113,11 +116,11 @@ export function OverviewView({ onFocus }: { onFocus: (view: 'today' | 'board') =
                 key={k}
                 label={SUB_STATUS_META[k as LeadSubStatus]?.label ?? k}
                 value={n}
-                onClick={() => onFocus('board')}
+                onClick={() => onFocus('list')}
               />
             ))}
           {d.waitingOn.NONE > 0 && (
-            <Row label="Not set" value={d.waitingOn.NONE} muted onClick={() => onFocus('board')} />
+            <Row label="Not set" value={d.waitingOn.NONE} muted onClick={() => onFocus('list')} />
           )}
         </Panel>
 
@@ -126,7 +129,7 @@ export function OverviewView({ onFocus }: { onFocus: (view: 'today' | 'board') =
           {Object.entries(d.byType)
             .sort((a, b) => b[1] - a[1])
             .map(([k, n]) => (
-              <Row key={k} label={TYPE_LABELS[k as LeadType] ?? k} value={n} onClick={() => onFocus('board')} />
+              <Row key={k} label={TYPE_LABELS[k as LeadType] ?? k} value={n} onClick={() => onFocus('list')} />
             ))}
         </Panel>
 
