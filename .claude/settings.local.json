@@ -460,7 +460,8 @@
       "Bash(DATABASE_URL=\"postgresql://postgres:t@localhost:55480/seq\" npx prisma db push --skip-generate --accept-data-loss)",
       "Bash(DATABASE_URL=\"postgresql://postgres:t@localhost:55490/fin\" npx prisma migrate deploy)",
       "Bash(awk '/^model Building \\\\{/,/^\\\\}/' packages/db/prisma/schema.prisma)",
-      "Bash(awk '/model AdminAuditLog/,/^}/' packages/db/prisma/schema.prisma)"
+      "Bash(awk '/model AdminAuditLog/,/^}/' packages/db/prisma/schema.prisma)",
+      "Bash(awk '/enum OpportunityStage/,/^\\\\}/' packages/db/prisma/schema.prisma)"
     ],
     "deny": [],
     "ask": []

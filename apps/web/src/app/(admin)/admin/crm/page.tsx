@@ -10,14 +10,15 @@ import { normalizeApiUrl } from '@/lib/utils/api-url'
 import { useAuth } from '@/contexts/AuthContext'
 import { LeadDrawer } from './LeadDrawer'
 import { LeadFormModal } from './LeadFormModal'
-import { LeadBoard } from './LeadBoard'
+import { DealBoard } from './DealBoard'
 import { ImportModal } from './ImportModal'
 import { BookViewingModal } from './BookViewingModal'
 import { TodayView } from './TodayView'
 import { OverviewView } from './OverviewView'
 import { ClientDirectory } from './ClientDirectory'
 import {
-  type Lead, type LeadMarket, type LeadStatus, type LeadType,
+  type Lead, type LeadMarket, type LeadType,
+  type Deal, type OpportunityStage,
   STATUS_META, TYPE_LABELS, MARKET_META, formatLastContact, formatPlanned,
   isWaitingOnUs, hasAwaitingFeedback, SUB_STATUS_META,
 } from './types'
@@ -50,6 +51,9 @@ type View = 'overview' | 'today' | 'board' | 'list'
 export default function CrmPage() {
   const apiUrl = normalizeApiUrl(process.env.NEXT_PUBLIC_API_URL || '')
   const [leads, setLeads] = useState<Lead[]>([])
+  // The pipeline is a list of deals, not of people — see DealBoard.
+  const [deals, setDeals] = useState<Deal[]>([])
+  const [movingDeal, setMovingDeal] = useState<string | null>(null)
   const [stats, setStats] = useState<Stats | null>(null)
   const [loading, setLoading] = useState(true)
   const [view, setView] = useState<View>('today')
@@ -67,6 +71,8 @@ export default function CrmPage() {
   const [creating, setCreating] = useState(false)
   const [importing, setImporting] = useState(false)
   const [bookingFor, setBookingFor] = useState<Lead | null>(null)
+  // Starting a deal is "which client, then which property" — the client step.
+  const [pickingClient, setPickingClient] = useState(false)
   const [showChannels, setShowChannels] = useState(false)
 
   const load = useCallback(async () => {
@@ -78,18 +84,20 @@ export default function CrmPage() {
       if (market !== 'all') p.set('market', market)
       if (search.trim()) p.set('search', search.trim())
 
-      const [listRes, statsRes, untappedRes, earnRes] = await Promise.all([
+      const [listRes, statsRes, untappedRes, earnRes, dealsRes] = await Promise.all([
         fetch(`${apiUrl}/api/crm?${p}`, { credentials: 'include', cache: 'no-store' }),
         fetch(`${apiUrl}/api/crm/stats`, { credentials: 'include', cache: 'no-store' }),
         fetch(`${apiUrl}/api/crm/untapped`, { credentials: 'include', cache: 'no-store' }),
         canSeeMoney
           ? fetch(`${apiUrl}/api/crm/earnings?months=12`, { credentials: 'include', cache: 'no-store' })
           : Promise.resolve(null),
+        fetch(`${apiUrl}/api/crm/deals?${p}`, { credentials: 'include', cache: 'no-store' }),
       ])
       if (listRes.ok) setLeads((await listRes.json()).data ?? [])
       if (statsRes.ok) setStats((await statsRes.json()).data ?? null)
       if (untappedRes.ok) setUntapped((await untappedRes.json()).data?.counts ?? {})
       if (earnRes?.ok) setEarnings((await earnRes.json()).data ?? null)
+      if (dealsRes.ok) setDeals((await dealsRes.json()).data ?? [])
     } finally {
       setLoading(false)
     }
@@ -119,26 +127,47 @@ export default function CrmPage() {
   }), [leads, untapped])
 
   /**
-   * Move a card. The board updates immediately and the server response patches
-   * that one card — reloading the whole list on every drop is what made the
-   * board visibly flash and jump.
+   * Move a deal to another stage. Optimistic, and it rolls back on failure —
+   * a board that lies about where a deal is, is worse than a slow one.
    */
-  async function moveLead(id: string, status: LeadStatus) {
-    const before = leads
-    setLeads((prev) => prev.map((l) => (l.id === id ? { ...l, status } : l)))
+  async function moveDeal(dealId: string, stage: OpportunityStage) {
+    const before = deals
+    setMovingDeal(dealId)
+    setDeals((prev) => prev.map((d) => (d.id === dealId ? { ...d, stage } : d)))
     try {
-      const res = await fetch(`${apiUrl}/api/crm/${id}`, {
-        method: 'PUT',
+      const res = await fetch(`${apiUrl}/api/crm/opportunities/${dealId}`, {
+        method: 'PATCH',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status }),
+        body: JSON.stringify({ stage }),
       })
       if (!res.ok) throw new Error('rejected')
       const saved = (await res.json()).data
-      if (saved) setLeads((prev) => prev.map((l) => (l.id === id ? { ...l, ...saved } : l)))
+      if (saved) setDeals((prev) => prev.map((d) => (d.id === dealId ? { ...d, ...saved } : d)))
+      // Closing a deal changes the client's standing, so the other views need
+      // the fresh figures.
+      if (stage === 'WON') load()
     } catch {
-      // Put it back where it came from rather than leaving a lie on screen.
-      setLeads(before)
+      setDeals(before)
+    } finally {
+      setMovingDeal(null)
+    }
+  }
+
+  /** Record what we made, straight from the card. */
+  async function setCommission(dealId: string, usd: number) {
+    const before = deals
+    setDeals((prev) => prev.map((d) => (d.id === dealId ? { ...d, commissionUsd: usd } : d)))
+    try {
+      const res = await fetch(`${apiUrl}/api/crm/opportunities/${dealId}`, {
+        method: 'PATCH',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ commissionUsd: usd }),
+      })
+      if (!res.ok) throw new Error('rejected')
+    } catch {
+      setDeals(before)
     }
   }
 
@@ -325,6 +354,16 @@ export default function CrmPage() {
         <TodayView market={market} onOpen={setOpenId} />
       ) : loading ? (
         <div className="flex items-center justify-center py-20 text-slate-400"><Loader2 className="h-6 w-6 animate-spin" /></div>
+      ) : view === 'board' ? (
+        <DealBoard
+          deals={deals}
+          canSeeMoney={canSeeMoney}
+          busyId={movingDeal}
+          onMove={moveDeal}
+          onOpenClient={setOpenId}
+          onSetCommission={setCommission}
+          onNewDeal={() => setPickingClient(true)}
+        />
       ) : visible.length === 0 ? (
         <div className="bg-white border rounded-xl p-16 text-center text-slate-400">
           <UserSearch className="h-10 w-10 mx-auto mb-2 opacity-30" />
@@ -334,14 +373,6 @@ export default function CrmPage() {
             : focus === 'untapped' ? 'No untapped matches — everything promising has been shortlisted.'
             : 'No clients yet. Add one, or import your spreadsheet.'}
         </div>
-      ) : view === 'board' ? (
-        <LeadBoard
-          leads={visible}
-          onOpen={setOpenId}
-          onMove={moveLead}
-          onBookViewing={setBookingFor}
-          untapped={untapped}
-        />
       ) : (
         <ClientDirectory leads={visible} canSeeMoney={canSeeMoney} onOpen={setOpenId} />
       )}
@@ -373,7 +404,7 @@ export default function CrmPage() {
               Earned (12mo): <strong>${earnings.totalCommissionUsd.toLocaleString()}</strong>
             </span>
           )}
-          <span className="text-slate-400 self-center">Drag a card between columns to move a client through the pipeline.</span>
+          <span className="text-slate-400 self-center">Drag a deal between columns to move it along.</span>
         </div>
       )}
 
@@ -423,6 +454,14 @@ export default function CrmPage() {
       {openLead && <LeadDrawer lead={openLead} onClose={() => setOpenId(null)} onChanged={load} />}
       {creating && <LeadFormModal onClose={() => setCreating(false)} onSaved={() => { setCreating(false); load() }} />}
       {importing && <ImportModal onClose={() => setImporting(false)} onImported={load} />}
+      {pickingClient && (
+        <ClientPicker
+          leads={leads}
+          onClose={() => setPickingClient(false)}
+          onPick={(l) => { setPickingClient(false); setBookingFor(l) }}
+        />
+      )}
+
       {bookingFor && (
         <BookViewingModal
           lead={bookingFor}
@@ -471,3 +510,72 @@ function FocusChip({
   )
 }
 
+/**
+ * Which client is this deal for?
+ *
+ * Reads the already-loaded list rather than hitting the API — the clients are
+ * on screen anyway, and a spinner between "New deal" and picking a name is pure
+ * friction.
+ */
+function ClientPicker({
+  leads, onClose, onPick,
+}: {
+  leads: Lead[]
+  onClose: () => void
+  onPick: (lead: Lead) => void
+}) {
+  const [q, setQ] = useState('')
+  const rows = useMemo(() => {
+    const needle = q.trim().toLowerCase()
+    const base = needle
+      ? leads.filter((l) =>
+          [l.name, l.phone, l.whatsapp, l.email, l.askingFor]
+            .filter(Boolean)
+            .some((v) => String(v).toLowerCase().includes(needle))
+        )
+      : leads
+    return base.slice(0, 40)
+  }, [leads, q])
+
+  return (
+    <div className="fixed inset-0 z-50 bg-slate-900/40 flex items-start justify-center p-4 sm:p-10" onClick={onClose}>
+      <div
+        className="bg-white rounded-xl shadow-xl w-full max-w-lg max-h-[80vh] flex flex-col"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="p-4 border-b border-slate-100">
+          <h2 className="font-semibold text-slate-900">New deal — for which client?</h2>
+          <input
+            autoFocus
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="Search by name, phone or what they want…"
+            className="mt-2 w-full h-9 px-3 text-sm rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-slate-900/10"
+          />
+        </div>
+        <div className="overflow-y-auto p-2 space-y-1">
+          {rows.map((l) => (
+            <button
+              key={l.id}
+              onClick={() => onPick(l)}
+              className="w-full text-left rounded-lg border border-slate-200 px-3 py-2 hover:bg-slate-50 transition-colors"
+            >
+              <span className="flex items-center gap-2">
+                <span className="text-sm font-medium text-slate-900">{l.name}</span>
+                <span className="text-[10px] text-slate-400">{TYPE_LABELS[l.type]}</span>
+              </span>
+              {(l.askingFor || l.phone) && (
+                <span className="block text-[11px] text-slate-400 truncate">
+                  {l.askingFor || l.phone}
+                </span>
+              )}
+            </button>
+          ))}
+          {rows.length === 0 && (
+            <p className="text-sm text-slate-400 text-center py-8">Nobody matches “{q.trim()}”.</p>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}

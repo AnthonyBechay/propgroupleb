@@ -59,6 +59,10 @@ export interface Opportunity {
     ref?: string | null
     slug?: string | null
     url?: string | null
+    /** Asking price, so a deal can be valued before it closes. */
+    price?: number | null
+    currency?: 'USD' | 'LBP' | null
+    country?: string | null
     id?: string | null
   }
 }
@@ -484,4 +488,130 @@ export function lastActivityAt(lead: Lead): number {
     .filter(Boolean)
     .map((d) => new Date(d as string).getTime())
   return stamps.length ? Math.max(...stamps) : 0
+}
+
+/* ── The deal pipeline ────────────────────────────────────────────────────────
+ *
+ * The board is a pipeline of DEALS, not of people. One client can be viewing an
+ * apartment in Achrafieh and negotiating a studio in Batumi on the same day —
+ * a board keyed on the client collapses that into one card in one column and
+ * makes the CRM lie about where the business actually is.
+ *
+ * INTERESTED and OFFER_MADE are one column. The distinction matters on the deal
+ * itself, but as columns they split the same conversation in two and left both
+ * looking empty.
+ */
+
+export interface Deal extends Opportunity {
+  lead: {
+    id: string
+    name: string
+    type: LeadType
+    isInvestor?: boolean
+    market?: LeadMarket
+    phone?: string | null
+    whatsapp?: string | null
+    email?: string | null
+    status?: LeadStatus
+    nextContactAt?: string | null
+    lastContactAt?: string | null
+  }
+}
+
+export interface DealColumn {
+  key: string
+  label: string
+  /** The stage a card takes when dropped here. */
+  stage: OpportunityStage
+  /** Every stage this column displays. */
+  stages: OpportunityStage[]
+  hint: string
+  accent: string
+}
+
+export const DEAL_COLUMNS: DealColumn[] = [
+  {
+    key: 'SUGGESTED', label: 'Shortlisted', stage: 'SUGGESTED', stages: ['SUGGESTED'],
+    hint: 'Picked out for them — not sent yet', accent: 'bg-slate-400',
+  },
+  {
+    key: 'SHARED', label: 'Sent', stage: 'SHARED', stages: ['SHARED'],
+    hint: 'They have seen the details', accent: 'bg-sky-500',
+  },
+  {
+    key: 'VIEWING_BOOKED', label: 'Viewing booked', stage: 'VIEWING_BOOKED', stages: ['VIEWING_BOOKED'],
+    hint: 'A date is in the diary', accent: 'bg-violet-500',
+  },
+  {
+    key: 'VIEWED', label: 'Viewed', stage: 'VIEWED', stages: ['VIEWED'],
+    hint: 'Been to see it — waiting on a verdict', accent: 'bg-indigo-500',
+  },
+  {
+    key: 'NEGOTIATING', label: 'Negotiating', stage: 'INTERESTED',
+    stages: ['INTERESTED', 'OFFER_MADE'],
+    hint: 'They want it — price is moving', accent: 'bg-amber-500',
+  },
+  {
+    key: 'WON', label: 'Closed', stage: 'WON', stages: ['WON'],
+    hint: 'Signed. Record what we made.', accent: 'bg-emerald-600',
+  },
+]
+
+/** Which column a deal sits in. */
+export function dealColumnOf(deal: Deal): string {
+  const col = DEAL_COLUMNS.find((c) => c.stages.includes(deal.stage))
+  return col?.key ?? 'SUGGESTED'
+}
+
+/** How a stage reads on a card. */
+export const STAGE_LABELS: Record<OpportunityStage, string> = {
+  SUGGESTED: 'Shortlisted',
+  SHARED: 'Sent',
+  VIEWING_BOOKED: 'Viewing booked',
+  VIEWED: 'Viewed',
+  INTERESTED: 'Interested',
+  OFFER_MADE: 'Offer made',
+  WON: 'Closed',
+  REJECTED: 'Ruled out',
+}
+
+/** A deal still in play. */
+export function isLiveDeal(d: Deal | Opportunity): boolean {
+  return d.stage !== 'WON' && d.stage !== 'REJECTED'
+}
+
+/**
+ * What this deal is worth to us if it lands.
+ *
+ * Once closed, commission is the real figure. Before that we have the asking
+ * price and a house rate — a forecast, clearly labelled as one, beats showing
+ * nothing and beats asking the team to type a number they don't have yet.
+ */
+export const DEFAULT_COMMISSION_RATE = 0.025
+
+export function dealCommission(d: Deal | Opportunity): { usd: number; forecast: boolean } | null {
+  if (d.commissionUsd != null) return { usd: d.commissionUsd, forecast: false }
+  const price = d.soldPrice ?? d.subject?.price ?? null
+  if (price == null) return null
+  // LBP asking prices aren't converted here — a wrong number is worse than none.
+  const currency = d.soldPrice != null ? d.soldCurrency : d.subject?.currency
+  if (currency && currency !== 'USD') return null
+  return { usd: Math.round(price * DEFAULT_COMMISSION_RATE), forecast: true }
+}
+
+/** Something that needs doing on this deal, or null when it's simply waiting. */
+export function dealAlert(d: Deal): { text: string; tone: 'red' | 'amber' } | null {
+  const now = Date.now()
+  if (d.stage === 'VIEWING_BOOKED') {
+    if (!d.viewingAt) return { text: 'No date set', tone: 'red' }
+    const at = new Date(d.viewingAt).getTime()
+    if (at < now) return { text: 'Viewing passed — how did it go?', tone: 'red' }
+    if (at - now < 36e5 * 24) return { text: 'Viewing today', tone: 'amber' }
+  }
+  if (d.stage === 'VIEWED' && !d.feedback) return { text: 'No feedback yet', tone: 'amber' }
+  if (d.stage === 'WON' && d.commissionUsd == null) return { text: 'Commission not recorded', tone: 'amber' }
+  // A deal nobody has touched in three weeks is quietly dying.
+  const idle = (now - new Date(d.updatedAt).getTime()) / 864e5
+  if (isLiveDeal(d) && idle > 21) return { text: `Untouched ${Math.round(idle)} days`, tone: 'amber' }
+  return null
 }

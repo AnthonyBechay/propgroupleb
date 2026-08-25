@@ -137,11 +137,11 @@ async function hydrateOpportunities(opportunities: any[]): Promise<any[]> {
           where: { id: { in: listingIds } },
           select: {
             id: true, slug: true, headline: true, price: true, currency: true,
-            building: { select: { ref: true, title: true, city: true, caza: true } },
+            building: { select: { ref: true, title: true, city: true, caza: true, country: true } },
             unit: {
               select: {
                 ref: true,
-                building: { select: { ref: true, title: true, city: true, caza: true } },
+                building: { select: { ref: true, title: true, city: true, caza: true, country: true } },
               },
             },
           },
@@ -185,6 +185,11 @@ async function hydrateOpportunities(opportunities: any[]): Promise<any[]> {
               // Unit code when the listing sells a unit, else the property code.
               ref: listing.unit?.ref ?? listing.building?.ref ?? null,
               slug: listing.slug,
+              // The asking price, so the board can forecast what a deal is
+              // worth before anyone has typed a commission.
+              price: listing.price ?? null,
+              currency: listing.currency ?? null,
+              country: (listing.building ?? listing.unit?.building)?.country ?? null,
               id: listing.id,
             }
           : { kind: 'UNKNOWN', title: 'No longer available', subtitle: null },
@@ -742,6 +747,74 @@ router.get(
 );
 
 // ── GET /export.csv — download the pipeline as a spreadsheet ─────────────────
+// ── GET /deals — every live deal, for the pipeline board ─────────────────────
+//
+// The board used to be a pipeline of *clients*, which cannot express the thing
+// this business actually does: one client is viewing an apartment in Achrafieh
+// and negotiating a studio in Batumi at the same time. A stage belongs to the
+// deal, not the person, so the board reads deals and groups them by client.
+
+router.get(
+  '/deals',
+  authenticateToken,
+  requireCrm,
+  asyncHandler(async (req: Request, res: Response) => {
+    const q = req.query as Record<string, string>;
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const where: Record<string, any> = {};
+
+    // Ruled-out deals are history, not pipeline. `includeRejected` brings them
+    // back for the rare "what did we show them" question.
+    if (q.includeRejected !== 'true') where.stage = { not: 'REJECTED' };
+
+    // Closed business stops being pipeline after a while, but the board still
+    // shows recent wins so a closed deal doesn't vanish the moment it lands.
+    const wonSince = new Date();
+    wonSince.setMonth(wonSince.getMonth() - Number(q.wonMonths ?? 3));
+
+    if (q.market && MARKETS.includes(q.market as never)) {
+      where.lead = { ...(where.lead ?? {}), market: q.market };
+    }
+    if (q.stage && STAGES.includes(q.stage as never)) where.stage = q.stage;
+
+    const opportunities = await prisma.leadOpportunity.findMany({
+      where: {
+        ...where,
+        OR: [
+          { stage: { notIn: ['WON', 'REJECTED'] as never } },
+          { stage: 'WON' as never, closedAt: { gte: wonSince } },
+          { stage: 'WON' as never, closedAt: null },
+          ...(q.includeRejected === 'true' ? [{ stage: 'REJECTED' as never }] : []),
+        ],
+      },
+      orderBy: [{ updatedAt: 'desc' }],
+      take: Number(q.limit ?? 400),
+      include: {
+        lead: {
+          select: {
+            id: true, name: true, type: true, isInvestor: true, market: true,
+            phone: true, whatsapp: true, email: true, status: true,
+            nextContactAt: true, lastContactAt: true,
+          },
+        },
+      },
+    });
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const hydrated = await hydrateOpportunities(opportunities as any[]);
+
+    // Pair each hydrated deal back with its client. hydrateOpportunities
+    // preserves order, so index alignment is safe.
+    const deals = hydrated.map((o: any, i: number) => ({
+      ...o,
+      lead: (opportunities[i] as any).lead,
+    }));
+
+    sendSuccess(res, deals);
+  })
+);
+
 // CSV with a UTF-8 BOM so Excel opens Arabic/accented names correctly.
 
 function csvCell(v: unknown): string {

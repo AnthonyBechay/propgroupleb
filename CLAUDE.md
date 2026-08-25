@@ -87,6 +87,40 @@ Human codes clients quote back over WhatsApp. `apps/backend/src/utils/reference.
 Four views: **Overview** (state of the business), **Today** (what needs you now),
 **Board** (pipeline), **All clients** (directory). Plus a drawer per client.
 
+### The board is a pipeline of DEALS, not of people
+
+`DealBoard.tsx` reads `GET /api/crm/deals` — one card per **opportunity**,
+columns keyed on `OpportunityStage`. A client with three deals appears three
+times, deliberately.
+
+This replaced a client kanban (`LeadBoard.tsx`, deleted) whose columns were
+`lead.status`. That board could not express the thing the business does every
+week — the same client viewing an apartment in Achrafieh while negotiating a
+studio in Batumi — because one client collapsed into one card in one column,
+and dropping them in "Negotiating" never said *which* property. It also
+contradicted the rule two sections down, which was right all along.
+
+So the two axes are now separate, and neither is allowed to impersonate the
+other:
+
+- **`lead.status` is a relationship.** Derived by `syncLeadStatus` from the
+  client's live deals. Nothing drags it directly any more.
+- **`opportunity.stage` is a deal.** This is what the board moves.
+
+`INTERESTED` and `OFFER_MADE` share one **Negotiating** column — the
+distinction is real on the deal, but as columns they split one conversation in
+two and left both looking empty.
+
+Commission is editable in place on a card. Chasing it through a drawer is why
+so many closed deals had no figure against them. When none is recorded,
+`dealCommission` forecasts from the asking price at `DEFAULT_COMMISSION_RATE`
+and **labels it "est."** — never silently. It returns null rather than guess on
+a non-USD price.
+
+Moving a deal to `VIEWING_BOOKED` does **not** invent a date. The card shows a
+red "No date set" instead, for the same reason cadence-derived follow-ups were
+ripped out: a date nobody agreed is worse than no date.
+
 Vocabulary rules, learned the hard way:
 
 - A client's status describes a **relationship**, not a deal. `WON` renders as
@@ -221,6 +255,9 @@ When generating new share links, always go through the `ShareToken` table. Don't
 - ❌ Write a data migration as SQL only — deployment uses `db push` and will never run it. Add a `once(...)` step in `utils/crm-bootstrap.ts`.
 - ❌ Scope an admin query to one market. Admins see every country; only public pages are scoped.
 - ❌ Filter a client's matches by their `market`. It ranks, it doesn't exclude.
+- ❌ Re-create a kanban keyed on `lead.status`. The board moves deals; a client
+  is at several stages at once and a column per person cannot say that.
+- ❌ Show a forecast commission without marking it as one.
 - ❌ Add a fifth client "type". The four intents are fixed; anything else is a flag on the client.
 - ❌ Put a deal stage on the client. Viewing/negotiating belong to the opportunity — a client can be at different stages on different properties.
 - ❌ Assume a `Building`'s local `buildingSchema` in `routes/buildings.ts` is the shared one in `schemas/index.ts`. It shadows it; adding a field to the wrong one fails silently.
