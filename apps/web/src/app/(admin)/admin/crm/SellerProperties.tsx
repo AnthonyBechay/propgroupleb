@@ -1,7 +1,7 @@
 'use client'
 
-import { useState } from 'react'
-import { Plus, Trash2, Loader2, ExternalLink, Home, DollarSign, X, Check } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { Plus, Trash2, Loader2, ExternalLink, Home, DollarSign, X, Check, Link2, Search } from 'lucide-react'
 import { normalizeApiUrl } from '@/lib/utils/api-url'
 import { ALL_PROPERTY_KINDS, typeLabel } from '@/lib/property-types'
 import {
@@ -108,6 +108,25 @@ export function SellerProperties({
                       <span className={`text-[10px] font-semibold px-1.5 py-px rounded border ${meta.cls}`}>
                         {meta.label}
                       </span>
+                      {/* Is this a real property on the site, or just a note? */}
+                      {p.listing ? (
+                        <a
+                          href={`/admin/listings/${p.listing.id}`}
+                          onClick={(e) => e.stopPropagation()}
+                          className="inline-flex items-center gap-1 text-[10px] font-mono font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded px-1.5 py-px hover:bg-emerald-100"
+                          title="Linked to the catalogue"
+                        >
+                          <Link2 className="h-2.5 w-2.5" />
+                          {p.listing.unit?.ref ?? p.listing.building?.ref ?? 'Linked'}
+                        </a>
+                      ) : (
+                        <span
+                          className="text-[10px] text-amber-700 bg-amber-50 border border-amber-200 rounded px-1.5 py-px"
+                          title="Only a note in the CRM — it isn't on the website"
+                        >
+                          Not on the site
+                        </span>
+                      )}
                       {p.externalUrl && (
                         <a
                           href={p.externalUrl}
@@ -129,6 +148,14 @@ export function SellerProperties({
                         p.askingPrice ? `${p.currency} ${p.askingPrice.toLocaleString()}` : null,
                       ].filter(Boolean).join(' · ')}
                     </p>
+                    {/* Attach it to the real listing, so this stops being text. */}
+                    {!p.listing && (
+                      <ListingLink
+                        onLink={(listingId) => save(`properties/${p.id}`, 'PATCH', { listingId })}
+                        busy={busy === `properties/${p.id}`}
+                      />
+                    )}
+
                     {sold && (
                       <p className="text-xs text-emerald-700 mt-0.5 font-medium">
                         Sold {p.soldPrice ? `for ${p.currency} ${p.soldPrice.toLocaleString()}` : ''}
@@ -330,3 +357,96 @@ function PropertyForm({
 }
 
 export type { LeadPropertyStatus }
+
+/**
+ * Attach a seller's property to the real catalogue record.
+ *
+ * `LeadProperty.listingId` has always existed but nothing ever set it, so every
+ * seller's property was a free-text note that looked identical whether or not
+ * the property was actually live on the site.
+ */
+function ListingLink({ onLink, busy }: { onLink: (listingId: string) => void; busy: boolean }) {
+  const apiUrl = normalizeApiUrl(process.env.NEXT_PUBLIC_API_URL || '')
+  const [open, setOpen] = useState(false)
+  const [q, setQ] = useState('')
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [results, setResults] = useState<any[]>([])
+  const [searching, setSearching] = useState(false)
+
+  useEffect(() => {
+    if (!open || q.trim().length < 2) { setResults([]); return }
+    const ctl = new AbortController()
+    const bail = setTimeout(() => ctl.abort(), 12000)
+    const t = setTimeout(async () => {
+      setSearching(true)
+      try {
+        const res = await fetch(
+          `${apiUrl}/api/listings?search=${encodeURIComponent(q.trim())}&limit=6`,
+          { credentials: 'include', cache: 'no-store', signal: ctl.signal }
+        )
+        const j = await res.json().catch(() => ({}))
+        setResults(j.data?.items ?? j.data ?? [])
+      } catch {
+        setResults([])
+      } finally {
+        clearTimeout(bail)
+        setSearching(false)
+      }
+    }, 250)
+    return () => { clearTimeout(t); clearTimeout(bail); ctl.abort() }
+  }, [q, open, apiUrl])
+
+  if (!open) {
+    return (
+      <button
+        onClick={() => setOpen(true)}
+        className="mt-1 inline-flex items-center gap-1 text-[11px] text-slate-500 hover:text-slate-900 underline decoration-dotted"
+      >
+        <Link2 className="h-3 w-3" /> Link to a property on the site
+      </button>
+    )
+  }
+
+  return (
+    <div className="mt-1.5 rounded-lg border border-slate-200 p-2">
+      <div className="relative">
+        <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
+        <input
+          autoFocus
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          placeholder="Search the catalogue by name or ref…"
+          className="w-full pl-7 pr-2 py-1.5 text-xs border border-slate-200 rounded focus:outline-none focus:ring-1 focus:ring-slate-900/20"
+        />
+        {(searching || busy) && (
+          <Loader2 className="absolute right-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 animate-spin text-slate-400" />
+        )}
+      </div>
+      <div className="mt-1 space-y-1 max-h-40 overflow-y-auto">
+        {results.map((li) => {
+          const b = li.building ?? li.unit?.building
+          return (
+            <button
+              key={li.id}
+              onClick={() => { setOpen(false); onLink(li.id) }}
+              className="w-full text-left rounded border border-slate-200 px-2 py-1 hover:bg-slate-50"
+            >
+              <span className="flex items-center gap-1.5">
+                {(li.unit?.ref ?? b?.ref) && (
+                  <span className="font-mono text-[10px] text-slate-500">{li.unit?.ref ?? b?.ref}</span>
+                )}
+                <span className="text-xs text-slate-800 truncate">{li.headline || b?.title || 'Property'}</span>
+              </span>
+            </button>
+          )
+        })}
+        {q.trim().length >= 2 && !searching && results.length === 0 && (
+          <p className="text-[11px] text-slate-400 px-1">Nothing matches.</p>
+        )}
+      </div>
+      <button onClick={() => setOpen(false)} className="mt-1 text-[11px] text-slate-400 hover:text-slate-700">
+        Cancel
+      </button>
+    </div>
+  )
+}

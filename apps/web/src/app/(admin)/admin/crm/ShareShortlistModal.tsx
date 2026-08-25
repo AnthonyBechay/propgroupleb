@@ -5,7 +5,7 @@ import { X, MessageCircle, Copy, Check, Building2, Globe, Handshake } from 'luci
 import { type Lead, type Opportunity, LIVE_STAGES } from './types'
 
 /**
- * Send a client their shortlist over WhatsApp.
+ * Send a client the properties on their list, over WhatsApp.
  *
  * This is the single most repeated action in the job — the broker retypes the
  * same three properties into WhatsApp several times a day, and the reference

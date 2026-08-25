@@ -121,6 +121,15 @@ export default function CrmPage() {
     return out
   }, [leads, focus, typeFilter, untapped])
 
+  // Clients nothing has ever been shown to. They have no card on a deal board,
+  // so without this they simply stop existing the moment you open the pipeline.
+  const clientsWithNoDeal = useMemo(() => {
+    const withDeals = new Set(deals.map((d) => d.lead.id))
+    return leads.filter(
+      (l) => !withDeals.has(l.id) && !['WON', 'LOST', 'ARCHIVED'].includes(l.status)
+    ).length
+  }, [leads, deals])
+
   // Live counts for the focus chips, computed from what's loaded.
   const counts = useMemo(() => ({
     planned: leads.filter((l) => formatPlanned(l.nextContactAt)?.due).length,
@@ -390,6 +399,8 @@ export default function CrmPage() {
           onNewDeal={() => setPickingClient(true)}
           onRemoveDeal={removeDeal}
           search={search}
+          clientsWithNoDeal={clientsWithNoDeal}
+          onShowClients={() => setView('list')}
         />
       ) : visible.length === 0 ? (
         <div className="bg-white border rounded-xl p-16 text-center text-slate-400">

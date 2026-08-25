@@ -43,6 +43,9 @@ const CHANNELS = ['CALL', 'WHATSAPP', 'EMAIL', 'MEETING', 'VIEWING', 'NOTE'] as 
 const leadSchema = z.object({
   market: z.enum(MARKETS).default('LEBANON'),
   type: z.enum(LEAD_TYPES).default('BUYER'),
+  // A client can be selling one thing and buying another. `type` stays the
+  // primary intent and is always intents[0].
+  intents: z.array(z.enum(LEAD_TYPES)).optional(),
   // An investor is a buyer with a different motive, not a fifth type.
   isInvestor: z.boolean().optional(),
   status: z.enum(LEAD_STATUSES).default('ACTIVE'),
@@ -80,9 +83,14 @@ const MANUAL_SUB_STATUSES: readonly string[] = SUB_STATUSES.filter((s) => s !== 
 function toLeadData(data: z.infer<typeof leadSchema>): Record<string, any> {
   const last = data.lastContactAt ? new Date(data.lastContactAt) : null;
   const interval = data.contactIntervalDays;
+  // The primary intent is whatever `type` says; the set always contains it, so
+  // "is this client selling?" is one question with one answer everywhere.
+  const intents = Array.from(new Set([data.type, ...(data.intents ?? [])]));
+
   return {
     market: data.market,
     type: data.type,
+    intents,
     isInvestor: data.isInvestor ?? false,
     status: data.status,
     source: data.source,
@@ -747,6 +755,52 @@ router.get(
 );
 
 // ── GET /export.csv — download the pipeline as a spreadsheet ─────────────────
+
+/**
+ * Take a sold property off the market.
+ *
+ * Deliberately does **not** touch a repeatable unit type. Abroad we broker
+ * stock we don't own: "1 bedroom" in a development is a template many clients
+ * buy, and marking it sold because one client bought one would remove it from
+ * every other client's matches. Which actual apartment they got is recorded on
+ * the deal (`soldUnitRef`), not by retiring the type.
+ */
+async function markListingSold(listingId: string, closedAt: Date): Promise<void> {
+  const listing = await prisma.listing.findUnique({
+    where: { id: listingId },
+    select: {
+      id: true, intent: true, subjectType: true, buildingId: true,
+      unit: { select: { id: true, isUnitType: true } },
+    },
+  });
+  if (!listing) return;
+
+  // A rental that "closes" is let, not sold, and the unit comes back later.
+  const rented = listing.intent === 'FOR_RENT';
+
+  if (listing.unit) {
+    // A repeatable type never sells out — see the doc comment above.
+    if (listing.unit.isUnitType) return;
+    await prisma.unit.update({
+      where: { id: listing.unit.id },
+      data: { lifecycle: (rented ? 'RENTED' : 'SOLD') as never },
+    });
+  } else if (listing.buildingId && !rented) {
+    // Building.status is a build stage (off-plan / new / resale), not a sale
+    // state, so the sale is recorded by soldAt and by hiding it.
+    await prisma.building.update({
+      where: { id: listing.buildingId },
+      data: { soldAt: closedAt, visibility: 'PRIVATE' as never },
+    });
+  }
+
+  // ListingStatus has no SOLD — a finished listing is CLOSED.
+  await prisma.listing.update({
+    where: { id: listing.id },
+    data: { status: 'CLOSED' as never, visibility: 'PRIVATE' as never },
+  });
+}
+
 // ── GET /deals — every live deal, for the pipeline board ─────────────────────
 //
 // The board used to be a pipeline of *clients*, which cannot express the thing
@@ -881,7 +935,21 @@ router.get(
       include: {
         contacts: { orderBy: { contactedAt: 'desc' } },
         opportunities: { orderBy: { updatedAt: 'desc' } },
-        properties: { orderBy: { createdAt: 'desc' } },
+        properties: {
+          orderBy: { createdAt: 'desc' },
+          // A seller's property can point at the real catalogue record. Without
+          // this the row rendered as the free text somebody typed, with no way
+          // to tell whether it was actually on the site.
+          include: {
+            listing: {
+              select: {
+                id: true, slug: true, headline: true, status: true,
+                building: { select: { ref: true, title: true, city: true } },
+                unit: { select: { ref: true, building: { select: { ref: true, title: true, city: true } } } },
+              },
+            },
+          },
+        },
         // Catalogue stock this client actually owns. Narrow projection — the
         // drawer lists it, it doesn't render the whole property.
         ownedBuildings: {
@@ -1603,6 +1671,12 @@ router.patch(
     if (data.stage && data.stage !== 'WON') patch.closedAt = null;
 
     const opportunity = await prisma.leadOpportunity.update({ where: { id: req.params.oid }, data: patch });
+
+    // Closing a deal takes the property off the market. Nothing did this
+    // before, so an apartment we had sold stayed ACTIVE on the public site.
+    if (data.stage === 'WON' && existing.listingId) {
+      await markListingSold(existing.listingId, patch.closedAt ?? existing.closedAt ?? new Date());
+    }
 
     await syncLeadStatus(existing.leadId);
     await logAdminAction('UPDATE_OPPORTUNITY', 'lead', existing.leadId, { stage: opportunity.stage }, authReq);

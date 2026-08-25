@@ -730,6 +730,9 @@ model Listing {
   inquiries PropertyInquiry[]
   favorites FavoriteProperty[]
 
+  // Seller-side CRM rows that point at this listing.
+  leadProperties LeadProperty[] @relation("LeadPropertyListing")
+
   @@index([subjectType])
   @@index([buildingId])
   @@index([unitId])
@@ -1500,6 +1503,13 @@ model Lead {
   // buyer — one with a different motive — so it's a flag, not a category.
   type LeadType @default(BUYER)
 
+  // Every intent this client has. Plenty of people are selling the family
+  // apartment *and* looking for a smaller one; a single `type` forced the team
+  // to pick a side and quietly lost the other half of the relationship.
+  // `type` stays the primary intent (display order, matching defaults) and is
+  // always intents[0]; this is the full set.
+  intents LeadType[] @default([])
+
   // A buyer chasing yield rather than a home. Changes what you show them.
   isInvestor Boolean    @default(false)
   status     LeadStatus @default(ACTIVE)
@@ -1680,7 +1690,12 @@ model LeadProperty {
 
   // Where it lives, if anywhere: a listing on this site, or a link to the
   // Georgia site / an external portal for stock we don't host.
+  //
+  // This was a bare id with no relation behind it, so nothing could ever read
+  // the property it pointed at — the row rendered as whatever text somebody
+  // typed, with no way to tell if it was actually on the site.
   listingId   String?
+  listing     Listing? @relation("LeadPropertyListing", fields: [listingId], references: [id], onDelete: SetNull)
   externalUrl String?
 
   notes String?

@@ -94,6 +94,23 @@ export async function normaliseCrmData(): Promise<void> {
     return `${count} investors folded into buyers`;
   });
 
+  // A client can be selling and buying at once. Existing rows have one `type`;
+  // seed the set from it so nothing has an empty intent list. `db push` adds
+  // the column but never runs a migration's UPDATE.
+  await once('crm_seed_lead_intents_v1', async () => {
+    const leads = await prisma.lead.findMany({
+      where: { intents: { isEmpty: true } },
+      select: { id: true, type: true },
+    });
+    for (const l of leads) {
+      await prisma.lead.update({
+        where: { id: l.id },
+        data: { intents: [l.type] as never },
+      });
+    }
+    return `${leads.length} clients seeded with their intent`;
+  });
+
   // Follow-up dates used to be invented from a 7-day cadence, so every imported
   // client showed up overdue on day one and the team stopped reading the badge.
   // Clear the invented ones; from here on a date only exists if someone set it.

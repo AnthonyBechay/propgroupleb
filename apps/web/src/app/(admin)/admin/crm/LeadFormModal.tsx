@@ -35,6 +35,8 @@ export function LeadFormModal({
   const [f, setF] = useState({
     market: lead?.market ?? 'LEBANON',
     type: lead?.type ?? 'BUYER',
+    // Everything they're here to do. type is always the first of these.
+    intents: (lead?.intents?.length ? lead.intents : [lead?.type ?? 'BUYER']) as LeadType[],
     isInvestor: lead?.isInvestor ?? false,
     status: lead?.status ?? 'ACTIVE',
     source: lead?.source ?? initialSource ?? 'MANUAL',
@@ -76,7 +78,7 @@ export function LeadFormModal({
     setSaving(true); setError(null)
     try {
       const payload = {
-        market: f.market, type: f.type, status: f.status, source: f.source,
+        market: f.market, type: f.type, intents: f.intents, status: f.status, source: f.source,
         isInvestor: f.isInvestor,
         name: f.name.trim(),
         phone: f.phone.trim() || null,
@@ -183,13 +185,24 @@ const inp = 'w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-whit
               <label className={lbl}>Client type</label>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
                 {INTENT_TYPES.map((t) => {
-                  const on = f.type === t
+                  const on = f.intents.includes(t)
                   const meta = TYPE_META[t]
                   return (
                     <button
                       key={t}
                       type="button"
-                      onClick={() => set('type', t)}
+                      // Pick as many as apply: selling the family flat and
+                      // looking for a smaller one is one client, not two.
+                      onClick={() =>
+                        setF((p) => {
+                          const next = p.intents.includes(t)
+                            ? p.intents.filter((x) => x !== t)
+                            : [...p.intents, t]
+                          // Never leave them with no intent at all.
+                          const intents = (next.length ? next : [t]) as LeadType[]
+                          return { ...p, intents, type: intents[0] }
+                        })
+                      }
                       className={`px-2 py-2 rounded-lg text-xs font-semibold border transition-colors ${
                         on ? `${meta.solid} border-transparent` : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
                       }`}
@@ -199,6 +212,10 @@ const inp = 'w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-whit
                   )
                 })}
               </div>
+              <p className="text-[11px] text-slate-400 mt-1">
+                Pick everything that applies. The first one is their main intent
+                {f.intents.length > 1 && <> — currently <strong>{TYPE_LABELS[f.type as LeadType]}</strong></>}.
+              </p>
             </div>
 
             {/* An investor is a buyer with a motive, not a fifth category. */}

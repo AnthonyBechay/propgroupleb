@@ -33,6 +33,15 @@ export interface Opportunity {
   leadId: string
   stage: OpportunityStage
   listingId: string | null
+  /** The real catalogue record, when this property is linked to one. */
+  listing?: {
+    id: string
+    slug?: string | null
+    headline?: string | null
+    status?: string | null
+    building?: { ref?: string | null; title?: string | null; city?: string | null } | null
+    unit?: { ref?: string | null; building?: { ref?: string | null; title?: string | null } | null } | null
+  } | null
   counterpartLeadId: string | null
   leadPropertyId: string | null
   /** Off-platform property (a Batumi studio on propgrp.com, a private sale). */
@@ -86,6 +95,15 @@ export interface LeadProperty {
   areaSqm: number | null
   status: LeadPropertyStatus
   listingId: string | null
+  /** The real catalogue record, when this property is linked to one. */
+  listing?: {
+    id: string
+    slug?: string | null
+    headline?: string | null
+    status?: string | null
+    building?: { ref?: string | null; title?: string | null; city?: string | null } | null
+    unit?: { ref?: string | null; building?: { ref?: string | null; title?: string | null } | null } | null
+  } | null
   externalUrl: string | null
   notes: string | null
   soldPrice: number | null
@@ -217,6 +235,9 @@ export interface Lead {
     visibility?: string | null
     images?: string[]
   }>
+
+  /** Every intent this client has; `type` is always the first of them. */
+  intents?: LeadType[]
 }
 
 /**
@@ -383,6 +404,24 @@ export const SUPPLY_TYPES: LeadType[] = ['SELLER', 'LANDLORD']
 export const DEMAND_TYPES: LeadType[] = ['BUYER', 'RENTER', 'INVESTOR']
 
 export const isSupplyType = (t: LeadType) => SUPPLY_TYPES.includes(t)
+
+/** Intents this client actually has. Falls back to the primary one. */
+export const intentsOf = (lead: { type: LeadType; intents?: LeadType[] }): LeadType[] =>
+  lead.intents?.length ? lead.intents : [lead.type]
+
+/**
+ * Do they have something to sell or let?
+ *
+ * Asked of the whole intent set, not just the primary type — a buyer who is
+ * also selling their current flat needs the seller section, and checking
+ * `type` alone hid it from exactly the people who had a property with us.
+ */
+export const hasSupplyIntent = (lead: { type: LeadType; intents?: LeadType[] }) =>
+  intentsOf(lead).some(isSupplyType)
+
+/** Are they looking to buy or rent? */
+export const hasDemandIntent = (lead: { type: LeadType; intents?: LeadType[] }) =>
+  intentsOf(lead).some((t) => !isSupplyType(t))
 
 /**
  * Colour identity per client type so a glance at the board tells you which side

@@ -7,7 +7,7 @@ import {
 } from 'lucide-react'
 import {
   type Lead, type LeadType, TYPE_LABELS, TYPE_META, STATUS_META,
-  formatLastContact, isSupplyType, isPastClient, isReturningClient, hasClosedBefore,
+  formatLastContact, hasSupplyIntent, hasDemandIntent, isPastClient, isReturningClient, hasClosedBefore,
 } from './types'
 import { countryFlag } from '@/lib/market'
 
@@ -41,8 +41,8 @@ export function ClientDirectory({
     return leads
       .filter((l) => {
         if (side !== 'all') {
-          const supply = isSupplyType(l.type)
-          if (side === 'supply' ? !supply : supply) return false
+          // Someone doing both belongs under both filters.
+          if (side === 'supply' ? !hasSupplyIntent(l) : !hasDemandIntent(l)) return false
         }
         if (group !== 'all') {
           const past = isPastClient(l)
@@ -151,9 +151,13 @@ function ClientRow({
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 flex-wrap">
             <span className="font-semibold text-slate-900">{l.name}</span>
-            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${TYPE_META[l.type].chip}`}>
-              {TYPE_LABELS[l.type as LeadType]}
-            </span>
+            {/* Every intent, not just the primary one — somebody selling a flat
+                and hunting a smaller one is one client with two jobs. */}
+            {(l.intents?.length ? l.intents : [l.type]).map((t) => (
+              <span key={t} className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${TYPE_META[t].chip}`}>
+                {TYPE_LABELS[t as LeadType]}
+              </span>
+            ))}
             {isReturningClient(l) && (
               <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-emerald-600 text-white">
                 Returning

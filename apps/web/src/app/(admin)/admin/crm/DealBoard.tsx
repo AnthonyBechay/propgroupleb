@@ -33,6 +33,8 @@ export function DealBoard({
   onNewDeal,
   onRemoveDeal,
   search,
+  clientsWithNoDeal,
+  onShowClients,
 }: {
   deals: Deal[]
   canSeeMoney: boolean
@@ -46,6 +48,9 @@ export function DealBoard({
   onRemoveDeal: (deal: Deal) => void
   /** The page's single search box — the board doesn't own one. */
   search: string
+  /** Clients with no deal at all — invisible on a board made of deals. */
+  clientsWithNoDeal: number
+  onShowClients: () => void
 }) {
   const q = search
   const [onlyAlerts, setOnlyAlerts] = useState(false)
@@ -127,6 +132,21 @@ export function DealBoard({
           )}
         </div>
       </div>
+
+      {/* A board of deals cannot show someone who has none. These are the
+          people who asked something and went quiet, or who nobody has answered
+          yet — the easiest business in the CRM to forget about. */}
+      {clientsWithNoDeal > 0 && (
+        <button
+          onClick={onShowClients}
+          className="w-full text-left rounded-xl border border-dashed border-slate-300 bg-white px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 inline-flex items-center gap-2"
+        >
+          <AlertCircle className="h-4 w-4 text-slate-400" />
+          <strong className="text-slate-900">{clientsWithNoDeal}</strong>
+          client{clientsWithNoDeal === 1 ? ' has' : 's have'} no deal yet — nothing has been shown to them.
+          <ChevronRight className="h-4 w-4 ml-auto text-slate-400" />
+        </button>
+      )}
 
       {/* Phone: pick a column, then read it full width. The chips double as the
           pipeline summary you'd otherwise have to scroll sideways to get. */}

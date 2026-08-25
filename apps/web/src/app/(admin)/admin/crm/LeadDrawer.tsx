@@ -10,7 +10,7 @@ import { regionLabel } from '@/lib/crm-locations'
 import { LeadFormModal } from './LeadFormModal'
 import {
   type Lead, type LeadContact, type Opportunity, STATUS_META, TYPE_LABELS, MARKET_META,
-  UNIT_KIND_LABELS, formatLastContact, formatPlanned, REJECTION_LABELS, isSupplyType,
+  UNIT_KIND_LABELS, formatLastContact, formatPlanned, REJECTION_LABELS, hasSupplyIntent,
   SUB_STATUS_META, subStatusesFor, type LeadSubStatus, STRONG_MATCH_SCORE,
   isPastClient, LIVE_STAGES,
 } from './types'
@@ -281,7 +281,8 @@ export function LeadDrawer({ lead, onClose, onChanged }: { lead: Lead; onClose: 
   }
 
   const l = detail ?? lead
-  const isSupply = isSupplyType(l.type)
+  // A client selling AND buying gets both halves of the drawer.
+  const isSupply = hasSupplyIntent(l)
   // Strong fits vs. worth-a-call near misses — brokers want both, but clearly separated.
   const strongMatches = matches.filter((m) => m.match.score >= STRONG_MATCH_SCORE)
   const nearMatches = matches.filter((m) => m.match.score < STRONG_MATCH_SCORE)
@@ -306,7 +307,9 @@ export function LeadDrawer({ lead, onClose, onChanged }: { lead: Lead; onClose: 
               <div className="flex items-center gap-1.5 mt-1 flex-wrap">
                 <span className={`px-2 py-0.5 rounded text-xs font-medium ${STATUS_META[l.status].cls}`}>{STATUS_META[l.status].label}</span>
                 <span className={`px-2 py-0.5 rounded text-xs font-medium ${MARKET_META[l.market].cls}`}>{MARKET_META[l.market].label}</span>
-                <span className="text-xs text-slate-400">{TYPE_LABELS[l.type]}</span>
+                {(l.intents?.length ? l.intents : [l.type]).map((t) => (
+                  <span key={t} className="text-xs text-slate-400">{TYPE_LABELS[t]}</span>
+                ))}
               </div>
             </div>
             <div className="flex items-center gap-1 shrink-0">
@@ -347,9 +350,9 @@ export function LeadDrawer({ lead, onClose, onChanged }: { lead: Lead; onClose: 
               <button
                 onClick={() => setSharing(true)}
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 text-white text-sm font-medium hover:bg-emerald-700"
-                title="Send this client their shortlist on WhatsApp"
+                title="Compose a WhatsApp message listing these properties, with their reference codes"
               >
-                <Send className="h-3.5 w-3.5" /> Send shortlist
+                <Send className="h-3.5 w-3.5" /> Send properties
               </button>
             )}
             <span
@@ -765,7 +768,7 @@ export function LeadDrawer({ lead, onClose, onChanged }: { lead: Lead; onClose: 
                     <button
                       onClick={() => addOpportunity({ counterpartLeadId: other.id, matchScore: match.score })}
                       disabled={busy}
-                      title="Add to shortlist"
+                      title="Add to their list"
                       className="shrink-0 p-1.5 rounded-lg border border-slate-200 text-slate-500 hover:text-slate-900 hover:bg-slate-100 disabled:opacity-50"
                     >
                       <Plus className="h-3.5 w-3.5" />
