@@ -1,92 +1,15 @@
 # PropGroup — Shared Backend & Central Back Office
 
-> **This file describes `~/development/propgroupleb`** — the single backend, the
-> central back office, and the Lebanon storefront (propgrouplb.com). It owns all
-> property data, the CRM, and SEO generation **for both public sites**.
+> **This file describes `propgroupleb/`** — the single backend, the central back
+> office, and the Lebanon storefront. It owns all property data, the CRM, and
+> SEO generation **for both public sites**.
 >
-> Its sibling `~/development/propgroup` is the Georgia storefront (propgrp.com)
-> and has its own CLAUDE.md with the same section headings.
+> **Read `../CLAUDE.md` first** — it holds the cross-repo rules (path
+> disambiguation, `pnpm -C`, task routing, shared invariants) that apply to both
+> repos. Its sibling `propgroup/` is the Georgia storefront (propgrp.com).
 >
-> ⚠️ **176 of `propgroup`'s files share an identical relative path with a
-> different file in this repo** — including `apps/backend/src/routes/properties.ts`,
-> `packages/db/prisma/schema.prisma` and this file. Every workspace package name
-> is identical too. In a session with both directories open, a bare path or a
-> bare `pnpm --filter` is ambiguous. Read *Working across both repos* first.
->
-> Quick tell you are in the right repo: this one's `packages/db/prisma/schema.prisma`
-> has **38 models**. `propgroup`'s has 4.
-
----
-
-## Working across both repos — read this first
-
-Two repos, one platform. If your session has **both** directories open, both of
-these CLAUDE.md files are in your context at once, and almost every path in them
-is ambiguous.
-
-| Repo | Absolute path | Owns | Deployed as |
-|---|---|---|---|
-| `propgroup` | `~/development/propgroup` | propgrp.com — **Georgia storefront**. Its own users, auth, CMS. No property data. | Coolify app (web + thin backend) |
-| `propgroupleb` | `~/development/propgroupleb` | **The single backend + central back office**, plus propgrouplb.com (Lebanon storefront). Owns all property data, the CRM, SEO generation. | Coolify app (web + backend) |
-
-### The collision hazard (this is not theoretical)
-
-**176 of `propgroup`'s 207 tracked files have an identical relative path to a
-different file in `propgroupleb`.** Both repos contain:
-
-- `apps/backend/src/routes/properties.ts` — *different code, different purpose*
-- `apps/backend/src/routes/{admin,auth,content,files,share,upload,users,location-guides}.ts`
-- `apps/backend/src/{index.ts,schemas/index.ts}`
-- `packages/db/prisma/schema.prisma` — **4 models vs 38**
-- `apps/web/src/components/PropertyCard.tsx`, `lib/api/client.ts`
-- `CLAUDE.md`, `README.md`, `docker-compose.yml`
-
-**And every workspace package name is identical**: root `propgroup`, backend
-`propgroup-backend`, web `web`, `@propgroup/db`, `@propgroup/config`.
-
-### Rules that follow from that
-
-1. **Never use a bare relative path.** Prefix every path with the repo:
-   `propgroup/apps/backend/...` or `propgroupleb/apps/backend/...`, or use the
-   absolute path. "Edit `routes/properties.ts`" is a coin flip.
-2. **Never use a bare `pnpm --filter`.** `pnpm --filter propgroup-backend run build`
-   resolves against whichever directory you happen to be in. Always pin the repo:
-   ```bash
-   pnpm -C ~/development/propgroup    --filter web run build
-   pnpm -C ~/development/propgroupleb --filter propgroup-backend run build
-   ```
-   `pnpm -C` echoes the resolved path in its output — read it back to confirm you
-   hit the repo you meant.
-3. **Before editing any file whose path exists in both, state which repo you are
-   editing** and confirm it from the file's own content (e.g. `propgroup`'s
-   `schema.prisma` has 4 models; `propgroupleb`'s has 38).
-4. **`@propgroup/db` is not shared code.** Each repo has its own, with a
-   different schema. They are unrelated packages that happen to share a name.
-5. **Don't "fix" drift between same-named files.** They are supposed to differ.
-
-### Where does this task belong?
-
-| Task | Repo |
-|---|---|
-| Property/unit/listing data, pricing, availability | `propgroupleb` |
-| Back-office admin: buildings, units, listings, CRM | `propgroupleb` |
-| SEO generation (the only generator) | `propgroupleb` |
-| Lead handling, CRM pipeline | `propgroupleb` |
-| Lebanon storefront UI | `propgroupleb` |
-| **Georgia storefront UI**: landing, listing, filters, project page | `propgroup` |
-| Georgia site's own accounts, auth, CMS content, branding | `propgroup` |
-| The adapter that maps `Building`/`Unit`/`Listing` → flat `Property` | `propgroup` (moving upstream is deferred work) |
-| Anything touching the public API contract between them | **both** — change `propgroupleb` first, then its consumer in `propgroup` |
-
-### Shared invariants — true in both repos
-
-- **One backend.** `propgroupleb` is the source of truth for property data. `propgroup` reads it over HTTP and must never hold a local catalogue.
-- **One CRM.** All leads land in `propgroupleb`. `propgroup` forwards and stores nothing.
-- **One SEO generator.** `propgroupleb/apps/backend/src/routes/ai-seo.ts`. `propgroup` only formats a fallback when the back office left the fields empty.
-- **One storage write target.** Canonical bucket `propgroupleb` / `assets.propgrouplb.com`. The `propgroup` bucket is read-only legacy.
-- **Market scope is per request, never per process.** `publicCountryFilter(req)` in `propgroupleb`; `?country=` + `X-Site-Scope: INTERNATIONAL` from `propgroup`. Default scope with neither is **Lebanon**.
-- **`NEXT_PUBLIC_*` is inlined at build time** in both — changing one needs a rebuild, not a restart.
-- **Changing `package.json` requires regenerating `pnpm-lock.yaml`** in that repo — both Dockerfiles install with `--frozen-lockfile`.
+> Quick tell you're in the right repo: this one's
+> `packages/db/prisma/schema.prisma` has **38 models**. `propgroup`'s has 4.
 
 ---
 
@@ -97,19 +20,19 @@ different file in `propgroupleb`.** Both repos contain:
 - For significant changes, verify with — **note the `-C`**, since the sibling
   repo uses the identical package names:
   ```bash
-  pnpm -C ~/development/propgroupleb --filter web run build
-  pnpm -C ~/development/propgroupleb --filter propgroup-backend run build
-  pnpm -C ~/development/propgroupleb --filter web run type-check
+  pnpm -C ~/development/propgroup-platform/propgroupleb --filter web run build
+  pnpm -C ~/development/propgroup-platform/propgroupleb --filter propgroup-backend run build
+  pnpm -C ~/development/propgroup-platform/propgroupleb --filter web run type-check
   ```
   Each prints the resolved path — read it back to confirm the right repo.
 - **After any dependency change**, also run
-  `pnpm -C ~/development/propgroupleb install --frozen-lockfile`. The Dockerfile
+  `pnpm -C ~/development/propgroup-platform/propgroupleb install --frozen-lockfile`. The Dockerfile
   installs with that flag, so a `package.json` edit without a regenerated
   lockfile fails the deploy while building fine locally.
 - **After changing anything on the public API**, verify the Georgia storefront
   still renders — it is a separate repo and its build won't catch a contract break:
   ```bash
-  cd ~/development/propgroup && \
+  cd ~/development/propgroup-platform/propgroup && \
     SHARED_API_URL=https://api.propgrouplb.com node scripts/verify-shared-api.mjs
   ```
 
@@ -166,15 +89,10 @@ before assuming a new route is scoped):
 | `GET /api/listings` | ✅ `publicCountryFilter` via the header (`?country=` is not read here) |
 | `GET /api/properties` | ✅ **since this was fixed** — it previously applied no filter at all |
 
-`/api/properties` is a legacy alias over `Building`. It is public and it used to
-return Lebanese and Georgian stock mixed together (83 rows, both countries) —
-the one endpoint that leaked across markets. **Any new public read route must
-call `publicCountryFilter(req)`.** Grep for it when adding one.
-
-Note it also returns `price: null` on every row: it does not flatten
-`Building` + `Unit` + `Listing`, so it is not usable as a storefront catalogue
-endpoint. propgrp.com reads `/api/buildings` and does the flattening itself —
-see *Serving propgrp.com* below.
+`/api/properties` is public and used to return Lebanese and Georgian stock mixed
+together (83 rows, both countries) — the one endpoint that leaked across
+markets. **Any new public read route must call `publicCountryFilter(req)`.**
+Grep for it when adding one.
 - International is defined as "not Lebanon", never a fixed list — adding a
   country must never require a code change.
 - Georgian stock lives in the same `Building`/`Unit`/`Listing` tables. There is
@@ -196,17 +114,42 @@ here, or forwards to here.
 
 What it consumes:
 
-- `GET /api/buildings?country=GEORGIA` with `X-Site-Scope: INTERNATIONAL` — its
-  catalogue. It hydrates each building's detail endpoint for unit areas and
-  options, because the list truncates units to `{ id, kind, lifecycle }` and
-  Georgian stock has no `Listing` rows, so price can only come from
-  `pricePerSqm × areaSqm`.
-- `GET /api/buildings/slug/:slug` — project detail (units + options embedded).
+- **`GET /api/properties`** — its catalogue, in the **flat legacy `Property`
+  shape**. This is the storefront contract: `/api/buildings` stays the native
+  shape for the back office, and `/api/properties` folds
+  Building + Unit + UnitOption + Listing + BuildingInvestmentData down via
+  `propgroupleb/apps/backend/src/utils/property-mapper.ts`.
+  Nothing in this repo consumes it — its own admin uses `/api/buildings`.
+- `GET /api/properties/slug/:slug` and `GET /api/properties/:id` — project
+  detail, same flat shape. The `:id` handler accepts **an id or a slug**,
+  because the storefront links to `/property/{id}` from cards and
+  `/property/{slug}` from its compare page.
 - `GET /api/location-guides?country=GEORGIA`.
 - `POST /api/contact` — **all** its leads, both the contact form and property
   enquiries, forwarded server-side. Property enquiries arrive with
   `Project enquiry: PG-#### — <title>` as the subject. It stores no leads
   locally, so this CRM is the only place they exist.
+
+### The flat `Property` contract
+
+- **Price is derived, not stored.** Georgian stock has no `Listing` rows, so
+  price comes from `min(pricePerSqm × areaSqm)` across the units' options.
+  Verified: PG-1059 = 45 m² × $4000 = **$180,000**.
+- **`price`, `propertyType` and bedroom counts cannot be filtered or sorted in
+  SQL** — they are computed after mapping. The handler therefore maps the whole
+  scoped match set (bounded at 1000), narrows in memory, and paginates from
+  there, so `total` is the post-filter count rather than a misleading SQL count.
+- **Units and options come back in the same query** (`FLAT_PROPERTY_INCLUDE`).
+  Do not "optimise" that to a narrow select: without `units.options` and
+  `units.areaSqm`, every price silently becomes `0` and every project's type
+  falls back to `APARTMENT`. That is exactly the N+1 this mapper was moved
+  upstream to remove.
+- **`deriveUnitStats` hoists** the smallest unit's bedrooms/bathrooms/area onto
+  the project, and exposes `minBedrooms`/`maxBedrooms`/`minArea`/`maxArea`, so
+  storefront cards and range filters have something to read.
+- **Default order is featured first, then newest** — the storefront's ordering.
+
+Things to be careful of when changing this API:
 
 Things to be careful of when changing this API:
 

@@ -10,6 +10,7 @@ import { buildingSchema, buildingQuerySchema, extractInvestmentData, buildInvest
 import { deleteFile, extractKeyFromUrl } from '../services/upload.service.js';
 import { nextUnitRef } from '../utils/reference.js';
 import { publicCountryFilter } from '../utils/market.js';
+import { mapBuildingToProperty } from '../utils/property-mapper.js';
 import type { AuthenticatedRequest } from '../types/index.js';
 
 const router: Router = express.Router();
@@ -44,15 +45,61 @@ async function generateUniqueSlug(
   }
 }
 
-// Get all buildings (public)
+// ── PUBLIC READ: the legacy flat `Property` contract ─────────────────────────
+//
+// These three handlers exist for the Georgia storefront (propgrp.com, separate
+// repo), which renders the pre-merge flat `Property` shape. They fold
+// Building + Unit + UnitOption + Listing + BuildingInvestmentData down via
+// utils/property-mapper.ts.
+//
+// `/api/buildings` remains the native shape and is what this back office uses —
+// nothing in this repo consumes these handlers.
+//
+// The mapping used to live in the storefront repo and run over HTTP, which
+// forced an N+1 (its list response truncated units, so each building had to be
+// re-fetched for areas and options). Here units and options come back in the
+// same query.
+
+/** Everything the flat shape needs, in one query. */
+const FLAT_PROPERTY_INCLUDE = {
+  developer: true,
+  locationGuide: true,
+  investmentData: true,
+  listings: true,
+  units: { include: { options: true }, orderBy: { floor: 'asc' as const } },
+} as const;
+
+/** Filters that can only be applied after mapping, because the values they
+ *  test are derived rather than stored (price comes from pricePerSqm x area,
+ *  propertyType from the units' kind). */
+function applyDerivedFilters(
+  properties: Record<string, unknown>[],
+  query: Record<string, unknown>,
+): Record<string, unknown>[] {
+  let out = properties;
+  const num = (v: unknown) => (v === undefined || v === null ? undefined : Number(v));
+
+  const minPrice = num(query.minPrice);
+  const maxPrice = num(query.maxPrice);
+  const bedrooms = num(query.bedrooms);
+  const propertyType = typeof query.propertyType === 'string' ? query.propertyType : undefined;
+
+  if (minPrice !== undefined) out = out.filter((p) => Number(p.price ?? 0) >= minPrice);
+  if (maxPrice !== undefined) out = out.filter((p) => Number(p.price ?? 0) <= maxPrice);
+  if (propertyType) out = out.filter((p) => p.propertyType === propertyType);
+  if (bedrooms !== undefined) {
+    out = out.filter((p) => Number((p.maxBedrooms ?? p.bedrooms) ?? 0) >= bedrooms);
+  }
+  return out;
+}
+
+// Get all properties — flat shape (public)
 router.get(
   '/',
   asyncHandler(async (req: Request, res: Response) => {
     const query = buildingQuerySchema.parse(req.query);
     const { page, limit } = query;
-    const skip = (page - 1) * limit;
 
-    // Build where clause
     const where: Record<string, unknown> = { visibility: 'PUBLIC' };
 
     // One database, two websites. This legacy alias route previously applied NO
@@ -62,7 +109,6 @@ router.get(
     const country = publicCountryFilter(req);
     if (country) where.country = country;
 
-    if (query.kind) where.kind = query.kind;
     if (query.city) where.city = { contains: query.city, mode: 'insensitive' };
     if (query.mohafazat) where.mohafazat = query.mohafazat;
     if (query.caza) where.caza = query.caza;
@@ -75,72 +121,106 @@ router.get(
         { description: { contains: query.search, mode: 'insensitive' } },
         { city: { contains: query.search, mode: 'insensitive' } },
         { neighborhood: { contains: query.search, mode: 'insensitive' } },
+        { ref: { contains: query.search, mode: 'insensitive' } },
       ];
     }
 
-    const sortOrder = query.sortOrder || 'desc';
-    let orderBy: Record<string, string> = { createdAt: sortOrder };
-    if (query.sortBy) {
-      const validSortFields = ['createdAt', 'views', 'title'];
-      if (validSortFields.includes(query.sortBy)) {
-        orderBy = { [query.sortBy]: sortOrder };
-      }
+    // Price and property type are derived, so they cannot be filtered or sorted
+    // in SQL. The scoped catalogue is small (tens of rows), so the whole match
+    // set is mapped and then narrowed — which also keeps `total` honest, since
+    // a post-filter count is the only correct one.
+    const buildings = await prisma.building.findMany({
+      where,
+      include: FLAT_PROPERTY_INCLUDE,
+      orderBy: { createdAt: 'desc' },
+      take: 1000,
+    });
+
+    let properties = buildings.map((b) => mapBuildingToProperty(b, { detail: false }));
+    properties = applyDerivedFilters(properties, query as unknown as Record<string, unknown>);
+
+    const sortOrder = query.sortOrder === 'asc' ? 1 : -1;
+    const byCreated = (a: Record<string, unknown>, b: Record<string, unknown>) =>
+      new Date(String(b.createdAt ?? 0)).getTime() - new Date(String(a.createdAt ?? 0)).getTime();
+
+    switch (query.sortBy) {
+      case 'price':
+        properties.sort((a, b) => (Number(a.price ?? 0) - Number(b.price ?? 0)) * sortOrder);
+        break;
+      case 'views':
+        properties.sort((a, b) => (Number(a.views ?? 0) - Number(b.views ?? 0)) * sortOrder);
+        break;
+      case 'title':
+        properties.sort((a, b) => String(a.title).localeCompare(String(b.title)) * sortOrder);
+        break;
+      default:
+        // Featured first, then newest — the storefront's default ordering.
+        properties.sort((a, b) => {
+          if (Boolean(a.featured) !== Boolean(b.featured)) return a.featured ? -1 : 1;
+          return byCreated(a, b);
+        });
     }
 
-    const [buildings, total] = await Promise.all([
-      prisma.building.findMany({
-        where,
-        include: PROPERTY_LIST_INCLUDE,
-        orderBy,
-        skip,
-        take: limit,
-      }),
-      prisma.building.count({ where }),
-    ]);
+    const total = properties.length;
+    const start = (page - 1) * limit;
 
-    sendPaginated(res, buildings, buildPaginationResponse(page, limit, total));
+    sendPaginated(
+      res,
+      properties.slice(start, start + limit),
+      buildPaginationResponse(page, limit, total),
+    );
   })
 );
 
-// Get building by slug (PUBLIC — no auth required)
+// Get property by slug — flat shape (public)
 router.get(
   '/slug/:slug',
   asyncHandler(async (req: Request, res: Response) => {
     const building = await prisma.building.findUnique({
       where: { slug: req.params.slug },
-      include: PROPERTY_DETAIL_INCLUDE,
+      include: FLAT_PROPERTY_INCLUDE,
     });
 
     if (!building) {
-      res.status(404).json({ error: 'Building not found' });
+      sendNotFound(res, 'Property');
       return;
     }
 
-    sendSuccess(res, building);
+    sendSuccess(res, mapBuildingToProperty(building, { detail: true }));
   })
 );
 
-// Get single building (public)
+// Get single property by id OR slug — flat shape (public)
+//
+// Accepts both because the storefront links to `/property/{id}` from cards and
+// `/property/{slug}` from the compare page.
 router.get(
   '/:id',
   asyncHandler(async (req: Request, res: Response) => {
-    const building = await prisma.building.findUnique({
-      where: { id: req.params.id },
-      include: PROPERTY_DETAIL_INCLUDE,
-    });
+    const idOrSlug = req.params.id;
+
+    const building =
+      (await prisma.building.findUnique({
+        where: { id: idOrSlug },
+        include: FLAT_PROPERTY_INCLUDE,
+      })) ??
+      (await prisma.building.findUnique({
+        where: { slug: idOrSlug },
+        include: FLAT_PROPERTY_INCLUDE,
+      }));
 
     if (!building) {
-      sendNotFound(res, 'Building');
+      sendNotFound(res, 'Property');
       return;
     }
 
-    // Increment view count (fire and forget)
-    prisma.building.update({
-      where: { id: req.params.id },
-      data: { views: { increment: 1 } },
-    }).catch((err: unknown) => logger.error('Failed to increment view count', err));
+    // Fire and forget.
+    prisma.building
+      .update({ where: { id: building.id }, data: { views: { increment: 1 } } })
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .catch((err: any) => logger.error('Failed to increment building views', err));
 
-    sendSuccess(res, building);
+    sendSuccess(res, mapBuildingToProperty(building, { detail: true }));
   })
 );
 
