@@ -9,6 +9,7 @@ import { PROPERTY_LIST_INCLUDE, PROPERTY_DETAIL_INCLUDE } from '../utils/prisma-
 import { buildingSchema, buildingQuerySchema, extractInvestmentData, buildInvestmentDataPayload, unitSchema, unitOptionSchema } from '../schemas/index.js';
 import { deleteFile, extractKeyFromUrl } from '../services/upload.service.js';
 import { nextUnitRef } from '../utils/reference.js';
+import { publicCountryFilter } from '../utils/market.js';
 import type { AuthenticatedRequest } from '../types/index.js';
 
 const router: Router = express.Router();
@@ -53,6 +54,13 @@ router.get(
 
     // Build where clause
     const where: Record<string, unknown> = { visibility: 'PUBLIC' };
+
+    // One database, two websites. This legacy alias route previously applied NO
+    // market scope at all, so a public caller got Lebanese and Georgian stock
+    // mixed together — the one public endpoint that leaked across markets.
+    // Admins still see everything (publicCountryFilter returns null for them).
+    const country = publicCountryFilter(req);
+    if (country) where.country = country;
 
     if (query.kind) where.kind = query.kind;
     if (query.city) where.city = { contains: query.city, mode: 'insensitive' };

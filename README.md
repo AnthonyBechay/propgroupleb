@@ -1,6 +1,15 @@
 # PropGroup
 
-Lebanon-focused real estate platform. Catalog, inquiries, portfolio, admin CMS, and AI-assisted property search.
+**This repo is the single backend and the central back office** for two public
+sites: propgrouplb.com (Lebanon, in this repo) and propgrp.com (Georgia, in the
+[`propgroup`](https://github.com/AnthonyBechay/propgroup) repo). It owns all
+property data, the CRM, and SEO generation for both.
+
+Changes to the public API, `Building` field names, or the market-scoping helpers
+affect the Georgia storefront too — see [CLAUDE.md](CLAUDE.md) →
+*Serving propgrp.com*.
+
+Real-estate platform serving two markets from one database and one back office: Lebanon and Georgia.
 
 ## Stack
 

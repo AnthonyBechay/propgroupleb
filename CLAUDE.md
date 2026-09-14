@@ -56,6 +56,25 @@ in order:
 **A signed-in admin sees every market regardless**, which is what makes one back
 office work. Add propgrp.com to `ALLOWED_ORIGINS`; auth cookies already use
 `SameSite=None; Secure` in production, so cross-site login works.
+
+**Which public endpoints actually apply it** (measured against live data — check
+before assuming a new route is scoped):
+
+| Endpoint | Scoped? |
+|---|---|
+| `GET /api/buildings` | ✅ `publicCountryFilter` — `?country=GEORGIA` and `X-Site-Scope` both work |
+| `GET /api/listings` | ✅ `publicCountryFilter` via the header (`?country=` is not read here) |
+| `GET /api/properties` | ✅ **since this was fixed** — it previously applied no filter at all |
+
+`/api/properties` is a legacy alias over `Building`. It is public and it used to
+return Lebanese and Georgian stock mixed together (83 rows, both countries) —
+the one endpoint that leaked across markets. **Any new public read route must
+call `publicCountryFilter(req)`.** Grep for it when adding one.
+
+Note it also returns `price: null` on every row: it does not flatten
+`Building` + `Unit` + `Listing`, so it is not usable as a storefront catalogue
+endpoint. propgrp.com reads `/api/buildings` and does the flattening itself —
+see *Serving propgrp.com* below.
 - International is defined as "not Lebanon", never a fixed list — adding a
   country must never require a code change.
 - Georgian stock lives in the same `Building`/`Unit`/`Listing` tables. There is
@@ -65,6 +84,65 @@ office work. Add propgrp.com to `ALLOWED_ORIGINS`; auth cookies already use
   `GEORGIA_AREAS` from `lib/crm-locations.ts`. `mohafazat`/`caza` are Lebanese
   administrative divisions and stay null abroad.
 
+
+---
+
+## Serving propgrp.com (the Georgia storefront)
+
+`propgroup` is a separate repo: a Next.js frontend plus a thin Express backend.
+Its database holds four models — `User`, `AdminAuditLog`, `SiteContent`,
+`SiteMedia` — and **no property data at all**. Everything else it reads from
+here, or forwards to here.
+
+What it consumes:
+
+- `GET /api/buildings?country=GEORGIA` with `X-Site-Scope: INTERNATIONAL` — its
+  catalogue. It hydrates each building's detail endpoint for unit areas and
+  options, because the list truncates units to `{ id, kind, lifecycle }` and
+  Georgian stock has no `Listing` rows, so price can only come from
+  `pricePerSqm × areaSqm`.
+- `GET /api/buildings/slug/:slug` — project detail (units + options embedded).
+- `GET /api/location-guides?country=GEORGIA`.
+- `POST /api/contact` — **all** its leads, both the contact form and property
+  enquiries, forwarded server-side. Property enquiries arrive with
+  `Project enquiry: PG-#### — <title>` as the subject. It stores no leads
+  locally, so this CRM is the only place they exist.
+
+Things to be careful of when changing this API:
+
+- **`GET /api/buildings/:id/units` returns `[]`.** propgrp.com works around it by
+  reading units from the building detail payload. Either fix it or leave it —
+  but don't assume it works.
+- **Numerics serialise as strings** (Prisma `Decimal` over JSON). Its mapper
+  coerces defensively; anything new consuming this API must too.
+- **`ref` is the reference code**, not `referenceCode`. Renaming it breaks
+  propgrp.com's listing search, which matches on `PG-####`.
+- **`Building.kind` is `STANDALONE`/`PROJECT`** — a building classification, not
+  a property type. Don't repurpose it.
+- **Adding a field to `Building` is free; renaming one is a cross-repo change.**
+  `propgroup/apps/backend/src/utils/shared-mappers.ts` is the only consumer that
+  matters, and it reads several candidate key names per value to survive drift.
+
+### The SEO contract
+
+`routes/ai-seo.ts` (`POST /api/ai-seo/generate`) is the **only** SEO generator
+across both sites, driven by the "Auto-write SEO" action in
+`admin/buildings/BuildingForm.tsx`, writing `Building.metaTitle` /
+`metaDescription`.
+
+It is **country-aware** via `marketFor(country)`. It previously hardcoded
+Lebanon — every prompt said "a Lebanese property platform" and required
+`'Lebanon'` in the meta title — which is why the Georgian catalogue was never
+given metadata: the output would have been wrong. Georgia / Cyprus / Greece /
+Lebanon each get their own wording, and an unknown country omits the cue rather
+than guessing.
+
+propgrp.com treats whatever is stored here as authoritative and only formats a
+fallback when both fields are empty. So **generating SEO here is what makes it
+appear on the Georgia site** — nothing else needs doing.
+
+Do not add a second generator in the other repo. One was built there by mistake
+and removed.
 ---
 
 ## Reference codes
@@ -383,6 +461,10 @@ When generating new share links, always go through the `ShareToken` table. Don't
 - ❌ Add a fifth client "type". The four intents are fixed; anything else is a flag on the client.
 - ❌ Put a deal stage on the client. Viewing/negotiating belong to the opportunity — a client can be at different stages on different properties.
 - ❌ Assume a `Building`'s local `buildingSchema` in `routes/buildings.ts` is the shared one in `schemas/index.ts`. It shadows it; adding a field to the wrong one fails silently.
+- ❌ Add a public read route without `publicCountryFilter(req)` — that is exactly how `/api/properties` leaked both markets.
+- ❌ Rename `ref`, or repurpose `Building.kind` — `propgroup/apps/backend/src/utils/shared-mappers.ts` reads both, and breaking them breaks the Georgia storefront silently.
+- ❌ Hardcode a country or market in a prompt, label or query — `marketFor()` / `publicCountryFilter()` exist so adding a country never needs a code change. The AI SEO prompt hardcoded Lebanon and silently produced unusable copy for Georgia.
+- ❌ Assume propgrp.com has its own catalogue, leads or SEO. It has none — it reads this API and forwards leads here. Building a feature "for Lebanon only" in this repo usually means building it for both sites.
 
 ---
 
