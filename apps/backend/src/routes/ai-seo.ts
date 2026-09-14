@@ -118,6 +118,31 @@ router.post(
     let facts: string;
     let instructions: string;
 
+    /**
+     * Market wording, derived from the record's own country.
+     *
+     * This used to be hardcoded to Lebanon — every prompt said "a Lebanese
+     * property platform" and instructed the model to put "Lebanon" in the meta
+     * title. Since the back-office merge this API also serves the Georgian
+     * catalogue, where that produced wrong copy, so the feature was unusable
+     * for it (all 18 Georgian buildings still have null metaTitle).
+     */
+    const marketFor = (country?: unknown): { platform: string; place: string } => {
+      switch (String(country ?? '').toUpperCase()) {
+        case 'GEORGIA':
+          return { platform: 'a Georgian property platform', place: 'Georgia' };
+        case 'CYPRUS':
+          return { platform: 'a Cypriot property platform', place: 'Cyprus' };
+        case 'GREECE':
+          return { platform: 'a Greek property platform', place: 'Greece' };
+        case 'LEBANON':
+          return { platform: 'a Lebanese property platform', place: 'Lebanon' };
+        default:
+          // No country on the record: omit the country cue rather than guess.
+          return { platform: 'an international property platform', place: '' };
+      }
+    };
+
     if (type === 'building') {
       // Either a saved building (id) or live form attributes (create flow).
       let b: Record<string, unknown> | null = null;
@@ -130,10 +155,11 @@ router.post(
         sendError(res, 400, 'Provide an id or attributes to generate from'); return;
       }
       facts = buildingFacts(b);
-      instructions = `Write SEO metadata for this real-estate BUILDING/PROJECT page on a Lebanese property platform.
+      const market = marketFor((b as Record<string, unknown>)?.country);
+      instructions = `Write SEO metadata for this real-estate BUILDING/PROJECT page on ${market.platform}.
 Return ONLY JSON with exactly these keys:
 {
-  "metaTitle": "<=60 chars, compelling, include the location and 'Lebanon'",
+  "metaTitle": "<=60 chars, compelling, include the location${market.place ? ` and '${market.place}'` : ''}",
   "metaDescription": "<=155 chars, persuasive search snippet with location, type and a key selling point",
   "shortDescription": "<=120 chars, a punchy one-liner for listing cards"
 }`;
@@ -143,13 +169,14 @@ Return ONLY JSON with exactly these keys:
       if (!u) { sendError(res, 404, 'Unit not found'); return; }
       if (!u.building) { sendError(res, 400, 'Unit has no building'); return; }
       facts = unitFacts(u as unknown as Record<string, unknown>, u.building as unknown as Record<string, unknown>);
-      instructions = `Write SEO + marketing copy for this individual real-estate UNIT listing on a Lebanese property platform.
+      const market = marketFor((u.building as Record<string, unknown>)?.country);
+      instructions = `Write SEO + marketing copy for this individual real-estate UNIT listing on ${market.platform}.
 Return ONLY JSON with exactly these keys:
 {
   "headline": "<=70 chars, scannable listing headline with type, beds and location",
   "description": "2-3 sentences (<=320 chars), warm and specific, highlighting the best features",
   "highlights": ["3 to 5 very short selling points, each <=4 words"],
-  "metaTitle": "<=60 chars including location and 'Lebanon'",
+  "metaTitle": "<=60 chars including location${market.place ? ` and '${market.place}'` : ''}",
   "metaDescription": "<=155 chars persuasive search snippet"
 }`;
     }
