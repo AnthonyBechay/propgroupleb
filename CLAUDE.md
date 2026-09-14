@@ -1,21 +1,121 @@
-# PropGroup — Claude Code Instructions
+# PropGroup — Shared Backend & Central Back Office
 
-Context for Claude (and human contributors) extending this codebase. Keep this file up to date whenever architectural decisions change.
+> **This file describes `~/development/propgroupleb`** — the single backend, the
+> central back office, and the Lebanon storefront (propgrouplb.com). It owns all
+> property data, the CRM, and SEO generation **for both public sites**.
+>
+> Its sibling `~/development/propgroup` is the Georgia storefront (propgrp.com)
+> and has its own CLAUDE.md with the same section headings.
+>
+> ⚠️ **176 of `propgroup`'s files share an identical relative path with a
+> different file in this repo** — including `apps/backend/src/routes/properties.ts`,
+> `packages/db/prisma/schema.prisma` and this file. Every workspace package name
+> is identical too. In a session with both directories open, a bare path or a
+> bare `pnpm --filter` is ambiguous. Read *Working across both repos* first.
+>
+> Quick tell you are in the right repo: this one's `packages/db/prisma/schema.prisma`
+> has **38 models**. `propgroup`'s has 4.
 
 ---
 
-## Testing & verification
+## Working across both repos — read this first
+
+Two repos, one platform. If your session has **both** directories open, both of
+these CLAUDE.md files are in your context at once, and almost every path in them
+is ambiguous.
+
+| Repo | Absolute path | Owns | Deployed as |
+|---|---|---|---|
+| `propgroup` | `~/development/propgroup` | propgrp.com — **Georgia storefront**. Its own users, auth, CMS. No property data. | Coolify app (web + thin backend) |
+| `propgroupleb` | `~/development/propgroupleb` | **The single backend + central back office**, plus propgrouplb.com (Lebanon storefront). Owns all property data, the CRM, SEO generation. | Coolify app (web + backend) |
+
+### The collision hazard (this is not theoretical)
+
+**176 of `propgroup`'s 207 tracked files have an identical relative path to a
+different file in `propgroupleb`.** Both repos contain:
+
+- `apps/backend/src/routes/properties.ts` — *different code, different purpose*
+- `apps/backend/src/routes/{admin,auth,content,files,share,upload,users,location-guides}.ts`
+- `apps/backend/src/{index.ts,schemas/index.ts}`
+- `packages/db/prisma/schema.prisma` — **4 models vs 38**
+- `apps/web/src/components/PropertyCard.tsx`, `lib/api/client.ts`
+- `CLAUDE.md`, `README.md`, `docker-compose.yml`
+
+**And every workspace package name is identical**: root `propgroup`, backend
+`propgroup-backend`, web `web`, `@propgroup/db`, `@propgroup/config`.
+
+### Rules that follow from that
+
+1. **Never use a bare relative path.** Prefix every path with the repo:
+   `propgroup/apps/backend/...` or `propgroupleb/apps/backend/...`, or use the
+   absolute path. "Edit `routes/properties.ts`" is a coin flip.
+2. **Never use a bare `pnpm --filter`.** `pnpm --filter propgroup-backend run build`
+   resolves against whichever directory you happen to be in. Always pin the repo:
+   ```bash
+   pnpm -C ~/development/propgroup    --filter web run build
+   pnpm -C ~/development/propgroupleb --filter propgroup-backend run build
+   ```
+   `pnpm -C` echoes the resolved path in its output — read it back to confirm you
+   hit the repo you meant.
+3. **Before editing any file whose path exists in both, state which repo you are
+   editing** and confirm it from the file's own content (e.g. `propgroup`'s
+   `schema.prisma` has 4 models; `propgroupleb`'s has 38).
+4. **`@propgroup/db` is not shared code.** Each repo has its own, with a
+   different schema. They are unrelated packages that happen to share a name.
+5. **Don't "fix" drift between same-named files.** They are supposed to differ.
+
+### Where does this task belong?
+
+| Task | Repo |
+|---|---|
+| Property/unit/listing data, pricing, availability | `propgroupleb` |
+| Back-office admin: buildings, units, listings, CRM | `propgroupleb` |
+| SEO generation (the only generator) | `propgroupleb` |
+| Lead handling, CRM pipeline | `propgroupleb` |
+| Lebanon storefront UI | `propgroupleb` |
+| **Georgia storefront UI**: landing, listing, filters, project page | `propgroup` |
+| Georgia site's own accounts, auth, CMS content, branding | `propgroup` |
+| The adapter that maps `Building`/`Unit`/`Listing` → flat `Property` | `propgroup` (moving upstream is deferred work) |
+| Anything touching the public API contract between them | **both** — change `propgroupleb` first, then its consumer in `propgroup` |
+
+### Shared invariants — true in both repos
+
+- **One backend.** `propgroupleb` is the source of truth for property data. `propgroup` reads it over HTTP and must never hold a local catalogue.
+- **One CRM.** All leads land in `propgroupleb`. `propgroup` forwards and stores nothing.
+- **One SEO generator.** `propgroupleb/apps/backend/src/routes/ai-seo.ts`. `propgroup` only formats a fallback when the back office left the fields empty.
+- **One storage write target.** Canonical bucket `propgroupleb` / `assets.propgrouplb.com`. The `propgroup` bucket is read-only legacy.
+- **Market scope is per request, never per process.** `publicCountryFilter(req)` in `propgroupleb`; `?country=` + `X-Site-Scope: INTERNATIONAL` from `propgroup`. Default scope with neither is **Lebanon**.
+- **`NEXT_PUBLIC_*` is inlined at build time** in both — changing one needs a rebuild, not a restart.
+- **Changing `package.json` requires regenerating `pnpm-lock.yaml`** in that repo — both Dockerfiles install with `--frozen-lockfile`.
+
+---
+
+## Testing & verification — propgroupleb · backend + back office
 
 - **Do NOT** run dev servers, `pnpm dev`, or previews unless explicitly asked.
 - **Do NOT** run tests unless explicitly asked.
-- For significant changes, verify with:
-  - `pnpm --filter web run build`
-  - `pnpm --filter propgroup-backend run build`
-  - `pnpm --filter web run type-check`
+- For significant changes, verify with — **note the `-C`**, since the sibling
+  repo uses the identical package names:
+  ```bash
+  pnpm -C ~/development/propgroupleb --filter web run build
+  pnpm -C ~/development/propgroupleb --filter propgroup-backend run build
+  pnpm -C ~/development/propgroupleb --filter web run type-check
+  ```
+  Each prints the resolved path — read it back to confirm the right repo.
+- **After any dependency change**, also run
+  `pnpm -C ~/development/propgroupleb install --frozen-lockfile`. The Dockerfile
+  installs with that flag, so a `package.json` edit without a regenerated
+  lockfile fails the deploy while building fine locally.
+- **After changing anything on the public API**, verify the Georgia storefront
+  still renders — it is a separate repo and its build won't catch a contract break:
+  ```bash
+  cd ~/development/propgroup && \
+    SHARED_API_URL=https://api.propgrouplb.com node scripts/verify-shared-api.mjs
+  ```
 
 ---
 
-## Project overview
+## Project overview — propgroupleb · backend + back office
 
 - **Monorepo** (pnpm workspaces): `apps/web` (Next.js 15 App Router, React 19), `apps/backend` (Express 4)
 - **Shared packages**: `packages/db` (Prisma schema + client), `packages/config` (Zod schemas, calculator formulas)
@@ -43,7 +143,7 @@ against this API and database, including its admin. So market scope is decided
 **per request, never per process** — an env var would be wrong for one of the
 two sites whatever value it held.
 
-`apps/backend/src/utils/market.ts` owns it. `publicCountryFilter(req)` resolves,
+`propgroupleb/apps/backend/src/utils/market.ts` owns it. `publicCountryFilter(req)` resolves,
 in order:
 
 1. `?country=` — explicit, and `?country=all` lifts the scope
@@ -79,9 +179,9 @@ see *Serving propgrp.com* below.
   country must never require a code change.
 - Georgian stock lives in the same `Building`/`Unit`/`Listing` tables. There is
   no separate catalogue (one existed; it was removed as duplication).
-- Location capture branches by country in `components/admin/LocationFields.tsx`:
-  Lebanon uses the curated gazetteer (`lib/lebanon-locations.ts`), Georgia uses
-  `GEORGIA_AREAS` from `lib/crm-locations.ts`. `mohafazat`/`caza` are Lebanese
+- Location capture branches by country in `propgroupleb/apps/web/src/components/admin/LocationFields.tsx`:
+  Lebanon uses the curated gazetteer (`propgroupleb/apps/web/src/lib/lebanon-locations.ts`), Georgia uses
+  `GEORGIA_AREAS` from `propgroupleb/apps/web/src/lib/crm-locations.ts`. `mohafazat`/`caza` are Lebanese
   administrative divisions and stay null abroad.
 
 
@@ -125,9 +225,9 @@ Things to be careful of when changing this API:
 
 ### The SEO contract
 
-`routes/ai-seo.ts` (`POST /api/ai-seo/generate`) is the **only** SEO generator
+`propgroupleb/apps/backend/src/routes/ai-seo.ts` (`POST /api/ai-seo/generate`) is the **only** SEO generator
 across both sites, driven by the "Auto-write SEO" action in
-`admin/buildings/BuildingForm.tsx`, writing `Building.metaTitle` /
+`propgroupleb/apps/web/src/app/(admin)/admin/buildings/BuildingForm.tsx`, writing `Building.metaTitle` /
 `metaDescription`.
 
 It is **country-aware** via `marketFor(country)`. It previously hardcoded
@@ -272,7 +372,7 @@ Bedrooms aren't scored for investors or international stock.
 
 ---
 
-## Visual conventions
+## Visual conventions — propgroupleb · backend + back office
 
 - Grey-first neutrals (slate/gray) with a subtle charcoal primary. Avoid strong navy-forward styling in new work.
 - CSS variables: bare HSL triples in `:root`, wrapped with `hsl(var(--…))` in the `@theme inline` block.
@@ -300,7 +400,7 @@ Bedrooms aren't scored for investors or international stock.
 
 ---
 
-## Caching strategy (important — read before adding any cache layer)
+## Caching strategy (important — read before adding any cache layer) — propgroupleb · backend + back office
 
 The app was cleaned up from a round of broken `unstable_cache` usage. The rules now:
 
@@ -320,7 +420,7 @@ The app was cleaned up from a round of broken `unstable_cache` usage. The rules 
 
 ---
 
-## Prisma patterns
+## Prisma patterns — propgroupleb · backend + back office
 
 - **Client location**: generated into `node_modules/.pnpm/@prisma+client/…/.prisma/client`. Regenerated automatically by the `postinstall` hook in `packages/db/package.json`, so `pnpm install` never leaves you with stale types.
 - **Include strategy**: `apps/backend/src/utils/prisma-includes.ts` exports three levels:
@@ -333,7 +433,7 @@ The app was cleaned up from a round of broken `unstable_cache` usage. The rules 
 
 ---
 
-## Backend patterns (`apps/backend/src/**`)
+## Backend patterns (`apps/backend/src/**`) — propgroupleb · backend + back office
 
 - **Routers**: one file per domain in `routes/*.ts`, all mounted in `index.ts`. Every new router must be imported + mounted there.
 - **Handlers**: wrap in `asyncHandler(...)` from `utils/errors.ts` — surfaces rejections through the central error middleware.
@@ -352,7 +452,7 @@ The app was cleaned up from a round of broken `unstable_cache` usage. The rules 
 
 ---
 
-## Auth flow (do not break)
+## Auth flow (do not break) — propgroupleb · backend + back office
 
 - Signup / login hit backend, receive JWT in an httpOnly cookie named `token`.
 - `authenticateToken` middleware decodes it on each request and attaches `req.user`.
@@ -413,7 +513,7 @@ role change, ban and delete reached the API unauthenticated and 401'd.
 
 ---
 
-## Frontend patterns (`apps/web/src/**`)
+## Frontend patterns (`apps/web/src/**`) — propgroupleb · backend + back office
 
 - **Server components by default**; drop to `'use client'` only for interactivity.
 - **API client**: `lib/api/client.ts` exports `apiClient` with typed methods for every endpoint. Add new methods here, don't inline `fetch` in components.
@@ -424,7 +524,7 @@ role change, ban and delete reached the API unauthenticated and 401'd.
 
 ---
 
-## Share tokens
+## Share tokens — propgroupleb · backend + back office
 
 Two mechanisms coexist in `routes/share.ts`:
 
@@ -435,7 +535,7 @@ When generating new share links, always go through the `ShareToken` table. Don't
 
 ---
 
-## What NOT to do
+## What NOT to do — propgroupleb · backend + back office
 
 - ❌ Add `unstable_cache` without testing tag invalidation (silent staleness trap).
 - ❌ Add `express-session`, `passport-jwt`, `connect-pg-simple`, `@types/express-session` — removed as dead deps.
@@ -468,7 +568,7 @@ When generating new share links, always go through the `ShareToken` table. Don't
 
 ---
 
-## Known deferred work (post-launch)
+## Known deferred work (post-launch) — propgroupleb · backend + back office
 
 - Token blacklist / refresh token rotation
 - Soft deletes for Property, User
@@ -486,7 +586,7 @@ When generating new share links, always go through the `ShareToken` table. Don't
 
 ---
 
-## Build & deploy
+## Build & deploy — propgroupleb · backend + back office
 
 - `pnpm install` auto-runs `prisma generate` via the `postinstall` hook in `packages/db` — no manual step needed on fresh clones or after schema changes.
 - `pnpm build` runs `scripts/build.js`: packages first (config → db), then backend, then web.
