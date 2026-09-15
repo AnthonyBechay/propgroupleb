@@ -10,12 +10,11 @@
  * themselves being written twice and drifting apart again.
  */
 
-import { useRef, useState } from 'react'
+import { useState } from 'react'
 import {
   Building2, CalendarClock, Coins, FileText, Image as ImageIcon, Loader2, MapPin,
-  Search, Sparkles, Video, X,
+  Search, Sparkles,
 } from 'lucide-react'
-import { normalizeApiUrl } from '@/lib/utils/api-url'
 import { LocationFields } from '@/components/admin/LocationFields'
 import { OwnerPicker, type OwnerRef } from '@/components/admin/OwnerPicker'
 import { PaymentPlansEditor } from '@/components/admin/PaymentPlansEditor'
@@ -24,7 +23,7 @@ import {
   ChipsInput, CountedTextarea, Field, FieldGrid, InlineNote, MoneyInput,
   NumberInput, SelectInput, TextInput, Textarea, Toggle, CheckboxCard, SegmentedControl,
 } from '@/components/admin/ui/form'
-import { FormSection } from '@/components/admin/ui/layout'
+import { Disclosure, FormSection } from '@/components/admin/ui/layout'
 import { PROPERTY_TYPE_GROUPS, typeLabel } from '@/lib/property-types'
 import { siteFor } from '@/lib/market'
 import { parseCoordinates, type BuildingFormState } from './building-form-state'
@@ -159,29 +158,6 @@ export function BasicsSection({
             </SelectInput>
           </Field>
 
-          {isDevelopment && (
-            <Field
-              label="Listing structure"
-              hint="How the development is organised. Property types are set per unit."
-            >
-              <SelectInput value={f.kind} onChange={(e) => set({ kind: e.target.value })} disabled={disabled}>
-                <option value="STANDALONE">Single property</option>
-                <option value="PROJECT">Project — several units</option>
-                <option value="COMMUNITY">Community / compound</option>
-                <option value="MIXED_USE">Mixed use — residential + commercial</option>
-              </SelectInput>
-            </Field>
-          )}
-
-          <Field
-            label="Who listed it"
-            hint="Only changes how it is labelled and filtered in here."
-          >
-            <SelectInput value={f.source} onChange={(e) => set({ source: e.target.value })} disabled={disabled}>
-              <option value="ADMIN">Our office</option>
-              <option value="OWNER">The property owner</option>
-            </SelectInput>
-          </Field>
         </FieldGrid>
 
         {/* Publishing is a decision, not a dropdown among dropdowns — it is the
@@ -237,6 +213,33 @@ export function BasicsSection({
             disabled={disabled}
           />
         </Field>
+
+        {/* Two dropdowns that are right by default and almost never touched.
+            Leaving them in the open cost as much attention as the title. */}
+        <Disclosure
+          label="More"
+          hint={isDevelopment ? 'How the development is organised · who listed it' : 'Who listed it'}
+        >
+          {isDevelopment && (
+            <Field
+              label="Listing structure"
+              hint="How the development is organised. Property types are set per unit."
+            >
+              <SelectInput value={f.kind} onChange={(e) => set({ kind: e.target.value })} disabled={disabled}>
+                <option value="STANDALONE">Single property</option>
+                <option value="PROJECT">Project — several units</option>
+                <option value="COMMUNITY">Community / compound</option>
+                <option value="MIXED_USE">Mixed use — residential + commercial</option>
+              </SelectInput>
+            </Field>
+          )}
+          <Field label="Who listed it" hint="Only changes how it is labelled and filtered in here.">
+            <SelectInput value={f.source} onChange={(e) => set({ source: e.target.value })} disabled={disabled}>
+              <option value="ADMIN">Our office</option>
+              <option value="OWNER">The property owner</option>
+            </SelectInput>
+          </Field>
+        </Disclosure>
       </div>
     </FormSection>
   )
@@ -298,23 +301,14 @@ export function LocationSection({ f, set, disabled, errors }: SectionProps & { e
         />
         {errors?.location && <InlineNote tone="error">{errors.location}</InlineNote>}
 
-        <FieldGrid cols={3}>
-          <Field label="Street address" optional span={2}>
-            <TextInput
-              value={f.address}
-              onChange={(e) => set({ address: e.target.value })}
-              placeholder="Building, street"
-              disabled={disabled}
-            />
-          </Field>
-          <Field label="Post code" optional>
-            <TextInput
-              value={f.zipCode}
-              onChange={(e) => set({ zipCode: e.target.value })}
-              disabled={disabled}
-            />
-          </Field>
-        </FieldGrid>
+        <Field label="Street address" optional>
+          <TextInput
+            value={f.address}
+            onChange={(e) => set({ address: e.target.value })}
+            placeholder="Building, street"
+            disabled={disabled}
+          />
+        </Field>
 
         <Field
           label="Google Maps link"
@@ -352,33 +346,37 @@ export function LocationSection({ f, set, disabled, errors }: SectionProps & { e
               Clear
             </button>
           </div>
-        ) : (
-          <details className="text-sm">
-            <summary className="cursor-pointer text-xs text-slate-400 hover:text-slate-600">
-              Enter coordinates by hand instead
-            </summary>
-            <FieldGrid cols={2} className="mt-2">
-              <Field label="Latitude" optional>
-                <NumberInput
-                  step="any"
-                  value={f.latitude}
-                  onChange={(e) => set({ latitude: e.target.value })}
-                  placeholder="33.8886"
-                  disabled={disabled}
-                />
-              </Field>
-              <Field label="Longitude" optional>
-                <NumberInput
-                  step="any"
-                  value={f.longitude}
-                  onChange={(e) => set({ longitude: e.target.value })}
-                  placeholder="35.4955"
-                  disabled={disabled}
-                />
-              </Field>
-            </FieldGrid>
-          </details>
-        )}
+        ) : null}
+
+        <Disclosure label="More" hint="Post code · coordinates by hand">
+          <Field label="Post code" optional className="max-w-xs">
+            <TextInput
+              value={f.zipCode}
+              onChange={(e) => set({ zipCode: e.target.value })}
+              disabled={disabled}
+            />
+          </Field>
+          <FieldGrid cols={2}>
+            <Field label="Latitude" optional>
+              <NumberInput
+                step="any"
+                value={f.latitude}
+                onChange={(e) => set({ latitude: e.target.value })}
+                placeholder="33.8886"
+                disabled={disabled}
+              />
+            </Field>
+            <Field label="Longitude" optional>
+              <NumberInput
+                step="any"
+                value={f.longitude}
+                onChange={(e) => set({ longitude: e.target.value })}
+                placeholder="35.4955"
+                disabled={disabled}
+              />
+            </Field>
+          </FieldGrid>
+        </Disclosure>
       </div>
     </FormSection>
   )
@@ -437,7 +435,7 @@ export function SpecsSection({ f, set, disabled, residential }: SectionProps & {
         </FieldGrid>
 
         <div>
-          <p className="mb-2 text-sm font-medium text-slate-700">Amenities</p>
+          <p className="mb-2.5 text-sm font-medium text-slate-700">Amenities</p>
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
             {amenities.map(({ key, label }) => (
               <CheckboxCard
@@ -491,130 +489,37 @@ export function HighlightsSection({ f, set, disabled }: SectionProps) {
 export function MediaSection({
   f, set, disabled, buildingId, deleteFromStorage = true,
 }: SectionProps & { buildingId?: string; deleteFromStorage?: boolean }) {
-  const apiUrl = normalizeApiUrl(process.env.NEXT_PUBLIC_API_URL || '')
-  const videoRef = useRef<HTMLInputElement>(null)
-  const [uploadingVideo, setUploadingVideo] = useState(false)
-  const [videoError, setVideoError] = useState<string | null>(null)
-
   // Group uploads under buildings/<slug>/… in R2. Prefer the title (readable
   // folders); fall back to the id for a brand-new untitled property so files
   // still get a stable home.
   const slug = (f.title.trim() || buildingId || '').trim()
 
-  async function uploadVideo(file: File) {
-    setUploadingVideo(true)
-    setVideoError(null)
-    try {
-      const fd = new FormData()
-      fd.append('file', file)
-      if (slug) fd.append('propertySlug', slug)
-      const res = await fetch(`${apiUrl}/api/upload/video`, { method: 'POST', credentials: 'include', body: fd })
-      const d = await res.json().catch(() => ({}))
-      if (res.ok && d.url) set({ videoUrl: d.url })
-      else setVideoError(d.message || d.error || 'Video upload failed')
-    } catch {
-      setVideoError('Video upload failed')
-    } finally {
-      setUploadingVideo(false)
-    }
-  }
-
   return (
     <FormSection
       id="media"
       title="Photos & video"
-      description="The first photo is the cover — it is what every card, search result and share link shows."
+      description="Drop everything in one place. The first photo is the cover — it is what every card, search result and share link shows."
       icon={<ImageIcon className="h-4 w-4" />}
     >
-      <div className="space-y-6">
-        <ImageManager
-          value={f.images}
-          onChange={(images) => set({ images })}
-          folder="buildings"
-          propertySlug={slug}
-          deleteFromStorage={deleteFromStorage}
-          disabled={disabled}
-        />
-
-        <div className="space-y-4 border-t border-slate-100 pt-5">
-          <Field
-            label="Property video"
-            optional
-            hint="Uploaded video or a YouTube link — either plays in the gallery."
-            error={videoError ?? undefined}
-          >
-            {f.videoUrl ? (
-              <div className="flex min-h-11 items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
-                <Video className="h-4 w-4 shrink-0 text-slate-500" />
-                <span className="flex-1 truncate">{f.videoUrl}</span>
-                <button
-                  type="button"
-                  onClick={() => set({ videoUrl: '' })}
-                  aria-label="Remove video"
-                  className="text-slate-400 transition-colors hover:text-red-600"
-                >
-                  <X className="h-4 w-4" />
-                </button>
-              </div>
-            ) : (
-              <div className="space-y-2">
-                <TextInput
-                  type="url"
-                  value={f.videoUrl}
-                  onChange={(e) => set({ videoUrl: e.target.value })}
-                  placeholder="https://youtube.com/watch?v=…"
-                  disabled={disabled}
-                />
-                <button
-                  type="button"
-                  onClick={() => videoRef.current?.click()}
-                  disabled={uploadingVideo || disabled}
-                  className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50"
-                >
-                  {uploadingVideo ? <Loader2 className="h-4 w-4 animate-spin" /> : <Video className="h-4 w-4" />}
-                  {uploadingVideo ? 'Uploading…' : 'Or upload a video file'}
-                </button>
-              </div>
-            )}
-            <input
-              ref={videoRef}
-              type="file"
-              accept="video/mp4,video/webm,video/quicktime"
-              className="hidden"
-              onChange={(e) => { if (e.target.files?.[0]) uploadVideo(e.target.files[0]); e.target.value = '' }}
-            />
-          </Field>
-
-          {/* `youtubeUrls` and `virtualTourUrl` are columns the schema has always
-              had and no admin screen ever wrote to. */}
-          <Field
-            label="More YouTube videos"
-            optional
-            hint="Extra clips — a walkthrough, a drone pass, the neighbourhood."
-          >
-            <ChipsInput
-              value={f.youtubeUrls}
-              onChange={(youtubeUrls) => set({ youtubeUrls })}
-              placeholder="https://youtube.com/watch?v=…"
-              disabled={disabled}
-            />
-          </Field>
-
-          <Field
-            label="Virtual tour link"
-            optional
-            hint="Matterport, Kuula or any 360° tour."
-          >
-            <TextInput
-              type="url"
-              value={f.virtualTourUrl}
-              onChange={(e) => set({ virtualTourUrl: e.target.value })}
-              placeholder="https://my.matterport.com/show/?m=…"
-              disabled={disabled}
-            />
-          </Field>
-        </div>
-      </div>
+      {/* One dropzone for photos and video, one box for links.
+          This was four controls — a photo dropzone, an "upload a video" button,
+          a YouTube field and a virtual-tour field — sitting next to each other
+          with no visible reason to pick one over another. They are four database
+          columns, which is not a reason. */}
+      <ImageManager
+        value={f.images}
+        onChange={(images) => set({ images })}
+        folder="buildings"
+        propertySlug={slug}
+        deleteFromStorage={deleteFromStorage}
+        disabled={disabled}
+        media={{
+          videoUrl: f.videoUrl,
+          youtubeUrls: f.youtubeUrls,
+          virtualTourUrl: f.virtualTourUrl,
+          onChange: (patch) => set(patch),
+        }}
+      />
     </FormSection>
   )
 }
@@ -633,14 +538,14 @@ export function InvestmentSection({ f, set, disabled }: SectionProps) {
       description="What an investor is shown. Leave it empty and the property simply shows no figures."
       icon={<Coins className="h-4 w-4" />}
     >
-      <div className="space-y-5">
+      <div className="space-y-6">
         <InlineNote tone="info">
           These are the numbers on the ROI badge on every card, and the figures the
           AI search sorts by. Until now there was nowhere in the back office to enter them.
         </InlineNote>
 
         <div>
-          <p className="mb-2 text-sm font-medium text-slate-700">Returns</p>
+          <p className="mb-2.5 text-sm font-medium text-slate-700">Returns</p>
           <FieldGrid cols={4}>
             <Field label="Expected ROI" optional hint="Headline figure.">
               <NumberInput
@@ -682,7 +587,7 @@ export function InvestmentSection({ f, set, disabled }: SectionProps) {
         </div>
 
         <div>
-          <p className="mb-2 text-sm font-medium text-slate-700">Money in</p>
+          <p className="mb-2.5 text-sm font-medium text-slate-700">Money in</p>
           <FieldGrid cols={4}>
             <Field label="Entry price" optional hint="Smallest ticket into the project.">
               <MoneyInput
@@ -721,8 +626,15 @@ export function InvestmentSection({ f, set, disabled }: SectionProps) {
           </FieldGrid>
         </div>
 
-        <div>
-          <p className="mb-2 text-sm font-medium text-slate-700">Running costs</p>
+        <Disclosure
+          label="Running costs & delivery dates"
+          hint="Service fee · property tax · completion · handover"
+          badge={
+            [inv.serviceFee, inv.propertyTax, inv.completionDate, inv.handoverDate].filter(Boolean).length
+              ? `${[inv.serviceFee, inv.propertyTax, inv.completionDate, inv.handoverDate].filter(Boolean).length} set`
+              : undefined
+          }
+        >
           <FieldGrid cols={2}>
             <Field label="Service fee" optional hint="Per year.">
               <MoneyInput
@@ -741,33 +653,33 @@ export function InvestmentSection({ f, set, disabled }: SectionProps) {
               />
             </Field>
           </FieldGrid>
-        </div>
 
-        <div>
-          <p className="mb-2 flex items-center gap-1.5 text-sm font-medium text-slate-700">
-            <CalendarClock className="h-3.5 w-3.5 text-slate-400" /> Delivery
-          </p>
-          <FieldGrid cols={2}>
-            <Field label="Completion date" optional hint="When the building is finished.">
-              <TextInput
-                type="date"
-                value={inv.completionDate}
-                onChange={(e) => setInv({ completionDate: e.target.value })}
-                disabled={disabled}
-              />
-            </Field>
-            <Field label="Handover date" optional hint="When keys go to the buyer.">
-              <TextInput
-                type="date"
-                value={inv.handoverDate}
-                onChange={(e) => setInv({ handoverDate: e.target.value })}
-                disabled={disabled}
-              />
-            </Field>
-          </FieldGrid>
-        </div>
+          <div>
+            <p className="mb-2.5 flex items-center gap-1.5 text-sm font-medium text-slate-700">
+              <CalendarClock className="h-3.5 w-3.5 text-slate-400" /> Delivery
+            </p>
+            <FieldGrid cols={2}>
+              <Field label="Completion date" optional hint="When the building is finished.">
+                <TextInput
+                  type="date"
+                  value={inv.completionDate}
+                  onChange={(e) => setInv({ completionDate: e.target.value })}
+                  disabled={disabled}
+                />
+              </Field>
+              <Field label="Handover date" optional hint="When keys go to the buyer.">
+                <TextInput
+                  type="date"
+                  value={inv.handoverDate}
+                  onChange={(e) => setInv({ handoverDate: e.target.value })}
+                  disabled={disabled}
+                />
+              </Field>
+            </FieldGrid>
+          </div>
+        </Disclosure>
 
-        <div className="space-y-3 rounded-lg border border-slate-200 bg-slate-50/60 p-4">
+        <div className="space-y-4 rounded-xl border border-slate-200 bg-slate-50/60 p-4">
           <Toggle
             checked={inv.mortgageAvailable}
             onChange={(v) => setInv({ mortgageAvailable: v })}

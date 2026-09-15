@@ -10,6 +10,9 @@ import { normalizeApiUrl } from '@/lib/utils/api-url'
 
 interface Dashboard {
   rangeDays: number
+  site: string
+  /** How the range splits between the two websites, whatever the filter. */
+  bySite: Array<{ site: string; events: number }>
   totals: {
     totalEvents: number
     uniqueVisitors: number
@@ -26,7 +29,7 @@ interface Dashboard {
   }
   byType: Record<string, number>
   series: Array<{ date: string; pageViews: number; listingViews: number }>
-  topListings: Array<{ listingId: string; slug: string | null; label: string; intent: string | null; status: string | null; views: number }>
+  topListings: Array<{ listingId: string; slug: string | null; label: string; intent: string | null; status: string | null; country: string | null; views: number }>
 }
 
 const RANGES = [7, 30, 90]
@@ -42,7 +45,7 @@ const EVENT_LABELS: Record<string, string> = {
   favorite: 'Favorites',
 }
 
-export function BehaviorAnalytics() {
+export function BehaviorAnalytics({ site }: { site?: 'LEBANON' | 'INTERNATIONAL' | null }) {
   const [days, setDays] = useState(30)
   const [data, setData] = useState<Dashboard | null>(null)
   const [loading, setLoading] = useState(true)
@@ -53,7 +56,7 @@ export function BehaviorAnalytics() {
     setError(null)
     try {
       const apiUrl = normalizeApiUrl(process.env.NEXT_PUBLIC_API_URL || '')
-      const res = await fetch(`${apiUrl}/api/analytics/dashboard?days=${days}`, {
+      const res = await fetch(`${apiUrl}/api/analytics/dashboard?days=${days}${site ? `&site=${site}` : ''}`, {
         credentials: 'include',
         cache: 'no-store',
       })
@@ -65,7 +68,7 @@ export function BehaviorAnalytics() {
     } finally {
       setLoading(false)
     }
-  }, [days])
+  }, [days, site])
 
   useEffect(() => { load() }, [load])
 
@@ -77,9 +80,14 @@ export function BehaviorAnalytics() {
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h2 className="text-lg font-semibold text-slate-900 flex items-center gap-2">
-            <Activity className="w-5 h-5 text-violet-600" /> User Behaviour
+            <Activity className="w-5 h-5 text-violet-600" /> User behaviour
           </h2>
-          <p className="text-sm text-slate-500">How visitors browse and engage — first-party, cookie-free.</p>
+          <p className="text-sm text-slate-500">
+            How visitors browse and engage — first-party, cookie-free.
+            {site
+              ? ` ${site === 'LEBANON' ? 'propgrouplb.com' : 'propgrp.com'} only.`
+              : ' Both websites together.'}
+          </p>
         </div>
         <div className="flex rounded-lg border border-slate-200 bg-white overflow-hidden">
           {RANGES.map((r) => (
@@ -110,6 +118,35 @@ export function BehaviorAnalytics() {
         </div>
       ) : (
         <>
+          {/* Which site the activity came from. Shown even when nothing is
+              filtered, because a blended figure with no breakdown is exactly
+              what made these numbers unreadable once there were two sites. */}
+          {(data?.bySite?.length ?? 0) > 0 && (
+            <div className="flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3">
+              <span className="text-xs font-medium text-slate-500">Events by website:</span>
+              {data!.bySite.map((r) => (
+                <span
+                  key={r.site}
+                  className={`rounded-full px-2.5 py-1 text-xs font-medium ${
+                    r.site === 'UNKNOWN'
+                      ? 'bg-amber-50 text-amber-700 border border-amber-200'
+                      : 'bg-slate-100 text-slate-700'
+                  }`}
+                  title={
+                    r.site === 'UNKNOWN'
+                      ? 'Recorded before we started tagging events with their website — counted, but not attributable'
+                      : undefined
+                  }
+                >
+                  {r.site === 'LEBANON' ? '🇱🇧 propgrouplb.com'
+                    : r.site === 'INTERNATIONAL' ? '🌍 propgrp.com'
+                    : '· untagged'}{' '}
+                  {r.events.toLocaleString()}
+                </span>
+              ))}
+            </div>
+          )}
+
           {/* Metric cards */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
             <MetricCard icon={<Users className="w-4 h-4" />} label="Unique Visitors" value={t.uniqueVisitors} accent="text-sky-600" />

@@ -5,6 +5,7 @@ import { authenticateToken, requireAdmin, optionalAuthenticateToken } from '../m
 import { asyncHandler } from '../utils/errors.js';
 import { logger } from '../utils/logger.js';
 import { sendSuccess } from '../utils/response.js';
+import { requestScope, type SiteScope } from '../utils/market.js';
 import type { AuthenticatedRequest } from '../types/index.js';
 
 const router: Router = express.Router();
@@ -56,6 +57,11 @@ router.post(
           userId: authReq.user?.id ?? null,
           referrer: referrer ? referrer.slice(0, 512) : null,
           userAgent: userAgent ? userAgent.slice(0, 512) : null,
+          // Resolved on write, from the same X-Site-Scope / Origin rule the
+          // rest of the API uses. Deciding this later from `referrer` would
+          // guess: it is empty for direct navigation and names the referring
+          // page rather than the site being used.
+          site: requestScope(req),
           meta: (d.meta ?? undefined) as object | undefined,
         },
       });
@@ -75,10 +81,33 @@ router.get(
     const days = Math.min(Math.max(parseInt(String(req.query.days ?? '30'), 10) || 30, 1), 365);
     const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
 
+    // One back office, two websites. `?site=` narrows to one; anything else
+    // reports both together, and `bySite` below always says how they split —
+    // a blended figure with no breakdown is what made this unreadable.
+    const asked = String(req.query.site ?? '').toUpperCase();
+    const site: SiteScope | null =
+      asked === 'LEBANON' || asked === 'INTERNATIONAL' ? (asked as SiteScope) : null;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const scope: Record<string, any> = { createdAt: { gte: since }, ...(site ? { site } : {}) };
+    // Raw SQL can't take the Prisma filter object, so it gets the value.
+    const siteSql = site ?? null;
+
+    // How the whole range splits between the two sites, whatever the filter.
+    const bySiteRaw = await prisma.analyticsEvent.groupBy({
+      by: ['site'],
+      where: { createdAt: { gte: since } },
+      _count: { _all: true },
+    });
+    const bySite = bySiteRaw.map((r) => ({
+      // Events recorded before the column existed genuinely don't know.
+      site: r.site ?? 'UNKNOWN',
+      events: r._count._all,
+    }));
+
     // Totals by event type
     const byTypeRaw = await prisma.analyticsEvent.groupBy({
       by: ['type'],
-      where: { createdAt: { gte: since } },
+      where: scope,
       _count: { type: true },
     });
     const byType: Record<string, number> = {};
@@ -88,7 +117,9 @@ router.get(
     const uniqueRows = await prisma.$queryRaw<Array<{ count: bigint }>>`
       SELECT COUNT(DISTINCT "sessionId") AS count
       FROM analytics_events
-      WHERE "createdAt" >= ${since} AND "sessionId" IS NOT NULL`;
+      WHERE "createdAt" >= ${since}
+        AND "sessionId" IS NOT NULL
+        AND (${siteSql}::text IS NULL OR "site" = ${siteSql}::text)`;
     const uniqueVisitors = Number(uniqueRows[0]?.count ?? 0);
     const totalEvents = Object.values(byType).reduce((a, b) => a + b, 0);
 
@@ -96,7 +127,9 @@ router.get(
     const seriesRows = await prisma.$queryRaw<Array<{ day: Date; type: string; count: bigint }>>`
       SELECT date_trunc('day', "createdAt") AS day, type, COUNT(*) AS count
       FROM analytics_events
-      WHERE "createdAt" >= ${since} AND type IN ('page_view', 'listing_view')
+      WHERE "createdAt" >= ${since}
+        AND type IN ('page_view', 'listing_view')
+        AND (${siteSql}::text IS NULL OR "site" = ${siteSql}::text)
       GROUP BY day, type
       ORDER BY day ASC`;
     const seriesMap = new Map<string, { date: string; pageViews: number; listingViews: number }>();
@@ -112,7 +145,7 @@ router.get(
     // Top viewed listings
     const topAgg = await prisma.analyticsEvent.groupBy({
       by: ['listingId'],
-      where: { type: 'listing_view', listingId: { not: null }, createdAt: { gte: since } },
+      where: { ...scope, type: 'listing_view', listingId: { not: null } },
       _count: { listingId: true },
       orderBy: { _count: { listingId: 'desc' } },
       take: 10,
@@ -123,8 +156,8 @@ router.get(
           where: { id: { in: topIds } },
           select: {
             id: true, slug: true, headline: true, intent: true, status: true,
-            building: { select: { title: true } },
-            unit: { select: { name: true, unitNumber: true } },
+            building: { select: { title: true, country: true } },
+            unit: { select: { name: true, unitNumber: true, building: { select: { country: true } } } },
           },
         })
       : [];
@@ -143,6 +176,8 @@ router.get(
         label,
         intent: l?.intent ?? null,
         status: l?.status ?? null,
+        // A listing belongs to a market through whatever property it sells.
+        country: l?.building?.country ?? l?.unit?.building?.country ?? null,
         views: r._count.listingId,
       };
     });
@@ -154,6 +189,8 @@ router.get(
 
     sendSuccess(res, {
       rangeDays: days,
+      site: site ?? 'all',
+      bySite,
       totals: {
         totalEvents,
         uniqueVisitors,

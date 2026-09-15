@@ -802,8 +802,21 @@ model ContactMessage {
   subject   String?
   message   String
   isRead    Boolean  @default(false)
+
+  // Which website the message came from: LEBANON | INTERNATIONAL.
+  //
+  // propgrp.com forwards all of its leads here server-side, so without this
+  // every Georgian enquiry was indistinguishable from a Beirut one. Property
+  // enquiries could be traced through the "Project enquiry: PG-####" subject
+  // line; a plain contact form could not be traced at all.
+  //
+  // Nullable for the same reason as AnalyticsEvent.site — messages that predate
+  // the column don't know where they came from.
+  site      String?
+
   createdAt DateTime @default(now())
 
+  @@index([site])
   @@map("contact_messages")
 }
 
@@ -1354,12 +1367,28 @@ model AnalyticsEvent {
   referrer   String?
   userAgent  String?
   meta       Json?
+
+  // Which of the two websites this happened on: LEBANON | INTERNATIONAL.
+  //
+  // Both sites post to the same /track endpoint and every event landed in one
+  // undifferentiated pile, so "12,400 page views" was propgrouplb.com and
+  // propgrp.com added together with no way to pull them apart. Resolved on
+  // write by `requestScope(req)` — the same X-Site-Scope / Origin rule the rest
+  // of the API uses — rather than inferred later from `referrer`, which is
+  // empty for direct navigation and names the referring page, not this site.
+  //
+  // Nullable on purpose: events recorded before this column existed genuinely
+  // do not know, and reporting them as Lebanese would be a guess dressed as a
+  // fact. They are counted and labelled "unknown".
+  site       String?
+
   createdAt  DateTime @default(now())
 
   @@index([type])
   @@index([createdAt])
   @@index([listingId])
   @@index([sessionId])
+  @@index([site, createdAt])
   @@map("analytics_events")
 }
 

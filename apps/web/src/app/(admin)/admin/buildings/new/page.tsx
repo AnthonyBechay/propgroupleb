@@ -1,5 +1,5 @@
-import { CreatePropertyForm } from '../CreatePropertyForm'
+import { PropertyForm } from '../PropertyForm'
 
 export default function NewPropertyPage() {
-  return <CreatePropertyForm />
+  return <PropertyForm />
 }

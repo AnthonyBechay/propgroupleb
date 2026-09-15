@@ -4,6 +4,15 @@
 // run first. Once regenerated the types will be correct. The `as const` on each
 // object still provides full IDE inference via satisfies/const assertion.
 
+/**
+ * The listing states a visitor may be shown.
+ *
+ * Hoisted and explicitly typed rather than written inline: the includes below
+ * end in `as const`, which would make an inline array `readonly` and Prisma's
+ * generated `in` filter only accepts a mutable one.
+ */
+const LIVE_LISTING_STATUSES: Array<'ACTIVE' | 'UNDER_OFFER'> = ['ACTIVE', 'UNDER_OFFER'];
+
 // ── Building includes ─────────────────────────────────────────────────────────
 
 /** Narrow include for building list views (public cards, admin tables). */
@@ -65,9 +74,47 @@ export const BUILDING_DETAIL_INCLUDE = {
     },
     orderBy: { createdAt: 'desc' as const },
   },
+  // Listings, on the building and nested on each unit.
+  //
+  // These were absent, and the omission was silent and expensive. The Georgia
+  // storefront hydrates every project through this include and derives its
+  // price with `derivePrice(listings, units)`, which prefers an explicit
+  // listing price and only falls back to `pricePerSqm x area`. With no
+  // listings in the payload the first branch could never fire, so a property
+  // priced the way the back office prices things — a Listing on a unit —
+  // derived **0** and the storefront showed no price at all.
+  //
+  // It went unnoticed because the imported Georgian stock is priced by unit
+  // option (per m²), which takes the second branch and works. Only a newly
+  // created project hits it.
+  //
+  // Narrowed to what may actually be shown: a DRAFT or HIDDEN listing is a
+  // price the admin has not published, and quoting it as the project's "from"
+  // price would publish it.
+  listings: {
+    where: {
+      status: { in: LIVE_LISTING_STATUSES },
+      visibility: { not: 'HIDDEN' as const },
+    },
+    select: {
+      id: true, slug: true, intent: true, status: true, visibility: true,
+      price: true, currency: true, rentPeriod: true, negotiable: true,
+      headline: true, unitId: true,
+    },
+  },
   units: {
     include: {
       options: true,
+      listings: {
+        where: {
+          status: { in: LIVE_LISTING_STATUSES },
+          visibility: { not: 'HIDDEN' as const },
+        },
+        select: {
+          id: true, slug: true, intent: true, status: true,
+          price: true, currency: true, rentPeriod: true, negotiable: true,
+        },
+      },
     },
     orderBy: { floor: 'asc' as const },
   },

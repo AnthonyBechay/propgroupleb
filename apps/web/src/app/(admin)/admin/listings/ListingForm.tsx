@@ -66,7 +66,10 @@ export function ListingForm({ initialData, listingId, buildings, preselect }: Pr
   const [aiLoading, setAiLoading] = useState(false)
 
   const [form, setForm] = useState({
-    subjectType: initialData?.subjectType ?? (preselect?.subjectType || 'BUILDING'),
+    // A new listing is always unit-level. `?subjectType=BUILDING` is ignored
+    // rather than honoured — the option is gone from the UI, and a stale
+    // bookmark shouldn't be the one way left to create one.
+    subjectType: initialData?.subjectType ?? 'UNIT',
     buildingId: initialData?.buildingId ?? initialData?.building?.id ?? preselect?.buildingId ?? '',
     unitId: initialData?.unitId ?? initialData?.unit?.id ?? preselect?.unitId ?? '',
     intent: initialData?.intent ?? 'FOR_SALE',
@@ -220,18 +223,14 @@ export function ListingForm({ initialData, listingId, buildings, preselect }: Pr
             description="A listing sells either a whole property or one unit inside it."
             icon={<Building2 className="h-4 w-4" />}
           >
-            <div className="space-y-4">
-              <Field label="Listing covers">
-                <SegmentedControl
-                  value={form.subjectType}
-                  onChange={(v) => set({ subjectType: v, unitId: '' })}
-                  options={[
-                    { value: 'BUILDING', label: 'The whole property' },
-                    { value: 'UNIT', label: 'One unit' },
-                  ]}
-                />
-              </Field>
-
+            <div className="space-y-5">
+              {/* The "whole property" option is gone. `subjectType: BUILDING`
+                  said the same thing as a unit of kind WHOLE_BUILDING, and
+                  having two ways to say it meant a property's price could come
+                  from either — or from both at once, disagreeing. To sell a
+                  building entire, give it one WHOLE_BUILDING unit and list
+                  that. Existing building-level listings still open and edit
+                  here; only creating new ones is closed off. */}
               <Field label="Property" required>
                 <SelectInput
                   value={form.buildingId}

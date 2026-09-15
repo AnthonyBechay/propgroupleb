@@ -61,13 +61,36 @@ async function generateUniqueSlug(
 // re-fetched for areas and options). Here units and options come back in the
 // same query.
 
+/** The listing states a visitor may be shown. See the note below. */
+const LIVE_LISTING_STATUSES: Array<'ACTIVE' | 'UNDER_OFFER'> = ['ACTIVE', 'UNDER_OFFER'];
+
 /** Everything the flat shape needs, in one query. */
 const FLAT_PROPERTY_INCLUDE = {
   developer: true,
   locationGuide: true,
   investmentData: true,
-  listings: true,
-  units: { include: { options: true }, orderBy: { floor: 'asc' as const } },
+  // Narrowed from `listings: true`. `derivePrice` takes the lowest listing
+  // price in preference to anything else, so an unfiltered include let a DRAFT
+  // or HIDDEN listing — a price the admin has deliberately not published —
+  // become the "from $X" figure on a public card.
+  listings: {
+    where: {
+      status: { in: LIVE_LISTING_STATUSES },
+      visibility: { not: 'HIDDEN' as const },
+    },
+  },
+  units: {
+    include: {
+      options: true,
+      listings: {
+        where: {
+          status: { in: LIVE_LISTING_STATUSES },
+          visibility: { not: 'HIDDEN' as const },
+        },
+      },
+    },
+    orderBy: { floor: 'asc' as const },
+  },
 } as const;
 
 /** Filters that can only be applied after mapping, because the values they

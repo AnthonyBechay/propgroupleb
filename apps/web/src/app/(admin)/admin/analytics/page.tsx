@@ -11,11 +11,19 @@ import {
   Eye,
   MapPin,
 } from 'lucide-react'
+import Link from 'next/link'
 import { normalizeApiUrl } from '@/lib/utils/api-url'
 import { cookies } from 'next/headers'
 import { BehaviorAnalytics } from './BehaviorAnalytics'
 
-async function fetchAdminStats() {
+type Market = 'all' | 'LEBANON' | 'INTERNATIONAL'
+
+/** Which website a record belongs to, via its property's country. */
+function bucketOf(country?: string | null): 'LEBANON' | 'INTERNATIONAL' {
+  return (country ?? 'LEBANON') === 'LEBANON' ? 'LEBANON' : 'INTERNATIONAL'
+}
+
+async function fetchAdminStats(market: Market) {
   const apiUrl = normalizeApiUrl(process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001')
   const cookieStore = await cookies()
   const token = cookieStore.get('token')?.value
@@ -31,23 +39,55 @@ async function fetchAdminStats() {
   }
 
   const [buildingsRes, listingsRes, inquiriesRes, usersRes] = await Promise.all([
-    fetchJson('/api/buildings?limit=200'),
-    fetchJson('/api/listings?limit=200&status=all'),
-    fetchJson('/api/inquiries?limit=200'),
-    fetchJson('/api/users?limit=200'),
+    // `country=all` and `visibility=all` are stated rather than relied upon.
+    // The market filter defaults to Lebanon for anyone it can't identify as an
+    // admin, so a request that lost its cookie would silently report half the
+    // catalogue as the whole of it — and look entirely plausible doing it.
+    fetchJson('/api/buildings?limit=500&visibility=all&country=all'),
+    fetchJson('/api/listings?limit=500&status=all&country=all'),
+    fetchJson('/api/inquiries?limit=500'),
+    fetchJson('/api/users?limit=500'),
   ])
 
-  const buildings: any[] = buildingsRes?.data ?? []
-  const listings: any[] = listingsRes?.data ?? []
-  const inquiries: any[] = inquiriesRes?.data ?? []
+  const allBuildings: any[] = buildingsRes?.data ?? []
+  const allListings: any[] = listingsRes?.data ?? []
+  const allInquiries: any[] = inquiriesRes?.data ?? []
   const users: any[] = usersRes?.data ?? []
 
+  // A listing or an enquiry sits in a market through whichever property it
+  // belongs to; a user sits in neither.
+  const listingCountry = (l: any) => l.building?.country ?? l.unit?.building?.country ?? null
+  const inquiryCountry = (i: any) => i.building?.country ?? null
+
+  const inScope = (country: string | null | undefined) =>
+    market === 'all' || bucketOf(country) === market
+
+  const buildings = allBuildings.filter((b: any) => inScope(b.country))
+  const listings = allListings.filter((l: any) => inScope(listingCountry(l)))
+  // An enquiry with no property belongs to neither site, so a narrowed view
+  // leaves it out rather than assigning it to one.
+  const inquiries = market === 'all'
+    ? allInquiries
+    : allInquiries.filter((i: any) => i.building && inScope(inquiryCountry(i)))
+
   // --- Aggregates ---
-  const totalBuildings = buildingsRes?.pagination?.total ?? buildings.length
-  const totalListings = listingsRes?.pagination?.total ?? listings.length
-  const totalInquiries = inquiriesRes?.pagination?.total ?? inquiries.length
+  // Counted from the rows themselves, not from `pagination.total`, because the
+  // total is unscoped and would contradict every other figure on the page the
+  // moment a market is selected.
+  const totalBuildings = buildings.length
+  const totalListings = listings.length
+  const totalInquiries = inquiries.length
   const totalUsers = usersRes?.pagination?.total ?? users.length
   const totalViews = buildings.reduce((sum: number, b: any) => sum + (b.views ?? 0), 0)
+  const marketSplit = (['LEBANON', 'INTERNATIONAL'] as const).map((m) => ({
+    market: m,
+    site: m === 'LEBANON' ? 'propgrouplb.com' : 'propgrp.com',
+    buildings: allBuildings.filter((b: any) => bucketOf(b.country) === m).length,
+    listings: allListings.filter((l: any) => bucketOf(listingCountry(l)) === m).length,
+    views: allBuildings
+      .filter((b: any) => bucketOf(b.country) === m)
+      .reduce((sum: number, b: any) => sum + (b.views ?? 0), 0),
+  }))
 
   const forSale = listings.filter((l: any) => l.intent === 'FOR_SALE')
   const forRent = listings.filter((l: any) => l.intent === 'FOR_RENT')
@@ -58,12 +98,19 @@ async function fetchAdminStats() {
     statusCounts[l.status] = (statusCounts[l.status] ?? 0) + 1
   })
 
-  // By mohafazat (region)
+  // Where the stock is.
+  //
+  // This used to count `mohafazat` — a Lebanese governorate. Georgian buildings
+  // have none, so every one of them fell out of the chart silently: the
+  // "Buildings by Region" card showed Lebanon and quietly called it the
+  // portfolio. Lebanon keeps its governorates, everything else is grouped by
+  // city, and each is labelled with the site it belongs to.
   const regionCounts: Record<string, number> = {}
   buildings.forEach((b: any) => {
-    if (b.mohafazat) {
-      regionCounts[b.mohafazat] = (regionCounts[b.mohafazat] ?? 0) + 1
-    }
+    const key = bucketOf(b.country) === 'LEBANON'
+      ? (b.mohafazat || b.city || 'Unspecified')
+      : (b.city || b.country || 'Unspecified')
+    regionCounts[key] = (regionCounts[key] ?? 0) + 1
   })
 
   // Price stats from active listings
@@ -107,14 +154,21 @@ async function fetchAdminStats() {
   return {
     totalBuildings, totalListings, totalInquiries, totalUsers, totalViews,
     forSaleCount: forSale.length, forRentCount: forRent.length,
-    statusCounts, regionCounts, priceRange,
+    statusCounts, regionCounts, priceRange, marketSplit,
     monthlyInquiryCounts, userGrowthData,
     recentInquiries, recentUsers,
   }
 }
 
-export default async function AnalyticsPage() {
-  const stats = await fetchAdminStats()
+export default async function AnalyticsPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | undefined>>
+}) {
+  const sp = await searchParams
+  const asked = (sp.market ?? '').toUpperCase()
+  const market: Market = asked === 'LEBANON' || asked === 'INTERNATIONAL' ? asked : 'all'
+  const stats = await fetchAdminStats(market)
 
   const maxInquiryCount = Math.max(...stats.monthlyInquiryCounts.map(m => m.count), 1)
   const maxUserCount = Math.max(...stats.userGrowthData.map(m => m.count), 1)
@@ -131,18 +185,63 @@ export default async function AnalyticsPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div>
-        <h1 className="text-3xl font-black text-slate-900 flex items-center gap-3">
-          <div className="w-10 h-10 bg-slate-800 rounded-xl flex items-center justify-center shadow-md">
-            <BarChart3 className="h-6 w-6 text-white" />
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h1 className="text-xl font-bold text-slate-900 sm:text-2xl">Analytics</h1>
+          <p className="mt-0.5 text-sm text-slate-500">
+            {market === 'all'
+              ? 'Both websites together. Pick one to see it on its own.'
+              : `${market === 'LEBANON' ? 'propgrouplb.com' : 'propgrp.com'} only.`}
+          </p>
+        </div>
+        {/* Links rather than state: this is a server component, and the market
+            belongs in the URL so a filtered view can be shared or bookmarked. */}
+        <nav className="inline-flex rounded-lg border border-slate-200 bg-slate-50 p-1" aria-label="Market">
+          {([
+            { value: 'all', label: 'Both' },
+            { value: 'LEBANON', label: '🇱🇧 Lebanon' },
+            { value: 'INTERNATIONAL', label: '🌍 International' },
+          ] as const).map((o) => (
+            <Link
+              key={o.value}
+              href={o.value === 'all' ? '/admin/analytics' : `/admin/analytics?market=${o.value}`}
+              aria-current={market === o.value ? 'page' : undefined}
+              className={`min-h-9 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
+                market === o.value
+                  ? 'bg-white text-slate-900 shadow-sm'
+                  : 'text-slate-500 hover:text-slate-800'
+              }`}
+            >
+              {o.label}
+            </Link>
+          ))}
+        </nav>
+      </div>
+
+      {/* How the catalogue splits, whatever the filter — the question this page
+          exists to answer now that one back office runs two websites. */}
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        {stats.marketSplit.map((m) => (
+          <div
+            key={m.market}
+            className={`rounded-xl border p-4 ${
+              market === m.market ? 'border-slate-800 bg-slate-50' : 'border-slate-200 bg-white'
+            }`}
+          >
+            <p className="text-sm font-semibold text-slate-900">
+              {m.market === 'LEBANON' ? '🇱🇧' : '🌍'} {m.site}
+            </p>
+            <div className="mt-2 flex flex-wrap gap-x-5 gap-y-1 text-xs text-slate-500">
+              <span><strong className="text-slate-800">{m.buildings.toLocaleString()}</strong> properties</span>
+              <span><strong className="text-slate-800">{m.listings.toLocaleString()}</strong> listings</span>
+              <span><strong className="text-slate-800">{m.views.toLocaleString()}</strong> views</span>
+            </div>
           </div>
-          Analytics Dashboard
-        </h1>
-        <p className="mt-2 text-slate-600">Platform performance and engagement metrics.</p>
+        ))}
       </div>
 
       {/* User behaviour (first-party event tracking) */}
-      <BehaviorAnalytics />
+      <BehaviorAnalytics site={market === 'all' ? null : market} />
 
       {/* Key Metrics */}
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
@@ -237,7 +336,7 @@ export default async function AnalyticsPage() {
             <div className="w-8 h-8 bg-slate-800 rounded-lg flex items-center justify-center">
               <MapPin className="h-5 w-5 text-white" />
             </div>
-            Buildings by Region
+            Where the stock is
           </h3>
           <div className="space-y-3">
             {Object.entries(stats.regionCounts)

@@ -1,9 +1,9 @@
 /**
  * One shape for the property form, shared by create and edit.
  *
- * There were two forms — `CreatePropertyForm` and `BuildingForm` — each with
- * its own state object, its own payload builder and its own opinion about
- * which fields a property has. They had drifted badly:
+ * There were two forms — a create wizard and an edit screen — each with its own
+ * state object, its own payload builder and its own opinion about which fields
+ * a property has. They had drifted badly:
  *
  *  - Create offered a "Generator" and "Solar power" checkbox for a Georgian
  *    property; edit correctly hid both (they are a Lebanese concern).
@@ -12,8 +12,9 @@
  *    save, but rendered no input for either — dead state that could only ever
  *    write back what it was given.
  *
- * Both now build from `emptyBuildingForm` and submit `buildingPayload`, so a
- * field added here appears on both screens and is saved the same way by each.
+ * They are one screen now (`PropertyForm`), built from `emptyBuildingForm` and
+ * submitted through `buildingPayload`, so a field added here can only appear
+ * and be saved one way.
  */
 
 import type { PaymentPlan } from '@/components/admin/PaymentPlansEditor'

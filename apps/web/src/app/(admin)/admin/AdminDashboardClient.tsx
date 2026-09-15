@@ -1,402 +1,527 @@
 'use client'
 
-import { useAuth } from '@/contexts/AuthContext'
-import { useEffect, useState } from 'react'
-import { countryFlag, siteFor } from '@/lib/market'
-import {
-  Building2,
-  Users,
-  Heart,
-  FileText,
-  Shield,
-  MessageSquare,
-  Inbox,
-  TrendingUp,
-  ArrowUpRight,
-  Clock,
-  MapPin,
-} from 'lucide-react'
-import { apiClient } from '@/lib/api/client'
+import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
+import {
+  Building2, Clock, Eye, FileText, Globe, Heart, Inbox, Layers, ListChecks,
+  MapPin, MessageSquare, Users,
+} from 'lucide-react'
+import { normalizeApiUrl } from '@/lib/utils/api-url'
+import { EmptyState, FormSection, PageHeader, StatCard } from '@/components/admin/ui/layout'
+import { SegmentedControl } from '@/components/admin/ui/form'
+import { countryFlag, siteFor } from '@/lib/market'
+import { cn } from '@/lib/utils'
+
+type Market = 'all' | 'LEBANON' | 'INTERNATIONAL'
+
+interface MarketRow {
+  market: 'LEBANON' | 'INTERNATIONAL'
+  site: string
+  buildings: number
+  units: number
+  activeListings: number
+  inquiries: number
+  views: number
+}
 
 interface DashboardData {
+  market: string
   overview: {
-    totalBuildings: number
     totalUsers: number
-    totalFavorites: number
+    totalBuildings: number
+    totalUnits: number
+    activeListings: number
+    totalViews: number
     totalInquiries: number
+    totalFavorites: number
     totalContactMessages: number
     totalDocuments: number
+    unattributedInquiries: number
+    unattributedContacts: number
   }
   trends: {
     newUsersThisWeek: number
     newInquiriesThisWeek: number
-    newUsersThisMonth: number
-    newInquiriesThisMonth: number
+    newBuildingsThisWeek: number
   }
   recent: {
-    users: Array<{ id: string; email: string; firstName?: string; lastName?: string; role: string; createdAt: string }>
-    inquiries: Array<{ id: string; name: string; email: string; buildingTitle?: string; status: string; createdAt: string; building?: { id: string; title: string } }>
-    buildings: Array<{ id: string; title: string; city?: string; status: string; createdAt: string }>
-    contacts: Array<{ id: string; name: string; email: string; subject?: string; createdAt: string }>
+    users: Array<{ id: string; email: string; firstName?: string; lastName?: string; createdAt: string }>
+    inquiries: Array<{ id: string; name: string; email: string; buildingTitle?: string; status: string; createdAt: string; building?: { id: string; title: string; country?: string } }>
+    buildings: Array<{ id: string; title: string; city?: string; country?: string; status: string; createdAt: string }>
+    contacts: Array<{ id: string; name: string; email: string; subject?: string; site?: string | null; createdAt: string }>
   }
+  byMarket: MarketRow[]
   statistics: {
-    usersByRole: Array<{ role: string; _count: { role: number } }>
-    buildingsByCity: Array<{ city: string | null; _count: { city: number } }>
+    buildingsByCity: Array<{ city: string | null; country: string; count: number }>
     inquiriesByStatus: Array<{ status: string; _count: { status: number } }>
     buildingsByStatus: Array<{ status: string; _count: { status: number } }>
-    /** Which website each property belongs to. */
-    buildingsByCountry?: Array<{ country: string; count: number }>
   }
 }
 
 function timeAgo(dateStr: string) {
   const diff = Date.now() - new Date(dateStr).getTime()
   const mins = Math.floor(diff / 60000)
-  if (mins < 60) return `${mins}m ago`
+  if (mins < 60) return `${Math.max(mins, 0)}m ago`
   const hrs = Math.floor(mins / 60)
   if (hrs < 24) return `${hrs}h ago`
-  const days = Math.floor(hrs / 24)
-  return `${days}d ago`
+  return `${Math.floor(hrs / 24)}d ago`
 }
 
 const statusColors: Record<string, string> = {
-  NEW:           'bg-blue-100 text-blue-700',
-  PENDING:       'bg-amber-100 text-amber-700',
-  RESPONDED:     'bg-blue-100 text-blue-700',
-  CLOSED:        'bg-slate-100 text-slate-600',
-  CONVERTED:     'bg-emerald-100 text-emerald-700',
-  OFF_PLAN:      'bg-violet-100 text-violet-700',
-  NEW_BUILD:     'bg-sky-100 text-sky-700',
-  RESALE:        'bg-slate-100 text-slate-600',
-  AVAILABLE:     'bg-emerald-100 text-emerald-700',
-  RESERVED:      'bg-amber-100 text-amber-700',
-  SOLD:          'bg-red-100 text-red-700',
-  OFF_MARKET:    'bg-slate-100 text-slate-600',
+  NEW: 'bg-blue-100 text-blue-700',
+  PENDING: 'bg-amber-100 text-amber-700',
+  RESPONDED: 'bg-blue-100 text-blue-700',
+  CLOSED: 'bg-slate-100 text-slate-600',
+  CONVERTED: 'bg-emerald-100 text-emerald-700',
+  OFF_PLAN: 'bg-violet-100 text-violet-700',
+  NEW_BUILD: 'bg-sky-100 text-sky-700',
+  RESALE: 'bg-slate-100 text-slate-600',
 }
 
+const MARKET_LABEL: Record<Market, string> = {
+  all: 'Both websites',
+  LEBANON: 'propgrouplb.com',
+  INTERNATIONAL: 'propgrp.com',
+}
+
+/**
+ * The back office's front page, for a business that now runs two websites.
+ *
+ * Every number here used to be a single blended count. "83 buildings" was
+ * Lebanon and Georgia added together with no split and no way to ask for one;
+ * "Buildings by City" ranked Beirut against Batumi in one bar chart as a
+ * percentage of a total spanning two countries; and a Georgian property with no
+ * city printed the literal fallback "Lebanon" under its name.
+ *
+ * The market switch now runs the whole page, and the split is shown even when
+ * nothing is narrowed — because "how are the two sites doing?" is the question
+ * this page exists to answer.
+ */
 export function AdminDashboardClient() {
-  const { user } = useAuth()
+  const [market, setMarket] = useState<Market>('all')
   const [data, setData] = useState<DashboardData | null>(null)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(false)
 
-  useEffect(() => {
-    async function fetchDashboardData() {
-      try {
-        const response = await apiClient.getAdminStats() as any
-        const raw = response.data || response
-        setData(raw)
-      } catch (error) {
-        console.error('Error fetching dashboard data:', error)
-      } finally {
-        setLoading(false)
-      }
+  const load = useCallback(async (scope: Market) => {
+    setLoading(true)
+    setError(false)
+    try {
+      const apiUrl = normalizeApiUrl(process.env.NEXT_PUBLIC_API_URL || '')
+      const qs = scope === 'all' ? '' : `?market=${scope}`
+      const res = await fetch(`${apiUrl}/api/admin/stats${qs}`, {
+        credentials: 'include',
+        cache: 'no-store',
+      })
+      if (!res.ok) throw new Error('stats')
+      const body = await res.json()
+      setData(body.data ?? body)
+    } catch {
+      setError(true)
+    } finally {
+      setLoading(false)
     }
-    fetchDashboardData()
   }, [])
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <div className="text-slate-500 text-sm">Loading dashboard…</div>
-      </div>
-    )
-  }
+  useEffect(() => { load(market) }, [market, load])
 
-  if (!data) {
-    return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <div className="text-slate-400 text-sm">Could not load dashboard data.</div>
-      </div>
-    )
-  }
-
-  const { overview, trends, recent, statistics } = data
-
-  const statCards = [
-    { label: 'Buildings', value: overview.totalBuildings ?? 0,        icon: Building2,    color: 'bg-slate-800', href: '/admin/buildings' },
-    { label: 'Users',     value: overview.totalUsers ?? 0,            icon: Users,        color: 'bg-emerald-600', href: '/admin/users',    trend: trends.newUsersThisWeek,    trendLabel: 'this week' },
-    { label: 'Inquiries', value: overview.totalInquiries ?? 0,        icon: MessageSquare,color: 'bg-slate-600', href: '/admin/inquiries', trend: trends.newInquiriesThisWeek, trendLabel: 'this week' },
-    { label: 'Favorites', value: overview.totalFavorites ?? 0,        icon: Heart,        color: 'bg-rose-500' },
-    { label: 'Messages',  value: overview.totalContactMessages ?? 0,  icon: Inbox,        color: 'bg-violet-600', href: '/admin/contacts' },
-    { label: 'Documents', value: overview.totalDocuments ?? 0,        icon: FileText,     color: 'bg-sky-600',    href: '/admin/documents' },
-  ]
-
-  const totalBuildings = overview.totalBuildings || 1
+  const scoped = market !== 'all'
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+    <div className="space-y-6">
+      <PageHeader
+        title="Dashboard"
+        description={
+          scoped
+            ? <>Showing {MARKET_LABEL[market]} only.</>
+            : <>Both websites together. Narrow to one to see it on its own.</>
+        }
+        actions={
+          <SegmentedControl
+            value={market}
+            onChange={setMarket}
+            options={[
+              { value: 'all', label: 'Both' },
+              { value: 'LEBANON', label: '🇱🇧 Lebanon' },
+              { value: 'INTERNATIONAL', label: '🌍 International' },
+            ]}
+          />
+        }
+      />
 
-        {/* Header */}
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h1 className="text-2xl font-bold text-slate-900">Dashboard</h1>
-            <p className="text-sm text-slate-500 mt-0.5">Platform overview</p>
+      {error && (
+        <EmptyState
+          icon={<Building2 className="h-10 w-10" />}
+          title="Could not load the dashboard"
+          description="The API did not respond. Refresh to try again."
+        />
+      )}
+
+      {loading && !data && (
+        <div className="grid grid-cols-2 gap-2.5 lg:grid-cols-6">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} className="h-[4.5rem] animate-pulse rounded-xl border border-slate-200 bg-slate-50" />
+          ))}
+        </div>
+      )}
+
+      {data && (
+        <div className={cn('space-y-6 transition-opacity', loading && 'opacity-50')}>
+          {/* Headline numbers — everything here respects the market switch */}
+          <div className="grid grid-cols-2 gap-2.5 lg:grid-cols-6">
+            <StatCard
+              icon={<Building2 className="h-4 w-4" />}
+              label="Properties"
+              value={data.overview.totalBuildings.toLocaleString()}
+              href="/admin/buildings"
+              hint={data.trends.newBuildingsThisWeek > 0 ? `+${data.trends.newBuildingsThisWeek} this week` : undefined}
+            />
+            <StatCard
+              icon={<Layers className="h-4 w-4" />}
+              label="Units"
+              value={data.overview.totalUnits.toLocaleString()}
+            />
+            <StatCard
+              icon={<ListChecks className="h-4 w-4" />}
+              label="Live listings"
+              value={data.overview.activeListings.toLocaleString()}
+              accent="text-emerald-600"
+              href="/admin/listings"
+            />
+            <StatCard
+              icon={<Eye className="h-4 w-4" />}
+              label="Views"
+              value={data.overview.totalViews.toLocaleString()}
+            />
+            <StatCard
+              icon={<MessageSquare className="h-4 w-4" />}
+              label="Inquiries"
+              value={data.overview.totalInquiries.toLocaleString()}
+              href="/admin/inquiries"
+              hint={data.trends.newInquiriesThisWeek > 0 ? `+${data.trends.newInquiriesThisWeek} this week` : undefined}
+            />
+            <StatCard
+              icon={<Inbox className="h-4 w-4" />}
+              label="Messages"
+              value={data.overview.totalContactMessages.toLocaleString()}
+              href="/admin/contacts"
+            />
           </div>
-          <span className="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-800 text-white">
-            <Shield className="h-3.5 w-3.5 mr-1.5" />
-            {user?.role?.replace('_', ' ')}
+
+          {/* Things with no market of their own, said plainly rather than
+              folded into the numbers above as if they had one. */}
+          <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-3">
+            <StatCard
+              icon={<Users className="h-4 w-4" />}
+              label="Accounts"
+              value={data.overview.totalUsers.toLocaleString()}
+              href="/admin/users"
+              hint={
+                <>
+                  Platform-wide — an account isn&rsquo;t tied to a site
+                  {data.trends.newUsersThisWeek > 0 && ` · +${data.trends.newUsersThisWeek} this week`}
+                </>
+              }
+            />
+            <StatCard
+              icon={<Heart className="h-4 w-4" />}
+              label="Saved properties"
+              value={data.overview.totalFavorites.toLocaleString()}
+            />
+            <StatCard
+              icon={<FileText className="h-4 w-4" />}
+              label="Documents"
+              value={data.overview.totalDocuments.toLocaleString()}
+              href="/admin/documents"
+            />
+          </div>
+
+          {/* Enquiries and messages that belong to neither site. Counted rather
+              than dropped — under a market filter they'd otherwise vanish. */}
+          {scoped && (data.overview.unattributedInquiries > 0 || data.overview.unattributedContacts > 0) && (
+            <p className="text-xs leading-relaxed text-slate-400">
+              Not counted above:{' '}
+              {data.overview.unattributedInquiries > 0 && (
+                <>{data.overview.unattributedInquiries} enquir{data.overview.unattributedInquiries === 1 ? 'y' : 'ies'} with no property attached</>
+              )}
+              {data.overview.unattributedInquiries > 0 && data.overview.unattributedContacts > 0 && ', and '}
+              {data.overview.unattributedContacts > 0 && (
+                <>{data.overview.unattributedContacts} message{data.overview.unattributedContacts === 1 ? '' : 's'} received before we started recording which site they came from</>
+              )}
+              . Neither belongs to a single website.
+            </p>
+          )}
+
+          {/* The two sites, side by side */}
+          <FormSection
+            title="The two websites"
+            description="How the catalogue splits between them."
+            icon={<Globe className="h-4 w-4" />}
+          >
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-sm">
+                <thead>
+                  <tr className="border-b border-slate-200 text-xs font-medium text-slate-500">
+                    <th className="py-2 pr-4">Website</th>
+                    <th className="px-3 py-2 text-right">Properties</th>
+                    <th className="px-3 py-2 text-right">Units</th>
+                    <th className="px-3 py-2 text-right">Live listings</th>
+                    <th className="px-3 py-2 text-right">Views</th>
+                    <th className="py-2 pl-3 text-right">Inquiries</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {data.byMarket.map((row) => (
+                    <tr
+                      key={row.market}
+                      className={cn(
+                        'transition-colors',
+                        market === row.market && 'bg-slate-50',
+                      )}
+                    >
+                      <td className="py-3 pr-4">
+                        <button
+                          type="button"
+                          onClick={() => setMarket(market === row.market ? 'all' : row.market)}
+                          className="flex items-center gap-2 text-left font-medium text-slate-900 hover:underline"
+                        >
+                          <span>{row.market === 'LEBANON' ? '🇱🇧' : '🌍'}</span>
+                          {row.site}
+                        </button>
+                      </td>
+                      <td className="px-3 py-3 text-right tabular-nums text-slate-700">{row.buildings.toLocaleString()}</td>
+                      <td className="px-3 py-3 text-right tabular-nums text-slate-700">{row.units.toLocaleString()}</td>
+                      <td className="px-3 py-3 text-right tabular-nums font-medium text-emerald-700">{row.activeListings.toLocaleString()}</td>
+                      <td className="px-3 py-3 text-right tabular-nums text-slate-700">{row.views.toLocaleString()}</td>
+                      <td className="py-3 pl-3 text-right tabular-nums text-slate-700">{row.inquiries.toLocaleString()}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <p className="mt-3 text-xs text-slate-400">
+              A property appears on a site by its country — International is everything that isn&rsquo;t Lebanon.
+            </p>
+          </FormSection>
+
+          {/* Breakdowns */}
+          <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
+            <FormSection title="Where the stock is" icon={<MapPin className="h-4 w-4" />}>
+              <CityBreakdown rows={data.statistics.buildingsByCity} />
+            </FormSection>
+
+            <FormSection title="Build status" icon={<Building2 className="h-4 w-4" />}>
+              <StatusList
+                rows={data.statistics.buildingsByStatus.map((r) => ({ key: r.status, count: r._count.status }))}
+                empty="No properties yet"
+              />
+            </FormSection>
+
+            <FormSection title="Inquiry status" icon={<MessageSquare className="h-4 w-4" />}>
+              <StatusList
+                rows={data.statistics.inquiriesByStatus.map((r) => ({ key: r.status, count: r._count.status }))}
+                empty="No inquiries yet"
+              />
+            </FormSection>
+          </div>
+
+          {/* Activity */}
+          <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+            <FeedCard title="Recent inquiries" icon={<MessageSquare className="h-4 w-4" />} href="/admin/inquiries">
+              {data.recent.inquiries.length === 0 ? (
+                <FeedEmpty>No inquiries{scoped ? ' for this website' : ''} yet</FeedEmpty>
+              ) : data.recent.inquiries.map((inq) => (
+                <FeedRow
+                  key={inq.id}
+                  title={inq.name || inq.email}
+                  subtitle={
+                    <>
+                      {inq.building?.country && <span className="mr-1">{countryFlag(inq.building.country)}</span>}
+                      {inq.buildingTitle || inq.building?.title || 'General inquiry'}
+                    </>
+                  }
+                  badge={inq.status}
+                  when={inq.createdAt}
+                />
+              ))}
+            </FeedCard>
+
+            <FeedCard title="Recently added" icon={<Building2 className="h-4 w-4" />} href="/admin/buildings">
+              {data.recent.buildings.length === 0 ? (
+                <FeedEmpty>Nothing added{scoped ? ' to this website' : ''} yet</FeedEmpty>
+              ) : data.recent.buildings.map((b) => (
+                <FeedRow
+                  key={b.id}
+                  href={`/admin/buildings/${b.id}`}
+                  title={b.title}
+                  subtitle={
+                    <>
+                      {countryFlag(b.country)}{' '}
+                      {/* Was `b.city ?? 'Lebanon'` — which labelled a Georgian
+                          property with no city as Lebanese. */}
+                      {b.city || siteFor(b.country)}
+                    </>
+                  }
+                  badge={b.status}
+                  when={b.createdAt}
+                />
+              ))}
+            </FeedCard>
+
+            <FeedCard title="New accounts (7 days)" icon={<Users className="h-4 w-4" />} href="/admin/users">
+              {data.recent.users.length === 0 ? (
+                <FeedEmpty>No new accounts this week</FeedEmpty>
+              ) : data.recent.users.map((u) => (
+                <FeedRow
+                  key={u.id}
+                  title={u.firstName && u.lastName ? `${u.firstName} ${u.lastName}` : u.email}
+                  subtitle={u.firstName ? u.email : undefined}
+                  when={u.createdAt}
+                />
+              ))}
+            </FeedCard>
+
+            <FeedCard title="Recent messages" icon={<Inbox className="h-4 w-4" />} href="/admin/contacts">
+              {data.recent.contacts.length === 0 ? (
+                <FeedEmpty>No messages{scoped ? ' from this website' : ''} yet</FeedEmpty>
+              ) : data.recent.contacts.map((msg) => (
+                <FeedRow
+                  key={msg.id}
+                  title={msg.name}
+                  subtitle={
+                    <>
+                      {msg.site && <span className="mr-1">{msg.site === 'LEBANON' ? '🇱🇧' : '🌍'}</span>}
+                      {msg.subject || msg.email}
+                    </>
+                  }
+                  when={msg.createdAt}
+                />
+              ))}
+            </FeedCard>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+/**
+ * Cities, grouped under the website they belong to.
+ *
+ * Ranking Beirut against Batumi in one list and calling each a percentage of a
+ * shared total answered no question anybody has. Each market is its own list,
+ * with its own denominator.
+ */
+function CityBreakdown({ rows }: { rows: Array<{ city: string | null; country: string; count: number }> }) {
+  if (rows.length === 0) return <p className="text-xs text-slate-400">No properties yet</p>
+
+  const groups = new Map<'LEBANON' | 'INTERNATIONAL', Array<{ city: string; count: number }>>()
+  for (const r of rows) {
+    const bucket = (r.country ?? 'LEBANON') === 'LEBANON' ? 'LEBANON' : 'INTERNATIONAL'
+    const list = groups.get(bucket) ?? []
+    list.push({ city: r.city ?? 'Unknown', count: r.count })
+    groups.set(bucket, list)
+  }
+
+  return (
+    <div className="space-y-5">
+      {Array.from(groups.entries()).map(([bucket, list]) => {
+        const sorted = [...list].sort((a, b) => b.count - a.count).slice(0, 6)
+        const total = list.reduce((s, r) => s + r.count, 0) || 1
+        return (
+          <div key={bucket}>
+            <p className="mb-2.5 text-xs font-semibold uppercase tracking-wide text-slate-400">
+              {bucket === 'LEBANON' ? '🇱🇧 propgrouplb.com' : '🌍 propgrp.com'}
+            </p>
+            <div className="space-y-2">
+              {sorted.map((r) => (
+                <div key={r.city} className="flex items-center gap-3">
+                  <span className="w-24 truncate text-xs font-medium text-slate-600">{r.city}</span>
+                  <div className="h-2 flex-1 overflow-hidden rounded-full bg-slate-100">
+                    <div className="h-full rounded-full bg-slate-800" style={{ width: `${(r.count / total) * 100}%` }} />
+                  </div>
+                  <span className="w-6 text-right text-xs font-semibold tabular-nums text-slate-700">{r.count}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+function StatusList({ rows, empty }: { rows: Array<{ key: string; count: number }>; empty: string }) {
+  if (rows.length === 0) return <p className="text-xs text-slate-400">{empty}</p>
+  return (
+    <div className="space-y-2.5">
+      {rows.map((r) => (
+        <div key={r.key} className="flex items-center justify-between gap-3">
+          <span className={cn('rounded px-2 py-0.5 text-xs font-medium', statusColors[r.key] ?? 'bg-slate-100 text-slate-600')}>
+            {r.key?.replace(/_/g, ' ')}
           </span>
+          <span className="text-sm font-semibold tabular-nums text-slate-700">{r.count}</span>
         </div>
+      ))}
+    </div>
+  )
+}
 
-        {/* Stat Cards */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
-          {statCards.map((item) => {
-            const content = (
-              <>
-                <div className="flex items-center justify-between mb-2">
-                  <div className={`w-8 h-8 ${item.color} rounded-lg flex items-center justify-center`}>
-                    <item.icon className="h-4 w-4 text-white" />
-                  </div>
-                  {item.href && <ArrowUpRight className="h-3.5 w-3.5 text-slate-300 group-hover:text-slate-500 transition-colors" />}
-                </div>
-                <p className="text-2xl font-bold text-slate-900">{item.value.toLocaleString()}</p>
-                <p className="text-xs text-slate-500 mt-0.5">{item.label}</p>
-                {item.trend !== undefined && item.trend > 0 && (
-                  <p className="text-xs text-emerald-600 font-medium mt-1 flex items-center gap-0.5">
-                    <TrendingUp className="h-3 w-3" />+{item.trend} {item.trendLabel}
-                  </p>
-                )}
-              </>
-            )
-            const cls = "bg-white rounded-xl border border-slate-200 p-4 hover:shadow-md transition-shadow group"
-            return item.href ? (
-              <Link key={item.label} href={item.href} className={cls}>{content}</Link>
-            ) : (
-              <div key={item.label} className={cls}>{content}</div>
-            )
-          })}
-        </div>
+function FeedCard({
+  title, icon, href, children,
+}: {
+  title: string
+  icon: React.ReactNode
+  href: string
+  children: React.ReactNode
+}) {
+  return (
+    <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+      <div className="flex items-center justify-between border-b border-slate-100 px-5 py-3.5">
+        <h3 className="flex items-center gap-2 text-sm font-semibold text-slate-700">
+          <span className="text-slate-400">{icon}</span>
+          {title}
+        </h3>
+        <Link href={href} className="text-xs font-medium text-slate-500 transition-colors hover:text-slate-900">
+          View all
+        </Link>
+      </div>
+      <div className="divide-y divide-slate-50">{children}</div>
+    </div>
+  )
+}
 
-        {/* Breakdown row */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
+function FeedEmpty({ children }: { children: React.ReactNode }) {
+  return <p className="px-5 py-8 text-center text-sm text-slate-400">{children}</p>
+}
 
-          {/* Buildings by City */}
-          <div className="bg-white rounded-xl border border-slate-200 p-4">
-            <h3 className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
-              <MapPin className="h-4 w-4 text-slate-400" />
-              Buildings by City
-            </h3>
-            <div className="space-y-2">
-              {/* Which site the stock sits on — the first thing to know now
-                  that one admin serves both websites. */}
-              {(statistics.buildingsByCountry ?? []).length > 1 && (
-                <div className="mb-4 pb-4 border-b border-slate-100">
-                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">By website</p>
-                  <div className="space-y-1.5">
-                    {(statistics.buildingsByCountry ?? []).map((r) => (
-                      <div key={r.country} className="flex items-center justify-between text-sm">
-                        <span className="text-slate-600">
-                          {countryFlag(r.country)} {siteFor(r.country)}
-                        </span>
-                        <span className="font-semibold text-slate-900">{r.count}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {(statistics.buildingsByCity ?? []).length === 0 ? (
-                <p className="text-xs text-slate-400">No buildings yet</p>
-              ) : (
-                (statistics.buildingsByCity ?? []).map((s) => {
-                  const pct = totalBuildings > 0 ? (s._count.city / totalBuildings * 100) : 0
-                  return (
-                    <div key={s.city ?? 'unknown'} className="flex items-center gap-3">
-                      <span className="text-xs font-medium text-slate-600 w-24 truncate">{s.city ?? 'Unknown'}</span>
-                      <div className="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden">
-                        <div className="h-full bg-slate-800 rounded-full" style={{ width: `${pct}%` }} />
-                      </div>
-                      <span className="text-xs font-semibold text-slate-700 w-6 text-right">{s._count.city}</span>
-                    </div>
-                  )
-                })
-              )}
-            </div>
-          </div>
-
-          {/* Building Status */}
-          <div className="bg-white rounded-xl border border-slate-200 p-4">
-            <h3 className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
-              <Building2 className="h-4 w-4 text-slate-400" />
-              Building Status
-            </h3>
-            <div className="space-y-2">
-              {(statistics.buildingsByStatus ?? []).length === 0 ? (
-                <p className="text-xs text-slate-400">No data</p>
-              ) : (
-                (statistics.buildingsByStatus ?? []).map((s) => (
-                  <div key={s.status} className="flex items-center justify-between">
-                    <span className={`text-xs font-medium px-2 py-0.5 rounded ${statusColors[s.status] ?? 'bg-slate-100 text-slate-600'}`}>
-                      {s.status?.replace(/_/g, ' ')}
-                    </span>
-                    <span className="text-sm font-semibold text-slate-700">{s._count.status}</span>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-
-          {/* Inquiry Status */}
-          <div className="bg-white rounded-xl border border-slate-200 p-4">
-            <h3 className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
-              <MessageSquare className="h-4 w-4 text-slate-400" />
-              Inquiry Status
-            </h3>
-            <div className="space-y-2">
-              {(statistics.inquiriesByStatus ?? []).length === 0 ? (
-                <p className="text-xs text-slate-400">No inquiries yet</p>
-              ) : (
-                (statistics.inquiriesByStatus ?? []).map((s) => (
-                  <div key={s.status} className="flex items-center justify-between">
-                    <span className={`text-xs font-medium px-2 py-0.5 rounded ${statusColors[s.status] ?? 'bg-slate-100 text-slate-600'}`}>
-                      {s.status?.replace(/_/g, ' ')}
-                    </span>
-                    <span className="text-sm font-semibold text-slate-700">{s._count.status}</span>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Activity feed */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-
-          {/* Recent Inquiries */}
-          <div className="bg-white rounded-xl border border-slate-200">
-            <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
-              <h3 className="text-sm font-semibold text-slate-700 flex items-center gap-2">
-                <MessageSquare className="h-4 w-4 text-slate-500" />
-                Recent Inquiries
-              </h3>
-              <Link href="/admin/inquiries" className="text-xs text-slate-500 hover:text-slate-900 font-medium">View all</Link>
-            </div>
-            <div className="divide-y divide-slate-50">
-              {(recent.inquiries ?? []).length === 0 ? (
-                <p className="px-4 py-6 text-sm text-slate-400 text-center">No inquiries yet</p>
-              ) : (
-                (recent.inquiries ?? []).map((inq) => (
-                  <div key={inq.id} className="px-4 py-3 hover:bg-slate-50 transition-colors">
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium text-slate-900 truncate">{inq.name || inq.email}</p>
-                        <p className="text-xs text-slate-500 truncate">{inq.buildingTitle || inq.building?.title || 'General inquiry'}</p>
-                      </div>
-                      <div className="flex items-center gap-2 shrink-0">
-                        <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${statusColors[inq.status] ?? 'bg-slate-100 text-slate-600'}`}>
-                          {inq.status}
-                        </span>
-                        <span className="text-[10px] text-slate-400 flex items-center gap-0.5">
-                          <Clock className="h-2.5 w-2.5" />{timeAgo(inq.createdAt)}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-
-          {/* Recent Buildings */}
-          <div className="bg-white rounded-xl border border-slate-200">
-            <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
-              <h3 className="text-sm font-semibold text-slate-700 flex items-center gap-2">
-                <Building2 className="h-4 w-4 text-slate-500" />
-                Recent Buildings
-              </h3>
-              <Link href="/admin/buildings" className="text-xs text-slate-500 hover:text-slate-900 font-medium">View all</Link>
-            </div>
-            <div className="divide-y divide-slate-50">
-              {(recent.buildings ?? []).length === 0 ? (
-                <p className="px-4 py-6 text-sm text-slate-400 text-center">No buildings yet</p>
-              ) : (
-                (recent.buildings ?? []).map((b) => (
-                  <div key={b.id} className="px-4 py-3 hover:bg-slate-50 transition-colors">
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium text-slate-900 truncate">{b.title}</p>
-                        <p className="text-xs text-slate-500">{b.city ?? 'Lebanon'}</p>
-                      </div>
-                      <div className="flex items-center gap-2 shrink-0">
-                        <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${statusColors[b.status] ?? 'bg-slate-100 text-slate-600'}`}>
-                          {b.status?.replace(/_/g, ' ')}
-                        </span>
-                        <span className="text-[10px] text-slate-400">{timeAgo(b.createdAt)}</span>
-                      </div>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-
-          {/* Recent Users */}
-          <div className="bg-white rounded-xl border border-slate-200">
-            <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
-              <h3 className="text-sm font-semibold text-slate-700 flex items-center gap-2">
-                <Users className="h-4 w-4 text-emerald-600" />
-                New Users (7 days)
-              </h3>
-              <Link href="/admin/users" className="text-xs text-slate-500 hover:text-slate-900 font-medium">View all</Link>
-            </div>
-            <div className="divide-y divide-slate-50">
-              {(recent.users ?? []).length === 0 ? (
-                <p className="px-4 py-6 text-sm text-slate-400 text-center">No new users this week</p>
-              ) : (
-                (recent.users ?? []).map((u) => (
-                  <div key={u.id} className="px-4 py-3 hover:bg-slate-50 transition-colors">
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="flex items-center gap-2.5 min-w-0">
-                        <div className="w-7 h-7 rounded-full bg-slate-800 flex items-center justify-center shrink-0">
-                          <span className="text-[10px] font-bold text-white">{u.email.charAt(0).toUpperCase()}</span>
-                        </div>
-                        <div className="min-w-0">
-                          <p className="text-sm font-medium text-slate-900 truncate">
-                            {u.firstName && u.lastName ? `${u.firstName} ${u.lastName}` : u.email}
-                          </p>
-                          {u.firstName && <p className="text-xs text-slate-500 truncate">{u.email}</p>}
-                        </div>
-                      </div>
-                      <span className="text-[10px] text-slate-400 shrink-0">{timeAgo(u.createdAt)}</span>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-
-          {/* Recent Contact Messages */}
-          <div className="bg-white rounded-xl border border-slate-200">
-            <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
-              <h3 className="text-sm font-semibold text-slate-700 flex items-center gap-2">
-                <Inbox className="h-4 w-4 text-violet-600" />
-                Recent Messages
-              </h3>
-              <Link href="/admin/contacts" className="text-xs text-slate-500 hover:text-slate-900 font-medium">View all</Link>
-            </div>
-            <div className="divide-y divide-slate-50">
-              {(recent.contacts ?? []).length === 0 ? (
-                <p className="px-4 py-6 text-sm text-slate-400 text-center">No messages yet</p>
-              ) : (
-                (recent.contacts ?? []).map((msg) => (
-                  <div key={msg.id} className="px-4 py-3 hover:bg-slate-50 transition-colors">
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium text-slate-900 truncate">{msg.name}</p>
-                        <p className="text-xs text-slate-500 truncate">{msg.subject || msg.email}</p>
-                      </div>
-                      <span className="text-[10px] text-slate-400 shrink-0">{timeAgo(msg.createdAt)}</span>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-
-        </div>
+function FeedRow({
+  title, subtitle, badge, when, href,
+}: {
+  title: string
+  subtitle?: React.ReactNode
+  badge?: string
+  when: string
+  href?: string
+}) {
+  const body = (
+    <div className="flex items-start justify-between gap-3">
+      <div className="min-w-0">
+        <p className="truncate text-sm font-medium text-slate-900">{title}</p>
+        {subtitle && <p className="mt-0.5 truncate text-xs text-slate-500">{subtitle}</p>}
+      </div>
+      <div className="flex shrink-0 items-center gap-2">
+        {badge && (
+          <span className={cn('rounded px-1.5 py-0.5 text-[10px] font-semibold', statusColors[badge] ?? 'bg-slate-100 text-slate-600')}>
+            {badge.replace(/_/g, ' ')}
+          </span>
+        )}
+        <span className="flex items-center gap-0.5 whitespace-nowrap text-[10px] text-slate-400">
+          <Clock className="h-2.5 w-2.5" />{timeAgo(when)}
+        </span>
       </div>
     </div>
   )
+  const cls = 'block px-5 py-3.5 transition-colors hover:bg-slate-50'
+  return href ? <Link href={href} className={cls}>{body}</Link> : <div className={cls}>{body}</div>
 }

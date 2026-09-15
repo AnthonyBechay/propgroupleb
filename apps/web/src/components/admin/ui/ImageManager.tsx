@@ -23,16 +23,45 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
-  AlertCircle, ArrowLeft, ArrowRight, GripVertical, ImageIcon, Loader2,
-  RotateCw, Star, Trash2, X, ZoomIn,
+  AlertCircle, ArrowLeft, ArrowRight, Compass, Film, GripVertical, ImageIcon,
+  Loader2, RotateCw, Star, Trash2, X, ZoomIn,
 } from 'lucide-react'
 import { normalizeApiUrl, normalizeFileUrl } from '@/lib/utils/api-url'
 import { cn } from '@/lib/utils'
 import { ConfirmDialog } from './ConfirmDialog'
 
-const ACCEPT = 'image/jpeg,image/png,image/webp,image/avif'
+const IMAGE_ACCEPT = 'image/jpeg,image/png,image/webp,image/avif'
+const VIDEO_ACCEPT = 'video/mp4,video/webm,video/quicktime'
 /** R2 upload limit on the backend; flagged here so it fails before the round trip. */
 const MAX_BYTES = 15 * 1024 * 1024
+const MAX_VIDEO_BYTES = 200 * 1024 * 1024
+
+/**
+ * The media a property has, as the four columns it is actually stored in.
+ *
+ * `images`, `videoUrl`, `youtubeUrls` and `virtualTourUrl` are one idea — "the
+ * media" — and the form used to expose them as four separate controls: a photo
+ * dropzone, an "upload a video" button, a YouTube box, a tour box. Four ways to
+ * add a file, none of them obviously different from the others. They are one
+ * dropzone and one link box here, and this type is the seam back to the columns.
+ */
+export interface MediaSlice {
+  videoUrl: string
+  youtubeUrls: string[]
+  virtualTourUrl: string
+  onChange: (patch: { videoUrl?: string; youtubeUrls?: string[]; virtualTourUrl?: string }) => void
+}
+
+type LinkKind = 'video' | 'tour'
+
+/** What kind of thing is this URL? Returns null when we can't tell. */
+function classifyLink(raw: string): LinkKind | null {
+  const url = raw.trim().toLowerCase()
+  if (!/^https?:\/\//.test(url)) return null
+  if (/youtube\.com|youtu\.be|vimeo\.com|dailymotion\.com/.test(url)) return 'video'
+  if (/matterport|kuula|cupix|eyespy360|insidemaps|my\.matterport|360|virtualtour|vtour/.test(url)) return 'tour'
+  return null
+}
 
 interface PendingUpload {
   id: string
@@ -100,6 +129,8 @@ export function ImageManager({
   max,
   disabled,
   className,
+  /** When given, the same dropzone also takes video, and a link box appears. */
+  media,
 }: {
   value: string[]
   onChange: (next: string[]) => void
@@ -111,6 +142,7 @@ export function ImageManager({
   max?: number
   disabled?: boolean
   className?: string
+  media?: MediaSlice
 }) {
   const apiUrl = normalizeApiUrl(process.env.NEXT_PUBLIC_API_URL || '')
   const inputRef = useRef<HTMLInputElement>(null)
@@ -138,10 +170,24 @@ export function ImageManager({
 
     for (const file of files) {
       const id = `${file.name}-${file.size}-${Math.random().toString(36).slice(2, 8)}`
-      if (!file.type.startsWith('image/')) {
-        rejected.push({ id, name: file.name, progress: 0, error: 'Not an image', file })
-      } else if (file.size > MAX_BYTES) {
-        rejected.push({ id, name: file.name, progress: 0, error: `Too large (${humanSize(file.size)}, max 15 MB)`, file })
+      const isVideo = file.type.startsWith('video/')
+      const isImage = file.type.startsWith('image/')
+
+      if (!isImage && !(isVideo && media)) {
+        rejected.push({
+          id, name: file.name, progress: 0, file,
+          error: media ? 'Not a photo or video' : 'Not an image',
+        })
+      } else if (isVideo && !media) {
+        rejected.push({ id, name: file.name, progress: 0, file, error: 'Videos go on the property, not the unit' })
+      } else if (file.size > (isVideo ? MAX_VIDEO_BYTES : MAX_BYTES)) {
+        rejected.push({
+          id, name: file.name, progress: 0, file,
+          error: `Too large (${humanSize(file.size)}, max ${isVideo ? '200 MB' : '15 MB'})`,
+        })
+      } else if (isVideo && media?.videoUrl) {
+        // One uploaded video per property; more can be added as links.
+        rejected.push({ id, name: file.name, progress: 0, file, error: 'A video is already attached — remove it first' })
       } else {
         accepted.push(file)
       }
@@ -163,16 +209,23 @@ export function ImageManager({
     async function worker() {
       while (cursor < queued.length) {
         const item = queued[cursor++]
+        const isVideo = item.file.type.startsWith('video/')
         const fd = new FormData()
         fd.append('file', item.file)
-        fd.append('folder', folder)
+        if (!isVideo) fd.append('folder', folder)
         if (propertySlug?.trim()) fd.append('propertySlug', propertySlug.trim())
 
-        const res = await uploadWithProgress(`${apiUrl}/api/upload`, fd, (pct) => {
+        // Same dropzone, two endpoints — the difference is the file's type,
+        // which the admin should never have to know about.
+        const endpoint = isVideo ? `${apiUrl}/api/upload/video` : `${apiUrl}/api/upload`
+        const res = await uploadWithProgress(endpoint, fd, (pct) => {
           setPending((p) => p.map((x) => (x.id === item.id ? { ...x, progress: pct } : x)))
         })
 
-        if (res.url) {
+        if (res.url && isVideo) {
+          media?.onChange({ videoUrl: res.url })
+          setPending((p) => p.filter((x) => x.id !== item.id))
+        } else if (res.url) {
           // Append as each one lands rather than in one batch at the end, so a
           // long queue visibly fills the grid instead of sitting at 100%.
           //
@@ -192,7 +245,7 @@ export function ImageManager({
     }
 
     await Promise.all(Array.from({ length: Math.min(CONCURRENCY, queued.length) }, worker))
-  }, [apiUrl, folder, propertySlug, onChange])
+  }, [apiUrl, folder, propertySlug, onChange, media])
 
   function pick(files: FileList | File[] | null) {
     if (!files || disabled) return
@@ -459,12 +512,17 @@ export function ImageManager({
             disabled && 'pointer-events-none opacity-50',
           )}
         >
-          <ImageIcon className="mx-auto mb-2 h-7 w-7 text-slate-300" />
+          <ImageIcon className="mx-auto mb-2.5 h-8 w-8 text-slate-300" />
           <p className="text-sm text-slate-600">
-            <span className="font-medium text-slate-800">Drop photos here</span> or click to choose
+            <span className="font-medium text-slate-800">
+              Drop {media ? 'photos or video' : 'photos'} here
+            </span>{' '}
+            or click to choose
           </p>
-          <p className="mt-1 text-xs text-slate-400">
-            {hint ?? <>JPG, PNG, WebP or AVIF · up to 15 MB each · the first photo is the cover — drag to reorder</>}
+          <p className="mx-auto mt-1.5 max-w-sm text-xs leading-relaxed text-slate-400">
+            {hint ?? (media
+              ? <>Photos up to 15 MB, video up to 200 MB. The first photo is the cover — drag to reorder.</>
+              : <>JPG, PNG, WebP or AVIF · up to 15 MB each · the first photo is the cover — drag to reorder</>)}
           </p>
         </div>
       )}
@@ -475,11 +533,14 @@ export function ImageManager({
       <input
         ref={inputRef}
         type="file"
-        accept={ACCEPT}
+        accept={media ? `${IMAGE_ACCEPT},${VIDEO_ACCEPT}` : IMAGE_ACCEPT}
         multiple
         className="hidden"
         onChange={(e) => { pick(e.target.files); e.target.value = '' }}
       />
+
+      {/* Video and links — the same list, so "the media" is one thing */}
+      {media && <MediaLinks media={media} disabled={disabled} apiUrl={apiUrl} />}
 
       {/* Lightbox */}
       {lightbox != null && value[lightbox] && (
@@ -561,5 +622,151 @@ function IconAction({
     >
       {children}
     </button>
+  )
+}
+
+
+/**
+ * Whatever video and links the property has, plus the one box that adds more.
+ *
+ * There is deliberately no "is this a YouTube link or a tour link?" question.
+ * Pasting the URL is the whole interaction; `classifyLink` decides which column
+ * it belongs in, and says so afterwards rather than asking beforehand.
+ */
+function MediaLinks({
+  media, disabled, apiUrl,
+}: {
+  media: MediaSlice
+  disabled?: boolean
+  apiUrl: string
+}) {
+  const [draft, setDraft] = useState('')
+  const [error, setError] = useState<string | null>(null)
+  const [removing, setRemoving] = useState(false)
+
+  // An uploaded file lives on our own storage; a pasted YouTube URL does not.
+  const uploaded = !!media.videoUrl && media.videoUrl.includes('/api/files/')
+
+  function add() {
+    const raw = draft.trim()
+    if (!raw) return
+    const kind = classifyLink(raw)
+    if (!kind) {
+      setError('That doesn’t look like a video or a virtual-tour link. Paste a full https:// URL from YouTube, Vimeo, Matterport or Kuula.')
+      return
+    }
+    setError(null)
+    if (kind === 'tour') {
+      media.onChange({ virtualTourUrl: raw })
+    } else if (!media.videoUrl) {
+      media.onChange({ videoUrl: raw })
+    } else if (!media.youtubeUrls.some((u) => u === raw)) {
+      media.onChange({ youtubeUrls: [...media.youtubeUrls, raw] })
+    }
+    setDraft('')
+  }
+
+  async function removeVideo() {
+    const url = media.videoUrl
+    media.onChange({ videoUrl: '' })
+    // Only ours to delete — a YouTube URL is not a file in our bucket.
+    if (!uploaded) return
+    setRemoving(true)
+    try {
+      await fetch(`${apiUrl}/api/upload`, {
+        method: 'DELETE',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url }),
+      })
+    } catch {
+      /* already gone, or storage unreachable — the reference is off the form */
+    } finally {
+      setRemoving(false)
+    }
+  }
+
+  const rows: Array<{ key: string; icon: React.ReactNode; label: string; value: string; onRemove: () => void }> = []
+  if (media.videoUrl) {
+    rows.push({
+      key: 'video',
+      icon: <Film className="h-4 w-4 text-slate-500" />,
+      label: uploaded ? 'Video' : 'Video link',
+      value: media.videoUrl,
+      onRemove: removeVideo,
+    })
+  }
+  for (const url of media.youtubeUrls) {
+    rows.push({
+      key: url,
+      icon: <Film className="h-4 w-4 text-slate-500" />,
+      label: 'Extra video',
+      value: url,
+      onRemove: () => media.onChange({ youtubeUrls: media.youtubeUrls.filter((u) => u !== url) }),
+    })
+  }
+  if (media.virtualTourUrl) {
+    rows.push({
+      key: 'tour',
+      icon: <Compass className="h-4 w-4 text-slate-500" />,
+      label: '360° tour',
+      value: media.virtualTourUrl,
+      onRemove: () => media.onChange({ virtualTourUrl: '' }),
+    })
+  }
+
+  return (
+    <div className="space-y-3">
+      {rows.length > 0 && (
+        <ul className="space-y-2">
+          {rows.map((r) => (
+            <li
+              key={r.key}
+              className="flex min-h-12 items-center gap-3 rounded-lg border border-slate-200 bg-slate-50 px-3.5 py-2"
+            >
+              <span className="shrink-0">{r.icon}</span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-xs font-medium text-slate-500">{r.label}</span>
+                <span className="block truncate text-sm text-slate-700">{r.value}</span>
+              </span>
+              <button
+                type="button"
+                onClick={r.onRemove}
+                disabled={disabled || removing}
+                aria-label={`Remove ${r.label}`}
+                className="shrink-0 rounded-lg p-2 text-slate-400 transition-colors hover:bg-white hover:text-red-600 disabled:opacity-50"
+              >
+                {removing ? <Loader2 className="h-4 w-4 animate-spin" /> : <X className="h-4 w-4" />}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <div className="flex gap-2">
+        <input
+          type="url"
+          value={draft}
+          disabled={disabled}
+          onChange={(e) => { setDraft(e.target.value); setError(null) }}
+          onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); add() } }}
+          placeholder="Or paste a YouTube, Vimeo or 360° tour link"
+          className={cn(
+            'min-h-11 w-full rounded-lg border px-3.5 py-2.5 text-sm transition-colors',
+            'focus:outline-none focus:ring-2 focus:ring-slate-900/10',
+            error ? 'border-red-300 focus:border-red-400' : 'border-slate-200 focus:border-slate-400',
+          )}
+        />
+        <button
+          type="button"
+          onClick={add}
+          disabled={disabled || !draft.trim()}
+          className="min-h-11 shrink-0 rounded-lg border border-slate-200 px-4 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-40"
+        >
+          Add
+        </button>
+      </div>
+      {error && <p className="text-xs leading-relaxed text-red-600">{error}</p>}
+    </div>
   )
 }

@@ -106,27 +106,72 @@ export function FormSection({
     <section
       id={id}
       className={cn(
-        'scroll-mt-20 rounded-xl border p-4 sm:p-6',
+        // Generous padding on purpose. At `p-4` the fields touched the border
+        // and nine of these stacked read as one undifferentiated wall of inputs.
+        'scroll-mt-24 rounded-2xl border p-5 sm:p-7',
         tone === 'muted' ? 'border-slate-200 bg-slate-50/60' : 'border-slate-200 bg-white',
         className,
       )}
     >
       {(title || aside) && (
-        <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+        <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0">
             {title && (
-              <h2 className="flex items-center gap-2 font-semibold text-slate-900">
+              <h2 className="flex items-center gap-2 text-[15px] font-semibold text-slate-900">
                 {icon && <span className="text-slate-400">{icon}</span>}
                 {title}
               </h2>
             )}
-            {description && <p className="mt-0.5 text-sm text-slate-500">{description}</p>}
+            {description && <p className="mt-1 max-w-prose text-sm leading-relaxed text-slate-500">{description}</p>}
           </div>
           {aside && <div className="shrink-0">{aside}</div>}
         </div>
       )}
       {children}
     </section>
+  )
+}
+
+/**
+ * A group of fields most people never touch, folded away.
+ *
+ * The property form asks for about sixty things and a typical property needs
+ * eight of them. Showing all sixty at once is what made it unreadable — not the
+ * density of any one row, but the count. Anything that is genuinely occasional
+ * (a post code, a service fee, manual coordinates) goes behind one of these,
+ * and the summary says what is inside so nothing feels hidden.
+ */
+export function Disclosure({
+  label, hint, children, defaultOpen = false, badge,
+}: {
+  label: string
+  hint?: string
+  children: React.ReactNode
+  defaultOpen?: boolean
+  /** e.g. "3 set" — so a closed group can still say it has content. */
+  badge?: React.ReactNode
+}) {
+  const [open, setOpen] = useState(defaultOpen)
+  return (
+    <div className="rounded-xl border border-slate-200 bg-slate-50/50">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        aria-expanded={open}
+        className="flex min-h-12 w-full items-center gap-2 px-4 text-left"
+      >
+        <ChevronRight
+          className={cn('h-4 w-4 shrink-0 text-slate-400 transition-transform', open && 'rotate-90')}
+          aria-hidden="true"
+        />
+        <span className="min-w-0 flex-1">
+          <span className="block text-sm font-medium text-slate-700">{label}</span>
+          {hint && !open && <span className="block truncate text-xs text-slate-400">{hint}</span>}
+        </span>
+        {badge && <span className="shrink-0 text-xs font-medium text-slate-500">{badge}</span>}
+      </button>
+      {open && <div className="space-y-5 border-t border-slate-200 px-4 py-5">{children}</div>}
+    </div>
   )
 }
 
@@ -161,7 +206,7 @@ export function SectionNav({ sections, className }: { sections: SectionLink[]; c
       },
       // Bias the band towards the top of the viewport: the section whose
       // heading is near the top is the one being worked on.
-      { rootMargin: '-80px 0px -60% 0px', threshold: 0 },
+      { rootMargin: '-96px 0px -60% 0px', threshold: 0 },
     )
     els.forEach((el) => observer.observe(el))
     return () => observer.disconnect()
@@ -172,7 +217,7 @@ export function SectionNav({ sections, className }: { sections: SectionLink[]; c
   }, [sections.map((s) => s.id).join(',')])
 
   return (
-    <nav className={cn('sticky top-20 hidden w-52 shrink-0 lg:block', className)} aria-label="Form sections">
+    <nav className={cn('sticky top-24 hidden w-56 shrink-0 lg:block', className)} aria-label="Form sections">
       <ul className="space-y-0.5 border-l border-slate-200">
         {sections.map((s) => {
           const on = active === s.id
@@ -186,7 +231,7 @@ export function SectionNav({ sections, className }: { sections: SectionLink[]; c
                   setActive(s.id)
                 }}
                 className={cn(
-                  '-ml-px flex items-center gap-2 border-l-2 py-1.5 pl-3 text-sm transition-colors',
+                  '-ml-px flex items-center gap-2.5 border-l-2 py-2 pl-4 text-sm transition-colors',
                   on
                     ? 'border-slate-800 font-medium text-slate-900'
                     : 'border-transparent text-slate-500 hover:border-slate-300 hover:text-slate-800',

@@ -1,4 +1,5 @@
 import express, { type Request, type Response, type Router } from 'express';
+import { requestScope } from '../utils/market.js';
 import { z } from 'zod';
 import { prisma } from '@propgroup/db';
 import { asyncHandler } from '../utils/errors.js';
@@ -36,6 +37,9 @@ router.post('/', contactLimiter, asyncHandler(async (req: Request, res: Response
       phone: data.phone || null,
       subject: data.subject || null,
       message: data.message,
+      // propgrp.com forwards its leads here server-side, so without this every
+      // Georgian enquiry was indistinguishable from a Beirut one.
+      site: requestScope(req),
     },
   });
 

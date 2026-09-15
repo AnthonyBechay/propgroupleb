@@ -22,7 +22,7 @@ import { cn } from '@/lib/utils'
 // ── Shared class recipes ──────────────────────────────────────────────────────
 
 export const controlCls =
-  'w-full min-h-11 px-3 py-2 border border-slate-200 rounded-lg text-sm bg-white text-slate-900 ' +
+  'w-full min-h-11 px-3.5 py-2.5 border border-slate-200 rounded-lg text-sm bg-white text-slate-900 ' +
   'placeholder:text-slate-400 transition-colors ' +
   'focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400 ' +
   'disabled:bg-slate-50 disabled:text-slate-400 disabled:cursor-not-allowed'
@@ -60,7 +60,7 @@ export function Field({
   return (
     <div className={cn(SPAN_CLS[span], className)}>
       {label && (
-        <label htmlFor={htmlFor} className="mb-1 flex items-baseline gap-1.5 text-sm font-medium text-slate-700">
+        <label htmlFor={htmlFor} className="mb-1.5 flex items-baseline gap-1.5 text-sm font-medium text-slate-700">
           <span>{label}</span>
           {required && <span className="text-red-500" aria-hidden="true">*</span>}
           {optional && !required && <span className="text-xs font-normal text-slate-400">optional</span>}
@@ -68,12 +68,12 @@ export function Field({
       )}
       {children}
       {error ? (
-        <p className="mt-1 flex items-start gap-1 text-xs text-red-600">
+        <p className="mt-1.5 flex items-start gap-1 text-xs text-red-600">
           <AlertCircle className="mt-px h-3.5 w-3.5 shrink-0" aria-hidden="true" />
           {error}
         </p>
       ) : hint ? (
-        <p className="mt-1 text-xs text-slate-400">{hint}</p>
+        <p className="mt-1.5 text-xs leading-relaxed text-slate-400">{hint}</p>
       ) : null}
     </div>
   )
@@ -86,9 +86,11 @@ export function FieldGrid({
   return (
     <div
       className={cn(
-        'grid grid-cols-1 gap-4',
+        'grid grid-cols-1 gap-x-5 gap-y-5',
         cols === 2 && 'sm:grid-cols-2',
         cols === 3 && 'sm:grid-cols-3',
+        // Four across is too tight below `sm`; two is the honest maximum on a
+        // phone, and these are number fields where the label does the work.
         cols === 4 && 'grid-cols-2 sm:grid-cols-4',
         className,
       )}
@@ -305,7 +307,7 @@ export function CheckboxCard({
   return (
     <label
       className={cn(
-        'flex min-h-11 cursor-pointer items-center gap-2.5 rounded-lg border px-3 py-2.5 transition-colors',
+        'flex min-h-12 cursor-pointer items-center gap-3 rounded-xl border px-3.5 py-3 transition-colors',
         checked
           ? 'border-slate-800 bg-slate-800/[0.04] text-slate-900'
           : 'border-slate-200 text-slate-700 hover:bg-slate-50',

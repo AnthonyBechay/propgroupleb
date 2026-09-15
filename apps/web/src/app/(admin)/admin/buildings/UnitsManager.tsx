@@ -3,13 +3,14 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import {
-  Bed, Building2, Copy, Layers, Loader2, Pencil, Plus, Square, Tag, Trash2, X,
+  Bed, Building2, Copy, Layers, LayoutList, Loader2, Pencil, Plus, Square, Trash2, X,
 } from 'lucide-react'
 import { normalizeApiUrl, normalizeFileUrl } from '@/lib/utils/api-url'
 import { toast } from '@/components/ui/use-toast'
 import { ConfirmDialog } from '@/components/admin/ui/ConfirmDialog'
 import { InlineNote } from '@/components/admin/ui/form'
-import { EmptyState } from '@/components/admin/ui/layout'
+import { EmptyState, FormSection } from '@/components/admin/ui/layout'
+import { PriceSummary } from '@/components/admin/ui/PriceSummary'
 import { ALL_PROPERTY_KINDS, typeDef, typeLabel } from '@/lib/property-types'
 import { buildingRefOf, unitRef } from '@/lib/reference'
 import { cn } from '@/lib/utils'
@@ -77,11 +78,14 @@ type PanelMode = 'unit-edit' | 'listing-create' | 'listing-edit'
  * worth of units in one go, and duplicating one that is already right.
  */
 export function UnitsManager({
-  buildingId, buildingImages = [], buildingTitle,
+  buildingId, buildingImages = [], buildingTitle, buildingListings = [],
 }: {
   buildingId: string
   buildingImages?: string[]
   buildingTitle?: string
+  /** Legacy whole-building listings, so the price summary counts them. */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  buildingListings?: any[]
 }) {
   const apiUrl = normalizeApiUrl(process.env.NEXT_PUBLIC_API_URL || '')
 
@@ -272,33 +276,34 @@ export function UnitsManager({
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center gap-2 py-20 text-slate-400">
-        <Loader2 className="h-5 w-5 animate-spin" />
-        <span className="text-sm">Loading units…</span>
-      </div>
+      <FormSection id="unit" title="Units & pricing" icon={<LayoutList className="h-4 w-4" />}>
+        <div className="flex items-center justify-center gap-2 py-10 text-slate-400">
+          <Loader2 className="h-5 w-5 animate-spin" />
+          <span className="text-sm">Loading units…</span>
+        </div>
+      </FormSection>
     )
   }
 
   return (
-    <div className="space-y-5">
-      {/* Section header */}
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h2 className="font-semibold text-slate-900">Units</h2>
-          <p className="mt-0.5 text-sm text-slate-500">
-            {units.length} unit{units.length !== 1 ? 's' : ''}
-            {stats.total > 0 && (
-              <> · <span className="font-medium text-emerald-600">{stats.active} active</span> of {stats.total} listing{stats.total !== 1 ? 's' : ''}</>
-            )}
-          </p>
-        </div>
+    <FormSection
+      id="unit"
+      title="Units & pricing"
+      description={
+        units.length === 0
+          ? 'A property needs at least one unit — the unit is what carries the price.'
+          : `${units.length} unit${units.length === 1 ? '' : 's'}${
+              stats.total > 0 ? ` · ${stats.active} of ${stats.total} listing${stats.total === 1 ? '' : 's'} live` : ''
+            }`
+      }
+      icon={<LayoutList className="h-4 w-4" />}
+      aside={
         <div className="flex flex-wrap items-center gap-2">
-          <Link
-            href={`/admin/listings/new?buildingId=${buildingId}&subjectType=BUILDING`}
-            className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-slate-200 px-3 text-xs font-medium text-slate-600 transition-colors hover:bg-slate-50"
-          >
-            <Tag className="h-3.5 w-3.5" /> List the whole building
-          </Link>
+          {/* "List the whole building" is gone. A whole-building listing
+              (`subjectType: BUILDING`) duplicates something the model already
+              expresses better: a unit of kind WHOLE_BUILDING. Two ways to say
+              one thing meant price could come from either, and a property could
+              carry both at once. Existing ones still work and still edit. */}
           <button
             type="button"
             onClick={() => { setAdding((a) => (a === 'many' ? null : 'many')); setExpanded(null) }}
@@ -314,268 +319,273 @@ export function UnitsManager({
             <Plus className="h-3.5 w-3.5" /> Add unit
           </button>
         </div>
-      </div>
+      }
+    >
+      <div className="space-y-5">
+        {/* What the public site will actually print. See PriceSummary. */}
+        <PriceSummary units={units} buildingListings={buildingListings} />
 
-      {error && (
-        <InlineNote tone="error">
-          <div className="flex items-start justify-between gap-2">
-            <span>{error}</span>
-            <button type="button" onClick={() => setError(null)} aria-label="Dismiss"><X className="h-4 w-4" /></button>
-          </div>
-        </InlineNote>
-      )}
-      {notice && (
-        <InlineNote tone="success">
-          <div className="flex items-start justify-between gap-2">
-            <span>{notice}</span>
-            <button type="button" onClick={() => setNotice(null)} aria-label="Dismiss"><X className="h-4 w-4" /></button>
-          </div>
-        </InlineNote>
-      )}
+        {error && (
+          <InlineNote tone="error">
+            <div className="flex items-start justify-between gap-2">
+              <span>{error}</span>
+              <button type="button" onClick={() => setError(null)} aria-label="Dismiss"><X className="h-4 w-4" /></button>
+            </div>
+          </InlineNote>
+        )}
+        {notice && (
+          <InlineNote tone="success">
+            <div className="flex items-start justify-between gap-2">
+              <span>{notice}</span>
+              <button type="button" onClick={() => setNotice(null)} aria-label="Dismiss"><X className="h-4 w-4" /></button>
+            </div>
+          </InlineNote>
+        )}
 
-      {adding === 'one' && (
-        <UnitFormPanel
-          initial={emptyUnit()}
-          buildingId={buildingId}
-          onSave={createUnit}
-          onCancel={() => setAdding(null)}
-          saving={saving}
-        />
-      )}
-      {adding === 'many' && (
-        <BulkAddUnits
-          buildingId={buildingId}
-          saving={saving}
-          onCancel={() => setAdding(null)}
-          onCreate={createMany}
-        />
-      )}
+        {adding === 'one' && (
+          <UnitFormPanel
+            initial={emptyUnit()}
+            buildingId={buildingId}
+            onSave={createUnit}
+            onCancel={() => setAdding(null)}
+            saving={saving}
+          />
+        )}
+        {adding === 'many' && (
+          <BulkAddUnits
+            buildingId={buildingId}
+            saving={saving}
+            onCancel={() => setAdding(null)}
+            onCreate={createMany}
+          />
+        )}
 
-      {units.length === 0 && !adding && (
-        <EmptyState
-          icon={<Building2 className="h-10 w-10" />}
-          title="No units yet"
-          description="A property needs at least one unit before it can be listed — for a single apartment or a villa, that unit is the property itself."
-          action={
-            <button
-              type="button"
-              onClick={() => setAdding('one')}
-              className="inline-flex min-h-11 items-center gap-1.5 rounded-lg bg-slate-800 px-4 text-sm font-medium text-white hover:bg-slate-700"
-            >
-              <Plus className="h-4 w-4" /> Add the first unit
-            </button>
-          }
-        />
-      )}
-
-      {units.length > 0 && (
-        <ul className="space-y-3">
-          {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-          {units.map((unit: any) => {
-            const panelUnit = expanded?.id === unit.id
-            const editOpen = panelUnit && expanded?.mode === 'unit-edit'
-            const createOpen = panelUnit && expanded?.mode === 'listing-create'
-            const editListingId = panelUnit && expanded?.mode === 'listing-edit' ? expanded.listingId : null
-            const label = unit.name || (unit.unitNumber ? `Unit ${unit.unitNumber}` : null) || `Unit ${unit.id.slice(0, 6)}`
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const listings: any[] = unit.listings ?? []
-            const ref = unitRef(unit, units.length, unit.ref ? buildingRefOf(unit.ref) : null)
-            const cover = unit.images?.[0] ?? buildingImages[0]
-            const def = typeDef(unit.kind)
-
-            return (
-              <li
-                key={unit.id}
-                className={cn(
-                  'overflow-hidden rounded-xl border bg-white transition-colors',
-                  panelUnit ? 'border-slate-300 shadow-sm' : 'border-slate-200',
-                )}
+        {units.length === 0 && !adding && (
+          <EmptyState
+            icon={<Building2 className="h-10 w-10" />}
+            title="No units yet"
+            description="A property needs at least one unit before it can be listed — for a single apartment or a villa, that unit is the property itself."
+            action={
+              <button
+                type="button"
+                onClick={() => setAdding('one')}
+                className="inline-flex min-h-11 items-center gap-1.5 rounded-lg bg-slate-800 px-4 text-sm font-medium text-white hover:bg-slate-700"
               >
-                <div className="flex flex-col gap-3 px-4 py-3.5 sm:flex-row sm:items-center sm:px-5">
-                  {cover && (
-                    <div className="relative h-11 w-16 shrink-0 overflow-hidden rounded-lg border border-slate-200">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={normalizeFileUrl(cover)} alt="" className="h-full w-full object-cover" />
-                      {unit.images?.length > 0 && (
-                        <span className="absolute bottom-0 right-0 bg-slate-900/80 px-1 text-[9px] font-medium text-white">
-                          {unit.images.length}
+                <Plus className="h-4 w-4" /> Add the first unit
+              </button>
+            }
+          />
+        )}
+
+        {units.length > 0 && (
+          <ul className="space-y-3">
+            {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+            {units.map((unit: any) => {
+              const panelUnit = expanded?.id === unit.id
+              const editOpen = panelUnit && expanded?.mode === 'unit-edit'
+              const createOpen = panelUnit && expanded?.mode === 'listing-create'
+              const editListingId = panelUnit && expanded?.mode === 'listing-edit' ? expanded.listingId : null
+              const label = unit.name || (unit.unitNumber ? `Unit ${unit.unitNumber}` : null) || `Unit ${unit.id.slice(0, 6)}`
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              const listings: any[] = unit.listings ?? []
+              const ref = unitRef(unit, units.length, unit.ref ? buildingRefOf(unit.ref) : null)
+              const cover = unit.images?.[0] ?? buildingImages[0]
+              const def = typeDef(unit.kind)
+
+              return (
+                <li
+                  key={unit.id}
+                  className={cn(
+                    'overflow-hidden rounded-xl border bg-white transition-colors',
+                    panelUnit ? 'border-slate-300 shadow-sm' : 'border-slate-200',
+                  )}
+                >
+                  <div className="flex flex-col gap-3 px-4 py-3.5 sm:flex-row sm:items-center sm:px-5">
+                    {cover && (
+                      <div className="relative h-11 w-16 shrink-0 overflow-hidden rounded-lg border border-slate-200">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={normalizeFileUrl(cover)} alt="" className="h-full w-full object-cover" />
+                        {unit.images?.length > 0 && (
+                          <span className="absolute bottom-0 right-0 bg-slate-900/80 px-1 text-[9px] font-medium text-white">
+                            {unit.images.length}
+                          </span>
+                        )}
+                      </div>
+                    )}
+
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        {ref && (
+                          <span className="rounded border border-slate-200 bg-slate-100 px-1.5 py-0.5 font-mono text-[10px] font-semibold text-slate-500">
+                            {ref}
+                          </span>
+                        )}
+                        <span className="text-sm font-semibold text-slate-900">{label}</span>
+                        <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-500">
+                          {typeLabel(unit.kind)}
                         </span>
-                      )}
+                        {unit.lifecycle && (
+                          <span className={cn(
+                            'rounded-full px-2 py-0.5 text-xs font-medium',
+                            LIFECYCLE_COLORS[unit.lifecycle] ?? 'bg-slate-100 text-slate-500',
+                          )}>
+                            {LIFECYCLE_OPTIONS.find((o) => o.value === unit.lifecycle)?.label ?? unit.lifecycle}
+                          </span>
+                        )}
+                        {unit.isUnitType && (
+                          <span
+                            className="rounded-full border border-sky-200 bg-sky-50 px-2 py-0.5 text-xs font-medium text-sky-700"
+                            title="A repeatable type, not one specific apartment"
+                          >
+                            Type
+                          </span>
+                        )}
+                      </div>
+                      <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-400">
+                        {unit.floor != null && (
+                          <span className="flex items-center gap-1"><Layers className="h-3 w-3" /> Floor {unit.floor}</span>
+                        )}
+                        {def.beds && unit.bedrooms != null && (
+                          <span className="flex items-center gap-1"><Bed className="h-3 w-3" /> {unit.bedrooms} bed</span>
+                        )}
+                        {unit.areaSqm != null && (
+                          <span className="flex items-center gap-1"><Square className="h-3 w-3" /> {unit.areaSqm} m²</span>
+                        )}
+                        {unit.options?.length > 0 && (
+                          <span className="text-slate-500">{unit.options.length} finish option{unit.options.length === 1 ? '' : 's'}</span>
+                        )}
+                        {unit.ownerUserId && <span className="text-emerald-600">Assigned to a user</span>}
+                      </div>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-1.5 sm:flex-nowrap">
+                      {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+                      {listings.map((l: any) => (
+                        <button
+                          key={l.id}
+                          type="button"
+                          onClick={() => openPanel(unit.id, 'listing-edit', l.id)}
+                          title="Edit this listing here"
+                          className={cn(
+                            'inline-flex min-h-9 items-center gap-1.5 rounded-full border px-2.5 text-xs font-medium transition-all',
+                            editListingId === l.id ? 'ring-2 ring-amber-400 ring-offset-1' : 'hover:opacity-80',
+                            LISTING_INTENT_COLORS[l.intent] ?? 'border-slate-200 bg-slate-100 text-slate-600',
+                          )}
+                        >
+                          <span className={cn('h-1.5 w-1.5 shrink-0 rounded-full', LISTING_STATUS_DOT[l.status] ?? 'bg-slate-400')} />
+                          {l.intent === 'FOR_SALE' ? 'Sale' : 'Rent'}
+                          {l.price ? ` · ${formatPrice(l.price, l.currency)}` : ''}
+                        </button>
+                      ))}
+
+                      <button
+                        type="button"
+                        onClick={() => openPanel(unit.id, 'listing-create')}
+                        title="Put this unit on the market"
+                        className={cn(
+                          'inline-flex min-h-9 items-center gap-1 rounded-full border px-2.5 text-xs font-medium transition-colors',
+                          createOpen
+                            ? 'border-sky-600 bg-sky-600 text-white'
+                            : 'border-sky-200 text-sky-600 hover:bg-sky-50',
+                        )}
+                      >
+                        <Plus className="h-3.5 w-3.5" />
+                        {listings.length === 0 ? 'List it' : 'Another'}
+                      </button>
+
+                      <div className="ml-auto flex items-center gap-0.5 border-l border-slate-100 pl-1.5 sm:ml-0">
+                        <RowAction
+                          label={editOpen ? 'Close' : 'Edit unit'}
+                          active={editOpen}
+                          onClick={() => openPanel(unit.id, 'unit-edit')}
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                        </RowAction>
+                        <RowAction label="Duplicate" onClick={() => duplicateUnit(unit)} disabled={saving}>
+                          <Copy className="h-3.5 w-3.5" />
+                        </RowAction>
+                        <RowAction label="Delete unit" danger onClick={() => setDeleteTarget(unit)}>
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </RowAction>
+                      </div>
+                    </div>
+                  </div>
+
+                  {editOpen && (
+                    <div className="space-y-4 border-t border-slate-100 px-4 pb-5 pt-4 sm:px-5">
+                      <UnitFormPanel
+                        initial={unitFormFrom(unit)}
+                        buildingId={buildingId}
+                        unitId={unit.id}
+                        ownerAssigned={!!unit.ownerUserId}
+                        onSave={(f) => updateUnit(unit.id, f)}
+                        onCancel={() => setExpanded(null)}
+                        saving={saving}
+                      />
+                      {/* Finish / payment options — how off-plan projects are
+                          actually priced, and what the Georgia import carries. */}
+                      <UnitOptions
+                        buildingId={buildingId}
+                        unitId={unit.id}
+                        options={unit.options ?? []}
+                        areaSqm={unit.areaSqm}
+                        onChanged={fetchUnits}
+                      />
                     </div>
                   )}
 
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-1.5">
-                      {ref && (
-                        <span className="rounded border border-slate-200 bg-slate-100 px-1.5 py-0.5 font-mono text-[10px] font-semibold text-slate-500">
-                          {ref}
-                        </span>
-                      )}
-                      <span className="text-sm font-semibold text-slate-900">{label}</span>
-                      <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-500">
-                        {typeLabel(unit.kind)}
-                      </span>
-                      {unit.lifecycle && (
-                        <span className={cn(
-                          'rounded-full px-2 py-0.5 text-xs font-medium',
-                          LIFECYCLE_COLORS[unit.lifecycle] ?? 'bg-slate-100 text-slate-500',
-                        )}>
-                          {LIFECYCLE_OPTIONS.find((o) => o.value === unit.lifecycle)?.label ?? unit.lifecycle}
-                        </span>
-                      )}
-                      {unit.isUnitType && (
-                        <span
-                          className="rounded-full border border-sky-200 bg-sky-50 px-2 py-0.5 text-xs font-medium text-sky-700"
-                          title="A repeatable type, not one specific apartment"
-                        >
-                          Type
-                        </span>
-                      )}
+                  {createOpen && (
+                    <div className="border-t border-slate-100 px-4 pb-5 pt-4 sm:px-5">
+                      <ListingQuickForm
+                        buildingId={buildingId}
+                        unitId={unit.id}
+                        unitLabel={label}
+                        defaultIntent={unit.lifecycle === 'FOR_RENT' ? 'FOR_RENT' : 'FOR_SALE'}
+                        areaSqm={unit.areaSqm}
+                        onSuccess={async () => { setExpanded(null); await fetchUnits() }}
+                        onCancel={() => setExpanded(null)}
+                      />
                     </div>
-                    <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-400">
-                      {unit.floor != null && (
-                        <span className="flex items-center gap-1"><Layers className="h-3 w-3" /> Floor {unit.floor}</span>
-                      )}
-                      {def.beds && unit.bedrooms != null && (
-                        <span className="flex items-center gap-1"><Bed className="h-3 w-3" /> {unit.bedrooms} bed</span>
-                      )}
-                      {unit.areaSqm != null && (
-                        <span className="flex items-center gap-1"><Square className="h-3 w-3" /> {unit.areaSqm} m²</span>
-                      )}
-                      {unit.options?.length > 0 && (
-                        <span className="text-slate-500">{unit.options.length} finish option{unit.options.length === 1 ? '' : 's'}</span>
-                      )}
-                      {unit.ownerUserId && <span className="text-emerald-600">Assigned to a user</span>}
+                  )}
+
+                  {editListingId && (
+                    <div className="border-t border-slate-100 px-4 pb-5 pt-4 sm:px-5">
+                      <ListingEditPanel
+                        listingId={editListingId}
+                        listingLabel={label}
+                        unitId={unit.id}
+                        onSuccess={async () => { setExpanded(null); await fetchUnits() }}
+                        onCancel={() => setExpanded(null)}
+                      />
                     </div>
-                  </div>
+                  )}
+                </li>
+              )
+            })}
+          </ul>
+        )}
 
-                  <div className="flex flex-wrap items-center gap-1.5 sm:flex-nowrap">
-                    {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-                    {listings.map((l: any) => (
-                      <button
-                        key={l.id}
-                        type="button"
-                        onClick={() => openPanel(unit.id, 'listing-edit', l.id)}
-                        title="Edit this listing here"
-                        className={cn(
-                          'inline-flex min-h-9 items-center gap-1.5 rounded-full border px-2.5 text-xs font-medium transition-all',
-                          editListingId === l.id ? 'ring-2 ring-amber-400 ring-offset-1' : 'hover:opacity-80',
-                          LISTING_INTENT_COLORS[l.intent] ?? 'border-slate-200 bg-slate-100 text-slate-600',
-                        )}
-                      >
-                        <span className={cn('h-1.5 w-1.5 shrink-0 rounded-full', LISTING_STATUS_DOT[l.status] ?? 'bg-slate-400')} />
-                        {l.intent === 'FOR_SALE' ? 'Sale' : 'Rent'}
-                        {l.price ? ` · ${formatPrice(l.price, l.currency)}` : ''}
-                      </button>
-                    ))}
-
-                    <button
-                      type="button"
-                      onClick={() => openPanel(unit.id, 'listing-create')}
-                      title="Put this unit on the market"
-                      className={cn(
-                        'inline-flex min-h-9 items-center gap-1 rounded-full border px-2.5 text-xs font-medium transition-colors',
-                        createOpen
-                          ? 'border-sky-600 bg-sky-600 text-white'
-                          : 'border-sky-200 text-sky-600 hover:bg-sky-50',
-                      )}
-                    >
-                      <Plus className="h-3.5 w-3.5" />
-                      {listings.length === 0 ? 'List it' : 'Another'}
-                    </button>
-
-                    <div className="ml-auto flex items-center gap-0.5 border-l border-slate-100 pl-1.5 sm:ml-0">
-                      <RowAction
-                        label={editOpen ? 'Close' : 'Edit unit'}
-                        active={editOpen}
-                        onClick={() => openPanel(unit.id, 'unit-edit')}
-                      >
-                        <Pencil className="h-3.5 w-3.5" />
-                      </RowAction>
-                      <RowAction label="Duplicate" onClick={() => duplicateUnit(unit)} disabled={saving}>
-                        <Copy className="h-3.5 w-3.5" />
-                      </RowAction>
-                      <RowAction label="Delete unit" danger onClick={() => setDeleteTarget(unit)}>
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </RowAction>
-                    </div>
-                  </div>
-                </div>
-
-                {editOpen && (
-                  <div className="space-y-4 border-t border-slate-100 px-4 pb-5 pt-4 sm:px-5">
-                    <UnitFormPanel
-                      initial={unitFormFrom(unit)}
-                      buildingId={buildingId}
-                      unitId={unit.id}
-                      ownerAssigned={!!unit.ownerUserId}
-                      onSave={(f) => updateUnit(unit.id, f)}
-                      onCancel={() => setExpanded(null)}
-                      saving={saving}
-                    />
-                    {/* Finish / payment options — how off-plan projects are
-                        actually priced, and what the Georgia import carries. */}
-                    <UnitOptions
-                      buildingId={buildingId}
-                      unitId={unit.id}
-                      options={unit.options ?? []}
-                      areaSqm={unit.areaSqm}
-                      onChanged={fetchUnits}
-                    />
-                  </div>
-                )}
-
-                {createOpen && (
-                  <div className="border-t border-slate-100 px-4 pb-5 pt-4 sm:px-5">
-                    <ListingQuickForm
-                      buildingId={buildingId}
-                      unitId={unit.id}
-                      unitLabel={label}
-                      defaultIntent={unit.lifecycle === 'FOR_RENT' ? 'FOR_RENT' : 'FOR_SALE'}
-                      areaSqm={unit.areaSqm}
-                      onSuccess={async () => { setExpanded(null); await fetchUnits() }}
-                      onCancel={() => setExpanded(null)}
-                    />
-                  </div>
-                )}
-
-                {editListingId && (
-                  <div className="border-t border-slate-100 px-4 pb-5 pt-4 sm:px-5">
-                    <ListingEditPanel
-                      listingId={editListingId}
-                      listingLabel={label}
-                      unitId={unit.id}
-                      onSuccess={async () => { setExpanded(null); await fetchUnits() }}
-                      onCancel={() => setExpanded(null)}
-                    />
-                  </div>
-                )}
-              </li>
-            )
-          })}
-        </ul>
-      )}
-
-      <ConfirmDialog
-        open={!!deleteTarget}
-        tone="danger"
-        busy={deleting}
-        title={`Delete ${deleteTarget?.name || (deleteTarget?.unitNumber ? `unit ${deleteTarget.unitNumber}` : 'this unit')}?`}
-        description={buildingTitle ? `In ${buildingTitle}.` : undefined}
-        consequences={[
-          deleteTarget?.listings?.length
-            ? `Its ${deleteTarget.listings.length} listing${deleteTarget.listings.length === 1 ? '' : 's'} will be removed from the website.`
-            : 'It has no listings.',
-          deleteTarget?.options?.length
-            ? `${deleteTarget.options.length} finish option${deleteTarget.options.length === 1 ? '' : 's'} will go with it.`
-            : null,
-          'This cannot be undone.',
-        ].filter(Boolean) as string[]}
-        confirmLabel="Delete unit"
-        onConfirm={deleteUnit}
-        onClose={() => !deleting && setDeleteTarget(null)}
-      />
-    </div>
+        <ConfirmDialog
+          open={!!deleteTarget}
+          tone="danger"
+          busy={deleting}
+          title={`Delete ${deleteTarget?.name || (deleteTarget?.unitNumber ? `unit ${deleteTarget.unitNumber}` : 'this unit')}?`}
+          description={buildingTitle ? `In ${buildingTitle}.` : undefined}
+          consequences={[
+            deleteTarget?.listings?.length
+              ? `Its ${deleteTarget.listings.length} listing${deleteTarget.listings.length === 1 ? '' : 's'} will be removed from the website.`
+              : 'It has no listings.',
+            deleteTarget?.options?.length
+              ? `${deleteTarget.options.length} finish option${deleteTarget.options.length === 1 ? '' : 's'} will go with it.`
+              : null,
+            'This cannot be undone.',
+          ].filter(Boolean) as string[]}
+          confirmLabel="Delete unit"
+          onConfirm={deleteUnit}
+          onClose={() => !deleting && setDeleteTarget(null)}
+        />
+      </div>
+    </FormSection>
   )
 }
 
