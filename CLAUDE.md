@@ -130,6 +130,29 @@ What it consumes:
   `Project enquiry: PG-#### — <title>` as the subject. It stores no leads
   locally, so this CRM is the only place they exist.
 
+### View counting
+
+`Building.views` is incremented only when `shouldCountView(req)` says a read is
+a human page view — `apps/backend/src/utils/view-counting.ts`, applied at all
+five increment sites (`buildings.ts` ×2, `properties.ts`, `listings.ts` ×2).
+
+It used to fire on *any* read of a detail endpoint, which made the counter a
+measure of machine traffic. The Georgia storefront's list page hydrates every
+project through `/api/buildings/slug/:slug` (the list response truncates units),
+so **one visitor to propgrp.com/properties recorded 18 views** — one per
+project. With ISR and crawlers on top, projects reached ~37,000.
+
+Rules:
+- **Machine reads send `X-Prefetch: 1`** and are not counted. The storefront's
+  adapter sets it on hydration.
+- Obvious crawler user-agents and empty UAs are not counted.
+- The check is **opt-out, not opt-in**: an un-instrumented caller still counts,
+  so real traffic is never silently under-reported. If the number looks inflated
+  again, look for a new machine caller that isn't sending the header.
+- **Never increment a counter as a side effect of a data read** without this
+  guard. Sitemaps, prefetch, warming and health checks all read the same
+  endpoints.
+
 ### The flat `Property` contract
 
 - **Price is derived, not stored.** Georgian stock has no `Listing` rows, so

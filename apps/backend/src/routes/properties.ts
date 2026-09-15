@@ -2,6 +2,7 @@ import express, { type Request, type Response, type Router } from 'express';
 import { prisma } from '@propgroup/db';
 import { authenticateToken, requireAdmin, logAdminAction } from '../middleware/auth.js';
 import { asyncHandler } from '../utils/errors.js';
+import { shouldCountView } from '../utils/view-counting.js';
 import { logger } from '../utils/logger.js';
 import { sendSuccess, sendCreated, sendPaginated, sendNotFound } from '../utils/response.js';
 import { buildPaginationResponse } from '../utils/pagination.js';
@@ -215,10 +216,12 @@ router.get(
     }
 
     // Fire and forget.
-    prisma.building
-      .update({ where: { id: building.id }, data: { views: { increment: 1 } } })
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      .catch((err: any) => logger.error('Failed to increment building views', err));
+    if (shouldCountView(req)) {
+      prisma.building
+        .update({ where: { id: building.id }, data: { views: { increment: 1 } } })
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        .catch((err: any) => logger.error('Failed to increment building views', err));
+    }
 
     sendSuccess(res, mapBuildingToProperty(building, { detail: true }));
   })

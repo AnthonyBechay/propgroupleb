@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { prisma } from '@propgroup/db';
 import { authenticateToken, requireAdmin, logAdminAction, optionalAuthenticateToken } from '../middleware/auth.js';
 import { asyncHandler } from '../utils/errors.js';
+import { shouldCountView } from '../utils/view-counting.js';
 import { sendSuccess, sendCreated, sendPaginated, sendNotFound, sendError } from '../utils/response.js';
 import { parsePagination, buildPaginationResponse } from '../utils/pagination.js';
 import { listingSchema } from '../schemas/index.js';
@@ -393,7 +394,7 @@ router.get(
     }
 
     const buildingId = listing.buildingId ?? (listing.unit as { buildingId?: string } | null)?.buildingId;
-    if (buildingId) {
+    if (buildingId && shouldCountView(req)) {
       prisma.building
         .update({ where: { id: buildingId }, data: { views: { increment: 1 } } })
         .catch((err) => logger.error('Failed to increment building views', err));
@@ -425,7 +426,7 @@ router.get(
     if (!listing) { sendNotFound(res, 'Listing'); return; }
 
     const buildingId = listing.buildingId ?? (listing.unit as { buildingId?: string } | null)?.buildingId;
-    if (buildingId) {
+    if (buildingId && shouldCountView(req)) {
       prisma.building
         .update({ where: { id: buildingId }, data: { views: { increment: 1 } } })
         .catch((err) => logger.error('Failed to increment building views', err));
