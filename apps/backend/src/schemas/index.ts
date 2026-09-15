@@ -295,19 +295,6 @@ export const ownedPropertySchema = z.object({
   unitId: z.string().optional().nullable(),
 });
 
-export const aiSearchSchema = z.object({
-  query: z.string().min(1).max(500),
-  conversationHistory: z.array(z.object({
-    role: z.enum(['user', 'assistant']),
-    content: z.string(),
-  })).optional(),
-  previousFilters: z.record(z.unknown()).optional(),
-  previousPropertyIds: z.array(z.string()).optional(),
-  context: z.object({
-    userId: z.string().optional(),
-    previousSearches: z.array(z.string()).optional(),
-  }).optional(),
-});
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 

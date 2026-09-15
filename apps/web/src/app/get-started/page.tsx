@@ -174,16 +174,6 @@ export default function GetStartedPage() {
                         Browse Properties
                       </Button>
                     </Link>
-                    <Link href="/ai-search">
-                      <Button
-                        size="lg"
-                        variant="outline"
-                        className="w-full sm:w-auto border-slate-300 text-slate-900 hover:bg-slate-50 rounded-xl"
-                      >
-                        <Sparkles className="w-4 h-4 mr-2" />
-                        AI Search
-                      </Button>
-                    </Link>
                     {!user && (
                       <AuthModal defaultMode="signup">
                         <Button

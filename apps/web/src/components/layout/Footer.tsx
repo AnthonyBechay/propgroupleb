@@ -125,11 +125,6 @@ export function Footer() {
                   Contact
                 </Link>
               </li>
-              <li>
-                <Link href="/ai-search" className="text-zinc-300 hover:text-white transition-colors text-xs">
-                  AI Search
-                </Link>
-              </li>
             </ul>
           </div>
 

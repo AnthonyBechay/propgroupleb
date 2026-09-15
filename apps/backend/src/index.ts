@@ -26,10 +26,8 @@ import inquiryRoutes from './routes/inquiries.js';
 import portfolioRoutes from './routes/portfolio.js';
 import adminRoutes from './routes/admin.js';
 import agentRoutes from './routes/agent.js';
-import aiSearchRoutes from './routes/ai-search.js';
 import aiSeoRoutes from './routes/ai-seo.js';
 import analyticsRoutes from './routes/analytics.js';
-import settingsRoutes from './routes/settings.js';
 import contentRoutes from './routes/content.js';
 import contactRoutes from './routes/contact.js';
 import uploadRoutes from './routes/upload.js';
@@ -242,7 +240,6 @@ app.use('/api/auth/forgot-password', authLimiter);
 app.use('/api/auth/reset-password', authLimiter);
 // Public AI search calls Anthropic per request — unmetered, that is somebody
 // else's bill.
-app.use('/api/ai-search', expensiveLimiter);
 
 // Initialize Passport (JWT-only, no sessions)
 app.use(passport.initialize());
@@ -287,10 +284,19 @@ app.use('/api/inquiries', inquiryRoutes);
 app.use('/api/portfolio', portfolioRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/agent', agentRoutes);
-app.use('/api/ai-search', aiSearchRoutes);
+// AI search was removed: three UNAUTHENTICATED endpoints called Claude on every
+// request, rate-limited only by the 1000-req/15-min general limiter. With a
+// leaked key that cost ~$100 in 24h. Answer explicitly rather than 404 so any
+// stale client is unambiguous in the logs — and costs nothing.
+app.all('/api/ai-search', (_req, res) => {
+  res.status(410).json({ error: 'AI search has been removed.' });
+});
+app.all('/api/ai-search/*', (_req, res) => {
+  res.status(410).json({ error: 'AI search has been removed.' });
+});
+
 app.use('/api/ai-seo', aiSeoRoutes);
 app.use('/api/analytics', analyticsRoutes);
-app.use('/api/settings', settingsRoutes);
 app.use('/api/content', contentRoutes);
 app.use('/api/contact', contactRoutes);
 app.use('/api/upload', uploadRoutes);

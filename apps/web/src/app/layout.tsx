@@ -8,7 +8,6 @@ import { ConditionalFooter } from "@/components/layout/ConditionalFooter";
 import { Toaster } from "@/components/ui/toast";
 import { ConditionalScrollToTop } from "@/components/layout/ConditionalScrollToTop";
 import { AnalyticsTracker } from "@/components/analytics/AnalyticsTracker";
-import { ConditionalAIAssistantFab } from "@/components/ai/ConditionalAIAssistantFab";
 import { ComparatorBar } from "@/components/ComparatorBar";
 
 const inter = Inter({
@@ -184,7 +183,6 @@ export default function RootLayout({
             </div>
             <ConditionalFooter />
             <ConditionalScrollToTop />
-            <ConditionalAIAssistantFab />
             <ComparatorBar />
             <Toaster />
             <AnalyticsTracker />

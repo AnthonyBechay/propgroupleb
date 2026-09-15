@@ -166,26 +166,40 @@ Things to be careful of when changing this API:
   `propgroup/apps/backend/src/utils/shared-mappers.ts` is the only consumer that
   matters, and it reads several candidate key names per value to survive drift.
 
-### The SEO contract
+### The SEO contract — the only AI in the platform
 
-`propgroupleb/apps/backend/src/routes/ai-seo.ts` (`POST /api/ai-seo/generate`) is the **only** SEO generator
-across both sites, driven by the "Auto-write SEO" action in
-`propgroupleb/apps/web/src/app/(admin)/admin/buildings/BuildingForm.tsx`, writing `Building.metaTitle` /
-`metaDescription`.
+`routes/ai-seo.ts` (`POST /api/ai-seo/generate`) is the **only** endpoint in
+either repo that may call Claude. Admin-gated, driven by the "Auto-write SEO"
+action in `admin/buildings/BuildingForm.tsx`, writing `Building.metaTitle` /
+`metaDescription` — which the Georgia storefront then treats as authoritative.
 
 It is **country-aware** via `marketFor(country)`. It previously hardcoded
 Lebanon — every prompt said "a Lebanese property platform" and required
 `'Lebanon'` in the meta title — which is why the Georgian catalogue was never
-given metadata: the output would have been wrong. Georgia / Cyprus / Greece /
-Lebanon each get their own wording, and an unknown country omits the cue rather
-than guessing.
+given metadata: the output would have been wrong.
 
-propgrp.com treats whatever is stored here as authoritative and only formats a
-fallback when both fields are empty. So **generating SEO here is what makes it
-appear on the Georgia site** — nothing else needs doing.
+**Spend controls — `apps/backend/src/config/ai.ts`.** This file is the only
+permitted importer of `@anthropic-ai/sdk` anywhere in either repo. Three
+independent guards:
 
-Do not add a second generator in the other repo. One was built there by mistake
-and removed.
+1. **Default-deny.** `isAiEnabled()` requires `AI_ENABLED === 'true'` *and* a
+   key. Unsetting `AI_ENABLED` stops all spend without touching code.
+2. **Hardcoded cheap-model allowlist** (`claude-haiku-4-5-20251001`).
+   Deliberately not env-driven, so a mis-set variable cannot pick an expensive
+   model.
+3. **`createMessage()` takes no `model` argument.** Callers cannot pass one.
+   Output is capped at 600 tokens and each call logs its estimated cost.
+
+**Why this exists:** `/api/ai-search` had three *unauthenticated* endpoints
+calling Claude per request, behind only a 1000-req/15-min limiter — roughly
+$16/hour from a single IP. With an API key that had leaked into a committed log
+file, it cost ~$100 in 24 hours on a model this codebase never requests. The
+feature, its admin panel, its settings route and its frontend entry points were
+all removed; `/api/ai-search` now answers `410 Gone`.
+
+**Do not** add a second AI endpoint, import the SDK elsewhere, or reintroduce AI
+search. If a new AI feature is genuinely needed, it goes through
+`createMessage()` and stays admin-gated.
 ---
 
 ## Reference codes

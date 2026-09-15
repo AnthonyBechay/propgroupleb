@@ -21,9 +21,8 @@ import {
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { AISettingsPanel } from '@/components/admin/AISettingsPanel'
 
-type TabType = 'profile' | 'security' | 'appearance' | 'ai'
+type TabType = 'profile' | 'security' | 'appearance'
 
 export default function SettingsPage() {
   const { user, updateProfile, changePassword } = useAuth()
@@ -187,7 +186,6 @@ export default function SettingsPage() {
     { id: 'profile' as TabType, label: 'Profile', icon: User, color: 'bg-slate-800' },
     { id: 'security' as TabType, label: 'Security', icon: Lock, color: 'bg-emerald-600' },
     { id: 'appearance' as TabType, label: 'Appearance', icon: Palette, color: 'bg-teal-600' },
-    { id: 'ai' as TabType, label: 'AI Search', icon: Bot, color: 'bg-violet-600' },
   ]
 
   return (
@@ -576,7 +574,6 @@ export default function SettingsPage() {
 
 
           {/* AI Search Tab */}
-          {activeTab === 'ai' && <AISettingsPanel />}
 
         </div>
       </div>

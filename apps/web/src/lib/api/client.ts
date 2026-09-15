@@ -337,19 +337,6 @@ class ApiClient {
   async getSystemHealth() {
     return this.request('/api/admin/health');
   }
-
-  // AI Search endpoints
-  async aiSearch(query: string, context?: { userId?: string; previousSearches?: string[] }) {
-    return this.request('/api/ai-search', {
-      method: 'POST',
-      body: JSON.stringify({ query, context }),
-    });
-  }
-
-  async getAISearchSuggestions() {
-    return this.request('/api/ai-search/suggestions');
-  }
-
   // Agent endpoints
   async getAgentDashboardStats() {
     return this.request('/api/agent/dashboard/stats');

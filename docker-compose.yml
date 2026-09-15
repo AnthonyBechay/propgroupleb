@@ -19,6 +19,9 @@ services:
       GOOGLE_CALLBACK_URL: ${GOOGLE_CALLBACK_URL:-}
       BACKEND_URL: ${BACKEND_URL:-}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      # Master AI switch. OFF unless explicitly 'true'. Unset this and
+      # redeploy to stop ALL Anthropic spend without touching code.
+      AI_ENABLED: ${AI_ENABLED:-true}
       # Cloudflare R2 — required for file uploads
       R2_ACCOUNT_ID: ${R2_ACCOUNT_ID:-}
       R2_ACCESS_KEY_ID: ${R2_ACCESS_KEY_ID:-}

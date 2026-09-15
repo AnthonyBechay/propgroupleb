@@ -1,24 +1,16 @@
 import express, { type Request, type Response, type Router } from 'express';
-import Anthropic from '@anthropic-ai/sdk';
 import { z } from 'zod';
 import { prisma } from '@propgroup/db';
 import { authenticateToken, requireAdmin, logAdminAction } from '../middleware/auth.js';
 import { asyncHandler } from '../utils/errors.js';
+import { createText, isAiEnabled } from '../config/ai.js';
 import { logger } from '../utils/logger.js';
 import { sendSuccess, sendError } from '../utils/response.js';
 import type { AuthenticatedRequest } from '../types/index.js';
 
 const router: Router = express.Router();
 
-// Lazy Anthropic client — picks up env at request time (matches ai-search.ts).
-let _anthropic: Anthropic | null = null;
-function getAnthropic(): Anthropic | null {
-  if (!process.env.ANTHROPIC_API_KEY) return null;
-  if (!_anthropic) _anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-  return _anthropic;
-}
 
-const SEO_MODEL = 'claude-haiku-4-5-20251001';
 
 const generateSchema = z.object({
   type: z.enum(['building', 'unit']),
@@ -109,9 +101,8 @@ router.post(
     const authReq = req as AuthenticatedRequest;
     const { type, id, attributes } = generateSchema.parse(req.body);
 
-    const client = getAnthropic();
-    if (!client) {
-      sendError(res, 503, 'AI is not configured (missing ANTHROPIC_API_KEY).');
+    if (!isAiEnabled()) {
+      sendError(res, 503, 'AI is disabled. Set AI_ENABLED=true and ANTHROPIC_API_KEY to enable.');
       return;
     }
 
@@ -189,15 +180,13 @@ ${facts}
 Rules: be accurate to the facts (never invent amenities, prices or sizes), write natural English, no emojis, no quotes around values, no markdown. Return JSON only.`;
 
     try {
-      const message = await client.messages.create({
-        model: SEO_MODEL,
-        max_tokens: 600,
+      // Routed through config/ai.ts, which pins the model to the cheap-tier
+      // allowlist, caps output tokens, logs per-call cost, and refuses to run
+      // unless AI_ENABLED=true. There is deliberately no way to pass a model.
+      const text = await createText({
         messages: [{ role: 'user', content: prompt }],
+        maxTokens: 600,
       });
-      const text = message.content
-        .filter((c): c is Anthropic.TextBlock => c.type === 'text')
-        .map((c) => c.text)
-        .join('');
       const parsed = parseJsonReply(text);
       if (!parsed) { sendError(res, 502, 'AI returned an unparseable response. Try again.'); return; }
 

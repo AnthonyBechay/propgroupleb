@@ -134,68 +134,7 @@ export function ListingsFilterBar() {
       .catch(() => {})
   }, [apiBase])
 
-  // ── AI inline box ──────────────────────────────────────────────────────────
-  const [aiEnabled, setAiEnabled] = useState(true)
-  const [aiOpen, setAiOpen] = useState(false)
-  const [aiQuery, setAiQuery] = useState('')
-  const [aiLoading, setAiLoading] = useState(false)
-  const [aiSummary, setAiSummary] = useState<string | null>(null)
-
-  useEffect(() => {
-    fetch(`${apiBase}/api/settings/public`)
-      .then((r) => (r.ok ? r.json() : null))
-      .then((j) => { const v = (j?.data ?? j)?.aiSearchEnabled; if (typeof v === 'boolean') setAiEnabled(v) })
-      .catch(() => {})
-  }, [apiBase])
-
-  async function runAiSearch() {
-    const q = aiQuery.trim()
-    if (!q || aiLoading) return
-    setAiLoading(true)
-    setAiSummary(null)
-    track('search', { meta: { query: q, source: 'inline' } })
-    try {
-      const res = await fetch(`${apiBase}/api/ai-search/catalog`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query: q }),
-      })
-      const json = await res.json()
-      const data = json?.data ?? json
-      const parsed = (data?.filters ?? {}) as Record<string, unknown>
-      const clean: Record<string, string> = {}
-      for (const k of AI_PARAM_KEYS) {
-        const v = parsed[k]
-        if (v !== null && v !== undefined && v !== '') clean[k] = String(v)
-      }
-      if (Object.keys(clean).length) {
-        // Reflect the AI's picks in the controls (which pushes them to the URL).
-        setFilters((f) => ({
-          ...f,
-          intent: clean.intent ?? f.intent,
-          kind: clean.kind ?? f.kind,
-          mohafazat: clean.mohafazat ?? f.mohafazat,
-          city: clean.city ?? f.city,
-          minPrice: clean.minPrice ?? f.minPrice,
-          maxPrice: clean.maxPrice ?? f.maxPrice,
-          minBeds: clean.minBeds ?? f.minBeds,
-          sort: clean.sortBy ? `${clean.sortBy}:${clean.sortOrder || 'desc'}` : f.sort,
-        }))
-        setAiSummary(data?.summary || 'Here’s what I found:')
-      } else {
-        setAiSummary(data?.summary || 'Sorry, I couldn’t turn that into filters — try rephrasing, or use the filters below.')
-      }
-    } catch {
-      setAiSummary('AI search is unavailable right now — please try the filters below.')
-    } finally {
-      setAiLoading(false)
-    }
-  }
-
   function clearAll() {
-    setAiSummary(null)
-    setAiQuery('')
-    setAiOpen(false)
     setFilters(EMPTY)
   }
 
@@ -253,52 +192,7 @@ export function ListingsFilterBar() {
             </button>
           )}
         </div>
-        {aiEnabled && (
-          <button
-            type="button"
-            onClick={() => setAiOpen((o) => !o)}
-            className={`shrink-0 inline-flex items-center gap-1.5 h-12 px-4 rounded-xl text-sm font-semibold shadow-sm transition-colors ${
-              aiOpen ? 'bg-slate-900 text-white' : 'text-white bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700'
-            }`}
-          >
-            <Sparkles className="w-4 h-4" />
-            <span className="sm:hidden">AI</span>
-            <span className="hidden sm:inline">AI search</span>
-          </button>
-        )}
       </div>
-
-      {/* AI panel */}
-      {aiOpen && aiEnabled && (
-        <div className="rounded-xl border border-violet-200 bg-violet-50/50 p-3 space-y-3">
-          <div className="flex flex-col sm:flex-row gap-2">
-            <div className="relative flex-1">
-              <Sparkles className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-violet-400 pointer-events-none" />
-              <input
-                type="text"
-                value={aiQuery}
-                onChange={(e) => setAiQuery(e.target.value)}
-                onKeyDown={(e) => { if (e.key === 'Enter') runAiSearch() }}
-                placeholder="e.g. 2-bed apartment in Beirut under $200k"
-                className="w-full pl-9 pr-3 h-11 text-base sm:text-sm border border-violet-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-500"
-                autoFocus
-              />
-            </div>
-            <button
-              type="button"
-              onClick={runAiSearch}
-              disabled={aiLoading || !aiQuery.trim()}
-              className="inline-flex items-center justify-center gap-1.5 h-11 px-4 rounded-xl text-sm font-medium text-white bg-violet-600 hover:bg-violet-700 disabled:opacity-50"
-            >
-              {aiLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <ArrowRight className="w-4 h-4" />}
-              Search
-            </button>
-          </div>
-          {aiSummary && (
-            <div className="text-sm text-slate-700 bg-white border border-violet-200 rounded-lg px-3 py-2">{aiSummary}</div>
-          )}
-        </div>
-      )}
 
       {/* Intent tabs + mobile "Filters" toggle */}
       <div className="flex items-center gap-2">
