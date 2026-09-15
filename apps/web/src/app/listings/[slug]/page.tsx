@@ -1,4 +1,5 @@
 import { notFound } from 'next/navigation'
+import { prettyAttr } from '@/lib/unit-attributes'
 import Link from 'next/link'
 import {
   MapPin,
@@ -412,7 +413,9 @@ export default async function ListingDetailPage({ params }: PageProps) {
                   {unit.features.map((f: string, i: number) => (
                     <li key={i} className="flex items-center gap-2 text-sm text-slate-700">
                       <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
-                      {f}
+                      {/* Imported stock stores these as MAID_ROOM-style tokens;
+                          anything typed in the back office is already readable. */}
+                      {prettyAttr(f)}
                     </li>
                   ))}
                 </ul>

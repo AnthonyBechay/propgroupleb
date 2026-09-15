@@ -25,6 +25,12 @@ const unitUpdateSchema = z.object({
   areaSqm: z.number().optional().nullable(),
   floor: z.number().int().optional().nullable(),
   parkingSpaces: z.number().int().optional().nullable(),
+  // A repeatable type ("1 bedroom" in a development) rather than one specific
+  // apartment. This was missing, and Zod strips unknown keys rather than
+  // rejecting them — so the admin's "this is a unit type" checkbox posted the
+  // value on every save and the server silently dropped it. It could be set
+  // when the unit was created and never changed afterwards.
+  isUnitType: z.boolean().optional(),
   furnishing: z.enum(['UNFURNISHED', 'SEMI_FURNISHED', 'FULLY_FURNISHED']).optional().nullable(),
   ownership: z.enum(['FREEHOLD', 'LEASEHOLD']).optional().nullable(),
   views: z.array(z.string()).optional(),

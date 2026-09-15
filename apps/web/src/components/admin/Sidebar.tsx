@@ -3,7 +3,6 @@
 import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname } from 'next/navigation'
-import { useEffect, useState } from 'react'
 import {
   Home,
   Building2,
@@ -13,62 +12,71 @@ import {
   BarChart3,
   LogOut,
   MessageSquare,
-  ArrowLeft,
+  ExternalLink,
   Inbox,
   MapPin,
   ListFilter,
   ClipboardList,
-  ChevronDown,
   UserSearch,
-  Contact,
-  Warehouse,
   X,
 } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { canAccessAdminPath, isSuperAdmin, ROLE_LABELS, type Role } from '@/lib/permissions'
+import { cn } from '@/lib/utils'
 
 interface NavItem {
   name: string
   href: string
   icon: React.ComponentType<{ className?: string }>
+  /** Matched in addition to `href` so a detail route keeps its parent lit. */
+  match?: string[]
 }
 
 interface NavGroup {
   id: string
   label: string
-  icon: React.ComponentType<{ className?: string }>
   items: NavItem[]
 }
 
-// Grouped so related work sits together and the list stays short. Each group
-// collapses; the one containing the current route auto-opens.
+/**
+ * Sections, not accordions.
+ *
+ * These used to be collapsible: each group remembered its open state in
+ * localStorage, and the group containing the current route force-opened itself
+ * on every navigation. So the nav re-laid itself out as you used it — going to
+ * Settings expanded System and pushed nothing, but coming back to Properties
+ * expanded Inventory and shoved System five rows down. Every link was at a
+ * different height on every page, which is the "sliding menu": you learn where
+ * Listings is, and next time it isn't there.
+ *
+ * Collapsing was solving a problem this list doesn't have. Eleven links fit.
+ * They are now always visible, always in the same place, and the headers are
+ * plain labels with nothing to click.
+ */
 const GROUPS: NavGroup[] = [
   {
     id: 'inventory',
     label: 'Inventory',
-    icon: Warehouse,
     items: [
       { name: 'Properties', href: '/admin/buildings', icon: Building2 },
       { name: 'Listings', href: '/admin/listings', icon: ListFilter },
-      { name: 'Owner Submissions', href: '/admin/submissions', icon: ClipboardList },
-      { name: 'Location Guides', href: '/admin/location-guides', icon: MapPin },
+      { name: 'Owner submissions', href: '/admin/submissions', icon: ClipboardList },
+      { name: 'Location guides', href: '/admin/location-guides', icon: MapPin },
       { name: 'Documents', href: '/admin/documents', icon: FileText },
     ],
   },
   {
     id: 'clients',
     label: 'Clients',
-    icon: Contact,
     items: [
-      { name: 'CRM — Clients', href: '/admin/crm', icon: UserSearch },
+      { name: 'CRM', href: '/admin/crm', icon: UserSearch },
       { name: 'Inquiries', href: '/admin/inquiries', icon: MessageSquare },
-      { name: 'Contact Messages', href: '/admin/contacts', icon: Inbox },
+      { name: 'Contact messages', href: '/admin/contacts', icon: Inbox },
     ],
   },
   {
     id: 'system',
     label: 'System',
-    icon: Settings,
     items: [
       { name: 'Analytics', href: '/admin/analytics', icon: BarChart3 },
       { name: 'Users', href: '/admin/users', icon: Users },
@@ -77,7 +85,11 @@ const GROUPS: NavGroup[] = [
   },
 ]
 
-const STORAGE_KEY = 'admin-nav-open-groups'
+/** Every nav destination, flattened — the header's breadcrumb reads this too. */
+export const ADMIN_NAV_ITEMS = [
+  { name: 'Dashboard', href: '/admin', icon: Home },
+  ...GROUPS.flatMap((g) => g.items),
+]
 
 /**
  * The back-office nav — one component, two presentations.
@@ -97,28 +109,32 @@ export function Sidebar({ open = false, onClose }: { open?: boolean; onClose?: (
 
       {/* Mobile drawer */}
       <div
-        className={`lg:hidden fixed inset-0 z-50 transition-opacity duration-200 ${
-          open ? 'opacity-100' : 'pointer-events-none opacity-0'
-        }`}
+        className={cn(
+          'fixed inset-0 z-50 transition-opacity duration-200 lg:hidden',
+          open ? 'opacity-100' : 'pointer-events-none opacity-0',
+        )}
         aria-hidden={!open}
       >
-        <div
-          className="absolute inset-0 bg-black/50"
-          onClick={onClose}
-        />
+        <div className="absolute inset-0 bg-black/50" onClick={onClose} />
         <div
           role="dialog"
           aria-modal="true"
           aria-label="Admin navigation"
-          className={`absolute inset-y-0 left-0 w-[17rem] max-w-[85vw] transition-transform duration-200 ease-out ${
-            open ? 'translate-x-0' : '-translate-x-full'
-          }`}
+          className={cn(
+            'absolute inset-y-0 left-0 w-[17rem] max-w-[85vw] transition-transform duration-200 ease-out',
+            open ? 'translate-x-0' : '-translate-x-full',
+          )}
         >
           <SidebarNav onNavigate={onClose} onClose={onClose} />
         </div>
       </div>
     </>
   )
+}
+
+function isActive(pathname: string, item: NavItem): boolean {
+  const all = [item.href, ...(item.match ?? [])]
+  return all.some((h) => pathname === h || pathname.startsWith(h + '/'))
 }
 
 function SidebarNav({ onNavigate, onClose }: { onNavigate?: () => void; onClose?: () => void }) {
@@ -134,79 +150,40 @@ function SidebarNav({ onNavigate, onClose }: { onNavigate?: () => void; onClose?
     .filter((g) => g.items.length > 0)
 
   const showDashboard = canAccessAdminPath(role, '/admin')
-
-  const groupOf = (path: string) => groups.find((g) => g.items.some((i) => path.startsWith(i.href)))?.id
-
-  // Start with the active group open; restore the rest from localStorage.
-  const [open, setOpen] = useState<string[]>(() => {
-    const active = groupOf(pathname)
-    return active ? [active] : ['inventory']
-  })
-
-  useEffect(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY)
-      if (saved) {
-        const ids = JSON.parse(saved) as string[]
-        const active = groupOf(pathname)
-        setOpen(active && !ids.includes(active) ? [...ids, active] : ids)
-      }
-    } catch { /* ignore malformed storage */ }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
-
-  // Keep the group containing the current page open when navigating.
-  useEffect(() => {
-    const active = groupOf(pathname)
-    if (active) setOpen((prev) => (prev.includes(active) ? prev : [...prev, active]))
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pathname])
-
-  function toggle(id: string) {
-    setOpen((prev) => {
-      const next = prev.includes(id) ? prev.filter((g) => g !== id) : [...prev, id]
-      try { localStorage.setItem(STORAGE_KEY, JSON.stringify(next)) } catch { /* ignore */ }
-      return next
-    })
-  }
+  const dashboardActive = pathname === '/admin'
 
   // `min-h-11` keeps every row at the ~44px Apple/Android minimum touch target;
   // at the old `p-2.5` these were 36px and consistently mis-tapped on a phone.
   const linkCls = (active: boolean) =>
-    `group flex min-h-11 items-center gap-x-3 rounded-lg px-2.5 py-2.5 text-sm font-medium leading-6 transition-all ${
-      active ? 'bg-zinc-700 text-white' : 'text-zinc-400 hover:text-white hover:bg-zinc-800'
-    }`
+    cn(
+      'group relative flex min-h-11 items-center gap-x-3 rounded-lg px-2.5 py-2.5 text-sm font-medium leading-6 transition-colors',
+      active ? 'bg-zinc-800 text-white' : 'text-zinc-400 hover:bg-zinc-800/60 hover:text-white',
+    )
   const iconCls = (active: boolean) =>
-    `h-5 w-5 shrink-0 ${active ? 'text-white' : 'text-zinc-500 group-hover:text-white'}`
-
-  const dashboardActive = pathname === '/admin'
+    cn('h-5 w-5 shrink-0', active ? 'text-white' : 'text-zinc-500 group-hover:text-zinc-300')
 
   return (
-    <div className="flex h-full grow flex-col gap-y-5 overflow-y-auto overscroll-contain bg-zinc-900 px-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:px-6 border-r border-zinc-800">
+    <div className="flex h-full grow flex-col gap-y-4 overflow-y-auto overscroll-contain border-r border-zinc-800 bg-zinc-900 px-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:px-5">
+      {/* Brand */}
       <div className="flex h-16 shrink-0 items-center gap-3">
-        <Image src="/logo.png" alt="PropGroup" width={40} height={40} className="brightness-0 invert" />
+        <Image src="/logo.png" alt="PropGroup" width={36} height={36} className="brightness-0 invert" />
         <div className="min-w-0 flex-1">
-          <span className="font-bold text-lg text-white block leading-tight">Admin Panel</span>
-          {user?.role && user.role !== 'ADMIN' ? (
-            <span
-              className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-semibold text-white mt-0.5 ${
-                isSuperAdmin(user.role) ? 'bg-amber-600' : 'bg-emerald-700'
-              }`}
-            >
-              {ROLE_LABELS[role] ?? role}
-            </span>
-          ) : (
-            <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-semibold bg-zinc-600 text-white mt-0.5">
-              Admin
-            </span>
-          )}
+          <span className="block text-base font-bold leading-tight text-white">Back office</span>
+          <span
+            className={cn(
+              'mt-0.5 inline-flex items-center rounded-md px-1.5 py-0.5 text-[11px] font-semibold text-white',
+              isSuperAdmin(role) ? 'bg-amber-600' : role === 'ADMIN' ? 'bg-zinc-700' : 'bg-emerald-700',
+            )}
+          >
+            {ROLE_LABELS[role] ?? role}
+          </span>
         </div>
         {onClose && (
           <button
             type="button"
             onClick={onClose}
             aria-label="Close navigation"
-            className="lg:hidden -mr-1 flex h-11 w-11 items-center justify-center rounded-lg text-zinc-400 hover:bg-zinc-800 hover:text-white"
+            className="-mr-1 flex h-11 w-11 items-center justify-center rounded-lg text-zinc-400 hover:bg-zinc-800 hover:text-white lg:hidden"
           >
             <X className="h-5 w-5" />
           </button>
@@ -220,62 +197,52 @@ function SidebarNav({ onNavigate, onClose }: { onNavigate?: () => void; onClose?
               <Link href="/admin" onClick={onNavigate} className={linkCls(dashboardActive)}>
                 <Home className={iconCls(dashboardActive)} aria-hidden="true" />
                 Dashboard
+                {dashboardActive && <ActiveMark />}
               </Link>
             </li>
           )}
 
-          {groups.map((group) => {
-            const isOpen = open.includes(group.id)
-            const hasActive = group.items.some((i) => pathname.startsWith(i.href))
-            return (
-              <li key={group.id} className="-mx-2 mt-2">
-                <button
-                  type="button"
-                  onClick={() => toggle(group.id)}
-                  aria-expanded={isOpen}
-                  className={`w-full flex min-h-9 items-center gap-x-2 px-2.5 py-1.5 rounded-lg text-xs font-semibold uppercase tracking-wider transition-colors ${
-                    hasActive ? 'text-zinc-200' : 'text-zinc-500 hover:text-zinc-300'
-                  }`}
-                >
-                  <group.icon className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-                  <span className="flex-1 text-left">{group.label}</span>
-                  <ChevronDown
-                    className={`h-3.5 w-3.5 shrink-0 transition-transform ${isOpen ? '' : '-rotate-90'}`}
-                    aria-hidden="true"
-                  />
-                </button>
-                {isOpen && (
-                  <ul role="list" className="mt-1 space-y-1">
-                    {group.items.map((item) => {
-                      const active = pathname === item.href || pathname.startsWith(item.href + '/')
-                      return (
-                        <li key={item.name}>
-                          <Link href={item.href} onClick={onNavigate} className={linkCls(active)}>
-                            <item.icon className={iconCls(active)} aria-hidden="true" />
-                            {item.name}
-                          </Link>
-                        </li>
-                      )
-                    })}
-                  </ul>
-                )}
-              </li>
-            )
-          })}
+          {groups.map((group) => (
+            <li key={group.id} className="-mx-2 mt-4 first:mt-2">
+              {/* A label, not a button. Nothing here opens or closes. */}
+              <p className="px-2.5 pb-1 text-[11px] font-semibold uppercase tracking-wider text-zinc-600">
+                {group.label}
+              </p>
+              <ul role="list" className="space-y-0.5">
+                {group.items.map((item) => {
+                  const active = isActive(pathname, item)
+                  return (
+                    <li key={item.href}>
+                      <Link
+                        href={item.href}
+                        onClick={onNavigate}
+                        aria-current={active ? 'page' : undefined}
+                        className={linkCls(active)}
+                      >
+                        <item.icon className={iconCls(active)} aria-hidden="true" />
+                        <span className="truncate">{item.name}</span>
+                        {active && <ActiveMark />}
+                      </Link>
+                    </li>
+                  )
+                })}
+              </ul>
+            </li>
+          ))}
 
-          <li className="mt-auto space-y-2 -mx-2 pt-4">
+          <li className="-mx-2 mt-auto space-y-1 pt-6">
             <Link
               href="/"
               target="_blank"
               onClick={onNavigate}
-              className="group flex min-h-11 w-full items-center gap-x-3 rounded-lg px-2.5 py-2.5 text-sm font-medium leading-6 text-zinc-400 hover:bg-zinc-800 hover:text-white transition-all"
+              className="group flex min-h-11 w-full items-center gap-x-3 rounded-lg px-2.5 py-2.5 text-sm font-medium leading-6 text-zinc-400 transition-colors hover:bg-zinc-800/60 hover:text-white"
             >
-              <ArrowLeft className="h-5 w-5 shrink-0 text-zinc-500 group-hover:text-white" aria-hidden="true" />
-              Back to Website
+              <ExternalLink className="h-5 w-5 shrink-0 text-zinc-500 group-hover:text-zinc-300" aria-hidden="true" />
+              View website
             </Link>
             <button
               onClick={signOut}
-              className="group flex min-h-11 w-full items-center gap-x-3 rounded-lg px-2.5 py-2.5 text-sm font-medium leading-6 text-zinc-400 hover:bg-red-900/30 hover:text-red-400 transition-all"
+              className="group flex min-h-11 w-full items-center gap-x-3 rounded-lg px-2.5 py-2.5 text-sm font-medium leading-6 text-zinc-400 transition-colors hover:bg-red-900/30 hover:text-red-400"
             >
               <LogOut className="h-5 w-5 shrink-0 text-zinc-500 group-hover:text-red-400" aria-hidden="true" />
               Sign out
@@ -284,5 +251,15 @@ function SidebarNav({ onNavigate, onClose }: { onNavigate?: () => void; onClose?
         </ul>
       </nav>
     </div>
+  )
+}
+
+/** The bar down the left edge of the active row — findable at a glance. */
+function ActiveMark() {
+  return (
+    <span
+      className="absolute inset-y-1.5 -left-2 w-1 rounded-r bg-white"
+      aria-hidden="true"
+    />
   )
 }

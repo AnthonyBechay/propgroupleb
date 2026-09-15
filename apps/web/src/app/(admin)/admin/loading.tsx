@@ -9,7 +9,7 @@
  */
 export default function AdminLoading() {
   return (
-    <div className="p-4 sm:p-6">
+    <div>
       {/* Header row */}
       <div className="flex items-start justify-between mb-6 gap-4">
         <div className="space-y-2 flex-1">

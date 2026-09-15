@@ -51,6 +51,9 @@ const listingUpdateSchema = z.object({
   price: z.number().min(0).optional(),
   currency: z.enum(['USD', 'LBP']).optional(),
   rentPeriod: z.enum(['MONTHLY', 'QUARTERLY', 'YEARLY']).optional().nullable(),
+  // Settable at creation but absent here, so "price is negotiable" could be
+  // turned on once and never off again — the update silently dropped it.
+  negotiable: z.boolean().optional(),
   headline: z.string().optional().nullable(),
   description: z.string().optional().nullable(),
   highlights: z.array(z.string()).optional(),

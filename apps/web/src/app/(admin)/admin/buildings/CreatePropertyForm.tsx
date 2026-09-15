@@ -1,566 +1,674 @@
 'use client'
 
-import { useState, useRef } from 'react'
+import { useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import Link from 'next/link'
-import { ArrowLeft, Loader2, Building2, Image as ImageIcon, X, Home, Plus, Sparkles, Star, FileText, Upload, Video } from 'lucide-react'
-import { normalizeApiUrl, normalizeFileUrl } from '@/lib/utils/api-url'
-import { PaymentPlansEditor, type PaymentPlan } from '@/components/admin/PaymentPlansEditor'
-import { LocationFields } from '@/components/admin/LocationFields'
-import { OwnerPicker, type OwnerRef } from '@/components/admin/OwnerPicker'
+import {
+  Check, ChevronLeft, ChevronRight, FileText, Home, Loader2, Sparkles, Upload, X,
+} from 'lucide-react'
+import { normalizeApiUrl } from '@/lib/utils/api-url'
+import { toast } from '@/components/ui/use-toast'
+import { type OwnerRef } from '@/components/admin/OwnerPicker'
+import {
+  Field, FieldGrid, InlineNote, MoneyInput, NumberInput, SegmentedControl,
+  SelectInput, TextInput, Toggle,
+} from '@/components/admin/ui/form'
+import { FormSection, PageHeader } from '@/components/admin/ui/layout'
+import { useUnsavedChanges } from '@/components/admin/ui/useUnsavedChanges'
 import { isKnownLocation } from '@/lib/lebanon-locations'
-import { PROPERTY_TYPE_GROUPS, typeDef, typeLabel, isResidential } from '@/lib/property-types'
+import { isResidential, typeDef, typeLabel } from '@/lib/property-types'
+import { cn } from '@/lib/utils'
+import {
+  BasicsSection, HighlightsSection, InvestmentSection, LocationSection,
+  MediaSection, PaymentPlansSection, SeoSection, SpecsSection,
+} from './BuildingSections'
+import { buildingPayload, emptyBuildingForm, type BuildingFormState } from './building-form-state'
 
-// Amenities split by who they're relevant to — a warehouse has no pool or gym.
-const SHARED_AMENITIES = [
-  { key: 'hasGenerator', label: 'Generator' }, { key: 'hasElevator', label: 'Elevator' },
-  { key: 'hasSecurity', label: 'Security' }, { key: 'hasSolarPower', label: 'Solar Power' },
-] as const
-const RESIDENTIAL_AMENITIES = [
-  { key: 'hasPool', label: 'Pool' }, { key: 'hasGym', label: 'Gym' },
-  { key: 'hasConcierge', label: 'Concierge' }, { key: 'hasGarden', label: 'Garden' },
-  { key: 'hasRooftop', label: 'Rooftop' },
-  { key: 'hasCentralAC', label: 'Central A/C' },
-] as const
 const DOC_TYPES = ['FLOOR_PLAN', 'BROCHURE', 'CONTRACT', 'LEGAL_DOCUMENT', 'CERTIFICATE', 'OTHER']
 const DOC_TYPE_LABELS: Record<string, string> = {
-  FLOOR_PLAN: 'Floor Plan', BROCHURE: 'Brochure', CONTRACT: 'Contract',
-  LEGAL_DOCUMENT: 'Legal Document', CERTIFICATE: 'Certificate', OTHER: 'Other',
+  FLOOR_PLAN: 'Floor plan', BROCHURE: 'Brochure', CONTRACT: 'Contract',
+  LEGAL_DOCUMENT: 'Legal document', CERTIFICATE: 'Certificate', OTHER: 'Other',
 }
 
 interface DocEntry { file: File; title: string; type: string; isPublic: boolean }
 
+const STEPS = [
+  { id: 'property', label: 'Property', hint: 'What and where' },
+  { id: 'details', label: 'Details', hint: 'Size and features' },
+  { id: 'media', label: 'Photos', hint: 'Images and files' },
+  { id: 'market', label: 'Price', hint: 'Put it on the market' },
+] as const
+
+type StepId = (typeof STEPS)[number]['id']
+
+/**
+ * Adding a property.
+ *
+ * This was a single 560-line scroll: nine cards, every field for every property
+ * type, with the one required decision — the title — sharing a screen with
+ * meta descriptions and golden-visa amounts. Typical stock needs four fields to
+ * exist at all, so the form asked for sixty and buried the four.
+ *
+ * It is now four steps, and only the first is mandatory. From step two onward
+ * "Create now" is live: get the property into the system, fill in the rest from
+ * the edit screen when the photos actually arrive, which is how these listings
+ * are really put together.
+ */
 export function CreatePropertyForm() {
   const router = useRouter()
   const apiUrl = normalizeApiUrl(process.env.NEXT_PUBLIC_API_URL || '')
-  const fileInputRef = useRef<HTMLInputElement>(null)
   const docInputRef = useRef<HTMLInputElement>(null)
-  const videoInputRef = useRef<HTMLInputElement>(null)
-  const [saving, setSaving] = useState(false)
-  const [uploading, setUploading] = useState(false)
-  const [uploadingVideo, setUploadingVideo] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  // Whose property this is — linked to a CRM client, or created inline.
+
+  const [step, setStep] = useState<StepId>('property')
+  const [form, setForm] = useState<BuildingFormState>(() => emptyBuildingForm())
   const [owner, setOwner] = useState<OwnerRef | null>(null)
-  const [highlightInput, setHighlightInput] = useState('')
-  const [aiLoading, setAiLoading] = useState(false)
-
-  const [f, setF] = useState({
-    title: '', kind: 'STANDALONE', status: 'NEW_BUILD', visibility: 'PUBLIC', featured: false,
-    shortDescription: '', description: '',
-    country: 'LEBANON',
-    mohafazat: '', caza: '', city: '', neighborhood: '', address: '',
-    locationUrl: '', builtYear: '', totalFloors: '', parkingSpaces: '',
-    hasGenerator: false, hasElevator: false, hasPool: false, hasGym: false, hasConcierge: false,
-    hasSecurity: false, hasGarden: false, hasRooftop: false, hasSolarPower: false,
-    hasCentralAC: false,
-    videoUrl: '', highlightedFeatures: [] as string[],
-    metaTitle: '', metaDescription: '',
-    images: [] as string[],
-    unitKind: 'APARTMENT', bedrooms: '', bathrooms: '', areaSqm: '', floor: '',
-    enableListing: true, intent: 'FOR_SALE', priceMode: 'TOTAL', price: '', currency: 'USD', listingStatus: 'ACTIVE', negotiable: false,
-  })
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const set = (k: keyof typeof f, v: any) => setF(p => ({ ...p, [k]: v }))
-
   const [docs, setDocs] = useState<DocEntry[]>([])
-  const [paymentPlans, setPaymentPlans] = useState<PaymentPlan[]>([])
+  const [saving, setSaving] = useState(false)
+  // A second click while the first create is in flight would make a second
+  // property — `saving` is read from a stale closure, a ref is not.
+  const inFlight = useRef(false)
+  const [error, setError] = useState<string | null>(null)
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
+  const [aiLoading, setAiLoading] = useState(false)
+  const [aiError, setAiError] = useState<string | null>(null)
 
-  // ── Highlights ──────────────────────────────────────────────────────────────
-  function addHighlight() {
-    const v = highlightInput.trim()
-    if (!v) return
-    setF(p => ({ ...p, highlightedFeatures: [...p.highlightedFeatures, v] }))
-    setHighlightInput('')
-  }
+  // The first unit's specs. A property with one unit *is* that unit, so these
+  // are asked here rather than sending the admin to the Units tab afterwards.
+  const [unit, setUnit] = useState({ bedrooms: '', bathrooms: '', areaSqm: '', floor: '' })
 
-  // ── Images ──────────────────────────────────────────────────────────────────
-  async function uploadImages(files: FileList) {
-    setUploading(true)
-    const urls: string[] = []
-    for (const file of Array.from(files)) {
-      try {
-        const fd = new FormData()
-        fd.append('file', file); fd.append('folder', 'buildings')
-        if (f.title.trim()) fd.append('propertySlug', f.title.trim())
-        const res = await fetch(`${apiUrl}/api/upload`, { method: 'POST', credentials: 'include', body: fd })
-        if (res.ok) { const d = await res.json(); if (d.url) urls.push(d.url) }
-      } catch { /* skip */ }
+  // The listing, so a property can go on the market in the same pass.
+  const [listing, setListing] = useState({
+    enabled: true,
+    intent: 'FOR_SALE',
+    priceMode: 'TOTAL' as 'TOTAL' | 'PER_SQM',
+    price: '',
+    currency: 'USD',
+    status: 'ACTIVE',
+    negotiable: false,
+  })
+
+  const touched = !!form.title.trim() || form.images.length > 0 || !!listing.price
+  useUnsavedChanges(touched && !saving, 'This property has not been created yet. Leave and lose it?')
+
+  const set = (patch: Partial<BuildingFormState>) => setForm((p) => ({ ...p, ...patch }))
+
+  const def = typeDef(form.unitKind)
+  const isLand = form.unitKind === 'LAND_PARCEL'
+  const showBuildingSpecs = def.inBuilding || form.unitKind === 'WHOLE_BUILDING'
+  const residential = isResidential(form.unitKind)
+
+  const stepIndex = STEPS.findIndex((s) => s.id === step)
+  const isLastStep = stepIndex === STEPS.length - 1
+
+  // ── Validation ──────────────────────────────────────────────────────────────
+
+  /** Step one is the only gate — everything after it can be filled in later. */
+  function validateProperty(): boolean {
+    const errs: Record<string, string> = {}
+    if (!form.title.trim()) errs.title = 'A property needs a title.'
+    if (form.country === 'LEBANON' && !isKnownLocation({ city: form.city, neighborhood: form.neighborhood })) {
+      errs.location = 'Pick a location from the search list — Lebanese locations come from a fixed gazetteer.'
+    } else if (form.country !== 'LEBANON' && !form.city.trim()) {
+      errs.location = 'Enter a city.'
     }
-    if (urls.length) setF(p => ({ ...p, images: [...p.images, ...urls] }))
-    setUploading(false)
+    setFieldErrors(errs)
+    return Object.keys(errs).length === 0
   }
-  async function removeImage(idx: number) {
-    const url = f.images[idx]
-    if (!url) return
-    // Actually delete the just-uploaded file from R2 so it isn't orphaned.
+
+  function validateListing(): string | null {
+    if (!listing.enabled) return null
+    const area = unit.areaSqm !== '' ? Number(unit.areaSqm) : 0
+    if (!listing.price || Number(listing.price) <= 0) return 'Enter a price, or switch the listing off.'
+    if (listing.priceMode === 'PER_SQM' && area <= 0) return 'Set the area first — a price per m² needs one.'
+    return null
+  }
+
+  function goto(next: StepId) {
+    // Only step one blocks; the rest are navigable in any order.
+    if (step === 'property' && !validateProperty()) {
+      document.getElementById(fieldErrors.title ? 'basics' : 'location')?.scrollIntoView({ behavior: 'smooth' })
+      return
+    }
+    setError(null)
+    setStep(next)
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  // ── Submit ──────────────────────────────────────────────────────────────────
+
+  async function submit() {
+    if (inFlight.current) return
+    setError(null)
+    if (!validateProperty()) { setStep('property'); window.scrollTo({ top: 0, behavior: 'smooth' }); return }
+
+    const listingProblem = validateListing()
+    if (listingProblem) { setError(listingProblem); setStep('market'); return }
+
+    inFlight.current = true
+    setSaving(true)
+    const area = unit.areaSqm !== '' ? Number(unit.areaSqm) : 0
+    const totalPrice = listing.priceMode === 'PER_SQM'
+      ? (Number(listing.price) || 0) * area
+      : (Number(listing.price) || 0)
+
     try {
-      await fetch(`${apiUrl}/api/upload`, {
-        method: 'DELETE', credentials: 'include',
-        headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url }),
+      // 1) The property
+      const bRes = await fetch(`${apiUrl}/api/buildings`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...buildingPayload(form, { showBuildingSpecs }),
+          ownerLeadId: owner?.id ?? null,
+        }),
       })
-    } catch { /* best effort */ }
-    setF(p => ({ ...p, images: p.images.filter((_, i) => i !== idx) }))
-  }
-  function setCover(idx: number) {
-    setF(p => { const imgs = [...p.images]; const [pick] = imgs.splice(idx, 1); imgs.unshift(pick); return { ...p, images: imgs } })
-  }
-  async function uploadVideo(file: File) {
-    setUploadingVideo(true)
-    try {
-      const fd = new FormData()
-      fd.append('file', file)
-      if (f.title.trim()) fd.append('propertySlug', f.title.trim())
-      const res = await fetch(`${apiUrl}/api/upload/video`, { method: 'POST', credentials: 'include', body: fd })
-      if (res.ok) { const d = await res.json(); if (d.url) set('videoUrl', d.url) }
-      else { const e = await res.json().catch(() => ({})); setError(e.message || e.error || 'Video upload failed') }
-    } catch { setError('Video upload failed') } finally { setUploadingVideo(false) }
-  }
-
-  // ── Documents ───────────────────────────────────────────────────────────────
-  function addDocs(files: FileList) {
-    const next = Array.from(files).map(file => ({ file, title: file.name.replace(/\.[^.]+$/, ''), type: 'OTHER', isPublic: false }))
-    setDocs(d => [...d, ...next])
-  }
-
-  // ── AI SEO (from live form attributes) ──────────────────────────────────────
-  async function generateSeo() {
-    if (!f.title.trim()) { setError('Add a title first, then generate SEO'); return }
-    setAiLoading(true); setError(null)
-    try {
-      const attributes = {
-        title: f.title, neighborhood: f.neighborhood, city: f.city, caza: f.caza, mohafazat: f.mohafazat,
-        kind: f.kind, status: f.status, totalFloors: f.totalFloors, builtYear: f.builtYear,
-        hasGenerator: f.hasGenerator, hasElevator: f.hasElevator, hasPool: f.hasPool, hasGym: f.hasGym,
-        hasConcierge: f.hasConcierge, hasSecurity: f.hasSecurity, hasGarden: f.hasGarden, hasRooftop: f.hasRooftop, hasSolarPower: f.hasSolarPower, hasCentralAC: f.hasCentralAC,
-        highlightedFeatures: f.highlightedFeatures, description: f.description || f.shortDescription,
+      const bData = await bRes.json().catch(() => ({}))
+      if (!bRes.ok) {
+        setError(bData.message || bData.error || 'Could not create the property.')
+        inFlight.current = false
+        setSaving(false)
+        return
       }
+      const buildingId = (bData.data ?? bData)?.id
+      if (!buildingId) { setError('The property was not created.'); inFlight.current = false; setSaving(false); return }
+
+      // 2) Its first unit
+      const lifecycle = listing.enabled
+        ? (listing.intent === 'FOR_RENT' ? 'FOR_RENT' : 'FOR_SALE')
+        : 'VACANT'
+      const uRes = await fetch(`${apiUrl}/api/buildings/${buildingId}/units`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          kind: form.unitKind,
+          bedrooms: def.beds && unit.bedrooms !== '' ? Number(unit.bedrooms) : null,
+          bathrooms: def.baths && unit.bathrooms !== '' ? Number(unit.bathrooms) : null,
+          areaSqm: area || null,
+          floor: def.floor && unit.floor !== '' ? Number(unit.floor) : null,
+          // Photos live on the property, not duplicated onto the unit.
+          lifecycle,
+        }),
+      })
+      const createdUnit = (await uRes.json().catch(() => ({}))).data ?? {}
+
+      // 3) Its listing
+      if (listing.enabled && createdUnit?.id) {
+        await fetch(`${apiUrl}/api/listings`, {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            subjectType: 'UNIT',
+            unitId: createdUnit.id,
+            buildingId,
+            intent: listing.intent,
+            price: totalPrice,
+            currency: listing.currency,
+            status: listing.status,
+            visibility: 'PUBLIC',
+            negotiable: listing.negotiable,
+            highlights: [],
+          }),
+        }).catch(() => { /* the property exists; the listing can be added after */ })
+      }
+
+      // 4) Documents
+      for (const d of docs) {
+        try {
+          const fd = new FormData()
+          fd.append('file', d.file)
+          fd.append('propertyId', buildingId)
+          fd.append('title', d.title)
+          fd.append('type', d.type)
+          fd.append('isPublic', String(d.isPublic))
+          await fetch(`${apiUrl}/api/documents`, { method: 'POST', credentials: 'include', body: fd })
+        } catch { /* best effort */ }
+      }
+
+      toast({
+        title: 'Property created',
+        description: listing.enabled ? `${form.title} is on the market.` : `${form.title} was saved without a listing.`,
+      })
+      // Land on the property itself, not the list — there is almost always
+      // something else to add, and the list gives no way back to what you just made.
+      router.push(`/admin/buildings/${buildingId}`)
+      router.refresh()
+    } catch {
+      setError('Network error — the property was not created.')
+      inFlight.current = false
+      setSaving(false)
+    }
+  }
+
+  // ── AI SEO, from what's on the form (nothing is saved yet) ──────────────────
+
+  async function generateSeo() {
+    if (!form.title.trim()) { setAiError('Add a title first.'); return }
+    setAiLoading(true)
+    setAiError(null)
+    try {
       const res = await fetch(`${apiUrl}/api/ai-seo/generate`, {
-        method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type: 'building', attributes }),
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'building',
+          attributes: {
+            title: form.title, neighborhood: form.neighborhood, city: form.city,
+            caza: form.caza, mohafazat: form.mohafazat, country: form.country,
+            kind: form.kind, status: form.status,
+            totalFloors: form.totalFloors, builtYear: form.builtYear,
+            hasGenerator: form.hasGenerator, hasElevator: form.hasElevator,
+            hasPool: form.hasPool, hasGym: form.hasGym, hasConcierge: form.hasConcierge,
+            hasSecurity: form.hasSecurity, hasGarden: form.hasGarden,
+            hasRooftop: form.hasRooftop, hasSolarPower: form.hasSolarPower,
+            hasCentralAC: form.hasCentralAC,
+            highlightedFeatures: form.highlightedFeatures,
+            description: form.description || form.shortDescription,
+          },
+        }),
       })
       const data = await res.json().catch(() => ({}))
-      if (!res.ok) { setError(data.message || 'AI generation failed'); return }
+      if (!res.ok) { setAiError(data.message || 'AI generation failed'); return }
       const s = data.data ?? data
-      setF(p => ({
+      setForm((p) => ({
         ...p,
         metaTitle: s.metaTitle ?? p.metaTitle,
         metaDescription: s.metaDescription ?? p.metaDescription,
         shortDescription: p.shortDescription || s.shortDescription || p.shortDescription,
       }))
-    } catch { setError('Network error') } finally { setAiLoading(false) }
+    } catch {
+      setAiError('Network error')
+    } finally {
+      setAiLoading(false)
+    }
   }
 
-  // ── Submit ──────────────────────────────────────────────────────────────────
-  async function submit(e: React.FormEvent) {
-    e.preventDefault()
-    if (!f.title.trim()) { setError('Property title is required'); return }
-    // The curated gazetteer only covers Lebanon; other markets take free text.
-    if (f.country === 'LEBANON' && !isKnownLocation({ city: f.city, neighborhood: f.neighborhood })) {
-      setError('Pick a valid location from the search list before saving'); return
-    }
-    if (f.country !== 'LEBANON' && !f.city.trim()) { setError('Enter a city before saving'); return }
-    const perSqm = f.priceMode === 'PER_SQM'
-    const area = f.areaSqm !== '' ? Number(f.areaSqm) : 0
-    const totalPrice = perSqm ? (Number(f.price) || 0) * area : (Number(f.price) || 0)
-    if (f.enableListing) {
-      if (!f.price || Number(f.price) <= 0) { setError('Enter a price, or turn off listing'); return }
-      if (perSqm && area <= 0) { setError('Set the area to price per m²'); return }
-    }
-    setSaving(true); setError(null)
-    try {
-      // 1) Building
-      const bRes = await fetch(`${apiUrl}/api/buildings`, {
-        method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          title: f.title.trim(), kind: f.kind, status: f.status, visibility: f.visibility, featured: f.featured,
-          ownerLeadId: owner?.id ?? null,
-          shortDescription: f.shortDescription || null, description: f.description || null,
-          country: f.country,
-          mohafazat: f.mohafazat || null, caza: f.caza || null, city: f.city || null,
-          neighborhood: f.neighborhood || null, address: f.address || null, locationUrl: f.locationUrl || null,
-          builtYear: showBuildingSections && f.builtYear !== '' ? parseInt(f.builtYear) : null,
-          totalFloors: showBuildingSections && f.totalFloors !== '' ? parseInt(f.totalFloors) : null,
-          parkingSpaces: showBuildingSections && f.parkingSpaces !== '' ? parseInt(f.parkingSpaces) : null,
-          hasGenerator: showBuildingSections && f.hasGenerator, hasElevator: showBuildingSections && f.hasElevator, hasPool: showBuildingSections && f.hasPool, hasGym: showBuildingSections && f.hasGym,
-          hasConcierge: showBuildingSections && f.hasConcierge, hasSecurity: showBuildingSections && f.hasSecurity, hasGarden: showBuildingSections && f.hasGarden, hasRooftop: showBuildingSections && f.hasRooftop, hasSolarPower: showBuildingSections && f.hasSolarPower, hasCentralAC: showBuildingSections && f.hasCentralAC,
-          videoUrl: f.videoUrl || null, highlightedFeatures: f.highlightedFeatures,
-          paymentPlans: paymentPlans.length ? paymentPlans : null,
-          metaTitle: f.metaTitle || null, metaDescription: f.metaDescription || null, images: f.images,
-        }),
-      })
-      const bData = await bRes.json()
-      if (!bRes.ok) { setError(bData.message || bData.error || 'Failed to create property'); setSaving(false); return }
-      const buildingId = (bData.data ?? bData)?.id
-      if (!buildingId) { setError('Could not create the property.'); setSaving(false); return }
+  // ── Render ──────────────────────────────────────────────────────────────────
 
-      // 2) First unit
-      const lifecycle = f.enableListing ? (f.intent === 'FOR_RENT' ? 'FOR_RENT' : 'FOR_SALE') : 'VACANT'
-      const uRes = await fetch(`${apiUrl}/api/buildings/${buildingId}/units`, {
-        method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          kind: f.unitKind,
-          bedrooms: showBeds && f.bedrooms !== '' ? Number(f.bedrooms) : null,
-          bathrooms: showBaths && f.bathrooms !== '' ? Number(f.bathrooms) : null,
-          areaSqm: area || null, floor: showFloor && f.floor !== '' ? Number(f.floor) : null,
-          lifecycle, // photos live on the property (building), not duplicated on the unit
-        }),
-      })
-      const unit = (await uRes.json().catch(() => ({}))).data ?? {}
-
-      // 3) Listing
-      if (f.enableListing && unit?.id) {
-        await fetch(`${apiUrl}/api/listings`, {
-          method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            subjectType: 'UNIT', unitId: unit.id, buildingId, intent: f.intent,
-            price: totalPrice, currency: f.currency, status: f.listingStatus, visibility: 'PUBLIC',
-            negotiable: f.negotiable, highlights: [],
-          }),
-        }).catch(() => {})
-      }
-
-      // 4) Documents (multipart, attached to the new building)
-      for (const d of docs) {
-        try {
-          const fd = new FormData()
-          fd.append('file', d.file); fd.append('propertyId', buildingId)
-          fd.append('title', d.title); fd.append('type', d.type); fd.append('isPublic', String(d.isPublic))
-          await fetch(`${apiUrl}/api/documents`, { method: 'POST', credentials: 'include', body: fd })
-        } catch { /* best effort */ }
-      }
-
-      router.push('/admin/buildings')
-      router.refresh()
-    } catch { setError('Network error'); setSaving(false) }
-  }
-
-  const inp = 'w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400'
-  const lbl = 'block text-sm font-medium text-slate-700 mb-1'
-  // Every "does this field apply?" answer comes from the shared type registry,
-  // so the form, the filters and the public pages always agree.
-  const def = typeDef(f.unitKind)
-  const isLand = f.unitKind === 'LAND_PARCEL'
-  const showBeds = def.beds
-  const showBaths = def.baths
-  const showFloor = def.floor
-  const showBuildingSections = def.inBuilding || f.unitKind === 'WHOLE_BUILDING'
-  const amenities = isResidential(f.unitKind)
-    ? [...SHARED_AMENITIES, ...RESIDENTIAL_AMENITIES]
-    : SHARED_AMENITIES
-  const detailsHint =
-    f.unitKind === 'PARKING' ? 'A parking spot only needs its area and level.' :
-    f.unitKind === 'STORAGE' ? 'A storage unit only needs its area and level.' :
-    f.unitKind === 'WHOLE_BUILDING' ? 'The entire building is sold or rented as one.' :
-    def.group === 'COMMERCIAL' ? 'Commercial space — bedrooms don’t apply.' :
-    ''
+  const listingProblem = validateListing()
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
-      <div className="flex items-center gap-4">
-        <Link href="/admin/buildings" className="p-2 rounded-lg hover:bg-slate-100 text-slate-600"><ArrowLeft className="h-4 w-4" /></Link>
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2"><Building2 className="h-6 w-6" /> Add Property</h1>
-          <p className="text-sm text-slate-500 mt-0.5">Add a property and put it on the market in one step.</p>
-        </div>
-      </div>
+    <div className="mx-auto max-w-4xl space-y-5">
+      <PageHeader
+        title="Add property"
+        description="Four steps. Only the first is required — the rest can wait."
+        backHref="/admin/buildings"
+        crumbs={[{ label: 'Properties', href: '/admin/buildings' }, { label: 'New' }]}
+      />
 
-      <form onSubmit={submit} className="space-y-6">
-        {error && <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-xl px-4 py-3">{error}</div>}
+      <Stepper current={stepIndex} onJump={(i) => goto(STEPS[i].id)} />
 
-        {/* Basic info */}
-        <div className="bg-white border rounded-xl p-6 space-y-4">
-          <h2 className="font-semibold text-slate-900">Basic Information</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="sm:col-span-2">
-              <OwnerPicker value={owner} onChange={setOwner} />
-            </div>
-            <div className="sm:col-span-2">
-              <label className={lbl}>Title <span className="text-red-500">*</span></label>
-              <input value={f.title} onChange={e => set('title', e.target.value)} className={inp} placeholder="e.g., Elegant Apartment in Verdun" required />
-              <p className="text-xs text-slate-400 mt-1">This is the title shown on the website.</p>
-            </div>
-            <div className={isLand ? '' : 'sm:col-span-2'}>
-              <label className={lbl}>Property type <span className="text-red-500">*</span></label>
-              <select value={f.unitKind} onChange={e => set('unitKind', e.target.value)} className={inp}>
-                {PROPERTY_TYPE_GROUPS.map(g => (
-                  <optgroup key={g.group} label={g.label}>
-                    {g.kinds.map(k => <option key={k} value={k}>{typeLabel(k)}</option>)}
-                  </optgroup>
-                ))}
-              </select>
-              <p className="text-xs text-slate-400 mt-1">What is being sold or rented. This decides which fields appear below.</p>
-            </div>
+      {error && <InlineNote tone="error">{error}</InlineNote>}
 
-            {/* Land has no rooms or floors — its only measurement is the plot. */}
-            {isLand && (
-              <div>
-                <label className={lbl}>{def.areaLabel}</label>
-                <input type="number" min="0" value={f.areaSqm} onChange={e => set('areaSqm', e.target.value)} className={inp} placeholder="e.g., 800" />
-              </div>
-            )}
-
-
-            <div>
-              <label className={lbl}>Status</label>
-              <select value={f.status} onChange={e => set('status', e.target.value)} className={inp}>
-                <option value="OFF_PLAN">Off-Plan</option><option value="NEW_BUILD">New Build</option><option value="RESALE">Resale</option>
-              </select>
-            </div>
-            <div>
-              <label className={lbl}>Visibility</label>
-              <select value={f.visibility} onChange={e => set('visibility', e.target.value)} className={inp}>
-                <option value="PUBLIC">Public</option><option value="ELITE_ONLY">Elite Only</option><option value="HIDDEN">Hidden</option>
-              </select>
-            </div>
-            <div className="flex items-center gap-2 pt-5">
-              <input type="checkbox" id="featured" checked={f.featured} onChange={e => set('featured', e.target.checked)} className="rounded border-slate-300" />
-              <label htmlFor="featured" className="text-sm text-slate-700 cursor-pointer">Featured listing</label>
-            </div>
-          </div>
-          <div><label className={lbl}>Short Description</label><input value={f.shortDescription} onChange={e => set('shortDescription', e.target.value)} className={inp} placeholder="One-line summary shown on cards" /></div>
-          <div><label className={lbl}>Full Description</label><textarea value={f.description} onChange={e => set('description', e.target.value)} rows={4} className={inp + ' resize-y'} placeholder="Detailed description…" /></div>
-        </div>
-
-        {/* Location */}
-        <div className="bg-white border rounded-xl p-6 space-y-4">
-          <div className="flex items-center justify-between gap-3 flex-wrap">
-            <h2 className="font-semibold text-slate-900">Location</h2>
-            <label className="flex items-center gap-2 text-sm">
-              <span className="text-slate-500">Market</span>
-              <select
-                value={f.country}
-                onChange={(e) => setF(p => ({ ...p, country: e.target.value, mohafazat: '', caza: '' }))}
-                className="px-2.5 py-1.5 border border-slate-300 rounded-lg text-sm bg-white"
-              >
-                <option value="LEBANON">🇱🇧 Lebanon — propgrouplb.com</option>
-                <option value="GEORGIA">🇬🇪 Georgia — propgrp.com</option>
-                <option value="CYPRUS">🇨🇾 Cyprus — propgrp.com</option>
-                <option value="GREECE">🇬🇷 Greece — propgrp.com</option>
-              </select>
-            </label>
-          </div>
-          <LocationFields
-            country={f.country}
-            value={{ mohafazat: f.mohafazat, caza: f.caza, city: f.city, neighborhood: f.neighborhood }}
-            onChange={(patch) => setF(p => ({ ...p, ...patch }))}
+      {step === 'property' && (
+        <div className="space-y-5">
+          <BasicsSection
+            f={form}
+            set={set}
+            owner={owner}
+            onOwnerChange={setOwner}
+            unitCount={0}
+            errors={fieldErrors}
+            disabled={saving}
           />
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="sm:col-span-2"><label className={lbl}>Street Address <span className="text-slate-400">(optional)</span></label><input value={f.address} onChange={e => set('address', e.target.value)} className={inp} placeholder="Leave empty if not applicable" /></div>
-            <div className="sm:col-span-2"><label className={lbl}>Google Maps URL</label><input type="url" value={f.locationUrl} onChange={e => set('locationUrl', e.target.value)} className={inp} placeholder="https://maps.google.com/..." /></div>
-          </div>
+          <LocationSection f={form} set={set} errors={fieldErrors} disabled={saving} />
         </div>
+      )}
 
-        {/* Size & layout — the physical facts. Land has none of these (its plot
-            area lives in Basic Information), so the whole section disappears. */}
-        {!isLand && (
-        <div className="bg-white border rounded-xl p-6 space-y-4">
-          <h2 className="font-semibold text-slate-900 flex items-center gap-2">
-            <Home className="h-4 w-4 text-slate-500" /> {typeLabel(f.unitKind)} details
-          </h2>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-            {showBeds && <div><label className={lbl}>Bedrooms</label><input type="number" min="0" value={f.bedrooms} onChange={e => set('bedrooms', e.target.value)} className={inp} /></div>}
-            {showBaths && <div><label className={lbl}>Bathrooms</label><input type="number" min="0" value={f.bathrooms} onChange={e => set('bathrooms', e.target.value)} className={inp} /></div>}
-            <div><label className={lbl}>{def.areaLabel}</label><input type="number" min="0" value={f.areaSqm} onChange={e => set('areaSqm', e.target.value)} className={inp} /></div>
-            {showFloor && <div><label className={lbl}>Floor</label><input type="number" value={f.floor} onChange={e => set('floor', e.target.value)} className={inp} /></div>}
-          </div>
-          {detailsHint && <p className="text-xs text-slate-400">{detailsHint}</p>}
-        </div>
-        )}
-
-        {/* Building details — not applicable to land, parking or storage */}
-        {showBuildingSections && (
-        <div className="bg-white border rounded-xl p-6 space-y-4">
-          <h2 className="font-semibold text-slate-900">Building Details</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div><label className={lbl}>Built Year</label><input type="number" value={f.builtYear} onChange={e => set('builtYear', e.target.value)} className={inp} placeholder="2023" min="1900" max="2050" /></div>
-            <div><label className={lbl}>Total Floors</label><input type="number" value={f.totalFloors} onChange={e => set('totalFloors', e.target.value)} className={inp} placeholder="12" min="1" /></div>
-            <div><label className={lbl}>Parking Spaces</label><input type="number" value={f.parkingSpaces} onChange={e => set('parkingSpaces', e.target.value)} className={inp} placeholder="50" min="0" /></div>
-          </div>
-        </div>
-        )}
-
-        {/* Amenities — not applicable to land, parking or storage */}
-        {showBuildingSections && (
-        <div className="bg-white border rounded-xl p-6">
-          <h2 className="font-semibold text-slate-900 mb-4">Amenities</h2>
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-            {amenities.map(({ key, label }) => (
-              <label key={key} className="flex items-center gap-2 cursor-pointer p-3 rounded-lg border border-slate-100 hover:bg-slate-50">
-                {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-                <input type="checkbox" checked={(f as any)[key]} onChange={e => set(key as keyof typeof f, e.target.checked)} className="rounded border-slate-300" />
-                <span className="text-sm text-slate-700">{label}</span>
-              </label>
-            ))}
-          </div>
-        </div>
-        )}
-
-        {/* Highlighted features */}
-        <div className="bg-white border rounded-xl p-6 space-y-4">
-          <h2 className="font-semibold text-slate-900">Highlighted Features</h2>
-          <div className="flex gap-2">
-            <input value={highlightInput} onChange={e => setHighlightInput(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addHighlight() } }} className={inp} placeholder="e.g., Sea view, Private pool…" />
-            <button type="button" onClick={addHighlight} className="px-3 py-2 bg-slate-800 text-white rounded-lg hover:bg-slate-700 flex-shrink-0"><Plus className="h-4 w-4" /></button>
-          </div>
-          {f.highlightedFeatures.length > 0 && (
-            <div className="flex flex-wrap gap-2">
-              {f.highlightedFeatures.map((h, i) => (
-                <span key={i} className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 text-slate-700 rounded-lg text-sm">
-                  {h}<button type="button" onClick={() => setF(p => ({ ...p, highlightedFeatures: p.highlightedFeatures.filter((_, idx) => idx !== i) }))} className="text-slate-400 hover:text-red-500"><X className="h-3 w-3" /></button>
-                </span>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Listing */}
-        <div className="bg-white border rounded-xl p-6 space-y-4">
-          <label className="flex items-center gap-2 cursor-pointer">
-            <input type="checkbox" checked={f.enableListing} onChange={e => set('enableListing', e.target.checked)} className="rounded border-slate-300" />
-            <span className="font-semibold text-slate-900">List this property now</span>
-          </label>
-          {f.enableListing && (
-            <>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                <div>
-                  <label className={lbl}>For</label>
-                  <select value={f.intent} onChange={e => set('intent', e.target.value)} className={inp}><option value="FOR_SALE">Sale</option><option value="FOR_RENT">Rent</option></select>
-                </div>
-                <div>
-                  <label className={lbl}>Pricing</label>
-                  <select value={f.priceMode} onChange={e => set('priceMode', e.target.value)} className={inp}>
-                    <option value="TOTAL">Total price</option>
-                    <option value="PER_SQM">Price per m²</option>
-                  </select>
-                </div>
-                <div>
-                  <label className={lbl}>{f.priceMode === 'PER_SQM' ? 'Price / m²' : 'Price'}</label>
-                  <input type="number" min="0" value={f.price} onChange={e => set('price', e.target.value)} className={inp} placeholder={f.priceMode === 'PER_SQM' ? '2500' : '250000'} />
-                </div>
-                <div><label className={lbl}>Currency</label><select value={f.currency} onChange={e => set('currency', e.target.value)} className={inp}><option value="USD">USD</option><option value="LBP">LBP</option></select></div>
-              </div>
-              {f.priceMode === 'PER_SQM' && f.areaSqm && f.price && (
-                <p className="text-xs text-slate-500">Total: <strong>{f.currency} {(Number(f.price) * Number(f.areaSqm)).toLocaleString()}</strong> ({f.areaSqm} m² × {f.currency} {Number(f.price).toLocaleString()})</p>
+      {step === 'details' && (
+        <div className="space-y-5">
+          {/* Land has no rooms or floors — its plot area is its only measurement. */}
+          <FormSection
+            id="unit"
+            title={`${typeLabel(form.unitKind)} details`}
+            description={hintFor(form.unitKind)}
+            icon={<Home className="h-4 w-4" />}
+          >
+            <FieldGrid cols={4}>
+              {def.beds && (
+                <Field label="Bedrooms" optional>
+                  <NumberInput
+                    min="0" value={unit.bedrooms}
+                    onChange={(e) => setUnit((u) => ({ ...u, bedrooms: e.target.value }))}
+                    placeholder="2" disabled={saving}
+                  />
+                </Field>
               )}
-              <div className="flex flex-wrap items-center gap-4">
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input type="checkbox" checked={f.negotiable} onChange={e => set('negotiable', e.target.checked)} className="rounded border-slate-300" />
-                  <span className="text-sm text-slate-700">Price is negotiable</span>
-                </label>
-                <div className="flex items-center gap-2">
-                  <span className="text-sm text-slate-500">Visibility:</span>
-                  <select value={f.listingStatus} onChange={e => set('listingStatus', e.target.value)} className={inp + ' w-auto'}><option value="ACTIVE">Active (public)</option><option value="DRAFT">Draft (hidden)</option></select>
-                </div>
-              </div>
-            </>
-          )}
-        </div>
+              {def.baths && (
+                <Field label="Bathrooms" optional>
+                  <NumberInput
+                    min="0" value={unit.bathrooms}
+                    onChange={(e) => setUnit((u) => ({ ...u, bathrooms: e.target.value }))}
+                    placeholder="1" disabled={saving}
+                  />
+                </Field>
+              )}
+              <Field
+                label={def.areaLabel}
+                optional={!listing.enabled || listing.priceMode !== 'PER_SQM'}
+                required={listing.enabled && listing.priceMode === 'PER_SQM'}
+              >
+                <NumberInput
+                  min="0" unit="m²" value={unit.areaSqm}
+                  onChange={(e) => setUnit((u) => ({ ...u, areaSqm: e.target.value }))}
+                  placeholder="120" disabled={saving}
+                />
+              </Field>
+              {def.floor && (
+                <Field label="Floor" optional>
+                  <NumberInput
+                    value={unit.floor}
+                    onChange={(e) => setUnit((u) => ({ ...u, floor: e.target.value }))}
+                    placeholder="3" disabled={saving}
+                  />
+                </Field>
+              )}
+            </FieldGrid>
+            {isLand && (
+              <p className="mt-3 text-xs text-slate-400">
+                A land plot has no rooms or floors — the plot area is the only measurement it needs.
+              </p>
+            )}
+          </FormSection>
 
-        {/* Payment plans */}
-        <div className="bg-white border rounded-xl p-6 space-y-4">
-          <h2 className="font-semibold text-slate-900">Payment Plans</h2>
-          <PaymentPlansEditor value={paymentPlans} onChange={setPaymentPlans} />
+          {showBuildingSpecs && <SpecsSection f={form} set={set} residential={residential} disabled={saving} />}
+          <HighlightsSection f={form} set={set} disabled={saving} />
         </div>
+      )}
 
-        {/* Photos */}
-        <div className="bg-white border rounded-xl p-6 space-y-4">
-          <h2 className="font-semibold text-slate-900">Photos</h2>
-          {f.images.length > 0 && (
-            <div className="grid grid-cols-3 sm:grid-cols-6 gap-3">
-              {f.images.map((url, i) => (
-                <div key={i} className="relative group aspect-square">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={normalizeFileUrl(url)} alt="" className="w-full h-full object-cover rounded-lg border" />
-                  {i === 0 ? (
-                    <span className="absolute top-1 left-1 text-[9px] bg-slate-800 text-white px-1.5 py-0.5 rounded">Cover</span>
-                  ) : (
-                    <button type="button" onClick={() => setCover(i)} title="Set as cover" className="absolute top-1 left-1 p-0.5 bg-white/90 text-slate-700 rounded opacity-0 group-hover:opacity-100 hover:bg-white">
-                      <Star className="h-3 w-3" />
-                    </button>
-                  )}
-                  <button type="button" onClick={() => removeImage(i)} className="absolute top-1 right-1 p-0.5 bg-red-500 text-white rounded-md opacity-0 group-hover:opacity-100"><X className="h-3 w-3" /></button>
-                </div>
-              ))}
+      {step === 'media' && (
+        <div className="space-y-5">
+          {/* Photos are uploaded to storage as they're picked, before the
+              property exists — so removing one here really does delete it. */}
+          <MediaSection f={form} set={set} disabled={saving} />
+
+          <FormSection
+            id="documents"
+            title="Documents"
+            description="Floor plans, brochures, contracts. They upload once the property is created."
+            icon={<FileText className="h-4 w-4" />}
+          >
+            <div className="space-y-3">
+              {docs.length > 0 && (
+                <ul className="space-y-2">
+                  {docs.map((d, i) => (
+                    <li key={i} className="flex flex-col gap-2 rounded-lg border border-slate-200 bg-slate-50 p-2.5 sm:flex-row sm:items-center">
+                      <TextInput
+                        value={d.title}
+                        onChange={(e) => setDocs((ds) => ds.map((x, idx) => (idx === i ? { ...x, title: e.target.value } : x)))}
+                        placeholder="Document title"
+                        className="flex-1"
+                      />
+                      <SelectInput
+                        value={d.type}
+                        onChange={(e) => setDocs((ds) => ds.map((x, idx) => (idx === i ? { ...x, type: e.target.value } : x)))}
+                        className="sm:w-44"
+                      >
+                        {DOC_TYPES.map((t) => <option key={t} value={t}>{DOC_TYPE_LABELS[t]}</option>)}
+                      </SelectInput>
+                      <label className="flex items-center gap-1.5 whitespace-nowrap px-1 text-sm text-slate-600">
+                        <input
+                          type="checkbox"
+                          checked={d.isPublic}
+                          onChange={(e) => setDocs((ds) => ds.map((x, idx) => (idx === i ? { ...x, isPublic: e.target.checked } : x)))}
+                          className="rounded border-slate-300"
+                        />
+                        Public
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => setDocs((ds) => ds.filter((_, idx) => idx !== i))}
+                        aria-label="Remove document"
+                        className="p-1.5 text-slate-400 transition-colors hover:text-red-600"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              <button
+                type="button"
+                onClick={() => docInputRef.current?.click()}
+                className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50"
+              >
+                <Upload className="h-4 w-4" /> Add documents
+              </button>
+              <p className="text-xs text-slate-400">
+                PDF, images, Word or Excel. Public documents show on the property page; private ones stay in here.
+              </p>
+              <input
+                ref={docInputRef}
+                type="file"
+                accept=".pdf,image/*,.doc,.docx,.xls,.xlsx"
+                multiple
+                className="hidden"
+                onChange={(e) => {
+                  if (e.target.files?.length) {
+                    setDocs((ds) => [
+                      ...ds,
+                      ...Array.from(e.target.files!).map((file) => ({
+                        file,
+                        title: file.name.replace(/\.[^.]+$/, ''),
+                        type: 'OTHER',
+                        isPublic: false,
+                      })),
+                    ])
+                  }
+                  e.target.value = ''
+                }}
+              />
             </div>
-          )}
-          <div className="border-2 border-dashed border-slate-200 rounded-xl p-5 text-center hover:border-slate-400 cursor-pointer" onClick={() => fileInputRef.current?.click()}>
-            {uploading ? <span className="text-sm text-slate-500 inline-flex items-center gap-2"><Loader2 className="h-4 w-4 animate-spin" /> Uploading…</span>
-              : <span className="text-sm text-slate-500 inline-flex items-center gap-2"><ImageIcon className="h-4 w-4 text-slate-400" /> Click to upload photos — hover a photo to set it as cover</span>}
-          </div>
-          <input ref={fileInputRef} type="file" accept="image/jpeg,image/png,image/webp" multiple className="hidden" onChange={e => { if (e.target.files?.length) uploadImages(e.target.files); e.target.value = '' }} />
+          </FormSection>
+        </div>
+      )}
 
-          {/* Property video — shown as part of the gallery on the public page */}
-          <div className="pt-2 border-t border-slate-100">
-            <label className={lbl}>Property video <span className="text-slate-400">(optional)</span></label>
-            {f.videoUrl ? (
-              <div className="flex items-center gap-2 text-sm text-slate-700 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2">
-                <Video className="h-4 w-4 text-slate-500" />
-                <span className="flex-1 truncate">{f.videoUrl}</span>
-                <button type="button" onClick={() => set('videoUrl', '')} className="text-slate-400 hover:text-red-600"><X className="h-4 w-4" /></button>
+      {step === 'market' && (
+        <div className="space-y-5">
+          <FormSection
+            title="Put it on the market"
+            description="Creates the listing buyers see. You can add or change listings at any time."
+            aside={
+              <Toggle
+                checked={listing.enabled}
+                onChange={(v) => setListing((l) => ({ ...l, enabled: v }))}
+                label="List it now"
+              />
+            }
+          >
+            {listing.enabled ? (
+              <div className="space-y-4">
+                <FieldGrid cols={2}>
+                  <Field label="Listing type">
+                    <SegmentedControl
+                      value={listing.intent}
+                      onChange={(v) => setListing((l) => ({ ...l, intent: v }))}
+                      options={[{ value: 'FOR_SALE', label: 'For sale' }, { value: 'FOR_RENT', label: 'For rent' }]}
+                    />
+                  </Field>
+                  <Field label="How it is priced">
+                    <SegmentedControl
+                      value={listing.priceMode}
+                      onChange={(v) => setListing((l) => ({ ...l, priceMode: v }))}
+                      options={[
+                        { value: 'TOTAL', label: 'Total price' },
+                        { value: 'PER_SQM', label: 'Per m²' },
+                      ]}
+                    />
+                  </Field>
+                </FieldGrid>
+
+                <FieldGrid cols={2}>
+                  <Field
+                    label={listing.priceMode === 'PER_SQM' ? 'Price per m²' : 'Price'}
+                    required
+                    error={listingProblem ?? undefined}
+                  >
+                    <MoneyInput
+                      currency={listing.currency}
+                      value={listing.price}
+                      onChange={(e) => setListing((l) => ({ ...l, price: e.target.value }))}
+                      placeholder={listing.priceMode === 'PER_SQM' ? '2500' : '250000'}
+                      invalid={!!listingProblem}
+                      disabled={saving}
+                    />
+                  </Field>
+                  <Field label="Currency">
+                    <SelectInput
+                      value={listing.currency}
+                      onChange={(e) => setListing((l) => ({ ...l, currency: e.target.value }))}
+                      disabled={saving}
+                    >
+                      <option value="USD">USD</option>
+                      <option value="LBP">LBP</option>
+                    </SelectInput>
+                  </Field>
+                </FieldGrid>
+
+                {listing.priceMode === 'PER_SQM' && unit.areaSqm && listing.price && (
+                  <InlineNote tone="success">
+                    Total: <strong>{listing.currency} {(Number(listing.price) * Number(unit.areaSqm)).toLocaleString()}</strong>
+                    {' '}({unit.areaSqm} m² × {listing.currency} {Number(listing.price).toLocaleString()})
+                  </InlineNote>
+                )}
+
+                <div className="space-y-3 rounded-lg border border-slate-200 bg-slate-50/60 p-4">
+                  <Toggle
+                    checked={listing.negotiable}
+                    onChange={(v) => setListing((l) => ({ ...l, negotiable: v }))}
+                    label="Price is negotiable"
+                    hint="Shown to buyers as an invitation to make an offer."
+                  />
+                  <Field label="Publish" className="max-w-sm">
+                    <SegmentedControl
+                      value={listing.status}
+                      onChange={(v) => setListing((l) => ({ ...l, status: v }))}
+                      options={[
+                        { value: 'ACTIVE', label: 'Live now' },
+                        { value: 'DRAFT', label: 'Keep as draft' },
+                      ]}
+                    />
+                  </Field>
+                </div>
               </div>
             ) : (
-              <div className="flex items-center gap-2">
-                <button type="button" onClick={() => videoInputRef.current?.click()} disabled={uploadingVideo} className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium text-slate-700 border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-50">
-                  {uploadingVideo ? <Loader2 className="h-4 w-4 animate-spin" /> : <Video className="h-4 w-4" />} Upload a short video
-                </button>
-                <span className="text-xs text-slate-400">or paste a YouTube link below</span>
-              </div>
+              <p className="text-sm text-slate-500">
+                The property will be saved without a price. Add a listing from its Units &amp; listings tab whenever you&rsquo;re ready.
+              </p>
             )}
-            {!f.videoUrl && (
-              <input value={f.videoUrl} onChange={e => set('videoUrl', e.target.value)} className={inp + ' mt-2'} placeholder="https://youtube.com/…  (optional)" />
+          </FormSection>
+
+          <PaymentPlansSection f={form} set={set} />
+          <InvestmentSection f={form} set={set} disabled={saving} />
+          <SeoSection
+            f={form}
+            set={set}
+            onGenerate={generateSeo}
+            generating={aiLoading}
+            generateError={aiError}
+            generateDisabledReason={form.title.trim() ? null : 'Add a title first — the AI reads what you entered above.'}
+            disabled={saving}
+          />
+        </div>
+      )}
+
+      {/* Step controls */}
+      <div className="sticky bottom-3 z-30 mb-[max(0.25rem,env(safe-area-inset-bottom))] rounded-xl border border-slate-200 bg-white/95 px-4 py-3 shadow-lg backdrop-blur">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <button
+            type="button"
+            onClick={() => setStep(STEPS[Math.max(0, stepIndex - 1)].id)}
+            disabled={stepIndex === 0 || saving}
+            className="inline-flex min-h-11 items-center gap-1.5 rounded-lg px-3 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-100 disabled:opacity-40"
+          >
+            <ChevronLeft className="h-4 w-4" /> Back
+          </button>
+
+          <div className="flex items-center gap-2">
+            {/* Escape hatch: the property matters, the other 50 fields can wait. */}
+            {stepIndex > 0 && !isLastStep && (
+              <button
+                type="button"
+                onClick={submit}
+                disabled={saving}
+                className="min-h-11 rounded-lg px-3 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-100 disabled:opacity-50"
+              >
+                Create now
+              </button>
             )}
-            <input ref={videoInputRef} type="file" accept="video/mp4,video/webm,video/quicktime" className="hidden" onChange={e => { if (e.target.files?.[0]) uploadVideo(e.target.files[0]); e.target.value = '' }} />
+            {isLastStep ? (
+              <button
+                type="button"
+                onClick={submit}
+                disabled={saving}
+                className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-slate-800 px-5 text-sm font-medium text-white transition-colors hover:bg-slate-700 disabled:opacity-50"
+              >
+                {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+                {saving ? 'Creating…' : 'Create property'}
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => goto(STEPS[stepIndex + 1].id)}
+                disabled={saving}
+                className="inline-flex min-h-11 items-center gap-1.5 rounded-lg bg-slate-800 px-5 text-sm font-medium text-white transition-colors hover:bg-slate-700 disabled:opacity-50"
+              >
+                Next <ChevronRight className="h-4 w-4" />
+              </button>
+            )}
           </div>
         </div>
-
-        {/* Documents */}
-        <div className="bg-white border rounded-xl p-6 space-y-4">
-          <h2 className="font-semibold text-slate-900 flex items-center gap-2"><FileText className="h-4 w-4 text-slate-500" /> Documents</h2>
-          {docs.length > 0 && (
-            <div className="space-y-2">
-              {docs.map((d, i) => (
-                <div key={i} className="flex flex-col sm:flex-row sm:items-center gap-2 bg-slate-50 border border-slate-200 rounded-lg p-2.5">
-                  <input value={d.title} onChange={e => setDocs(ds => ds.map((x, idx) => idx === i ? { ...x, title: e.target.value } : x))} className={inp + ' flex-1'} placeholder="Document title" />
-                  <select value={d.type} onChange={e => setDocs(ds => ds.map((x, idx) => idx === i ? { ...x, type: e.target.value } : x))} className={inp + ' sm:w-44'}>
-                    {DOC_TYPES.map(t => <option key={t} value={t}>{DOC_TYPE_LABELS[t]}</option>)}
-                  </select>
-                  <label className="flex items-center gap-1.5 text-sm text-slate-600 whitespace-nowrap px-1">
-                    <input type="checkbox" checked={d.isPublic} onChange={e => setDocs(ds => ds.map((x, idx) => idx === i ? { ...x, isPublic: e.target.checked } : x))} className="rounded border-slate-300" /> Public
-                  </label>
-                  <button type="button" onClick={() => setDocs(ds => ds.filter((_, idx) => idx !== i))} className="p-1.5 text-slate-400 hover:text-red-600"><X className="h-4 w-4" /></button>
-                </div>
-              ))}
-            </div>
-          )}
-          <button type="button" onClick={() => docInputRef.current?.click()} className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium text-slate-700 border border-slate-200 rounded-lg hover:bg-slate-50">
-            <Upload className="h-4 w-4" /> Add documents
-          </button>
-          <p className="text-xs text-slate-400">PDF, images, Word or Excel. Public documents show on the property page; private ones are admin-only.</p>
-          <input ref={docInputRef} type="file" accept=".pdf,image/*,.doc,.docx,.xls,.xlsx" multiple className="hidden" onChange={e => { if (e.target.files?.length) addDocs(e.target.files); e.target.value = '' }} />
-        </div>
-
-        {/* SEO */}
-        <div className="bg-white border rounded-xl p-6 space-y-4">
-          <div className="flex items-center justify-between gap-3">
-            <h2 className="font-semibold text-slate-900">SEO (optional)</h2>
-            <button type="button" onClick={generateSeo} disabled={aiLoading || !f.title.trim()} className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-violet-700 bg-violet-50 border border-violet-200 rounded-lg hover:bg-violet-100 disabled:opacity-50">
-              {aiLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
-              {aiLoading ? 'Generating…' : 'Generate with AI'}
-            </button>
-          </div>
-          <p className="text-xs text-slate-400">AI reads the title, description, location and amenities you entered above.</p>
-          <div><label className={lbl}>Meta Title</label><input value={f.metaTitle} onChange={e => set('metaTitle', e.target.value)} className={inp} placeholder="Custom page title for search engines" /></div>
-          <div><label className={lbl}>Meta Description</label><textarea value={f.metaDescription} onChange={e => set('metaDescription', e.target.value)} rows={2} className={inp + ' resize-none'} placeholder="Custom description for search engines" /></div>
-        </div>
-
-        <div className="flex justify-end gap-3 pb-8">
-          <Link href="/admin/buildings" className="px-4 py-2 text-sm font-medium text-slate-700 bg-slate-100 rounded-lg hover:bg-slate-200">Cancel</Link>
-          <button type="submit" disabled={saving || uploading} className="px-6 py-2 text-sm font-medium text-white bg-slate-800 rounded-lg hover:bg-slate-700 disabled:opacity-50 flex items-center gap-2">
-            {saving && <Loader2 className="h-4 w-4 animate-spin" />} Create Property
-          </button>
-        </div>
-      </form>
+      </div>
     </div>
+  )
+}
+
+function hintFor(kind: string): string {
+  switch (kind) {
+    case 'PARKING': return 'A parking spot only needs its area and level.'
+    case 'STORAGE': return 'A storage unit only needs its area and level.'
+    case 'WHOLE_BUILDING': return 'The entire building is sold or rented as one.'
+    case 'LAND_PARCEL': return 'Just the plot.'
+    default: return typeDef(kind).group === 'COMMERCIAL'
+      ? 'Commercial space — bedrooms don’t apply.'
+      : 'The unit being sold or rented.'
+  }
+}
+
+/** The progress rail. Steps already passed are clickable; later ones are not. */
+function Stepper({ current, onJump }: { current: number; onJump: (i: number) => void }) {
+  return (
+    <ol className="flex gap-2 overflow-x-auto pb-1">
+      {STEPS.map((s, i) => {
+        const done = i < current
+        const active = i === current
+        return (
+          <li key={s.id} className="min-w-0 flex-1">
+            <button
+              type="button"
+              onClick={() => (done || active ? onJump(i) : undefined)}
+              disabled={!done && !active}
+              className={cn(
+                'w-full rounded-lg border px-3 py-2 text-left transition-colors',
+                active
+                  ? 'border-slate-800 bg-slate-800 text-white'
+                  : done
+                    ? 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                    : 'border-slate-200 bg-slate-50 text-slate-400',
+              )}
+            >
+              <span className="flex items-center gap-1.5 text-xs font-semibold">
+                {done ? <Check className="h-3.5 w-3.5" /> : <span className="tabular-nums">{i + 1}</span>}
+                <span className="truncate">{s.label}</span>
+              </span>
+              <span className={cn('mt-0.5 hidden truncate text-[11px] sm:block', active ? 'text-white/70' : 'text-slate-400')}>
+                {s.hint}
+              </span>
+            </button>
+          </li>
+        )
+      })}
+    </ol>
   )
 }

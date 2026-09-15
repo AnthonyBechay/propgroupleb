@@ -1,10 +1,19 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
-import { ArrowLeft, Loader2, Tag, Plus, X } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
+import { Building2, Loader2, Sparkles, Tag } from 'lucide-react'
 import { normalizeApiUrl } from '@/lib/utils/api-url'
+import { toast } from '@/components/ui/use-toast'
+import {
+  ChipsInput, Field, FieldGrid, InlineNote, MoneyInput, SegmentedControl,
+  SelectInput, TextInput, Textarea, Toggle,
+} from '@/components/admin/ui/form'
+import { FormSection, PageHeader, SaveBar } from '@/components/admin/ui/layout'
+import { useUnsavedChanges } from '@/components/admin/ui/useUnsavedChanges'
+import { countryFlag } from '@/lib/market'
+import { typeLabel } from '@/lib/property-types'
 
 interface Preselect {
   buildingId?: string
@@ -13,21 +22,48 @@ interface Preselect {
 }
 
 interface Props {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   initialData?: any
   listingId?: string
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   buildings: any[]
   preselect?: Preselect
 }
 
+const RENT_PERIODS = [
+  { value: 'MONTHLY', label: 'Per month' },
+  { value: 'QUARTERLY', label: 'Per quarter' },
+  { value: 'YEARLY', label: 'Per year' },
+]
+
+const HIGHLIGHT_SUGGESTIONS = [
+  'Newly renovated', 'Move-in ready', 'Motivated seller', 'Below market',
+  'Corner unit', 'Quiet street', 'Near schools', 'Parking included',
+]
+
+/**
+ * The full listing editor.
+ *
+ * Two gaps it closes: `negotiable` was never on this form at all — only the
+ * create-property wizard could set it, and the API's update schema then dropped
+ * it, so a listing's negotiability was fixed at birth. And a listing's price
+ * could be typed with no idea what it looked like on a card, which is the one
+ * thing a listing is.
+ */
 export function ListingForm({ initialData, listingId, buildings, preselect }: Props) {
   const router = useRouter()
   const isEdit = !!listingId
+  const apiUrl = normalizeApiUrl(process.env.NEXT_PUBLIC_API_URL || '')
 
   const [saving, setSaving] = useState(false)
+  // Guards against the same save firing twice in one tick — see BuildingForm.
+  const inFlight = useRef(false)
+  const [saved, setSaved] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [units, setUnits] = useState<any[]>([])
   const [loadingUnits, setLoadingUnits] = useState(false)
-  const [highlightInput, setHighlightInput] = useState('')
+  const [aiLoading, setAiLoading] = useState(false)
 
   const [form, setForm] = useState({
     subjectType: initialData?.subjectType ?? (preselect?.subjectType || 'BUILDING'),
@@ -36,347 +72,410 @@ export function ListingForm({ initialData, listingId, buildings, preselect }: Pr
     intent: initialData?.intent ?? 'FOR_SALE',
     status: initialData?.status ?? 'DRAFT',
     visibility: initialData?.visibility ?? 'PUBLIC',
-    price: initialData?.price ?? '',
+    price: initialData?.price != null ? String(initialData.price) : '',
     currency: initialData?.currency ?? 'USD',
-    rentPeriod: initialData?.rentPeriod ?? '',
+    rentPeriod: initialData?.rentPeriod ?? 'MONTHLY',
+    negotiable: !!initialData?.negotiable,
     headline: initialData?.headline ?? '',
     description: initialData?.description ?? '',
     highlights: (initialData?.highlights ?? []) as string[],
   })
 
-  const setField = (key: keyof typeof form, value: any) =>
-    setForm(prev => ({ ...prev, [key]: value }))
+  const set = (patch: Partial<typeof form>) => { setForm((p) => ({ ...p, ...patch })); setSaved(false) }
 
-  // Load units when building changes (for UNIT subject type)
+  const baseline = useRef(JSON.stringify(form))
+  const dirty = JSON.stringify(form) !== baseline.current
+  useUnsavedChanges(dirty && !saving)
+
+  // Load units when the building changes (for a unit-level listing).
   useEffect(() => {
-    if (!form.buildingId || form.subjectType !== 'UNIT') {
-      setUnits([])
-      return
-    }
+    if (!form.buildingId || form.subjectType !== 'UNIT') { setUnits([]); return }
     setLoadingUnits(true)
-    const apiUrl = normalizeApiUrl(process.env.NEXT_PUBLIC_API_URL || '')
     fetch(`${apiUrl}/api/buildings/${form.buildingId}/units`, { credentials: 'include' })
-      .then(r => r.json())
-      .then(d => setUnits(d.data ?? []))
+      .then((r) => r.json())
+      .then((d) => setUnits(d.data ?? []))
       .catch(() => setUnits([]))
       .finally(() => setLoadingUnits(false))
-  }, [form.buildingId, form.subjectType])
+  }, [form.buildingId, form.subjectType, apiUrl])
 
-  function addHighlight() {
-    const val = highlightInput.trim()
-    if (!val) return
-    setField('highlights', [...form.highlights, val])
-    setHighlightInput('')
+  const selectedBuilding = buildings.find((b) => b.id === form.buildingId) ?? initialData?.building
+  const selectedUnit = units.find((u) => u.id === form.unitId) ?? initialData?.unit
+
+  async function generateCopy() {
+    const targetId = form.unitId || form.buildingId
+    if (!targetId) { setError('Pick what this listing is for first.'); return }
+    setAiLoading(true)
+    setError(null)
+    try {
+      const res = await fetch(`${apiUrl}/api/ai-seo/generate`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: form.unitId ? 'unit' : 'building', id: targetId }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) { setError(data.message || 'AI generation failed'); return }
+      const s = data.data ?? data
+      set({
+        headline: s.headline ?? form.headline,
+        description: s.description ?? form.description,
+      })
+    } catch {
+      setError('Network error')
+    } finally {
+      setAiLoading(false)
+    }
   }
 
-  function removeHighlight(idx: number) {
-    setField('highlights', form.highlights.filter((_: string, i: number) => i !== idx))
-  }
+  async function handleSubmit(e?: React.FormEvent) {
+    e?.preventDefault()
+    if (inFlight.current) return
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault()
-    if (!form.price || Number(form.price) <= 0) { setError('Price must be greater than 0'); return }
-    if (form.subjectType === 'BUILDING' && !form.buildingId) { setError('Please select a building'); return }
-    if (form.subjectType === 'UNIT' && !form.unitId) { setError('Please select a unit'); return }
+    const problem =
+      !form.price || Number(form.price) <= 0 ? 'A listing needs a price greater than zero.'
+      : !form.buildingId ? 'Pick the property this listing is for.'
+      : form.subjectType === 'UNIT' && !form.unitId ? 'Pick the unit this listing is for.'
+      : null
+    if (problem) { setError(problem); return }
 
+    inFlight.current = true
     setSaving(true)
     setError(null)
 
-    const payload: any = {
-      subjectType: form.subjectType,
-      buildingId: form.subjectType === 'BUILDING' ? form.buildingId : null,
-      unitId: form.subjectType === 'UNIT' ? form.unitId : null,
-      intent: form.intent,
+    const shared = {
       status: form.status,
       visibility: form.visibility,
-      price: parseFloat(String(form.price)),
+      price: parseFloat(form.price),
       currency: form.currency,
+      negotiable: form.negotiable,
+      rentPeriod: form.intent === 'FOR_RENT' ? form.rentPeriod : null,
       headline: form.headline || null,
       description: form.description || null,
       highlights: form.highlights,
     }
-    if (form.intent === 'FOR_RENT' && form.rentPeriod) {
-      payload.rentPeriod = form.rentPeriod
-    }
+
+    const body = isEdit
+      ? shared
+      : {
+          ...shared,
+          subjectType: form.subjectType,
+          buildingId: form.subjectType === 'BUILDING' ? form.buildingId : null,
+          unitId: form.subjectType === 'UNIT' ? form.unitId : null,
+          intent: form.intent,
+        }
 
     try {
-      const apiUrl = normalizeApiUrl(process.env.NEXT_PUBLIC_API_URL || '')
-      const url = isEdit ? `${apiUrl}/api/listings/${listingId}` : `${apiUrl}/api/listings`
-      // For edit, only send updatable fields
-      const body = isEdit
-        ? {
-            status: payload.status,
-            visibility: payload.visibility,
-            price: payload.price,
-            currency: payload.currency,
-            rentPeriod: payload.rentPeriod ?? null,
-            headline: payload.headline,
-            description: payload.description,
-            highlights: payload.highlights,
-          }
-        : payload
-
-      const res = await fetch(url, {
-        method: isEdit ? 'PUT' : 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      })
-      const data = await res.json()
+      const res = await fetch(
+        isEdit ? `${apiUrl}/api/listings/${listingId}` : `${apiUrl}/api/listings`,
+        {
+          method: isEdit ? 'PUT' : 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        },
+      )
+      const data = await res.json().catch(() => ({}))
       if (!res.ok) {
-        setError(data.message || data.error || 'Failed to save')
+        setError(data.message || data.error || 'Could not save this listing.')
+        inFlight.current = false
         setSaving(false)
         return
       }
+      baseline.current = JSON.stringify(form)
+      toast({
+        title: isEdit ? 'Listing saved' : 'Listing created',
+        description: form.status === 'ACTIVE' ? 'It is live on the website.' : 'It is saved as a draft.',
+      })
       router.push('/admin/listings')
       router.refresh()
-    } catch (err: any) {
-      setError(err.message || 'Network error')
+    } catch {
+      setError('Network error — nothing was saved.')
+      inFlight.current = false
       setSaving(false)
     }
   }
 
-  const inputCls = 'w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400'
-  const labelCls = 'block text-sm font-medium text-slate-700 mb-1'
-
-  const selectedBuilding = buildings.find(b => b.id === form.buildingId)
+  const cardTitle = form.headline
+    || selectedUnit?.name
+    || (selectedUnit?.unitNumber ? `Unit ${selectedUnit.unitNumber}` : null)
+    || selectedBuilding?.title
+    || 'Untitled listing'
 
   return (
-    <div className="max-w-3xl mx-auto space-y-6">
-      {/* Header */}
-      <div className="flex items-center gap-4">
-        <Link href="/admin/listings" className="p-2 rounded-lg hover:bg-slate-100 text-slate-600 transition-colors">
-          <ArrowLeft className="h-4 w-4" />
-        </Link>
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
-            <Tag className="h-6 w-6" />
-            {isEdit ? 'Edit Listing' : 'New Listing'}
-          </h1>
-          {isEdit && initialData?.headline && (
-            <p className="text-sm text-slate-500 mt-0.5">{initialData.headline}</p>
-          )}
-        </div>
-      </div>
+    <div className="mx-auto max-w-3xl">
+      <PageHeader
+        title={isEdit ? 'Edit listing' : 'New listing'}
+        description={isEdit ? initialData?.headline : 'Put a property or one of its units on the market.'}
+        backHref="/admin/listings"
+        crumbs={[{ label: 'Listings', href: '/admin/listings' }, { label: isEdit ? 'Edit' : 'New' }]}
+      />
 
-      <form onSubmit={handleSubmit} className="space-y-6">
-        {error && (
-          <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-xl px-4 py-3">
-            {error}
-          </div>
+      <form onSubmit={handleSubmit} className="space-y-5">
+        {error && <InlineNote tone="error">{error}</InlineNote>}
+
+        {/* What it sells */}
+        {!isEdit ? (
+          <FormSection
+            title="What is being listed"
+            description="A listing sells either a whole property or one unit inside it."
+            icon={<Building2 className="h-4 w-4" />}
+          >
+            <div className="space-y-4">
+              <Field label="Listing covers">
+                <SegmentedControl
+                  value={form.subjectType}
+                  onChange={(v) => set({ subjectType: v, unitId: '' })}
+                  options={[
+                    { value: 'BUILDING', label: 'The whole property' },
+                    { value: 'UNIT', label: 'One unit' },
+                  ]}
+                />
+              </Field>
+
+              <Field label="Property" required>
+                <SelectInput
+                  value={form.buildingId}
+                  onChange={(e) => set({ buildingId: e.target.value, unitId: '' })}
+                  required
+                  disabled={saving}
+                >
+                  <option value="">Choose a property…</option>
+                  {buildings.map((b) => (
+                    <option key={b.id} value={b.id}>
+                      {b.ref ? `${b.ref} · ` : ''}{b.title}{b.city ? ` — ${b.city}` : ''}
+                    </option>
+                  ))}
+                </SelectInput>
+              </Field>
+
+              {form.subjectType === 'UNIT' && form.buildingId && (
+                <Field label="Unit" required>
+                  {loadingUnits ? (
+                    <div className="flex min-h-11 items-center gap-2 text-sm text-slate-500">
+                      <Loader2 className="h-4 w-4 animate-spin" /> Loading units…
+                    </div>
+                  ) : units.length === 0 ? (
+                    <InlineNote tone="warning">
+                      This property has no units yet.{' '}
+                      <Link href={`/admin/buildings/${form.buildingId}`} className="font-medium underline">
+                        Add one first
+                      </Link>{' '}
+                      — a unit is what a listing attaches to.
+                    </InlineNote>
+                  ) : (
+                    <SelectInput
+                      value={form.unitId}
+                      onChange={(e) => set({ unitId: e.target.value })}
+                      required
+                      disabled={saving}
+                    >
+                      <option value="">Choose a unit…</option>
+                      {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+                      {units.map((u: any) => (
+                        <option key={u.id} value={u.id}>
+                          {u.name ?? (u.unitNumber ? `Unit ${u.unitNumber}` : u.id.slice(0, 6))}
+                          {u.kind ? ` · ${typeLabel(u.kind)}` : ''}
+                          {u.bedrooms != null ? ` · ${u.bedrooms} bed` : ''}
+                          {u.areaSqm ? ` · ${u.areaSqm} m²` : ''}
+                        </option>
+                      ))}
+                    </SelectInput>
+                  )}
+                </Field>
+              )}
+            </div>
+          </FormSection>
+        ) : (
+          initialData?.building && (
+            <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm">
+              <span className="text-slate-400">{countryFlag(initialData.building.country)}</span>{' '}
+              <span className="font-medium text-slate-900">{initialData.building.title}</span>
+              {initialData.unit && (
+                <span className="ml-2 text-slate-500">
+                  › {initialData.unit.name ?? `Unit ${initialData.unit.unitNumber ?? ''}`}
+                </span>
+              )}
+              {initialData.building.city && <span className="ml-2 text-slate-400">· {initialData.building.city}</span>}
+              <p className="mt-0.5 text-xs text-slate-400">
+                What a listing sells can&rsquo;t be changed — create a new one instead.
+              </p>
+            </div>
+          )
         )}
 
-        {/* Subject */}
-        {!isEdit && (
-          <div className="bg-white border rounded-xl p-6 space-y-4">
-            <h2 className="font-semibold text-slate-900">Subject</h2>
-            <div>
-              <label className={labelCls}>Listing Type</label>
-              <div className="flex gap-3">
-                {['BUILDING', 'UNIT'].map(t => (
-                  <button
-                    key={t}
-                    type="button"
-                    onClick={() => { setField('subjectType', t); setField('unitId', '') }}
-                    className={`flex-1 py-2.5 rounded-lg text-sm font-medium border transition-colors ${
-                      form.subjectType === t
-                        ? 'bg-slate-800 text-white border-slate-800'
-                        : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'
-                    }`}
-                  >
-                    {t === 'BUILDING' ? 'Whole Building / Project' : 'Specific Unit'}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div>
-              <label className={labelCls}>Building <span className="text-red-500">*</span></label>
-              <select
-                value={form.buildingId}
-                onChange={e => { setField('buildingId', e.target.value); setField('unitId', '') }}
-                className={inputCls}
-                required
-              >
-                <option value="">— Select a building —</option>
-                {buildings.map(b => (
-                  <option key={b.id} value={b.id}>
-                    {b.title}{b.city ? ` — ${b.city}` : ''}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {form.subjectType === 'UNIT' && form.buildingId && (
-              <div>
-                <label className={labelCls}>Unit <span className="text-red-500">*</span></label>
-                {loadingUnits ? (
-                  <div className="flex items-center gap-2 text-sm text-slate-500 py-2">
-                    <Loader2 className="h-4 w-4 animate-spin" /> Loading units...
-                  </div>
-                ) : units.length === 0 ? (
-                  <p className="text-sm text-slate-400 py-2">
-                    No units found for this building.{' '}
-                    <Link href={`/admin/buildings/${form.buildingId}`} className="text-sky-600 hover:underline">
-                      Add units from the building edit page.
-                    </Link>
-                  </p>
-                ) : (
-                  <select value={form.unitId} onChange={e => setField('unitId', e.target.value)} className={inputCls} required>
-                    <option value="">— Select a unit —</option>
-                    {units.map((u: any) => (
-                      <option key={u.id} value={u.id}>
-                        {u.name ?? u.unitNumber ?? u.id} {u.kind ? `· ${u.kind}` : ''} {u.bedrooms != null ? `· ${u.bedrooms}BR` : ''} {u.areaSqm ? `· ${u.areaSqm}m²` : ''}
-                      </option>
-                    ))}
-                  </select>
-                )}
-              </div>
+        {/* Price */}
+        <FormSection title="Price" icon={<Tag className="h-4 w-4" />}>
+          <div className="space-y-4">
+            {!isEdit && (
+              <Field label="Sale or rent">
+                <SegmentedControl
+                  value={form.intent}
+                  onChange={(v) => set({ intent: v })}
+                  options={[{ value: 'FOR_SALE', label: 'For sale' }, { value: 'FOR_RENT', label: 'For rent' }]}
+                />
+              </Field>
             )}
-          </div>
-        )}
 
-        {isEdit && initialData?.building && (
-          <div className="bg-slate-50 border rounded-xl p-4 text-sm text-slate-600">
-            <span className="font-medium text-slate-900">{initialData.building.title}</span>
-            {initialData.unit && <span className="ml-2 text-slate-500">› {initialData.unit.name ?? initialData.unit.unitNumber}</span>}
-            {initialData.building.city && <span className="ml-2 text-slate-400">· {initialData.building.city}</span>}
-          </div>
-        )}
+            <FieldGrid cols={4}>
+              <Field label="Price" required span={2}>
+                <MoneyInput
+                  currency={form.currency}
+                  value={form.price}
+                  onChange={(e) => set({ price: e.target.value })}
+                  placeholder="250000"
+                  step="any"
+                  required
+                  disabled={saving}
+                />
+              </Field>
+              <Field label="Currency">
+                <SelectInput value={form.currency} onChange={(e) => set({ currency: e.target.value })} disabled={saving}>
+                  <option value="USD">USD</option>
+                  <option value="LBP">LBP</option>
+                </SelectInput>
+              </Field>
+              {form.intent === 'FOR_RENT' && (
+                <Field label="Period">
+                  <SelectInput value={form.rentPeriod} onChange={(e) => set({ rentPeriod: e.target.value })} disabled={saving}>
+                    {RENT_PERIODS.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
+                  </SelectInput>
+                </Field>
+              )}
+            </FieldGrid>
 
-        {/* Listing Details */}
-        <div className="bg-white border rounded-xl p-6 space-y-4">
-          <h2 className="font-semibold text-slate-900">Listing Details</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className={labelCls}>Intent <span className="text-red-500">*</span></label>
-              <select value={form.intent} onChange={e => setField('intent', e.target.value)} className={inputCls}>
-                <option value="FOR_SALE">For Sale</option>
-                <option value="FOR_RENT">For Rent</option>
-              </select>
-            </div>
-            {form.intent === 'FOR_RENT' && (
-              <div>
-                <label className={labelCls}>Rent Period</label>
-                <select value={form.rentPeriod} onChange={e => setField('rentPeriod', e.target.value)} className={inputCls}>
-                  <option value="">— Select period —</option>
-                  <option value="MONTHLY">Monthly</option>
-                  <option value="QUARTERLY">Quarterly</option>
-                  <option value="YEARLY">Yearly</option>
-                </select>
-              </div>
-            )}
-            <div>
-              <label className={labelCls}>Price <span className="text-red-500">*</span></label>
-              <input
-                type="number"
-                value={form.price}
-                onChange={e => setField('price', e.target.value)}
-                className={inputCls}
-                placeholder="e.g., 250000"
-                min="0"
-                step="any"
-                required
+            <div className="rounded-lg border border-slate-200 bg-slate-50/60 p-4">
+              <Toggle
+                checked={form.negotiable}
+                onChange={(v) => set({ negotiable: v })}
+                label="Price is negotiable"
+                hint="Shown to buyers as an invitation to make an offer."
+                disabled={saving}
               />
             </div>
-            <div>
-              <label className={labelCls}>Currency</label>
-              <select value={form.currency} onChange={e => setField('currency', e.target.value)} className={inputCls}>
-                <option value="USD">USD ($)</option>
-                <option value="LBP">LBP</option>
-              </select>
-            </div>
-            <div>
-              <label className={labelCls}>Status</label>
-              <select value={form.status} onChange={e => setField('status', e.target.value)} className={inputCls}>
-                <option value="DRAFT">Draft</option>
-                <option value="ACTIVE">Active (Published)</option>
-                <option value="UNDER_OFFER">Under Offer</option>
+          </div>
+        </FormSection>
+
+        {/* Publishing */}
+        <FormSection title="Publishing" description="Where this listing is in its sale, and who can see it.">
+          <FieldGrid cols={2}>
+            <Field label="Status">
+              <SelectInput value={form.status} onChange={(e) => set({ status: e.target.value })} disabled={saving}>
+                <option value="DRAFT">Draft — not on the website</option>
+                <option value="ACTIVE">Active — live</option>
+                <option value="UNDER_OFFER">Under offer</option>
                 <option value="CLOSED">Closed</option>
                 <option value="ARCHIVED">Archived</option>
-              </select>
-            </div>
-            <div>
-              <label className={labelCls}>Visibility</label>
-              <select value={form.visibility} onChange={e => setField('visibility', e.target.value)} className={inputCls}>
+              </SelectInput>
+            </Field>
+            <Field label="Who can see it">
+              <SelectInput value={form.visibility} onChange={(e) => set({ visibility: e.target.value })} disabled={saving}>
                 <option value="PUBLIC">Public</option>
-                <option value="ELITE_ONLY">Elite Only</option>
+                <option value="ELITE_ONLY">Elite only</option>
                 <option value="HIDDEN">Hidden</option>
-              </select>
-            </div>
-          </div>
+              </SelectInput>
+            </Field>
+          </FieldGrid>
+          {form.status === 'ACTIVE' && form.visibility === 'HIDDEN' && (
+            <InlineNote tone="warning" className="mt-3">
+              Active but hidden — nobody will see it. Set visibility to Public to actually publish.
+            </InlineNote>
+          )}
+        </FormSection>
 
-          <div>
-            <label className={labelCls}>Headline</label>
-            <input
-              type="text"
-              value={form.headline}
-              onChange={e => setField('headline', e.target.value)}
-              className={inputCls}
-              placeholder="e.g., Spacious 3BR with sea view in Verdun"
-            />
-            <p className="text-xs text-slate-400 mt-1">Shown on the listing card. Falls back to building/unit name if blank.</p>
-          </div>
-
-          <div>
-            <label className={labelCls}>Description</label>
-            <textarea
-              value={form.description}
-              onChange={e => setField('description', e.target.value)}
-              rows={4}
-              className={inputCls + ' resize-y'}
-              placeholder="Additional listing-specific details..."
-            />
-          </div>
-
-          {/* Highlights */}
-          <div>
-            <label className={labelCls}>Highlights</label>
-            <div className="flex gap-2">
-              <input
-                type="text"
-                value={highlightInput}
-                onChange={e => setHighlightInput(e.target.value)}
-                onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addHighlight() } }}
-                className={inputCls}
-                placeholder="e.g., New renovation, No shared walls..."
+        {/* Copy */}
+        <FormSection
+          title="What buyers read"
+          description="Overrides the property's own words for this listing only."
+          aside={
+            <button
+              type="button"
+              onClick={generateCopy}
+              disabled={aiLoading || saving || !form.buildingId}
+              title={form.buildingId ? 'Write from the property’s details' : 'Pick a property first'}
+              className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-violet-200 bg-violet-50 px-3 text-xs font-medium text-violet-700 transition-colors hover:bg-violet-100 disabled:opacity-50"
+            >
+              {aiLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+              {aiLoading ? 'Writing…' : 'Write with AI'}
+            </button>
+          }
+        >
+          <div className="space-y-4">
+            <Field
+              label="Headline"
+              optional
+              hint="Falls back to the unit or property name if you leave it blank."
+            >
+              <TextInput
+                value={form.headline}
+                onChange={(e) => set({ headline: e.target.value })}
+                placeholder="e.g. Spacious 3BR with sea view in Verdun"
+                disabled={saving}
               />
-              <button type="button" onClick={addHighlight} className="px-3 py-2 bg-slate-800 text-white rounded-lg hover:bg-slate-700 transition-colors flex-shrink-0">
-                <Plus className="h-4 w-4" />
-              </button>
-            </div>
-            {form.highlights.length > 0 && (
-              <div className="flex flex-wrap gap-2 mt-3">
-                {form.highlights.map((h: string, i: number) => (
-                  <span key={i} className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 text-slate-700 rounded-lg text-sm">
-                    {h}
-                    <button type="button" onClick={() => removeHighlight(i)} className="text-slate-400 hover:text-red-500">
-                      <X className="h-3 w-3" />
-                    </button>
-                  </span>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
+            </Field>
 
-        {/* Actions */}
-        <div className="flex gap-3 justify-end pb-8">
-          <Link href="/admin/listings" className="px-4 py-2 text-sm font-medium text-slate-700 bg-slate-100 rounded-lg hover:bg-slate-200 transition-colors">
-            Cancel
-          </Link>
-          <button
-            type="submit"
-            disabled={saving}
-            className="px-6 py-2 text-sm font-medium text-white bg-slate-800 rounded-lg hover:bg-slate-700 transition-colors disabled:opacity-50 flex items-center gap-2"
-          >
-            {saving ? (
-              <><Loader2 className="h-4 w-4 animate-spin" /> Saving...</>
-            ) : (
-              isEdit ? 'Save Changes' : 'Create Listing'
-            )}
-          </button>
-        </div>
+            <Field label="Description" optional>
+              <Textarea
+                value={form.description}
+                onChange={(e) => set({ description: e.target.value })}
+                rows={5}
+                placeholder="Anything specific to this listing…"
+                disabled={saving}
+              />
+            </Field>
+
+            <Field label="Highlights" optional hint="Short bullets shown beside the price.">
+              <ChipsInput
+                value={form.highlights}
+                onChange={(highlights) => set({ highlights })}
+                placeholder="e.g. Newly renovated…"
+                suggestions={HIGHLIGHT_SUGGESTIONS}
+                disabled={saving}
+              />
+            </Field>
+
+            {/* A listing is a card. Showing the card removes the guesswork. */}
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+              <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+                How the card reads
+              </p>
+              <div className="rounded-lg border border-slate-200 bg-white p-3">
+                <p className="truncate text-sm font-semibold text-slate-900">{cardTitle}</p>
+                <p className="mt-0.5 text-sm font-bold text-slate-800">
+                  {form.price
+                    ? `${form.currency === 'USD' ? '$' : ''}${Number(form.price).toLocaleString()}${form.currency !== 'USD' ? ` ${form.currency}` : ''}`
+                    : 'No price'}
+                  {form.intent === 'FOR_RENT' && (
+                    <span className="font-normal text-slate-500">
+                      {' '}/ {RENT_PERIODS.find((p) => p.value === form.rentPeriod)?.label.replace('Per ', '') ?? 'month'}
+                    </span>
+                  )}
+                  {form.negotiable && <span className="ml-1.5 text-xs font-medium text-emerald-600">negotiable</span>}
+                </p>
+                {selectedBuilding && (
+                  <p className="mt-0.5 truncate text-xs text-slate-400">
+                    {[selectedBuilding.city, selectedBuilding.caza].filter(Boolean).join(', ')}
+                  </p>
+                )}
+                {form.highlights.length > 0 && (
+                  <div className="mt-1.5 flex flex-wrap gap-1">
+                    {form.highlights.slice(0, 3).map((h) => (
+                      <span key={h} className="rounded bg-slate-100 px-1.5 py-0.5 text-[11px] text-slate-600">{h}</span>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </FormSection>
+
+        <SaveBar
+          dirty={dirty}
+          saving={saving}
+          saved={saved}
+          onSave={() => handleSubmit()}
+          cancelHref="/admin/listings"
+          saveLabel={isEdit ? 'Save listing' : 'Create listing'}
+        />
       </form>
     </div>
   )

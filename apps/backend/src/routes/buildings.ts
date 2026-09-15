@@ -59,6 +59,46 @@ async function generateUniqueSlug(
 
 // ── Schemas ───────────────────────────────────────────────────────────────────
 
+/** The subset of `BuildingInvestmentData` the back office edits. */
+const investmentDataSchema = z.object({
+  expectedROI: z.number().optional().nullable(),
+  rentalYield: z.number().optional().nullable(),
+  capitalGrowth: z.number().optional().nullable(),
+  annualAppreciation: z.number().optional().nullable(),
+  minInvestment: z.number().optional().nullable(),
+  maxInvestment: z.number().optional().nullable(),
+  downPaymentPercentage: z.number().optional().nullable(),
+  installmentYears: z.number().int().optional().nullable(),
+  isGoldenVisaEligible: z.boolean().optional(),
+  goldenVisaMinAmount: z.number().optional().nullable(),
+  completionDate: z.string().optional().nullable(),
+  handoverDate: z.string().optional().nullable(),
+  expectedRentalStart: z.string().optional().nullable(),
+  averageRentPerMonth: z.number().optional().nullable(),
+  mortgageAvailable: z.boolean().optional(),
+  serviceFee: z.number().optional().nullable(),
+  propertyTax: z.number().optional().nullable(),
+});
+
+type InvestmentDataInput = z.infer<typeof investmentDataSchema>;
+
+/**
+ * Split the investment block out of a building body and coerce its dates.
+ *
+ * Kept as a helper because create and update both need it and both write the
+ * row through `upsert` — a building may or may not already have one, and the
+ * caller has no way to know which.
+ */
+function investmentWriteData(input: InvestmentDataInput) {
+  const { completionDate, handoverDate, expectedRentalStart, ...rest } = input;
+  return {
+    ...rest,
+    completionDate: completionDate ? new Date(completionDate) : null,
+    handoverDate: handoverDate ? new Date(handoverDate) : null,
+    expectedRentalStart: expectedRentalStart ? new Date(expectedRentalStart) : null,
+  };
+}
+
 const buildingSchema = z.object({
   kind: z.enum(['STANDALONE', 'PROJECT', 'COMMUNITY', 'MIXED_USE']).optional(),
   title: z.string().min(1, 'Title is required'),
@@ -110,6 +150,13 @@ const buildingSchema = z.object({
   developerId: z.string().optional().nullable(),
   locationGuideId: z.string().optional().nullable(),
   agentId: z.string().optional().nullable(),
+  // Investment figures. `BuildingInvestmentData` has always been rendered by
+  // the public site — the ROI badge on every card, Expected ROI and Rental
+  // Yield on the listing page, the golden-visa flag, and the sort keys the AI
+  // search uses — but only the legacy `/api/properties` route could write it,
+  // and the back office stopped calling that route. So in practice no property
+  // managed from here could ever have any of it.
+  investmentData: investmentDataSchema.optional().nullable(),
   paymentPlans: z.array(z.object({
     name: z.string(),
     kind: z.enum(['CASH', 'INSTALLMENTS', 'CUSTOM']),
@@ -143,6 +190,10 @@ const unitCreateSchema = z.object({
   rentCurrency: z.enum(['USD', 'LBP']).optional().nullable(),
   rentPeriod: z.enum(['MONTHLY', 'QUARTERLY', 'YEARLY']).optional().nullable(),
   generatorAmpere: z.number().int().optional().nullable(),
+  // Accepted by `PUT /api/units/:id` but not here, so a unit could only be
+  // given a furnishing or ownership type on a second save.
+  furnishing: z.enum(['UNFURNISHED', 'SEMI_FURNISHED', 'FULLY_FURNISHED']).optional().nullable(),
+  ownership: z.enum(['FREEHOLD', 'LEASEHOLD']).optional().nullable(),
   images: z.array(z.string()).optional(),
   notes: z.string().optional().nullable(),
   features: z.array(z.string()).optional(),
@@ -304,11 +355,13 @@ router.post(
     const authReq = req as AuthenticatedRequest;
     const data = buildingSchema.parse(req.body);
 
+    const { investmentData, ...buildingFields } = data;
+
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const result = await prisma.$transaction(async (tx: any) => {
       const slug = data.slug || (await generateUniqueSlug(data.title, undefined, tx));
       const createData = {
-        ...data,
+        ...buildingFields,
         // An empty select is "no owner", not a foreign key of "".
         ownerLeadId: data.ownerLeadId || null,
         ref: await nextBuildingRef(tx),
@@ -322,7 +375,13 @@ router.post(
         soldAt: data.soldAt ? new Date(data.soldAt) : undefined,
         publishedAt: new Date(),
       };
-      return tx.building.create({ data: createData });
+      const created = await tx.building.create({ data: createData });
+      if (investmentData) {
+        await tx.buildingInvestmentData.create({
+          data: { ...investmentWriteData(investmentData), buildingId: created.id },
+        });
+      }
+      return created;
     });
 
     await logAdminAction('CREATE_BUILDING', 'building', result.id, { title: result.title }, authReq);
@@ -462,9 +521,18 @@ router.put(
     });
     if (!existing) { sendNotFound(res, 'Building'); return; }
 
+    const { investmentData, ...buildingFields } = data;
+
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const updateData: Record<string, any> = { ...data };
+    const updateData: Record<string, any> = { ...buildingFields };
+    // These four arrive as ISO strings and are `DateTime` columns. Only
+    // `featuredUntil` was ever converted, so a body carrying any of the other
+    // three reached Prisma as a string and threw — which is why nothing in the
+    // admin had ever sent them.
     if (data.featuredUntil) updateData.featuredUntil = new Date(data.featuredUntil);
+    if ('availableFrom' in data) updateData.availableFrom = data.availableFrom ? new Date(data.availableFrom) : null;
+    if ('reservedUntil' in data) updateData.reservedUntil = data.reservedUntil ? new Date(data.reservedUntil) : null;
+    if ('soldAt' in data) updateData.soldAt = data.soldAt ? new Date(data.soldAt) : null;
     // Only touch the owner when the caller actually sent the field, so a
     // partial update from another screen can't silently unlink it.
     if ('ownerLeadId' in data) updateData.ownerLeadId = data.ownerLeadId || null;
@@ -478,6 +546,17 @@ router.put(
       where: { id: req.params.id },
       data: updateData,
     });
+
+    // Upsert rather than update: most buildings have no investment row yet, and
+    // the form has no way to tell the difference.
+    if (investmentData) {
+      const write = investmentWriteData(investmentData);
+      await prisma.buildingInvestmentData.upsert({
+        where: { buildingId: req.params.id },
+        create: { ...write, buildingId: req.params.id },
+        update: write,
+      });
+    }
 
     await logAdminAction('UPDATE_BUILDING', 'building', req.params.id, { title: result.title }, authReq);
     sendSuccess(res, result, 'Building updated successfully');

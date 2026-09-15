@@ -1,44 +1,46 @@
 'use client'
 
-import { useState, useCallback, useEffect, useRef } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import {
-  Plus, Pencil, Trash2, Tag, Loader2, X,
-  Building2, Bed, Square, Layers, ChevronDown, ChevronUp,
-  DollarSign, BadgePlus, ExternalLink, Archive, Sparkles,
+  Bed, Building2, Copy, Layers, Loader2, Pencil, Plus, Square, Tag, Trash2, X,
 } from 'lucide-react'
-import { Button } from '@/components/ui/button'
 import { normalizeApiUrl, normalizeFileUrl } from '@/lib/utils/api-url'
-import { ALL_PROPERTY_KINDS, typeLabel, typeDef } from '@/lib/property-types'
+import { toast } from '@/components/ui/use-toast'
+import { ConfirmDialog } from '@/components/admin/ui/ConfirmDialog'
+import { InlineNote } from '@/components/admin/ui/form'
+import { EmptyState } from '@/components/admin/ui/layout'
+import { ALL_PROPERTY_KINDS, typeDef, typeLabel } from '@/lib/property-types'
+import { buildingRefOf, unitRef } from '@/lib/reference'
+import { cn } from '@/lib/utils'
 import { UnitOptions } from './UnitOptions'
-import { unitRef, buildingRefOf } from '@/lib/reference'
+import { UnitFormPanel, buildUnitPayload, emptyUnit, unitFormFrom, type UnitFormState } from './UnitFormPanel'
+import { ListingEditPanel, ListingQuickForm } from './ListingPanels'
 
-// ── constants ─────────────────────────────────────────────────────────────────
+// ── Constants ─────────────────────────────────────────────────────────────────
 
-const KIND_OPTIONS = ALL_PROPERTY_KINDS.map((value) => ({ value, label: typeLabel(value) }))
-
-const LIFECYCLE_OPTIONS = [
-  { value: 'DRAFT',          label: 'Draft' },
-  { value: 'VACANT',         label: 'Vacant' },
-  { value: 'FOR_SALE',       label: 'For Sale' },
-  { value: 'FOR_RENT',       label: 'For Rent' },
-  { value: 'RESERVED',       label: 'Reserved' },
-  { value: 'SOLD',           label: 'Sold' },
-  { value: 'RENTED',         label: 'Rented' },
-  { value: 'OWNER_OCCUPIED', label: 'Owner Occupied' },
-  { value: 'OFF_MARKET',     label: 'Off Market' },
+export const LIFECYCLE_OPTIONS = [
+  { value: 'DRAFT', label: 'Draft' },
+  { value: 'VACANT', label: 'Vacant' },
+  { value: 'FOR_SALE', label: 'For sale' },
+  { value: 'FOR_RENT', label: 'For rent' },
+  { value: 'RESERVED', label: 'Reserved' },
+  { value: 'SOLD', label: 'Sold' },
+  { value: 'RENTED', label: 'Rented' },
+  { value: 'OWNER_OCCUPIED', label: 'Owner occupied' },
+  { value: 'OFF_MARKET', label: 'Off market' },
 ]
 
-const LIFECYCLE_COLORS: Record<string, string> = {
-  DRAFT:          'bg-zinc-100 text-zinc-500',
-  VACANT:         'bg-zinc-100 text-zinc-600',
-  FOR_SALE:       'bg-emerald-100 text-emerald-700',
-  FOR_RENT:       'bg-sky-100 text-sky-700',
-  RESERVED:       'bg-amber-100 text-amber-700',
-  SOLD:           'bg-zinc-200 text-zinc-600',
-  RENTED:         'bg-zinc-200 text-zinc-600',
+export const LIFECYCLE_COLORS: Record<string, string> = {
+  DRAFT: 'bg-zinc-100 text-zinc-500',
+  VACANT: 'bg-zinc-100 text-zinc-600',
+  FOR_SALE: 'bg-emerald-100 text-emerald-700',
+  FOR_RENT: 'bg-sky-100 text-sky-700',
+  RESERVED: 'bg-amber-100 text-amber-700',
+  SOLD: 'bg-zinc-200 text-zinc-600',
+  RENTED: 'bg-zinc-200 text-zinc-600',
   OWNER_OCCUPIED: 'bg-purple-100 text-purple-700',
-  OFF_MARKET:     'bg-zinc-100 text-zinc-400',
+  OFF_MARKET: 'bg-zinc-100 text-zinc-400',
 }
 
 const LISTING_INTENT_COLORS: Record<string, string> = {
@@ -47,792 +49,56 @@ const LISTING_INTENT_COLORS: Record<string, string> = {
 }
 
 const LISTING_STATUS_DOT: Record<string, string> = {
-  ACTIVE:      'bg-emerald-500',
-  DRAFT:       'bg-zinc-400',
+  ACTIVE: 'bg-emerald-500',
+  DRAFT: 'bg-zinc-400',
   UNDER_OFFER: 'bg-amber-500',
-  CLOSED:      'bg-red-400',
-  ARCHIVED:    'bg-zinc-300',
+  CLOSED: 'bg-red-400',
+  ARCHIVED: 'bg-zinc-300',
 }
 
-// ── helpers ───────────────────────────────────────────────────────────────────
+export const KIND_OPTIONS = ALL_PROPERTY_KINDS.map((value) => ({ value, label: typeLabel(value) }))
 
-function formatPrice(price: number, currency: string) {
+export function formatPrice(price: number, currency: string) {
   if (currency === 'LBP') return `${(price / 1_000_000).toFixed(1)}M LBP`
-  return `$${price.toLocaleString()}`
+  return `$${Number(price).toLocaleString()}`
 }
-
-// ── Unit form (create / edit) ─────────────────────────────────────────────────
-
-const EMPTY_UNIT = {
-  kind: 'APARTMENT', name: '', unitNumber: '', floor: '',
-  bedrooms: '', bathrooms: '', areaSqm: '', lifecycle: 'VACANT',
-  isUnitType: false,
-  images: [] as string[],
-}
-type UnitFormState = typeof EMPTY_UNIT
-
-function buildUnitPayload(f: UnitFormState) {
-  // Drop fields that don't apply to the chosen type so stale values aren't saved.
-  const bedsOk = typeDef(f.kind).beds
-  const bathsOk = typeDef(f.kind).baths
-  const floorOk = typeDef(f.kind).floor
-  return {
-    kind:      f.kind || undefined,
-    name:      f.name || null,
-    unitNumber:f.unitNumber || null,
-    floor:     floorOk && f.floor  !== '' ? Number(f.floor)  : null,
-    bedrooms:  bedsOk && f.bedrooms  !== '' ? Number(f.bedrooms)  : null,
-    bathrooms: bathsOk && f.bathrooms !== '' ? Number(f.bathrooms) : null,
-    areaSqm:   f.areaSqm   !== '' ? Number(f.areaSqm)   : null,
-    isUnitType: f.isUnitType,
-    lifecycle: f.lifecycle || undefined,
-    images:    f.images,
-  }
-}
-
-function UnitFormPanel({
-  initial, buildingId, unitId, ownerAssigned, onSave, onCancel, saving,
-}: {
-  initial: UnitFormState
-  buildingId: string
-  unitId?: string
-  ownerAssigned?: boolean
-  onSave: (f: UnitFormState) => void
-  onCancel: () => void
-  saving: boolean
-}) {
-  const [f, setF] = useState<UnitFormState>(initial)
-  const set = (k: keyof UnitFormState, v: string | boolean) => setF(p => ({ ...p, [k]: v }))
-  const inp = 'w-full px-3 py-2 border border-zinc-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-sky-600/15 focus:border-sky-500 bg-white'
-  const lbl = 'block text-xs font-medium text-zinc-600 mb-1'
-  // Only show fields that make sense for the chosen unit type.
-  const showBeds = typeDef(f.kind).beds
-  const showBaths = typeDef(f.kind).baths
-  const showFloor = typeDef(f.kind).floor
-
-  // Admin: assign this unit to a registered user (by email) — shows in their portal.
-  // (apiUrl is already declared above for image uploads.)
-  const [assignEmail, setAssignEmail] = useState('')
-  const [assignBusy, setAssignBusy] = useState(false)
-  const [assignMsg, setAssignMsg] = useState<{ ok: boolean; text: string } | null>(null)
-  const [assigned, setAssigned] = useState(!!ownerAssigned)
-
-  async function assignOwner(clear = false) {
-    if (!unitId) return
-    setAssignBusy(true)
-    setAssignMsg(null)
-    try {
-      const res = await fetch(`${apiUrl}/api/units/${unitId}/assign-owner`, {
-        method: 'PUT',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: clear ? null : assignEmail.trim() }),
-      })
-      const d = await res.json().catch(() => ({}))
-      if (!res.ok) { setAssignMsg({ ok: false, text: d.message || 'Failed' }); return }
-      setAssigned(!clear)
-      if (clear) setAssignEmail('')
-      setAssignMsg({ ok: true, text: d.message || (clear ? 'Owner cleared' : 'Assigned') })
-    } catch {
-      setAssignMsg({ ok: false, text: 'Network error' })
-    } finally {
-      setAssignBusy(false)
-    }
-  }
-
-  const apiUrl = normalizeApiUrl(process.env.NEXT_PUBLIC_API_URL || '')
-
-  // Optional unit-specific photos (most properties just use the shared property
-  // photos; this is for the rare case a unit needs its own images).
-  const fileInputRef = useRef<HTMLInputElement>(null)
-  const [uploading, setUploading] = useState(false)
-  const [deletingIdx, setDeletingIdx] = useState<number | null>(null)
-
-  async function uploadUnitImages(files: FileList) {
-    setUploading(true)
-    const urls: string[] = []
-    for (const file of Array.from(files)) {
-      try {
-        const fd = new FormData()
-        fd.append('file', file)
-        fd.append('folder', 'units')
-        if (buildingId) fd.append('propertySlug', buildingId)
-        const res = await fetch(`${apiUrl}/api/upload`, { method: 'POST', credentials: 'include', body: fd })
-        if (res.ok) { const d = await res.json(); if (d.url) urls.push(d.url) }
-      } catch { /* skip */ }
-    }
-    if (urls.length) setF(p => ({ ...p, images: [...p.images, ...urls] }))
-    setUploading(false)
-  }
-  async function removeUnitImage(idx: number) {
-    const url = f.images[idx]
-    if (!url) return
-    setDeletingIdx(idx)
-    try {
-      await fetch(`${apiUrl}/api/upload`, { method: 'DELETE', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url }) })
-    } catch { /* best effort */ }
-    setF(p => ({ ...p, images: p.images.filter((_, i) => i !== idx) }))
-    setDeletingIdx(null)
-  }
-
-  return (
-    <div className="bg-zinc-50 border border-zinc-200 rounded-xl p-5 space-y-4">
-      <p className="text-xs font-semibold text-zinc-500 uppercase tracking-wider">Unit details</p>
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <div className="col-span-2 sm:col-span-1">
-          <label className={lbl}>Unit type</label>
-          <select value={f.kind} onChange={e => set('kind', e.target.value)} className={inp}>
-            {KIND_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-          </select>
-        </div>
-        <div className="col-span-2 sm:col-span-1">
-          <label className={lbl}>Title</label>
-          <input value={f.name} onChange={e => set('name', e.target.value)} placeholder="e.g. Unit 3A" className={inp} title="Shown on the website if this unit has no listing headline" />
-        </div>
-        <div>
-          <label className={lbl}>Unit No.</label>
-          <input value={f.unitNumber} onChange={e => set('unitNumber', e.target.value)} placeholder="301" className={inp} />
-        </div>
-        {showFloor && (
-        <div>
-          <label className={lbl}>Floor</label>
-          <input type="number" value={f.floor} onChange={e => set('floor', e.target.value)} placeholder="3" className={inp} />
-        </div>
-        )}
-      </div>
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        {showBeds && (
-        <div>
-          <label className={lbl}>Bedrooms</label>
-          <input type="number" min="0" value={f.bedrooms} onChange={e => set('bedrooms', e.target.value)} placeholder="2" className={inp} />
-        </div>
-        )}
-        {showBaths && (
-        <div>
-          <label className={lbl}>Bathrooms</label>
-          <input type="number" min="0" value={f.bathrooms} onChange={e => set('bathrooms', e.target.value)} placeholder="1" className={inp} />
-        </div>
-        )}
-        <div>
-          <label className={lbl}>{f.kind === 'LAND_PARCEL' ? 'Land area (m²)' : 'Area (m²)'}</label>
-          <input type="number" min="0" value={f.areaSqm} onChange={e => set('areaSqm', e.target.value)} placeholder="120" className={inp} />
-        </div>
-        {/* A development we resell offers "1 bedroom" as a template many
-            clients buy. We're the broker, not the developer, so there's no
-            stock count — just a flag that it repeats. */}
-        <div className="sm:col-span-2">
-          <label className="flex items-start gap-2.5 rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2.5 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={f.isUnitType}
-              onChange={e => set('isUnitType', e.target.checked)}
-              className="mt-0.5 h-4 w-4 rounded border-zinc-300"
-            />
-            <span>
-              <span className="block text-sm font-medium text-zinc-800">
-                This is a unit type, not one specific apartment
-              </span>
-              <span className="block text-[11px] text-zinc-500 mt-0.5">
-                For developments where you sell the same &ldquo;1 bedroom&rdquo; to many clients.
-                It stays available to everyone, and you record which apartment each
-                client actually got when the deal closes.
-              </span>
-            </span>
-          </label>
-        </div>
-        <div>
-          <label className={lbl}>Lifecycle</label>
-          <select value={f.lifecycle} onChange={e => set('lifecycle', e.target.value)} className={inp}>
-            {LIFECYCLE_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-          </select>
-        </div>
-      </div>
-
-      {/* Unit-specific photos (optional) — overrides the shared property photos for this unit */}
-      <div>
-        <label className={lbl}>Unit-specific photos <span className="text-zinc-400 font-normal">(optional)</span></label>
-        {f.images.length > 0 && (
-          <div className="grid grid-cols-4 sm:grid-cols-6 gap-2 mb-2">
-            {f.images.map((url, i) => (
-              <div key={i} className="relative group aspect-square">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={normalizeFileUrl(url)} alt="" className="w-full h-full object-cover rounded-lg border border-zinc-200" />
-                {deletingIdx === i && (
-                  <div className="absolute inset-0 bg-black/50 rounded-lg flex items-center justify-center"><Loader2 className="h-4 w-4 text-white animate-spin" /></div>
-                )}
-                <button type="button" onClick={() => removeUnitImage(i)} disabled={deletingIdx !== null} className="absolute top-1 right-1 p-0.5 bg-red-500 text-white rounded-md opacity-0 group-hover:opacity-100 transition-opacity disabled:opacity-50">
-                  <X className="h-3 w-3" />
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
-        <div className="border-2 border-dashed border-zinc-200 rounded-lg p-3 text-center hover:border-zinc-400 cursor-pointer" onClick={() => fileInputRef.current?.click()}>
-          {uploading
-            ? <span className="text-sm text-zinc-500 inline-flex items-center gap-2"><Loader2 className="h-4 w-4 animate-spin" /> Uploading…</span>
-            : <span className="text-sm text-zinc-500">Click to add photos for this unit only</span>}
-        </div>
-        <input ref={fileInputRef} type="file" accept="image/jpeg,image/png,image/webp" multiple className="hidden" onChange={e => { if (e.target.files?.length) uploadUnitImages(e.target.files); e.target.value = '' }} />
-        <p className="text-xs text-zinc-400 mt-1">Leave empty to use the property’s shared photos. Add photos here only if this unit needs its own.</p>
-      </div>
-
-      {/* Assign to a user (admin) — only for existing units */}
-      {unitId && (
-        <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-3">
-          <p className="text-xs font-semibold text-zinc-600 mb-1.5">
-            Assign to user {assigned && <span className="text-emerald-600">· currently assigned</span>}
-          </p>
-          <div className="flex items-center gap-2">
-            <input
-              type="email"
-              value={assignEmail}
-              onChange={(e) => setAssignEmail(e.target.value)}
-              placeholder="owner@email.com"
-              className={inp + ' flex-1'}
-            />
-            <button
-              type="button"
-              onClick={() => assignOwner(false)}
-              disabled={assignBusy || !assignEmail.trim()}
-              className="px-3 py-2 text-sm font-medium text-white bg-sky-600 hover:bg-sky-700 rounded-lg disabled:opacity-50 flex items-center gap-1.5"
-            >
-              {assignBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null} Assign
-            </button>
-            {assigned && (
-              <button type="button" onClick={() => assignOwner(true)} disabled={assignBusy} className="px-3 py-2 text-sm text-zinc-600 hover:text-red-600 disabled:opacity-50">
-                Clear
-              </button>
-            )}
-          </div>
-          {assignMsg && (
-            <p className={`text-xs mt-1.5 ${assignMsg.ok ? 'text-emerald-600' : 'text-red-600'}`}>{assignMsg.text}</p>
-          )}
-          <p className="text-[11px] text-zinc-400 mt-1">The unit will appear in that user’s portal. Works for any registered user (Google or email).</p>
-        </div>
-      )}
-
-      <div className="flex items-center justify-end gap-2 pt-1">
-        <button type="button" onClick={onCancel} className="px-4 py-1.5 text-sm text-zinc-600 hover:text-zinc-900 transition-colors">
-          Cancel
-        </button>
-        <button
-          type="button"
-          onClick={() => onSave(f)}
-          disabled={saving}
-          className="px-5 py-1.5 text-sm font-medium text-white bg-zinc-800 hover:bg-zinc-700 rounded-lg transition-colors disabled:opacity-50 flex items-center gap-2"
-        >
-          {saving && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-          Save Unit
-        </button>
-      </div>
-    </div>
-  )
-}
-
-// ── Listing quick-create form ─────────────────────────────────────────────────
-
-const EMPTY_LISTING = {
-  intent: 'FOR_SALE',
-  price: '',
-  currency: 'USD',
-  rentPeriod: 'MONTHLY',
-  status: 'DRAFT',
-  headline: '',
-}
-type ListingFormState = typeof EMPTY_LISTING
-
-function ListingQuickForm({
-  buildingId, unitId, unitLabel,
-  onSuccess, onCancel,
-}: {
-  buildingId: string
-  unitId: string
-  unitLabel: string
-  onSuccess: () => void
-  onCancel: () => void
-}) {
-  const [f, setF] = useState<ListingFormState>(EMPTY_LISTING)
-  const [saving, setSaving] = useState(false)
-  const [err, setErr] = useState<string | null>(null)
-  const [aiLoading, setAiLoading] = useState(false)
-  const set = (k: keyof ListingFormState, v: string) => setF(p => ({ ...p, [k]: v }))
-
-  async function generateSeo() {
-    setAiLoading(true)
-    setErr(null)
-    try {
-      const apiUrl = normalizeApiUrl(process.env.NEXT_PUBLIC_API_URL || '')
-      const res = await fetch(`${apiUrl}/api/ai-seo/generate`, {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type: 'unit', id: unitId }),
-      })
-      const data = await res.json().catch(() => ({}))
-      if (!res.ok) { setErr(data.message || 'AI generation failed'); return }
-      const s = data.data ?? data
-      if (s.headline) set('headline', s.headline)
-    } catch {
-      setErr('Network error')
-    } finally {
-      setAiLoading(false)
-    }
-  }
-
-  const inp = 'w-full px-3 py-2 border border-zinc-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-sky-600/15 focus:border-sky-500 bg-white'
-  const lbl = 'block text-xs font-medium text-zinc-600 mb-1'
-
-  async function submit() {
-    if (!f.price || Number(f.price) <= 0) { setErr('Price must be greater than 0'); return }
-    setSaving(true)
-    setErr(null)
-    const apiUrl = normalizeApiUrl(process.env.NEXT_PUBLIC_API_URL || '')
-    try {
-      const payload: any = {
-        subjectType: 'UNIT',
-        unitId,
-        buildingId,
-        intent: f.intent,
-        price: parseFloat(f.price),
-        currency: f.currency,
-        status: f.status,
-        visibility: 'PUBLIC',
-        headline: f.headline || null,
-        highlights: [],
-      }
-      if (f.intent === 'FOR_RENT') payload.rentPeriod = f.rentPeriod
-      const res = await fetch(`${apiUrl}/api/listings`, {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      })
-      if (!res.ok) {
-        const d = await res.json().catch(() => ({}))
-        setErr(d.message || 'Failed to create listing')
-        return
-      }
-      onSuccess()
-    } catch {
-      setErr('Network error')
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  return (
-    <div className="bg-sky-50/60 border border-sky-200 rounded-xl p-5 space-y-4">
-      <div className="flex items-center justify-between">
-        <p className="text-xs font-semibold text-sky-700 uppercase tracking-wider flex items-center gap-1.5">
-          <Tag className="h-3.5 w-3.5" /> New listing for {unitLabel}
-        </p>
-        <button onClick={onCancel} className="text-zinc-400 hover:text-zinc-600">
-          <X className="h-4 w-4" />
-        </button>
-      </div>
-
-      {err && (
-        <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{err}</p>
-      )}
-
-      {/* Intent toggle */}
-      <div>
-        <label className={lbl}>Listing type</label>
-        <div className="flex rounded-lg border border-zinc-200 overflow-hidden bg-white w-fit">
-          {(['FOR_SALE', 'FOR_RENT'] as const).map(intent => (
-            <button
-              key={intent}
-              type="button"
-              onClick={() => set('intent', intent)}
-              className={`px-4 py-2 text-sm font-medium transition-colors ${
-                f.intent === intent
-                  ? 'bg-zinc-800 text-white'
-                  : 'text-zinc-500 hover:text-zinc-800'
-              }`}
-            >
-              {intent === 'FOR_SALE' ? 'For Sale' : 'For Rent'}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        {/* Price */}
-        <div className="col-span-2 sm:col-span-1">
-          <label className={lbl}>Price <span className="text-red-500">*</span></label>
-          <div className="relative">
-            <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-zinc-400" />
-            <input
-              type="number"
-              min="0"
-              step="any"
-              value={f.price}
-              onChange={e => set('price', e.target.value)}
-              placeholder="250000"
-              className={inp + ' pl-8'}
-            />
-          </div>
-        </div>
-
-        {/* Currency */}
-        <div>
-          <label className={lbl}>Currency</label>
-          <select value={f.currency} onChange={e => set('currency', e.target.value)} className={inp}>
-            <option value="USD">USD</option>
-            <option value="LBP">LBP</option>
-          </select>
-        </div>
-
-        {/* Rent period (conditional) */}
-        {f.intent === 'FOR_RENT' && (
-          <div>
-            <label className={lbl}>Period</label>
-            <select value={f.rentPeriod} onChange={e => set('rentPeriod', e.target.value)} className={inp}>
-              <option value="MONTHLY">Monthly</option>
-              <option value="QUARTERLY">Quarterly</option>
-              <option value="YEARLY">Yearly</option>
-            </select>
-          </div>
-        )}
-
-        {/* Status */}
-        <div>
-          <label className={lbl}>Status</label>
-          <select value={f.status} onChange={e => set('status', e.target.value)} className={inp}>
-            <option value="DRAFT">Draft</option>
-            <option value="ACTIVE">Active (publish now)</option>
-          </select>
-        </div>
-      </div>
-
-      {/* Headline */}
-      <div>
-        <div className="flex items-center justify-between mb-1">
-          <label className={lbl + ' mb-0'}>Headline <span className="text-zinc-400">(optional)</span></label>
-          <button
-            type="button"
-            onClick={generateSeo}
-            disabled={aiLoading}
-            title="Auto-write a headline from this unit’s details"
-            className="inline-flex items-center gap-1 text-xs font-medium text-violet-700 hover:text-violet-900 disabled:opacity-50"
-          >
-            {aiLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
-            {aiLoading ? 'Generating…' : 'Generate with AI'}
-          </button>
-        </div>
-        <input
-          type="text"
-          value={f.headline}
-          onChange={e => set('headline', e.target.value)}
-          placeholder="e.g. Spacious 2BR with sea view in Verdun"
-          className={inp}
-        />
-      </div>
-
-      <div className="flex items-center justify-end gap-2 pt-1">
-        <button type="button" onClick={onCancel} className="px-4 py-1.5 text-sm text-zinc-600 hover:text-zinc-900 transition-colors">
-          Cancel
-        </button>
-        <button
-          type="button"
-          onClick={submit}
-          disabled={saving}
-          className="px-5 py-1.5 text-sm font-medium text-white bg-sky-600 hover:bg-sky-700 rounded-lg transition-colors disabled:opacity-50 flex items-center gap-2"
-        >
-          {saving && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-          Create Listing
-        </button>
-      </div>
-    </div>
-  )
-}
-
-// ── Listing edit panel ────────────────────────────────────────────────────────
-
-function ListingEditPanel({
-  listingId, listingLabel, unitId,
-  onSuccess, onCancel,
-}: {
-  listingId: string
-  listingLabel: string
-  unitId: string
-  onSuccess: () => void
-  onCancel: () => void
-}) {
-  const apiUrl = normalizeApiUrl(process.env.NEXT_PUBLIC_API_URL || '')
-  const [loading, setLoading] = useState(true)
-  const [saving,  setSaving]  = useState(false)
-  const [err,     setErr]     = useState<string | null>(null)
-  const [aiLoading, setAiLoading] = useState(false)
-
-  async function generateSeo() {
-    setAiLoading(true)
-    setErr(null)
-    try {
-      const res = await fetch(`${apiUrl}/api/ai-seo/generate`, {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type: 'unit', id: unitId }),
-      })
-      const data = await res.json().catch(() => ({}))
-      if (!res.ok) { setErr(data.message || 'AI generation failed'); return }
-      const s = data.data ?? data
-      setForm(p => ({
-        ...p,
-        headline: s.headline ?? p.headline,
-        description: s.description ?? p.description,
-      }))
-    } catch {
-      setErr('Network error')
-    } finally {
-      setAiLoading(false)
-    }
-  }
-  const [form, setForm] = useState({
-    status:      '',
-    visibility:  '',
-    price:       '',
-    currency:    'USD',
-    rentPeriod:  '',
-    headline:    '',
-    description: '',
-    intent:      '',
-  })
-
-  const set = (k: keyof typeof form, v: string) => setForm(p => ({ ...p, [k]: v }))
-  const inp = 'w-full px-3 py-2 border border-zinc-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-sky-600/15 focus:border-sky-500 bg-white'
-  const lbl = 'block text-xs font-medium text-zinc-600 mb-1'
-
-  useEffect(() => {
-    fetch(`${apiUrl}/api/listings/${listingId}`, { credentials: 'include' })
-      .then(r => r.json())
-      .then(d => {
-        const l = d.data ?? d
-        setForm({
-          status:      l.status ?? '',
-          visibility:  l.visibility ?? 'PUBLIC',
-          price:       l.price != null ? String(l.price) : '',
-          currency:    l.currency ?? 'USD',
-          rentPeriod:  l.rentPeriod ?? '',
-          headline:    l.headline ?? '',
-          description: l.description ?? '',
-          intent:      l.intent ?? '',
-        })
-      })
-      .catch(() => setErr('Failed to load listing'))
-      .finally(() => setLoading(false))
-  }, [apiUrl, listingId])
-
-  async function submit() {
-    if (!form.price || Number(form.price) <= 0) { setErr('Price must be greater than 0'); return }
-    setSaving(true)
-    setErr(null)
-    try {
-      const body: any = {
-        status:      form.status,
-        visibility:  form.visibility,
-        price:       parseFloat(form.price),
-        currency:    form.currency,
-        headline:    form.headline || null,
-        description: form.description || null,
-        rentPeriod:  form.intent === 'FOR_RENT' && form.rentPeriod ? form.rentPeriod : null,
-      }
-      const res = await fetch(`${apiUrl}/api/listings/${listingId}`, {
-        method: 'PUT',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      })
-      if (!res.ok) {
-        const d = await res.json().catch(() => ({}))
-        setErr(d.message || 'Failed to save')
-        return
-      }
-      onSuccess()
-    } catch {
-      setErr('Network error')
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  async function archiveListing() {
-    if (!confirm('Archive this listing? It will be hidden from the public site.')) return
-    setSaving(true)
-    try {
-      await fetch(`${apiUrl}/api/listings/${listingId}`, { method: 'DELETE', credentials: 'include' })
-      onSuccess()
-    } catch {
-      setErr('Failed to archive')
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  if (loading) {
-    return (
-      <div className="bg-zinc-50 border border-zinc-200 rounded-xl p-5 flex items-center gap-2 text-sm text-zinc-400">
-        <Loader2 className="h-4 w-4 animate-spin" /> Loading listing…
-      </div>
-    )
-  }
-
-  return (
-    <div className="bg-amber-50/60 border border-amber-200 rounded-xl p-5 space-y-4">
-      <div className="flex items-center justify-between">
-        <p className="text-xs font-semibold text-amber-700 uppercase tracking-wider flex items-center gap-1.5">
-          <Tag className="h-3.5 w-3.5" /> Edit listing · {listingLabel}
-        </p>
-        <div className="flex items-center gap-2">
-          <a
-            href={`/admin/listings/${listingId}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-xs text-zinc-400 hover:text-zinc-600 flex items-center gap-1"
-          >
-            <ExternalLink className="h-3 w-3" /> Full edit
-          </a>
-          <button onClick={onCancel} className="text-zinc-400 hover:text-zinc-600">
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-      </div>
-
-      {err && (
-        <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{err}</p>
-      )}
-
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <div>
-          <label className={lbl}>Price <span className="text-red-500">*</span></label>
-          <div className="relative">
-            <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-zinc-400" />
-            <input
-              type="number" min="0" step="any"
-              value={form.price}
-              onChange={e => set('price', e.target.value)}
-              className={inp + ' pl-8'}
-            />
-          </div>
-        </div>
-        <div>
-          <label className={lbl}>Currency</label>
-          <select value={form.currency} onChange={e => set('currency', e.target.value)} className={inp}>
-            <option value="USD">USD</option>
-            <option value="LBP">LBP</option>
-          </select>
-        </div>
-        {form.intent === 'FOR_RENT' && (
-          <div>
-            <label className={lbl}>Period</label>
-            <select value={form.rentPeriod} onChange={e => set('rentPeriod', e.target.value)} className={inp}>
-              <option value="MONTHLY">Monthly</option>
-              <option value="QUARTERLY">Quarterly</option>
-              <option value="YEARLY">Yearly</option>
-            </select>
-          </div>
-        )}
-        <div>
-          <label className={lbl}>Status</label>
-          <select value={form.status} onChange={e => set('status', e.target.value)} className={inp}>
-            <option value="DRAFT">Draft</option>
-            <option value="ACTIVE">Active</option>
-            <option value="UNDER_OFFER">Under Offer</option>
-            <option value="CLOSED">Closed</option>
-          </select>
-        </div>
-        <div>
-          <label className={lbl}>Visibility</label>
-          <select value={form.visibility} onChange={e => set('visibility', e.target.value)} className={inp}>
-            <option value="PUBLIC">Public</option>
-            <option value="ELITE_ONLY">Elite Only</option>
-            <option value="HIDDEN">Hidden</option>
-          </select>
-        </div>
-      </div>
-
-      <div>
-        <div className="flex items-center justify-between mb-1">
-          <label className={lbl + ' mb-0'}>Headline</label>
-          <button
-            type="button"
-            onClick={generateSeo}
-            disabled={aiLoading}
-            title="Auto-write headline & description from this unit’s details"
-            className="inline-flex items-center gap-1 text-xs font-medium text-violet-700 hover:text-violet-900 disabled:opacity-50"
-          >
-            {aiLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
-            {aiLoading ? 'Generating…' : 'Generate with AI'}
-          </button>
-        </div>
-        <input
-          type="text" value={form.headline}
-          onChange={e => set('headline', e.target.value)}
-          placeholder="Short headline shown on cards"
-          className={inp}
-        />
-      </div>
-
-      <div>
-        <label className={lbl}>Description <span className="text-zinc-400">(optional)</span></label>
-        <textarea
-          value={form.description}
-          onChange={e => set('description', e.target.value)}
-          rows={3} className={inp + ' resize-y'}
-          placeholder="Additional listing details…"
-        />
-      </div>
-
-      <div className="flex items-center justify-between pt-1">
-        <button
-          type="button"
-          onClick={archiveListing}
-          disabled={saving}
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-        >
-          <Archive className="h-3.5 w-3.5" /> Archive
-        </button>
-        <div className="flex items-center gap-2">
-          <button type="button" onClick={onCancel} className="px-4 py-1.5 text-sm text-zinc-600 hover:text-zinc-900 transition-colors">
-            Cancel
-          </button>
-          <button
-            type="button"
-            onClick={submit}
-            disabled={saving}
-            className="px-5 py-1.5 text-sm font-medium text-white bg-amber-600 hover:bg-amber-700 rounded-lg transition-colors disabled:opacity-50 flex items-center gap-2"
-          >
-            {saving && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-            Save Changes
-          </button>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-// ── Main component ────────────────────────────────────────────────────────────
 
 type PanelMode = 'unit-edit' | 'listing-create' | 'listing-edit'
 
-export function UnitsManager({ buildingId, buildingImages = [] }: { buildingId: string; buildingImages?: string[] }) {
+/**
+ * The units inside a property, and the listings on them.
+ *
+ * The unit form here captured nine of the twenty-odd columns a unit has. The
+ * rest — how it is furnished, freehold or leasehold, what it looks out at, its
+ * features, its parking, any internal note — are accepted by the API, printed
+ * on the public listing page, and had no input anywhere in the back office.
+ *
+ * It also gained the two things a development actually needs: adding a floor's
+ * worth of units in one go, and duplicating one that is already right.
+ */
+export function UnitsManager({
+  buildingId, buildingImages = [], buildingTitle,
+}: {
+  buildingId: string
+  buildingImages?: string[]
+  buildingTitle?: string
+}) {
   const apiUrl = normalizeApiUrl(process.env.NEXT_PUBLIC_API_URL || '')
 
-  const [units, setUnits]     = useState<any[]>([])
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [units, setUnits] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
-  const [error, setError]     = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [notice, setNotice] = useState<string | null>(null)
 
-  // Which unit has its panel expanded, and in what mode (+ optional listingId for edit)
   const [expanded, setExpanded] = useState<{ id: string; mode: PanelMode; listingId?: string } | null>(null)
-
-  const [showAddUnit, setShowAddUnit]     = useState(false)
-  const [saving, setSaving]               = useState(false)
-  const [deletingId, setDeletingId]       = useState<string | null>(null)
-  const [notice, setNotice]               = useState<string | null>(null)
+  const [adding, setAdding] = useState<null | 'one' | 'many'>(null)
+  const [saving, setSaving] = useState(false)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [deleteTarget, setDeleteTarget] = useState<any | null>(null)
+  const [deleting, setDeleting] = useState(false)
 
   const fetchUnits = useCallback(async () => {
-    setLoading(true)
     setError(null)
     try {
       const res = await fetch(`${apiUrl}/api/buildings/${buildingId}/units`, {
@@ -840,27 +106,37 @@ export function UnitsManager({ buildingId, buildingImages = [] }: { buildingId: 
         cache: 'no-store',
       })
       const data = await res.json()
-      setUnits(data.data ?? data)
+      setUnits(data.data ?? data ?? [])
     } catch {
-      setError('Failed to load units')
+      setError('Could not load the units.')
     } finally {
       setLoading(false)
     }
   }, [apiUrl, buildingId])
 
-  // Auto-load when the component mounts (the tab has been switched to)
   useEffect(() => { fetchUnits() }, [fetchUnits])
 
+  const stats = useMemo(() => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const listings = units.flatMap((u: any) => u.listings ?? [])
+    return {
+      total: listings.length,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      active: listings.filter((l: any) => l.status === 'ACTIVE').length,
+    }
+  }, [units])
+
   function openPanel(unitId: string, mode: PanelMode, listingId?: string) {
-    setExpanded(prev => {
-      // Clicking the same panel closes it (toggle)
-      if (prev?.id === unitId && prev.mode === mode && prev.listingId === listingId) return null
-      return { id: unitId, mode, listingId }
-    })
-    setShowAddUnit(false)
+    setExpanded((prev) =>
+      prev?.id === unitId && prev.mode === mode && prev.listingId === listingId
+        ? null
+        : { id: unitId, mode, listingId })
+    setAdding(null)
   }
 
-  async function handleCreateUnit(f: UnitFormState) {
+  // ── Mutations ───────────────────────────────────────────────────────────────
+
+  async function createUnit(f: UnitFormState) {
     setSaving(true)
     try {
       const res = await fetch(`${apiUrl}/api/buildings/${buildingId}/units`, {
@@ -871,19 +147,57 @@ export function UnitsManager({ buildingId, buildingImages = [] }: { buildingId: 
       })
       if (!res.ok) {
         const d = await res.json().catch(() => ({}))
-        setError(d.message || 'Failed to create unit')
+        setError(d.message || 'Could not create the unit.')
         return
       }
-      setShowAddUnit(false)
+      setAdding(null)
+      toast({ title: 'Unit added' })
       await fetchUnits()
     } catch {
-      setError('Network error')
+      setError('Network error.')
     } finally {
       setSaving(false)
     }
   }
 
-  async function handleUpdateUnit(unitId: string, f: UnitFormState) {
+  /**
+   * Create a run of units in one pass.
+   *
+   * A twelve-floor development meant filling the same form twelve times,
+   * changing one digit each time. Everything but the number is shared, so it is
+   * asked once.
+   */
+  async function createMany(template: UnitFormState, count: number, startAt: number, prefix: string) {
+    setSaving(true)
+    const payload = buildUnitPayload(template)
+    let made = 0
+    const failures: number[] = []
+    for (let i = 0; i < count; i++) {
+      const n = startAt + i
+      try {
+        const res = await fetch(`${apiUrl}/api/buildings/${buildingId}/units`, {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ...payload, unitNumber: `${prefix}${n}`, name: template.name || null }),
+        })
+        if (res.ok) made++
+        else failures.push(n)
+      } catch {
+        failures.push(n)
+      }
+    }
+    setSaving(false)
+    setAdding(null)
+    await fetchUnits()
+    toast({
+      title: `${made} unit${made === 1 ? '' : 's'} added`,
+      description: failures.length ? `${failures.length} failed: ${failures.join(', ')}` : undefined,
+      variant: failures.length ? 'destructive' : 'default',
+    })
+  }
+
+  async function updateUnit(unitId: string, f: UnitFormState) {
     setSaving(true)
     setNotice(null)
     try {
@@ -895,48 +209,70 @@ export function UnitsManager({ buildingId, buildingImages = [] }: { buildingId: 
       })
       const d = await res.json().catch(() => ({}))
       if (!res.ok) {
-        setError(d.message || 'Failed to update unit')
+        setError(d.message || 'Could not update the unit.')
         return
       }
-      // Surface the cascade (e.g. "Unit updated — 1 listing updated to match")
-      // so the admin sees that changing lifecycle also closed/updated listings.
+      // Surface the cascade ("1 listing updated to match") so the admin sees
+      // that changing a lifecycle also closed or updated listings.
       if (d.message && /listing/i.test(d.message)) {
         setNotice(d.message)
-        setTimeout(() => setNotice(null), 5000)
+        setTimeout(() => setNotice(null), 6000)
       }
       setExpanded(null)
+      toast({ title: 'Unit saved' })
       await fetchUnits()
     } catch {
-      setError('Network error')
+      setError('Network error.')
     } finally {
       setSaving(false)
     }
   }
 
-  async function handleDeleteUnit(unit: any) {
-    const label = unit.name || unit.unitNumber || unit.id.slice(0, 8)
-    if (!confirm(`Delete unit "${label}"? Active listings on this unit will also be removed.`)) return
-    setDeletingId(unit.id)
+  /** Copy a unit that is already right, so only the number has to change. */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  async function duplicateUnit(unit: any) {
+    setSaving(true)
     try {
-      await fetch(`${apiUrl}/api/units/${unit.id}`, { method: 'DELETE', credentials: 'include' })
+      const payload = buildUnitPayload(unitFormFrom(unit))
+      const res = await fetch(`${apiUrl}/api/buildings/${buildingId}/units`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...payload,
+          unitNumber: payload.unitNumber ? `${payload.unitNumber} copy` : null,
+          // A copy never inherits a live market state — it has no listing yet.
+          lifecycle: 'DRAFT',
+        }),
+      })
+      if (!res.ok) { setError('Could not duplicate the unit.'); return }
+      toast({ title: 'Unit duplicated', description: 'It starts as a draft — give it a number.' })
       await fetchUnits()
-    } catch {
-      setError('Failed to delete unit')
     } finally {
-      setDeletingId(null)
+      setSaving(false)
     }
   }
 
-  // ── stats ────────────────────────────────────────────────────────────────────
+  async function deleteUnit() {
+    if (!deleteTarget) return
+    setDeleting(true)
+    try {
+      await fetch(`${apiUrl}/api/units/${deleteTarget.id}`, { method: 'DELETE', credentials: 'include' })
+      toast({ title: 'Unit deleted' })
+      setDeleteTarget(null)
+      await fetchUnits()
+    } catch {
+      setError('Could not delete the unit.')
+    } finally {
+      setDeleting(false)
+    }
+  }
 
-  const totalListings   = units.flatMap(u => u.listings ?? []).length
-  const activeListings  = units.flatMap(u => u.listings ?? []).filter((l: any) => l.status === 'ACTIVE').length
-
-  // ── render ────────────────────────────────────────────────────────────────────
+  // ── Render ──────────────────────────────────────────────────────────────────
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-20 text-zinc-400 gap-2">
+      <div className="flex items-center justify-center gap-2 py-20 text-slate-400">
         <Loader2 className="h-5 w-5 animate-spin" />
         <span className="text-sm">Loading units…</span>
       </div>
@@ -944,236 +280,239 @@ export function UnitsManager({ buildingId, buildingImages = [] }: { buildingId: 
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       {/* Section header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 className="text-base font-semibold text-zinc-900">Units</h2>
-          <p className="text-xs text-zinc-400 mt-0.5">
+          <h2 className="font-semibold text-slate-900">Units</h2>
+          <p className="mt-0.5 text-sm text-slate-500">
             {units.length} unit{units.length !== 1 ? 's' : ''}
-            {totalListings > 0 && (
-              <> · <span className="text-emerald-600 font-medium">{activeListings} active</span> / {totalListings} listing{totalListings !== 1 ? 's' : ''}</>
+            {stats.total > 0 && (
+              <> · <span className="font-medium text-emerald-600">{stats.active} active</span> of {stats.total} listing{stats.total !== 1 ? 's' : ''}</>
             )}
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          {/* Building-level listing shortcut */}
+        <div className="flex flex-wrap items-center gap-2">
           <Link
             href={`/admin/listings/new?buildingId=${buildingId}&subjectType=BUILDING`}
-            className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-zinc-600 border border-zinc-200 rounded-lg hover:bg-zinc-50 transition-colors"
+            className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-slate-200 px-3 text-xs font-medium text-slate-600 transition-colors hover:bg-slate-50"
           >
-            <Tag className="h-3.5 w-3.5" /> Building Listing
+            <Tag className="h-3.5 w-3.5" /> List the whole building
           </Link>
-          <Button
-            size="sm"
-            onClick={() => { setShowAddUnit(s => !s); setExpanded(null) }}
-            className="bg-zinc-800 hover:bg-zinc-700 h-8 text-xs"
+          <button
+            type="button"
+            onClick={() => { setAdding((a) => (a === 'many' ? null : 'many')); setExpanded(null) }}
+            className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-slate-200 px-3 text-xs font-medium text-slate-600 transition-colors hover:bg-slate-50"
           >
-            <Plus className="h-3.5 w-3.5 mr-1" /> Add Unit
-          </Button>
+            <Layers className="h-3.5 w-3.5" /> Add several
+          </button>
+          <button
+            type="button"
+            onClick={() => { setAdding((a) => (a === 'one' ? null : 'one')); setExpanded(null) }}
+            className="inline-flex min-h-9 items-center gap-1.5 rounded-lg bg-slate-800 px-3 text-xs font-medium text-white transition-colors hover:bg-slate-700"
+          >
+            <Plus className="h-3.5 w-3.5" /> Add unit
+          </button>
         </div>
       </div>
 
-      {/* Global error */}
       {error && (
-        <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-xl px-4 py-3 flex items-start justify-between gap-2">
-          {error}
-          <button onClick={() => setError(null)}><X className="h-4 w-4 flex-shrink-0" /></button>
-        </div>
+        <InlineNote tone="error">
+          <div className="flex items-start justify-between gap-2">
+            <span>{error}</span>
+            <button type="button" onClick={() => setError(null)} aria-label="Dismiss"><X className="h-4 w-4" /></button>
+          </div>
+        </InlineNote>
       )}
-
-      {/* Cascade notice (e.g. listings auto-closed when a unit was marked sold) */}
       {notice && (
-        <div className="bg-emerald-50 border border-emerald-200 text-emerald-700 text-sm rounded-xl px-4 py-3 flex items-start justify-between gap-2">
-          {notice}
-          <button onClick={() => setNotice(null)}><X className="h-4 w-4 flex-shrink-0" /></button>
-        </div>
+        <InlineNote tone="success">
+          <div className="flex items-start justify-between gap-2">
+            <span>{notice}</span>
+            <button type="button" onClick={() => setNotice(null)} aria-label="Dismiss"><X className="h-4 w-4" /></button>
+          </div>
+        </InlineNote>
       )}
 
-      {/* Add unit form */}
-      {showAddUnit && (
+      {adding === 'one' && (
         <UnitFormPanel
-          initial={EMPTY_UNIT}
+          initial={emptyUnit()}
           buildingId={buildingId}
-          onSave={handleCreateUnit}
-          onCancel={() => setShowAddUnit(false)}
+          onSave={createUnit}
+          onCancel={() => setAdding(null)}
           saving={saving}
         />
       )}
-
-      {/* Empty state */}
-      {units.length === 0 && !showAddUnit && (
-        <div className="text-center py-16 bg-white rounded-2xl border border-zinc-100">
-          <Building2 className="h-10 w-10 mx-auto mb-3 text-zinc-200" />
-          <p className="text-sm font-medium text-zinc-500">No units yet</p>
-          <p className="text-xs text-zinc-400 mt-1">Add the first unit to start creating listings.</p>
-          <Button
-            size="sm"
-            onClick={() => setShowAddUnit(true)}
-            className="mt-4 bg-zinc-800 hover:bg-zinc-700 h-8 text-xs"
-          >
-            <Plus className="h-3.5 w-3.5 mr-1" /> Add Unit
-          </Button>
-        </div>
+      {adding === 'many' && (
+        <BulkAddUnits
+          buildingId={buildingId}
+          saving={saving}
+          onCancel={() => setAdding(null)}
+          onCreate={createMany}
+        />
       )}
 
-      {/* Unit list */}
+      {units.length === 0 && !adding && (
+        <EmptyState
+          icon={<Building2 className="h-10 w-10" />}
+          title="No units yet"
+          description="A property needs at least one unit before it can be listed — for a single apartment or a villa, that unit is the property itself."
+          action={
+            <button
+              type="button"
+              onClick={() => setAdding('one')}
+              className="inline-flex min-h-11 items-center gap-1.5 rounded-lg bg-slate-800 px-4 text-sm font-medium text-white hover:bg-slate-700"
+            >
+              <Plus className="h-4 w-4" /> Add the first unit
+            </button>
+          }
+        />
+      )}
+
       {units.length > 0 && (
-        <div className="space-y-3">
+        <ul className="space-y-3">
+          {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
           {units.map((unit: any) => {
-            const isDeleting    = deletingId === unit.id
-            const panelUnit     = expanded?.id === unit.id
-            const editOpen      = panelUnit && expanded?.mode === 'unit-edit'
-            const createOpen    = panelUnit && expanded?.mode === 'listing-create'
+            const panelUnit = expanded?.id === unit.id
+            const editOpen = panelUnit && expanded?.mode === 'unit-edit'
+            const createOpen = panelUnit && expanded?.mode === 'listing-create'
             const editListingId = panelUnit && expanded?.mode === 'listing-edit' ? expanded.listingId : null
-            const panelOpen     = editOpen || createOpen || !!editListingId
             const label = unit.name || (unit.unitNumber ? `Unit ${unit.unitNumber}` : null) || `Unit ${unit.id.slice(0, 6)}`
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const listings: any[] = unit.listings ?? []
+            const ref = unitRef(unit, units.length, unit.ref ? buildingRefOf(unit.ref) : null)
+            const cover = unit.images?.[0] ?? buildingImages[0]
+            const def = typeDef(unit.kind)
 
             return (
-              <div
+              <li
                 key={unit.id}
-                className={`bg-white border rounded-2xl overflow-hidden transition-colors ${
-                  isDeleting ? 'opacity-50 border-red-200' : 'border-zinc-200'
-                }`}
+                className={cn(
+                  'overflow-hidden rounded-xl border bg-white transition-colors',
+                  panelUnit ? 'border-slate-300 shadow-sm' : 'border-slate-200',
+                )}
               >
-                {/* Unit row */}
-                <div className="flex flex-col sm:flex-row sm:items-center gap-3 px-5 py-4">
-                  {/* Cover thumbnail — the property (building) photo, shared across units */}
-                  {buildingImages.length > 0 && (
-                    <div className="relative w-12 h-12 shrink-0 rounded-lg overflow-hidden border border-zinc-200">
+                <div className="flex flex-col gap-3 px-4 py-3.5 sm:flex-row sm:items-center sm:px-5">
+                  {cover && (
+                    <div className="relative h-11 w-16 shrink-0 overflow-hidden rounded-lg border border-slate-200">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={normalizeFileUrl(buildingImages[0])} alt="" className="w-full h-full object-cover" />
+                      <img src={normalizeFileUrl(cover)} alt="" className="h-full w-full object-cover" />
+                      {unit.images?.length > 0 && (
+                        <span className="absolute bottom-0 right-0 bg-slate-900/80 px-1 text-[9px] font-medium text-white">
+                          {unit.images.length}
+                        </span>
+                      )}
                     </div>
                   )}
-                  {/* Identity */}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      {unitRef(unit, units.length, unit.ref ? buildingRefOf(unit.ref) : null) && (
-                        <span className="font-mono text-[10px] font-semibold text-zinc-500 bg-zinc-100 border border-zinc-200 rounded px-1.5 py-0.5">
-                          {unitRef(unit, units.length, unit.ref ? buildingRefOf(unit.ref) : null)}
+
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      {ref && (
+                        <span className="rounded border border-slate-200 bg-slate-100 px-1.5 py-0.5 font-mono text-[10px] font-semibold text-slate-500">
+                          {ref}
                         </span>
                       )}
-                      <span className="font-semibold text-zinc-900 text-sm">{label}</span>
-                      {unit.kind && (
-                        <span className="text-xs text-zinc-400 bg-zinc-100 px-2 py-0.5 rounded-full">
-                          {KIND_OPTIONS.find(k => k.value === unit.kind)?.label ?? unit.kind}
-                        </span>
-                      )}
+                      <span className="text-sm font-semibold text-slate-900">{label}</span>
+                      <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-500">
+                        {typeLabel(unit.kind)}
+                      </span>
                       {unit.lifecycle && (
-                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${LIFECYCLE_COLORS[unit.lifecycle] ?? 'bg-zinc-100 text-zinc-500'}`}>
-                          {unit.lifecycle.replace(/_/g, ' ')}
+                        <span className={cn(
+                          'rounded-full px-2 py-0.5 text-xs font-medium',
+                          LIFECYCLE_COLORS[unit.lifecycle] ?? 'bg-slate-100 text-slate-500',
+                        )}>
+                          {LIFECYCLE_OPTIONS.find((o) => o.value === unit.lifecycle)?.label ?? unit.lifecycle}
+                        </span>
+                      )}
+                      {unit.isUnitType && (
+                        <span
+                          className="rounded-full border border-sky-200 bg-sky-50 px-2 py-0.5 text-xs font-medium text-sky-700"
+                          title="A repeatable type, not one specific apartment"
+                        >
+                          Type
                         </span>
                       )}
                     </div>
-                    <div className="flex items-center gap-3 mt-1 text-xs text-zinc-400">
+                    <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-400">
                       {unit.floor != null && (
                         <span className="flex items-center gap-1"><Layers className="h-3 w-3" /> Floor {unit.floor}</span>
                       )}
-                      {unit.bedrooms != null && (
-                        <span className="flex items-center gap-1"><Bed className="h-3 w-3" /> {unit.bedrooms} BR</span>
-                      )}
-                      {unit.isUnitType && (
-                        <span className="flex items-center gap-1 font-medium text-sky-700">
-                          Unit type · repeatable
-                        </span>
+                      {def.beds && unit.bedrooms != null && (
+                        <span className="flex items-center gap-1"><Bed className="h-3 w-3" /> {unit.bedrooms} bed</span>
                       )}
                       {unit.areaSqm != null && (
                         <span className="flex items-center gap-1"><Square className="h-3 w-3" /> {unit.areaSqm} m²</span>
                       )}
+                      {unit.options?.length > 0 && (
+                        <span className="text-slate-500">{unit.options.length} finish option{unit.options.length === 1 ? '' : 's'}</span>
+                      )}
+                      {unit.ownerUserId && <span className="text-emerald-600">Assigned to a user</span>}
                     </div>
                   </div>
 
-                  {/* Listings + actions */}
-                  <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
-                    {/* Existing listing badges — click to edit inline */}
+                  <div className="flex flex-wrap items-center gap-1.5 sm:flex-nowrap">
+                    {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
                     {listings.map((l: any) => (
                       <button
                         key={l.id}
+                        type="button"
                         onClick={() => openPanel(unit.id, 'listing-edit', l.id)}
-                        className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-xs font-medium transition-all ${
-                          editListingId === l.id
-                            ? 'ring-2 ring-offset-1 ring-amber-400'
-                            : 'hover:opacity-80'
-                        } ${LISTING_INTENT_COLORS[l.intent] ?? 'bg-zinc-100 text-zinc-600 border-zinc-200'}`}
-                        title="Edit this listing inline"
+                        title="Edit this listing here"
+                        className={cn(
+                          'inline-flex min-h-9 items-center gap-1.5 rounded-full border px-2.5 text-xs font-medium transition-all',
+                          editListingId === l.id ? 'ring-2 ring-amber-400 ring-offset-1' : 'hover:opacity-80',
+                          LISTING_INTENT_COLORS[l.intent] ?? 'border-slate-200 bg-slate-100 text-slate-600',
+                        )}
                       >
-                        <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${LISTING_STATUS_DOT[l.status] ?? 'bg-zinc-400'}`} />
+                        <span className={cn('h-1.5 w-1.5 shrink-0 rounded-full', LISTING_STATUS_DOT[l.status] ?? 'bg-slate-400')} />
                         {l.intent === 'FOR_SALE' ? 'Sale' : 'Rent'}
                         {l.price ? ` · ${formatPrice(l.price, l.currency)}` : ''}
                       </button>
                     ))}
 
-                    {/* Create new listing button */}
                     <button
+                      type="button"
                       onClick={() => openPanel(unit.id, 'listing-create')}
-                      className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full border text-xs font-medium transition-colors ${
+                      title="Put this unit on the market"
+                      className={cn(
+                        'inline-flex min-h-9 items-center gap-1 rounded-full border px-2.5 text-xs font-medium transition-colors',
                         createOpen
-                          ? 'bg-sky-600 text-white border-sky-600'
-                          : 'text-sky-600 border-sky-200 hover:bg-sky-50'
-                      }`}
-                      title="Create a listing for this unit"
+                          ? 'border-sky-600 bg-sky-600 text-white'
+                          : 'border-sky-200 text-sky-600 hover:bg-sky-50',
+                      )}
                     >
-                      <BadgePlus className="h-3.5 w-3.5" />
-                      {listings.length === 0 ? 'List' : '+'}
+                      <Plus className="h-3.5 w-3.5" />
+                      {listings.length === 0 ? 'List it' : 'Another'}
                     </button>
 
-                    {/* Edit / Delete */}
-                    <div className="flex items-center gap-1 ml-auto sm:ml-0 pl-1 border-l border-zinc-100">
-                      <button
+                    <div className="ml-auto flex items-center gap-0.5 border-l border-slate-100 pl-1.5 sm:ml-0">
+                      <RowAction
+                        label={editOpen ? 'Close' : 'Edit unit'}
+                        active={editOpen}
                         onClick={() => openPanel(unit.id, 'unit-edit')}
-                        className={`p-1.5 rounded-lg transition-colors ${
-                          editOpen
-                            ? 'text-zinc-900 bg-zinc-200'
-                            : 'text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100'
-                        }`}
-                        title="Edit unit"
                       >
                         <Pencil className="h-3.5 w-3.5" />
-                      </button>
-                      <button
-                        onClick={() => handleDeleteUnit(unit)}
-                        disabled={isDeleting}
-                        className="p-1.5 rounded-lg text-zinc-400 hover:text-red-600 hover:bg-red-50 transition-colors"
-                        title="Delete unit"
-                      >
-                        {isDeleting
-                          ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                          : <Trash2 className="h-3.5 w-3.5" />
-                        }
-                      </button>
-                      {/* Collapse indicator */}
-                      <div className="text-zinc-300 ml-1">
-                        {panelOpen ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
-                      </div>
+                      </RowAction>
+                      <RowAction label="Duplicate" onClick={() => duplicateUnit(unit)} disabled={saving}>
+                        <Copy className="h-3.5 w-3.5" />
+                      </RowAction>
+                      <RowAction label="Delete unit" danger onClick={() => setDeleteTarget(unit)}>
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </RowAction>
                     </div>
                   </div>
                 </div>
 
-                {/* Expandable panels */}
                 {editOpen && (
-                  <div className="px-5 pb-5 border-t border-zinc-100 pt-4">
+                  <div className="space-y-4 border-t border-slate-100 px-4 pb-5 pt-4 sm:px-5">
                     <UnitFormPanel
-                      initial={{
-                        kind:       unit.kind ?? 'APARTMENT',
-                        name:       unit.name ?? '',
-                        unitNumber: unit.unitNumber ?? '',
-                        floor:      unit.floor != null ? String(unit.floor) : '',
-                        bedrooms:   unit.bedrooms != null ? String(unit.bedrooms) : '',
-                        bathrooms:  unit.bathrooms != null ? String(unit.bathrooms) : '',
-                        areaSqm:    unit.areaSqm != null ? String(unit.areaSqm) : '',
-                        isUnitType: !!unit.isUnitType,
-                        lifecycle:  unit.lifecycle ?? 'VACANT',
-                        images:     unit.images ?? [],
-                      }}
+                      initial={unitFormFrom(unit)}
                       buildingId={buildingId}
                       unitId={unit.id}
                       ownerAssigned={!!unit.ownerUserId}
-                      onSave={f => handleUpdateUnit(unit.id, f)}
+                      onSave={(f) => updateUnit(unit.id, f)}
                       onCancel={() => setExpanded(null)}
                       saving={saving}
                     />
-
                     {/* Finish / payment options — how off-plan projects are
                         actually priced, and what the Georgia import carries. */}
                     <UnitOptions
@@ -1187,11 +526,13 @@ export function UnitsManager({ buildingId, buildingImages = [] }: { buildingId: 
                 )}
 
                 {createOpen && (
-                  <div className="px-5 pb-5 border-t border-zinc-100 pt-4">
+                  <div className="border-t border-slate-100 px-4 pb-5 pt-4 sm:px-5">
                     <ListingQuickForm
                       buildingId={buildingId}
                       unitId={unit.id}
                       unitLabel={label}
+                      defaultIntent={unit.lifecycle === 'FOR_RENT' ? 'FOR_RENT' : 'FOR_SALE'}
+                      areaSqm={unit.areaSqm}
                       onSuccess={async () => { setExpanded(null); await fetchUnits() }}
                       onCancel={() => setExpanded(null)}
                     />
@@ -1199,7 +540,7 @@ export function UnitsManager({ buildingId, buildingImages = [] }: { buildingId: 
                 )}
 
                 {editListingId && (
-                  <div className="px-5 pb-5 border-t border-zinc-100 pt-4">
+                  <div className="border-t border-slate-100 px-4 pb-5 pt-4 sm:px-5">
                     <ListingEditPanel
                       listingId={editListingId}
                       listingLabel={label}
@@ -1209,11 +550,149 @@ export function UnitsManager({ buildingId, buildingImages = [] }: { buildingId: 
                     />
                   </div>
                 )}
-              </div>
+              </li>
             )
           })}
-        </div>
+        </ul>
       )}
+
+      <ConfirmDialog
+        open={!!deleteTarget}
+        tone="danger"
+        busy={deleting}
+        title={`Delete ${deleteTarget?.name || (deleteTarget?.unitNumber ? `unit ${deleteTarget.unitNumber}` : 'this unit')}?`}
+        description={buildingTitle ? `In ${buildingTitle}.` : undefined}
+        consequences={[
+          deleteTarget?.listings?.length
+            ? `Its ${deleteTarget.listings.length} listing${deleteTarget.listings.length === 1 ? '' : 's'} will be removed from the website.`
+            : 'It has no listings.',
+          deleteTarget?.options?.length
+            ? `${deleteTarget.options.length} finish option${deleteTarget.options.length === 1 ? '' : 's'} will go with it.`
+            : null,
+          'This cannot be undone.',
+        ].filter(Boolean) as string[]}
+        confirmLabel="Delete unit"
+        onConfirm={deleteUnit}
+        onClose={() => !deleting && setDeleteTarget(null)}
+      />
     </div>
   )
 }
+
+function RowAction({
+  label, onClick, children, danger, active, disabled,
+}: {
+  label: string
+  onClick: () => void
+  children: React.ReactNode
+  danger?: boolean
+  active?: boolean
+  disabled?: boolean
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      title={label}
+      aria-label={label}
+      className={cn(
+        'flex h-9 w-9 items-center justify-center rounded-lg transition-colors disabled:opacity-40',
+        active
+          ? 'bg-slate-200 text-slate-900'
+          : danger
+            ? 'text-slate-400 hover:bg-red-50 hover:text-red-600'
+            : 'text-slate-400 hover:bg-slate-100 hover:text-slate-700',
+      )}
+    >
+      {children}
+    </button>
+  )
+}
+
+// ── Bulk add ──────────────────────────────────────────────────────────────────
+
+/**
+ * "Floors 1–12, two-bed, 95 m²" in one action.
+ *
+ * The shared facts are edited in the normal unit form; this only adds the
+ * numbering, so there is nothing new to learn and nothing to keep in sync.
+ */
+function BulkAddUnits({
+  buildingId, saving, onCancel, onCreate,
+}: {
+  buildingId: string
+  saving: boolean
+  onCancel: () => void
+  onCreate: (template: UnitFormState, count: number, startAt: number, prefix: string) => void
+}) {
+  const [count, setCount] = useState('5')
+  const [startAt, setStartAt] = useState('1')
+  const [prefix, setPrefix] = useState('')
+
+  const n = Math.min(Math.max(parseInt(count || '0', 10) || 0, 0), 50)
+  const from = parseInt(startAt || '1', 10) || 1
+  const preview = n > 0
+    ? Array.from({ length: Math.min(n, 3) }, (_, i) => `${prefix}${from + i}`).join(', ') + (n > 3 ? `, … ${prefix}${from + n - 1}` : '')
+    : '—'
+
+  return (
+    <div className="space-y-4 rounded-xl border border-slate-200 bg-slate-50 p-4 sm:p-5">
+      <div>
+        <p className="text-sm font-semibold text-slate-800">Add several units at once</p>
+        <p className="mt-0.5 text-xs text-slate-500">
+          They all share the details below and differ only by number. Adjust any of them afterwards.
+        </p>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <label className="block">
+          <span className="mb-1 block text-xs font-medium text-slate-600">How many</span>
+          <input
+            type="number" min="1" max="50" value={count}
+            onChange={(e) => setCount(e.target.value)}
+            className="min-h-11 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10"
+          />
+        </label>
+        <label className="block">
+          <span className="mb-1 block text-xs font-medium text-slate-600">Start at</span>
+          <input
+            type="number" value={startAt}
+            onChange={(e) => setStartAt(e.target.value)}
+            className="min-h-11 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10"
+          />
+        </label>
+        <label className="block">
+          <span className="mb-1 block text-xs font-medium text-slate-600">Prefix</span>
+          <input
+            value={prefix} onChange={(e) => setPrefix(e.target.value)} placeholder="A-"
+            className="min-h-11 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10"
+          />
+        </label>
+        <div className="col-span-2 sm:col-span-1">
+          <span className="mb-1 block text-xs font-medium text-slate-600">Numbers</span>
+          <p className="flex min-h-11 items-center rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-500">
+            {preview}
+          </p>
+        </div>
+      </div>
+
+      {n > 20 && (
+        <InlineNote tone="warning">
+          {n} units will be created one at a time — give it a moment.
+        </InlineNote>
+      )}
+
+      <UnitFormPanel
+        initial={emptyUnit()}
+        buildingId={buildingId}
+        hideNumbering
+        saveLabel={n > 0 ? `Create ${n} unit${n === 1 ? '' : 's'}` : 'Create units'}
+        saving={saving}
+        onCancel={onCancel}
+        onSave={(f) => n > 0 && onCreate(f, n, from, prefix)}
+      />
+    </div>
+  )
+}
+
