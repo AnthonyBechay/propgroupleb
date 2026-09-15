@@ -13,6 +13,29 @@
  *  - controls stay at `text-sm`, which `globals.css` floors at 16px below
  *    `md` — anything smaller makes iOS Safari zoom in and never zoom back out
  *  - anything a thumb has to hit is `min-h-11` (~44px)
+ *
+ * ── Colour ──────────────────────────────────────────────────────────────────
+ *
+ * Seven accent hues were in use across the back office and none of them meant
+ * anything: the create-listing panel was blue and the edit-listing panel was
+ * amber, which looks like a status and is just a form. When every panel is a
+ * different colour, colour stops carrying information and the screen reads as
+ * decoration you have to see past.
+ *
+ * Five, each with one job:
+ *
+ *   slate    structure, text, and every primary action
+ *   emerald  live, published, on the market, on
+ *   amber    needs attention — unsaved, draft, over budget, a warning
+ *   red      destroys something
+ *   violet   AI wrote this
+ *
+ * `sky` survives in exactly one place: paired with emerald to tell FOR_RENT
+ * from FOR_SALE, where it is a data category rather than a mood.
+ *
+ * Text contrast: body copy is `text-slate-500` or darker. `text-slate-400` is
+ * 2.85:1 on white and fails WCAG AA, so it is for decorative icons and
+ * placeholders only — 134 pieces of real text were set in it.
  */
 
 import { forwardRef, useId, useState } from 'react'
@@ -264,7 +287,11 @@ export function Toggle({
   const auto = useId()
   const id = idProp ?? auto
   return (
-    <div className="flex items-start gap-3">
+    <div className="flex items-start gap-3.5">
+      {/* The switch is 24px tall but sits in a 44px target.
+          `-my-2.5 py-2.5` grows the hit area without moving anything: the
+          control has to be thumb-sized on a phone, and it has to not push the
+          label off its own baseline to get there. */}
       <button
         type="button"
         role="switch"
@@ -273,22 +300,40 @@ export function Toggle({
         disabled={disabled}
         onClick={() => onChange(!checked)}
         className={cn(
-          'relative mt-0.5 h-6 w-11 shrink-0 rounded-full transition-colors',
-          'focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-900/20 focus-visible:ring-offset-2',
-          checked ? 'bg-slate-800' : 'bg-slate-200',
-          disabled && 'opacity-50',
+          'group -my-2.5 flex shrink-0 items-center py-2.5',
+          'focus:outline-none',
+          disabled && 'cursor-not-allowed opacity-50',
         )}
       >
         <span
           className={cn(
-            'absolute top-0.5 h-5 w-5 rounded-full bg-white shadow-sm transition-transform',
-            checked ? 'translate-x-[1.375rem]' : 'translate-x-0.5',
+            'relative block h-6 w-11 rounded-full transition-colors',
+            // The off state used to be `bg-slate-200` behind a white knob —
+            // about 1.15:1 between the two, on panels that are themselves
+            // slate-50. It read as a washed-out blob you couldn't tell the
+            // state of. The track is now darker than the knob by a clear
+            // margin, and carries an inset border so it reads as a control
+            // even against a grey card.
+            checked
+              ? 'bg-emerald-600 ring-1 ring-inset ring-emerald-700/20'
+              : 'bg-slate-300 ring-1 ring-inset ring-slate-400/30',
+            !disabled && !checked && 'group-hover:bg-slate-400',
+            !disabled && checked && 'group-hover:bg-emerald-700',
+            'group-focus-visible:ring-2 group-focus-visible:ring-slate-900/30 group-focus-visible:ring-offset-2',
           )}
-        />
+        >
+          <span
+            className={cn(
+              'absolute top-0.5 block h-5 w-5 rounded-full bg-white shadow-sm ring-1 ring-slate-900/10',
+              'transition-transform duration-150',
+              checked ? 'translate-x-[1.375rem]' : 'translate-x-0.5',
+            )}
+          />
+        </span>
       </button>
-      <label htmlFor={id} className="cursor-pointer select-none">
+      <label htmlFor={id} className={cn('cursor-pointer select-none pt-0.5', disabled && 'cursor-not-allowed')}>
         <span className="block text-sm font-medium text-slate-800">{label}</span>
-        {hint && <span className="mt-0.5 block text-xs text-slate-400">{hint}</span>}
+        {hint && <span className="mt-1 block text-xs leading-relaxed text-slate-500">{hint}</span>}
       </label>
     </div>
   )
@@ -465,7 +510,7 @@ export function ChipsInput({
 
       {unused.length > 0 && (
         <div className="flex flex-wrap items-center gap-1.5">
-          <span className="text-xs text-slate-400">Common:</span>
+          <span className="text-xs text-slate-500">Common:</span>
           {unused.slice(0, 8).map((s) => (
             <button
               key={s}

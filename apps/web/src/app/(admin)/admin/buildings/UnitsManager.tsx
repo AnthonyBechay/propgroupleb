@@ -3,7 +3,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import {
-  Bed, Building2, Copy, Layers, LayoutList, Loader2, Pencil, Plus, Square, Trash2, X,
+  Bed, Building2, Copy, Layers, LayoutList, Loader2, Pencil, Plus, Square, Tag,
+  Trash2, X,
 } from 'lucide-react'
 import { normalizeApiUrl, normalizeFileUrl } from '@/lib/utils/api-url'
 import { toast } from '@/components/ui/use-toast'
@@ -299,6 +300,18 @@ export function UnitsManager({
       icon={<LayoutList className="h-4 w-4" />}
       aside={
         <div className="flex flex-wrap items-center gap-2">
+          {/* The round trip closes here. A listing now links back to its
+              property, and the property links out to its listings — before
+              this, neither direction existed and the two lived as separate
+              lists of the same thing. */}
+          {stats.total > 0 && (
+            <Link
+              href={`/admin/listings?buildingId=${buildingId}`}
+              className="inline-flex min-h-9 items-center gap-1.5 rounded-lg px-2.5 text-xs font-medium text-slate-600 transition-colors hover:bg-slate-100"
+            >
+              <Tag className="h-3.5 w-3.5" /> All {stats.total} listing{stats.total === 1 ? '' : 's'}
+            </Link>
+          )}
           {/* "List the whole building" is gone. A whole-building listing
               (`subjectType: BUILDING`) duplicates something the model already
               expresses better: a unit of kind WHOLE_BUILDING. Two ways to say
@@ -441,7 +454,7 @@ export function UnitsManager({
                           </span>
                         )}
                       </div>
-                      <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-400">
+                      <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500">
                         {unit.floor != null && (
                           <span className="flex items-center gap-1"><Layers className="h-3 w-3" /> Floor {unit.floor}</span>
                         )}

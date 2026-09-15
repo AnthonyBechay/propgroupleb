@@ -238,7 +238,7 @@ function ClientRow({
               ${earned.toLocaleString()}
             </span>
           )}
-          <span className="text-[11px] text-slate-400 hidden sm:block">{last.text}</span>
+          <span className="text-[11px] text-slate-500 hidden sm:block">{last.text}</span>
           {l.phone && (
             <a href={`tel:${l.phone}`} className="p-1.5 rounded-lg border border-slate-200 text-slate-500 hover:text-slate-900">
               <Phone className="h-3.5 w-3.5" />

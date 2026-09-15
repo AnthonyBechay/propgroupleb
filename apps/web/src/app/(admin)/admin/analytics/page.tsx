@@ -295,7 +295,7 @@ export default async function AnalyticsPage({
                     {m.count > 0 && <span className="text-xs font-bold text-white">{m.count}</span>}
                   </div>
                 </div>
-                {m.count === 0 && <span className="text-xs text-slate-400">0</span>}
+                {m.count === 0 && <span className="text-xs text-slate-500">0</span>}
               </div>
             ))}
           </div>
@@ -321,7 +321,7 @@ export default async function AnalyticsPage({
                     {m.count > 0 && <span className="text-xs font-bold text-white">{m.count}</span>}
                   </div>
                 </div>
-                {m.count === 0 && <span className="text-xs text-slate-400">0</span>}
+                {m.count === 0 && <span className="text-xs text-slate-500">0</span>}
               </div>
             ))}
           </div>
@@ -349,7 +349,7 @@ export default async function AnalyticsPage({
                 </div>
               ))}
             {Object.keys(stats.regionCounts).length === 0 && (
-              <p className="text-sm text-slate-400 text-center py-4">No data yet</p>
+              <p className="text-sm text-slate-500 text-center py-4">No data yet</p>
             )}
           </div>
         </div>
@@ -386,7 +386,7 @@ export default async function AnalyticsPage({
                 )
               })}
             {Object.keys(stats.statusCounts).length === 0 && (
-              <p className="text-sm text-slate-400 text-center py-4">No listings yet</p>
+              <p className="text-sm text-slate-500 text-center py-4">No listings yet</p>
             )}
           </div>
         </div>
@@ -412,16 +412,16 @@ export default async function AnalyticsPage({
                   <p className="text-sm font-medium text-slate-900">{inq.name || inq.email?.split('@')[0]}</p>
                   <p className="text-xs text-slate-500 truncate">{inq.email}</p>
                   {(inq.listingId || inq.message) && (
-                    <p className="text-xs text-slate-400 mt-0.5 truncate">{inq.message?.slice(0, 60) || 'Listing inquiry'}</p>
+                    <p className="text-xs text-slate-500 mt-0.5 truncate">{inq.message?.slice(0, 60) || 'Listing inquiry'}</p>
                   )}
                 </div>
-                <span className="text-xs text-slate-400 flex-shrink-0">
+                <span className="text-xs text-slate-500 flex-shrink-0">
                   {new Date(inq.createdAt).toLocaleDateString()}
                 </span>
               </div>
             ))}
             {stats.recentInquiries.length === 0 && (
-              <p className="text-sm text-slate-400 text-center py-4">No inquiries yet</p>
+              <p className="text-sm text-slate-500 text-center py-4">No inquiries yet</p>
             )}
           </div>
         </div>
@@ -454,12 +454,12 @@ export default async function AnalyticsPage({
                   }`}>
                     {u.role}
                   </span>
-                  <p className="text-xs text-slate-400 mt-1">{new Date(u.createdAt).toLocaleDateString()}</p>
+                  <p className="text-xs text-slate-500 mt-1">{new Date(u.createdAt).toLocaleDateString()}</p>
                 </div>
               </div>
             ))}
             {stats.recentUsers.length === 0 && (
-              <p className="text-sm text-slate-400 text-center py-4">No users yet</p>
+              <p className="text-sm text-slate-500 text-center py-4">No users yet</p>
             )}
           </div>
         </div>

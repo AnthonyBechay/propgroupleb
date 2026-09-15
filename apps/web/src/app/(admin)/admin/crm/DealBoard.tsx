@@ -202,17 +202,17 @@ export function DealBoard({
                 <div className="flex items-center gap-1.5">
                   <span className={`h-2 w-2 rounded-full ${col.accent}`} />
                   <span className="text-sm font-semibold text-slate-900">{col.label}</span>
-                  <span className="text-xs text-slate-400">{cards.length}</span>
+                  <span className="text-xs text-slate-500">{cards.length}</span>
                   {canSeeMoney && value > 0 && (
                     <span className="ml-auto text-[11px] font-medium text-slate-500">
                       ${value.toLocaleString()}
                     </span>
                   )}
                 </div>
-                <p className="text-[11px] text-slate-400 mt-0.5">{col.hint}</p>
+                <p className="text-[11px] text-slate-500 mt-0.5">{col.hint}</p>
               </div>
 
-              <p className="px-2.5 pt-2 text-[11px] text-slate-400 lg:hidden">{col.hint}</p>
+              <p className="px-2.5 pt-2 text-[11px] text-slate-500 lg:hidden">{col.hint}</p>
 
               <div className="p-1.5 space-y-1.5 min-h-[120px]">
                 {cards.map((d) => (
@@ -233,12 +233,12 @@ export function DealBoard({
                   col.key === 'SUGGESTED' && !q && !onlyAlerts ? (
                     <button
                       onClick={onNewDeal}
-                      className="w-full py-6 text-[11px] text-slate-400 hover:text-slate-700 hover:bg-white rounded-lg transition-colors"
+                      className="w-full py-6 text-[11px] text-slate-500 hover:text-slate-700 hover:bg-white rounded-lg transition-colors"
                     >
                       + Start a deal
                     </button>
                   ) : (
-                    <p className="text-[11px] text-slate-300 text-center py-6">Nothing here</p>
+                    <p className="text-[11px] text-slate-400 text-center py-6">Nothing here</p>
                   )
                 )}
               </div>
@@ -305,13 +305,13 @@ function DealCard({
       </div>
 
       {d.subject?.subtitle && (
-        <p className="text-[11px] text-slate-400 truncate mt-0.5">{d.subject.subtitle}</p>
+        <p className="text-[11px] text-slate-500 truncate mt-0.5">{d.subject.subtitle}</p>
       )}
 
       {/* Who it's for */}
       <div className="flex items-center gap-1.5 mt-1.5 pt-1.5 border-t border-slate-100">
         <span className="text-xs font-medium text-slate-700 truncate flex-1">{d.lead.name}</span>
-        <span className="text-[10px] text-slate-400 shrink-0">{TYPE_LABELS[d.lead.type]}</span>
+        <span className="text-[10px] text-slate-500 shrink-0">{TYPE_LABELS[d.lead.type]}</span>
       </div>
 
       {/* When it's happening */}
@@ -361,7 +361,7 @@ function DealCard({
             <button
               type="button"
               onClick={() => setEditing(true)}
-              className="text-[11px] text-slate-400 hover:text-slate-700 underline decoration-dotted"
+              className="text-[11px] text-slate-500 hover:text-slate-700 underline decoration-dotted"
             >
               Set commission
             </button>
@@ -391,7 +391,7 @@ function DealCard({
 
       {/* Reaching them shouldn't need the drawer */}
       <div className="flex items-center gap-1 mt-1.5" onClick={(e) => e.stopPropagation()}>
-        <span className="text-[10px] text-slate-300 flex-1 max-lg:hidden">{STAGE_LABELS[d.stage]}</span>
+        <span className="text-[10px] text-slate-400 flex-1 max-lg:hidden">{STAGE_LABELS[d.stage]}</span>
         <span className="flex-1 lg:hidden" />
         {d.lead.phone && (
           <a
@@ -435,7 +435,7 @@ function CommissionInput({
 
   return (
     <div className="flex items-center gap-1">
-      <span className="text-[11px] text-slate-400">$</span>
+      <span className="text-[11px] text-slate-500">$</span>
       <input
         autoFocus
         value={v}

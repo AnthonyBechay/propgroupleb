@@ -87,7 +87,7 @@ export function PaymentPlansEditor({ value, onChange }: { value: PaymentPlan[]; 
           )
         })}
       </div>
-      {value.length === 0 && <p className="text-xs text-slate-400">No payment plans added. Add one or more — they’ll show on the property page and the PDF proposal.</p>}
+      {value.length === 0 && <p className="text-xs text-slate-500">No payment plans added. Add one or more — they’ll show on the property page and the PDF proposal.</p>}
     </div>
   )
 }

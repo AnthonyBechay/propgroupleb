@@ -88,7 +88,7 @@ export function SellerProperties({
       )}
 
       {properties.length === 0 && !adding ? (
-        <p className="text-sm text-slate-400 py-3">
+        <p className="text-sm text-slate-500 py-3">
           Nothing recorded yet. Add each property this client is selling so buyers get matched to
           the right one.
         </p>
@@ -245,7 +245,7 @@ function SaleForm({
         )}
       </div>
       {canSeeMoney && (
-        <p className="text-[10px] text-slate-400">
+        <p className="text-[10px] text-slate-500">
           Commission is stored in USD so totals across both markets add up.
         </p>
       )}
@@ -441,10 +441,10 @@ function ListingLink({ onLink, busy }: { onLink: (listingId: string) => void; bu
           )
         })}
         {q.trim().length >= 2 && !searching && results.length === 0 && (
-          <p className="text-[11px] text-slate-400 px-1">Nothing matches.</p>
+          <p className="text-[11px] text-slate-500 px-1">Nothing matches.</p>
         )}
       </div>
-      <button onClick={() => setOpen(false)} className="mt-1 text-[11px] text-slate-400 hover:text-slate-700">
+      <button onClick={() => setOpen(false)} className="mt-1 text-[11px] text-slate-500 hover:text-slate-700">
         Cancel
       </button>
     </div>

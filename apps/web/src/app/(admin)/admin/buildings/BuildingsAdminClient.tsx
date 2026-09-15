@@ -276,7 +276,7 @@ export function BuildingsAdminClient({ initialBuildings }: Props) {
       </div>
 
       {(activeFilters > 0 || search) && (
-        <div className="-mt-2 flex items-center gap-2 text-xs text-slate-400">
+        <div className="-mt-2 flex items-center gap-2 text-xs text-slate-500">
           <ArrowUpDown className="h-3 w-3" />
           Showing {filtered.length} of {buildings.length}
           <button
@@ -549,7 +549,7 @@ function PropertyCell({ b, hidden }: { b: any; hidden: boolean }) {
           <span className="rounded border border-slate-200 px-1.5 text-[10px] text-slate-500">
             {KIND_LABELS[b.kind] ?? b.kind}
           </span>
-          {mix && <span className="truncate text-xs text-slate-400">{mix}</span>}
+          {mix && <span className="truncate text-xs text-slate-500">{mix}</span>}
         </div>
       </div>
     </div>
@@ -562,7 +562,7 @@ function ListedHint({ b }: { b: any }) {
   if ((b._count?.listings ?? 0) > 0) {
     return <div className="text-xs font-medium text-emerald-600">{b._count.listings} listed</div>
   }
-  return <div className="text-xs text-slate-300">not listed</div>
+  return <div className="text-xs text-slate-500">not listed</div>
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any

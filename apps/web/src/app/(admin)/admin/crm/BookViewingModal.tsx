@@ -217,7 +217,7 @@ export function BookViewingModal({
           {loading ? (
             <div className="flex justify-center py-10 text-slate-400"><Loader2 className="h-5 w-5 animate-spin" /></div>
           ) : candidates.length === 0 ? (
-            <p className="text-sm text-slate-400 text-center py-10">
+            <p className="text-sm text-slate-500 text-center py-10">
               {wantsCounterpart
                 ? 'No buyers match this property yet. Shortlist one from the client’s page first.'
                 : 'Nothing to view yet — shortlist a property for this client first.'}
@@ -248,7 +248,7 @@ export function BookViewingModal({
                         {on && <Check className="h-4 w-4 text-violet-600 shrink-0" />}
                       </div>
                       <div className="flex items-center gap-2 mt-0.5">
-                        {c.subtitle && <span className="text-xs text-slate-400 truncate">{c.subtitle}</span>}
+                        {c.subtitle && <span className="text-xs text-slate-500 truncate">{c.subtitle}</span>}
                         {c.opportunityId && (
                           <span className="text-[9.5px] font-semibold text-slate-500 bg-slate-100 px-1.5 py-px rounded">
                             {c.alreadyBooked ? 'Viewing booked — reschedule' : 'Shortlisted'}

@@ -94,7 +94,7 @@ export function LocationFields({
                   <span className="font-medium text-slate-800 truncate">
                     {l.name}{l.city ? <span className="font-normal text-slate-400"> · {l.city}</span> : null}
                   </span>
-                  <span className="text-xs text-slate-400 shrink-0">{l.caza} · {MOHAFAZAT_LABEL[l.mohafazat]}</span>
+                  <span className="text-xs text-slate-500 shrink-0">{l.caza} · {MOHAFAZAT_LABEL[l.mohafazat]}</span>
                 </button>
               ))}
             </div>
@@ -107,12 +107,12 @@ export function LocationFields({
             <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-medium">
               <Check className="w-3.5 h-3.5" /> {summary}
             </span>
-            <button type="button" onClick={clear} className="text-xs text-slate-400 hover:text-red-600 inline-flex items-center gap-1">
+            <button type="button" onClick={clear} className="text-xs text-slate-500 hover:text-red-600 inline-flex items-center gap-1">
               <X className="w-3 h-3" /> clear
             </button>
           </div>
         ) : (
-          <p className="text-xs text-slate-400 mt-2">
+          <p className="text-xs text-slate-500 mt-2">
             Pick a result to fill the region, district and city automatically. Can’t find a place? Ask us to add it — only listed locations can be saved.
           </p>
         )}
@@ -210,7 +210,7 @@ function InternationalLocation({
                         <span className="font-normal text-slate-400"> · {a.city}</span>
                       )}
                     </span>
-                    <span className="text-xs text-slate-400 shrink-0">
+                    <span className="text-xs text-slate-500 shrink-0">
                       {GEORGIA_REGION_LABEL[a.region] ?? a.region}
                     </span>
                   </button>
@@ -232,13 +232,13 @@ function InternationalLocation({
               <button
                 type="button"
                 onClick={() => onChange({ city: '', neighborhood: '', caza: '', mohafazat: '' })}
-                className="text-xs text-slate-400 hover:text-red-600 inline-flex items-center gap-1"
+                className="text-xs text-slate-500 hover:text-red-600 inline-flex items-center gap-1"
               >
                 <X className="w-3 h-3" /> clear
               </button>
             </div>
           ) : (
-            <p className="text-xs text-slate-400 mt-2">
+            <p className="text-xs text-slate-500 mt-2">
               Pick a result to fill the city and district together.
             </p>
           )}

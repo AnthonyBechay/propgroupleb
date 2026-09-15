@@ -124,9 +124,12 @@ export function ListingQuickForm({
   }
 
   return (
-    <div className="space-y-4 rounded-xl border border-sky-200 bg-sky-50/60 p-4 sm:p-5">
+    // Neutral, not sky-blue: the create panel was blue and the edit panel amber,
+    // which looked like a status and wasn't one — both are just a form. See the
+    // colour note in components/admin/ui/form.tsx.
+    <div className="space-y-5 rounded-xl border border-slate-300 bg-white p-4 shadow-sm sm:p-5">
       <div className="flex items-center justify-between">
-        <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-sky-700">
+        <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-slate-600">
           <Tag className="h-3.5 w-3.5" /> New listing · {unitLabel}
         </p>
         <button type="button" onClick={onCancel} aria-label="Close" className="text-slate-400 hover:text-slate-700">
@@ -212,7 +215,7 @@ export function ListingQuickForm({
         </div>
       </Field>
 
-      <div className="space-y-3 rounded-lg border border-slate-200 bg-white p-4">
+      <div className="space-y-4 rounded-lg border border-slate-200 bg-slate-50 p-4">
         <Toggle
           checked={f.negotiable}
           onChange={(v) => set({ negotiable: v })}
@@ -232,7 +235,7 @@ export function ListingQuickForm({
         <button
           type="button"
           onClick={onCancel}
-          className="min-h-11 rounded-lg px-4 text-sm font-medium text-slate-600 transition-colors hover:bg-white"
+          className="min-h-11 rounded-lg px-4 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-100"
         >
           Cancel
         </button>
@@ -240,7 +243,7 @@ export function ListingQuickForm({
           type="button"
           onClick={submit}
           disabled={saving}
-          className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-sky-600 px-5 text-sm font-medium text-white transition-colors hover:bg-sky-700 disabled:opacity-50"
+          className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-slate-800 px-5 text-sm font-medium text-white transition-colors hover:bg-slate-700 disabled:opacity-50"
         >
           {saving && <Loader2 className="h-4 w-4 animate-spin" />}
           Create listing
@@ -366,16 +369,16 @@ export function ListingEditPanel({
 
   if (loading) {
     return (
-      <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 p-5 text-sm text-slate-400">
+      <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 p-5 text-sm text-slate-500">
         <Loader2 className="h-4 w-4 animate-spin" /> Loading listing…
       </div>
     )
   }
 
   return (
-    <div className="space-y-4 rounded-xl border border-amber-200 bg-amber-50/60 p-4 sm:p-5">
+    <div className="space-y-5 rounded-xl border border-slate-300 bg-white p-4 shadow-sm sm:p-5">
       <div className="flex items-center justify-between gap-2">
-        <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-amber-700">
+        <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-slate-600">
           <Tag className="h-3.5 w-3.5" /> Editing listing · {listingLabel}
         </p>
         <div className="flex items-center gap-2">
@@ -383,7 +386,7 @@ export function ListingEditPanel({
             href={`/admin/listings/${listingId}`}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center gap-1 text-xs text-slate-400 transition-colors hover:text-slate-700"
+            className="flex items-center gap-1 text-xs text-slate-500 transition-colors hover:text-slate-700"
           >
             <ExternalLink className="h-3 w-3" /> Full editor
           </a>
@@ -437,7 +440,7 @@ export function ListingEditPanel({
         </Field>
       </FieldGrid>
 
-      <div className="rounded-lg border border-slate-200 bg-white p-4">
+      <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
         <Toggle
           checked={form.negotiable}
           onChange={(v) => set({ negotiable: v })}
@@ -490,7 +493,7 @@ export function ListingEditPanel({
           <button
             type="button"
             onClick={onCancel}
-            className="min-h-11 rounded-lg px-4 text-sm font-medium text-slate-600 transition-colors hover:bg-white"
+            className="min-h-11 rounded-lg px-4 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-100"
           >
             Cancel
           </button>
@@ -498,7 +501,7 @@ export function ListingEditPanel({
             type="button"
             onClick={submit}
             disabled={saving}
-            className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-amber-600 px-5 text-sm font-medium text-white transition-colors hover:bg-amber-700 disabled:opacity-50"
+            className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-slate-800 px-5 text-sm font-medium text-white transition-colors hover:bg-slate-700 disabled:opacity-50"
           >
             {saving && <Loader2 className="h-4 w-4 animate-spin" />}
             Save listing

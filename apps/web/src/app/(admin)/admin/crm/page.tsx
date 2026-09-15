@@ -275,7 +275,7 @@ export default function CrmPage() {
             Matches to explore
           </FocusChip>
           {focus !== 'none' && (
-            <button onClick={() => setFocus('none')} className="text-xs text-slate-400 hover:text-slate-700 self-center inline-flex items-center gap-1">
+            <button onClick={() => setFocus('none')} className="text-xs text-slate-500 hover:text-slate-700 self-center inline-flex items-center gap-1">
               <X className="h-3.5 w-3.5" /> Clear
             </button>
           )}
@@ -450,7 +450,7 @@ export default function CrmPage() {
         <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
           <div className="px-4 py-2.5 border-b border-slate-100">
             <h3 className="text-sm font-semibold text-slate-800">Where leads come from</h3>
-            <p className="text-[11px] text-slate-400 mt-0.5">
+            <p className="text-[11px] text-slate-500 mt-0.5">
               Last 12 months. Commission per lead is the number that decides where the ad budget goes.
             </p>
           </div>
@@ -598,7 +598,7 @@ function ClientPicker({
       >
         <div className="p-4 border-b border-slate-100">
           <h2 className="font-semibold text-slate-900">New deal — for which client?</h2>
-          <p className="text-[11px] text-slate-400 mt-0.5">
+          <p className="text-[11px] text-slate-500 mt-0.5">
             Someone who just messaged you? Add them here, then pick the property.
           </p>
           <input
@@ -618,10 +618,10 @@ function ClientPicker({
             >
               <span className="flex items-center gap-2">
                 <span className="text-sm font-medium text-slate-900">{l.name}</span>
-                <span className="text-[10px] text-slate-400">{TYPE_LABELS[l.type]}</span>
+                <span className="text-[10px] text-slate-500">{TYPE_LABELS[l.type]}</span>
               </span>
               {(l.askingFor || l.phone) && (
-                <span className="block text-[11px] text-slate-400 truncate">
+                <span className="block text-[11px] text-slate-500 truncate">
                   {l.askingFor || l.phone}
                 </span>
               )}
@@ -638,7 +638,7 @@ function ClientPicker({
           </button>
 
           {rows.length === 0 && q.trim() && (
-            <p className="text-sm text-slate-400 text-center py-6">Nobody matches “{q.trim()}”.</p>
+            <p className="text-sm text-slate-500 text-center py-6">Nobody matches “{q.trim()}”.</p>
           )}
         </div>
       </div>

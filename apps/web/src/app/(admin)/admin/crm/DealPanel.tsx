@@ -119,7 +119,7 @@ export function DealPanel({
 
       {deals.length === 0 && !creating && (
         <div className="py-2">
-          <p className="text-sm text-slate-400">
+          <p className="text-sm text-slate-500">
             {isClosed
               ? 'This client is marked Won but no sale has been recorded.'
               : 'Nothing closed yet.'}
@@ -180,7 +180,7 @@ export function DealPanel({
                       ? ` · we made $${d.commissionUsd.toLocaleString()}`
                       : ' · commission not recorded'}
                   </p>
-                  <p className="text-[11px] text-slate-400 mt-0.5">
+                  <p className="text-[11px] text-slate-500 mt-0.5">
                     {d.closedAt
                       ? `Closed ${new Date(d.closedAt).toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' })}`
                       : 'No sale date set'}
@@ -246,7 +246,7 @@ function PickRow({
         {country && <span className="text-[11px] shrink-0">{countryFlag(country)}</span>}
         <span className="text-sm text-slate-800 truncate">{label}</span>
       </span>
-      {sub && <span className="block text-[11px] text-slate-400 truncate">{sub}</span>}
+      {sub && <span className="block text-[11px] text-slate-500 truncate">{sub}</span>}
     </button>
   )
 }
@@ -407,7 +407,7 @@ function DealForm({
                   )}
 
                   {!searchError && q.trim().length >= 2 && !searching && results.length === 0 && (
-                    <p className="text-xs text-slate-400 px-1 py-1.5">Nothing matches “{q.trim()}”.</p>
+                    <p className="text-xs text-slate-500 px-1 py-1.5">Nothing matches “{q.trim()}”.</p>
                   )}
 
                   <button
@@ -485,7 +485,7 @@ function DealForm({
         </label>
       </div>
 
-      <p className="text-[10px] text-slate-400">
+      <p className="text-[10px] text-slate-500">
         Profit is kept in USD so totals across Lebanon and Georgia add up.
       </p>
 

@@ -133,12 +133,12 @@ export function OwnerPicker({
                   className="w-full text-left rounded-lg border border-slate-200 px-3 py-2 hover:bg-slate-50 transition-colors"
                 >
                   <span className="text-sm text-slate-800">{r.name}</span>
-                  {r.phone && <span className="text-xs text-slate-400 block">{r.phone}</span>}
+                  {r.phone && <span className="text-xs text-slate-500 block">{r.phone}</span>}
                 </button>
               ))}
 
               {!busy && !error && results.length === 0 && (
-                <p className="text-xs text-slate-400 px-1 py-1">No client matches “{q.trim()}”.</p>
+                <p className="text-xs text-slate-500 px-1 py-1">No client matches “{q.trim()}”.</p>
               )}
 
               <button
@@ -152,7 +152,7 @@ export function OwnerPicker({
             </div>
           )}
 
-          <p className="text-xs text-slate-400 mt-1">{hint}</p>
+          <p className="text-xs text-slate-500 mt-1">{hint}</p>
         </>
       )}
     </div>
@@ -213,7 +213,7 @@ function NewClientInline({
       {error && <p className="text-xs text-red-600">{error}</p>}
       <input value={name} onChange={(e) => setName(e.target.value)} className={cls} placeholder="Client name" />
       <input value={phone} onChange={(e) => setPhone(e.target.value)} className={cls} placeholder="Phone (optional)" />
-      <p className="text-[11px] text-slate-400">
+      <p className="text-[11px] text-slate-500">
         Added as a seller. You can complete their details in the CRM later.
       </p>
       <div className="flex gap-2">

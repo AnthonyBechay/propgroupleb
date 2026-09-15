@@ -201,7 +201,7 @@ export default function AdminUsersPage() {
                 <span className="min-w-0 flex-1 truncate text-slate-600">
                   {entry.admin?.firstName || entry.admin?.email || 'Someone'} · {entry.targetType}
                 </span>
-                <span className="text-xs text-slate-400">
+                <span className="text-xs text-slate-500">
                   {new Date(entry.createdAt).toLocaleString()}
                 </span>
               </li>

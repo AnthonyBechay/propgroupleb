@@ -448,7 +448,7 @@ export function SpecsSection({ f, set, disabled, residential }: SectionProps & {
             ))}
           </div>
           {f.country === 'LEBANON' && (
-            <p className="mt-2 text-xs text-slate-400">
+            <p className="mt-2 text-xs text-slate-500">
               Generator and solar are offered because mains power in Lebanon isn&rsquo;t reliable — they don&rsquo;t appear on other markets.
             </p>
           )}
@@ -761,7 +761,7 @@ export function SeoSection({
     >
       <div className="space-y-4">
         {generateError && <InlineNote tone="error">{generateError}</InlineNote>}
-        {generateDisabledReason && <p className="text-xs text-slate-400">{generateDisabledReason}</p>}
+        {generateDisabledReason && <p className="text-xs text-slate-500">{generateDisabledReason}</p>}
 
         <Field label="Page title" optional hint="Google shows about 60 characters.">
           <TextInput

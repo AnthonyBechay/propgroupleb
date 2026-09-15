@@ -233,7 +233,7 @@ function Section({
           <h3 className="text-sm font-semibold text-slate-800">{title}</h3>
           <span className={`text-[11px] font-bold px-1.5 py-0.5 rounded-full ${t.badge}`}>{count}</span>
         </div>
-        <p className="text-[11px] text-slate-400 mt-0.5">{hint}</p>
+        <p className="text-[11px] text-slate-500 mt-0.5">{hint}</p>
       </div>
       <ul className="divide-y divide-slate-50 max-h-[280px] overflow-y-auto">{children}</ul>
     </section>
@@ -258,7 +258,7 @@ function Row({
             <span className="text-[10px] shrink-0">{lead.market === 'GEORGIA' ? '🇬🇪' : '🇱🇧'}</span>
           </div>
           {(meta || detail) && (
-            <p className="text-[11px] text-slate-400 truncate">
+            <p className="text-[11px] text-slate-500 truncate">
               {[meta, detail].filter(Boolean).join(' · ')}
             </p>
           )}

@@ -114,7 +114,7 @@ export function BehaviorAnalytics({ site }: { site?: 'LEBANON' | 'INTERNATIONAL'
         <div className="bg-white border border-slate-200 rounded-2xl p-12 text-center">
           <Activity className="w-10 h-10 mx-auto mb-3 text-slate-200" />
           <p className="text-slate-500 font-medium">No activity yet</p>
-          <p className="text-slate-400 text-sm mt-1">Visitor behaviour will appear here as people browse the site.</p>
+          <p className="text-slate-500 text-sm mt-1">Visitor behaviour will appear here as people browse the site.</p>
         </div>
       ) : (
         <>
@@ -167,7 +167,7 @@ export function BehaviorAnalytics({ site }: { site?: 'LEBANON' | 'INTERNATIONAL'
               <TrendingUp className="w-4 h-4 text-slate-400" /> Views over time
             </h3>
             {data!.series.length === 0 ? (
-              <p className="text-sm text-slate-400">No views in this period.</p>
+              <p className="text-sm text-slate-500">No views in this period.</p>
             ) : (
               <div className="flex items-end gap-1 h-40">
                 {data!.series.map((s) => (
@@ -179,7 +179,7 @@ export function BehaviorAnalytics({ site }: { site?: 'LEBANON' | 'INTERNATIONAL'
                         title={`${s.date}: ${s.pageViews} page views, ${s.listingViews} listing views`}
                       />
                     </div>
-                    <span className="absolute -bottom-5 text-[9px] text-slate-400 rotate-0 hidden sm:block">
+                    <span className="absolute -bottom-5 text-[9px] text-slate-500 rotate-0 hidden sm:block">
                       {s.date.slice(5)}
                     </span>
                   </div>
@@ -224,7 +224,7 @@ export function BehaviorAnalytics({ site }: { site?: 'LEBANON' | 'INTERNATIONAL'
             <div className="bg-white border border-slate-200 rounded-2xl p-5">
               <h3 className="text-sm font-semibold text-slate-700 mb-4">Most viewed listings</h3>
               {data!.topListings.length === 0 ? (
-                <p className="text-sm text-slate-400">No listing views yet.</p>
+                <p className="text-sm text-slate-500">No listing views yet.</p>
               ) : (
                 <ol className="space-y-2">
                   {data!.topListings.map((l, i) => (
@@ -259,7 +259,7 @@ function MetricCard({ icon, label, value, accent, sub }: { icon: React.ReactNode
     <div className="bg-white border border-slate-200 rounded-2xl p-4">
       <div className={`flex items-center gap-1.5 text-xs font-medium ${accent}`}>{icon}{label}</div>
       <p className="text-2xl font-bold text-slate-900 mt-1.5">{value.toLocaleString()}</p>
-      {sub && <p className="text-xs text-slate-400 mt-0.5">{sub}</p>}
+      {sub && <p className="text-xs text-slate-500 mt-0.5">{sub}</p>}
     </div>
   )
 }
@@ -269,7 +269,7 @@ function MiniStat({ icon, label, value }: { icon: React.ReactNode; label: string
     <div>
       <div className="flex items-center justify-center text-slate-400 mb-1">{icon}</div>
       <p className="text-sm font-semibold text-slate-900">{value.toLocaleString()}</p>
-      <p className="text-[11px] text-slate-400">{label}</p>
+      <p className="text-[11px] text-slate-500">{label}</p>
     </div>
   )
 }

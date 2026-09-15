@@ -227,7 +227,7 @@ export default function AdminContactsPage() {
 
                     {/* Time */}
                     <div className="hidden md:block text-right flex-shrink-0">
-                      <p className="text-xs text-slate-400">{timeAgo(msg.createdAt)}</p>
+                      <p className="text-xs text-slate-500">{timeAgo(msg.createdAt)}</p>
                     </div>
 
                     <div className="text-slate-400 flex-shrink-0">

@@ -123,13 +123,13 @@ export function LocationPicker({
                     {a.name}
                     {a.city && <span className="font-normal text-slate-400"> · {a.city}</span>}
                   </span>
-                  <span className="text-xs text-slate-400 shrink-0">{a.caza} · {regionLabel(a.region)}</span>
+                  <span className="text-xs text-slate-500 shrink-0">{a.caza} · {regionLabel(a.region)}</span>
                 </button>
               ))}
             </div>
           )}
           {open && query && results.length === 0 && (
-            <div className="absolute z-30 mt-1 w-full bg-white border border-slate-200 rounded-lg shadow-xl px-3 py-2.5 text-sm text-slate-400">
+            <div className="absolute z-30 mt-1 w-full bg-white border border-slate-200 rounded-lg shadow-xl px-3 py-2.5 text-sm text-slate-500">
               No area found{regions.length ? ' in the selected regions' : ''}. Try another spelling.
             </div>
           )}

@@ -251,7 +251,7 @@ export default function AdminListingsPage() {
       </div>
 
       {filtersOn && (
-        <div className="-mt-2 flex items-center gap-2 text-xs text-slate-400">
+        <div className="-mt-2 flex items-center gap-2 text-xs text-slate-500">
           Showing {filtered.length} of {listings.length}
           <button
             type="button"
@@ -312,14 +312,20 @@ export default function AdminListingsPage() {
                   seven-column table in a side-scroller is unusable on a phone. */}
               <ul className="space-y-2">
                 {group.items.map((l) => {
-                  const title = l.headline ?? l.unit?.name ?? l.building?.title ?? 'Untitled'
+                  const buildingId = l.building?.id ?? l.unit?.buildingId ?? null
                   const location = l.building
                     ? [l.building.city, l.building.caza].filter(Boolean).join(', ')
-                    : '—'
-                  const subject = l.unit
-                    ? [typeLabel(l.unit.kind), l.unit.bedrooms != null ? `${l.unit.bedrooms} bed` : null, l.unit.areaSqm ? `${l.unit.areaSqm} m²` : null]
-                        .filter(Boolean).join(' · ')
+                    : ''
+                  const unitLabel = l.unit
+                    ? (l.unit.unitNumber ? `Unit ${l.unit.unitNumber}` : typeLabel(l.unit.kind))
                     : 'Whole property'
+                  const specs = l.unit
+                    ? [
+                        l.unit.unitNumber ? typeLabel(l.unit.kind) : null,
+                        l.unit.bedrooms != null ? `${l.unit.bedrooms} bed` : null,
+                        l.unit.areaSqm ? `${l.unit.areaSqm} m²` : null,
+                      ].filter(Boolean).join(' · ')
+                    : ''
                   const status = STATUS_META[l.status] ?? { label: l.status, cls: 'bg-slate-100 text-slate-600' }
 
                   return (
@@ -327,22 +333,46 @@ export default function AdminListingsPage() {
                       key={l.id}
                       className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-white p-3 transition-colors hover:border-slate-300 sm:flex-row sm:items-center sm:px-4"
                     >
-                      <Link href={`/admin/listings/${l.id}`} className="min-w-0 flex-1">
+                      {/* Two destinations, side by side rather than nested —
+                          an <a> inside an <a> is invalid, and wrapping the whole
+                          row in a link to the listing is what made the property
+                          unreachable from here in the first place.
+                          The property leads, because a listing's identity is the
+                          property it sells. Leading with `headline` meant a
+                          listing with marketing copy on it hid the property
+                          entirely behind a sentence. */}
+                      <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-center gap-1.5">
                           <span className="shrink-0 text-[11px]" title={countryOf(l)}>{countryFlag(countryOf(l))}</span>
-                          {listingRef(l) && (
-                            <span className="shrink-0 rounded border border-slate-200 bg-slate-100 px-1.5 py-0.5 font-mono text-[10px] font-semibold text-slate-500">
-                              {listingRef(l)}
+                          {l.building?.ref && (
+                            <span className="shrink-0 rounded border border-slate-200 bg-slate-100 px-1.5 py-0.5 font-mono text-[10px] font-semibold text-slate-600">
+                              {l.building.ref}
                             </span>
                           )}
-                          <span className="truncate text-sm font-medium text-slate-900">{title}</span>
+                          {buildingId ? (
+                            <Link
+                              href={`/admin/buildings/${buildingId}`}
+                              className="truncate text-sm font-semibold text-slate-900 underline-offset-2 hover:text-slate-700 hover:underline"
+                              title="Open the property"
+                            >
+                              {l.building?.title ?? 'Property'}
+                            </Link>
+                          ) : (
+                            <span className="truncate text-sm font-semibold text-slate-900">
+                              {l.building?.title ?? 'Unassigned'}
+                            </span>
+                          )}
                         </div>
-                        <p className="mt-0.5 truncate text-xs text-slate-400">
-                          {subject}
-                          {l.building?.title && l.unit ? ` · ${l.building.title}` : ''}
-                          {location !== '—' ? ` · ${location}` : ''}
-                        </p>
-                      </Link>
+                        <Link
+                          href={`/admin/listings/${l.id}`}
+                          className="mt-0.5 block truncate text-xs text-slate-500 hover:text-slate-800"
+                        >
+                          {unitLabel}
+                          {specs && ` · ${specs}`}
+                          {location && ` · ${location}`}
+                          {l.headline && <span className="text-slate-400"> — &ldquo;{l.headline}&rdquo;</span>}
+                        </Link>
+                      </div>
 
                       <div className="flex flex-wrap items-center gap-2 sm:shrink-0">
                         <span className={cn('rounded px-2 py-0.5 text-xs font-medium', INTENT_COLORS[l.intent] ?? '')}>
@@ -364,6 +394,16 @@ export default function AdminListingsPage() {
                         </span>
 
                         <div className="ml-auto flex items-center gap-0.5 sm:ml-0">
+                          {buildingId && (
+                            <Link
+                              href={`/admin/buildings/${buildingId}`}
+                              title="Open the property"
+                              aria-label="Open the property"
+                              className="flex h-9 w-9 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700"
+                            >
+                              <Building2 className="h-3.5 w-3.5" />
+                            </Link>
+                          )}
                           {l.slug && l.status === 'ACTIVE' && (
                             <a
                               href={`/listings/${l.slug}`}
@@ -428,7 +468,7 @@ export default function AdminListingsPage() {
 
       {/* Grouping keeps the counts honest when a filter is on. */}
       {!loading && groupBy !== 'none' && filtered.length > 0 && (
-        <p className="flex items-center gap-1.5 text-xs text-slate-400">
+        <p className="flex items-center gap-1.5 text-xs text-slate-500">
           <Layers className="h-3 w-3" /> {groups.length} group{groups.length === 1 ? '' : 's'} · {filtered.length} listings
         </p>
       )}

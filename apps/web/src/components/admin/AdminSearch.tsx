@@ -130,7 +130,7 @@ export function AdminSearch() {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="flex min-h-11 items-center gap-2 rounded-lg border border-slate-200 px-3 text-sm text-slate-400 transition-colors hover:border-slate-300 hover:bg-slate-50 sm:w-64"
+        className="flex min-h-11 items-center gap-2 rounded-lg border border-slate-200 px-3 text-sm text-slate-500 transition-colors hover:border-slate-300 hover:bg-slate-50 sm:w-64"
         aria-label="Search the back office"
       >
         <Search className="h-4 w-4 shrink-0" />
@@ -173,7 +173,7 @@ export function AdminSearch() {
 
             <ul className="max-h-[55vh] overflow-y-auto overscroll-contain p-2">
               {results.length === 0 && (
-                <li className="px-3 py-8 text-center text-sm text-slate-400">
+                <li className="px-3 py-8 text-center text-sm text-slate-500">
                   {q.length < 2 ? 'Type to search' : loading ? 'Searching…' : 'Nothing found'}
                 </li>
               )}
@@ -192,7 +192,7 @@ export function AdminSearch() {
                       <>
                         <r.icon className="h-4 w-4 shrink-0 text-slate-400" />
                         <span className="flex-1 truncate text-sm text-slate-700">{r.label}</span>
-                        <span className="shrink-0 text-[11px] text-slate-400">Page</span>
+                        <span className="shrink-0 text-[11px] text-slate-500">Page</span>
                       </>
                     ) : (
                       <>
@@ -217,7 +217,7 @@ export function AdminSearch() {
                             )}
                             <span className="truncate text-sm text-slate-800">{r.building.title}</span>
                           </span>
-                          <span className="block truncate text-xs text-slate-400">
+                          <span className="block truncate text-xs text-slate-500">
                             {countryFlag(r.building.country)} {r.building.city ?? '—'}
                             {r.building._count?.units ? ` · ${r.building._count.units} units` : ''}
                           </span>
@@ -230,7 +230,7 @@ export function AdminSearch() {
               ))}
             </ul>
 
-            <div className="flex items-center gap-3 border-t border-slate-100 bg-slate-50 px-4 py-2 text-[11px] text-slate-400">
+            <div className="flex items-center gap-3 border-t border-slate-100 bg-slate-50 px-4 py-2 text-[11px] text-slate-500">
               <span>↑↓ to move</span>
               <span>↵ to open</span>
               <span>esc to close</span>

@@ -308,7 +308,7 @@ export function LeadDrawer({ lead, onClose, onChanged }: { lead: Lead; onClose: 
                 <span className={`px-2 py-0.5 rounded text-xs font-medium ${STATUS_META[l.status].cls}`}>{STATUS_META[l.status].label}</span>
                 <span className={`px-2 py-0.5 rounded text-xs font-medium ${MARKET_META[l.market].cls}`}>{MARKET_META[l.market].label}</span>
                 {(l.intents?.length ? l.intents : [l.type]).map((t) => (
-                  <span key={t} className="text-xs text-slate-400">{TYPE_LABELS[t]}</span>
+                  <span key={t} className="text-xs text-slate-500">{TYPE_LABELS[t]}</span>
                 ))}
               </div>
             </div>
@@ -554,7 +554,7 @@ export function LeadDrawer({ lead, onClose, onChanged }: { lead: Lead; onClose: 
                   <button
                     type="button"
                     onClick={() => { setPlanDate(''); setPlanNote('') }}
-                    className="text-[11px] text-slate-400 hover:text-slate-700 inline-flex items-center gap-0.5"
+                    className="text-[11px] text-slate-500 hover:text-slate-700 inline-flex items-center gap-0.5"
                   >
                     <X className="h-3 w-3" /> Clear
                   </button>
@@ -601,7 +601,7 @@ export function LeadDrawer({ lead, onClose, onChanged }: { lead: Lead; onClose: 
               className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-900/10 resize-y"
             />
             <div className="flex items-center justify-between gap-2">
-              <span className="text-[11px] text-slate-400">
+              <span className="text-[11px] text-slate-500">
                 A note doesn&apos;t count as contacting them.
               </span>
               <button
@@ -621,7 +621,7 @@ export function LeadDrawer({ lead, onClose, onChanged }: { lead: Lead; onClose: 
                   .map((c) => (
                     <li key={c.id} className="rounded-lg bg-amber-50/60 border border-amber-100 px-2.5 py-1.5">
                       <p className="text-sm text-slate-700 whitespace-pre-wrap">{c.body}</p>
-                      <span className="text-[10px] text-slate-400">
+                      <span className="text-[10px] text-slate-500">
                         {new Date(c.contactedAt).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })}
                       </span>
                     </li>
@@ -654,7 +654,7 @@ export function LeadDrawer({ lead, onClose, onChanged }: { lead: Lead; onClose: 
                         <span className="font-mono text-[10px] font-semibold text-slate-500 shrink-0">{b.ref}</span>
                       )}
                       <span className="text-sm text-slate-800 truncate flex-1">{b.title}</span>
-                      <span className="text-[11px] text-slate-400 shrink-0">
+                      <span className="text-[11px] text-slate-500 shrink-0">
                         {[b.city, b.caza].filter(Boolean).join(', ')}
                       </span>
                     </a>
@@ -733,7 +733,7 @@ export function LeadDrawer({ lead, onClose, onChanged }: { lead: Lead; onClose: 
               <Handshake className="h-3.5 w-3.5" /> Possible client matches
               {leadMatches.length > 0 && <span className="text-slate-400 font-normal normal-case">({leadMatches.length})</span>}
             </p>
-            <p className="text-[11px] text-slate-400 -mt-2 mb-3">
+            <p className="text-[11px] text-slate-500 -mt-2 mb-3">
               {!isSupply
                 ? 'Sellers/landlords in our CRM whose property could suit this client.'
                 : 'Buyers/renters in our CRM who are looking for what this client has.'}
@@ -741,7 +741,7 @@ export function LeadDrawer({ lead, onClose, onChanged }: { lead: Lead; onClose: 
             {loading ? (
               <div className="flex justify-center py-6 text-slate-400"><Loader2 className="h-5 w-5 animate-spin" /></div>
             ) : leadMatches.length === 0 ? (
-              <p className="text-sm text-slate-400">No counterpart clients match closely enough yet.</p>
+              <p className="text-sm text-slate-500">No counterpart clients match closely enough yet.</p>
             ) : (
               <div className="space-y-2">
                 {leadMatches.map(({ lead: other, match }) => (
@@ -789,7 +789,7 @@ export function LeadDrawer({ lead, onClose, onChanged }: { lead: Lead; onClose: 
             {loading ? (
               <div className="flex justify-center py-6 text-slate-400"><Loader2 className="h-5 w-5 animate-spin" /></div>
             ) : matches.length === 0 ? (
-              <p className="text-sm text-slate-400">
+              <p className="text-sm text-slate-500">
                 {l.market === 'GEORGIA'
                   ? 'Georgia inventory lives on propgrp.com — no local matches.'
                   : 'No live listings fit these criteria closely enough yet.'}
@@ -871,7 +871,7 @@ export function LeadDrawer({ lead, onClose, onChanged }: { lead: Lead; onClose: 
               <History className="h-3.5 w-3.5" /> Contact history
             </p>
             {!l.contacts?.length ? (
-              <p className="text-sm text-slate-400">No contacts logged yet.</p>
+              <p className="text-sm text-slate-500">No contacts logged yet.</p>
             ) : (
               <ol className="space-y-3">
                 {l.contacts.map((c: LeadContact) => (

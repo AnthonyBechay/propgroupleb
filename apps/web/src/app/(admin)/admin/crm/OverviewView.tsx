@@ -139,7 +139,7 @@ export function OverviewView({ onFocus }: { onFocus: (view: 'today' | 'board' | 
           hint="Templates many clients buy, and how many have closed on each"
         >
           {d.projectStock.length === 0 ? (
-            <p className="text-xs text-slate-400 px-3.5 py-3">
+            <p className="text-xs text-slate-500 px-3.5 py-3">
               None yet. Tick &ldquo;This is a unit type&rdquo; on a unit in a development, and
               every client can be matched to it.
             </p>
@@ -191,7 +191,7 @@ function Stat({
         <span className="text-xs font-medium text-slate-500">{label}</span>
       </div>
       <p className="text-2xl font-bold text-slate-900 mt-1.5">{value}</p>
-      {hint && <p className="text-[11px] text-slate-400 mt-0.5">{hint}</p>}
+      {hint && <p className="text-[11px] text-slate-500 mt-0.5">{hint}</p>}
     </button>
   )
 }
@@ -203,7 +203,7 @@ function Panel({ title, hint, children }: { title: string; hint: string; childre
         <h3 className="text-sm font-semibold text-slate-800 flex items-center gap-1.5">
           <Building2 className="h-3.5 w-3.5 text-slate-300" /> {title}
         </h3>
-        <p className="text-[11px] text-slate-400 mt-0.5">{hint}</p>
+        <p className="text-[11px] text-slate-500 mt-0.5">{hint}</p>
       </div>
       <div className="divide-y divide-slate-50">{children}</div>
     </section>

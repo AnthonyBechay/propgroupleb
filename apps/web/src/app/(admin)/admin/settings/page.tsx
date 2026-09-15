@@ -515,7 +515,7 @@ export default function SettingsPage() {
                           <>
                             <ImageIcon className="w-8 h-8 text-slate-300 mx-auto mb-2" />
                             <p className="text-sm text-slate-500">Click to upload PNG, JPG, SVG, or WebP</p>
-                            <p className="text-xs text-slate-400 mt-1">Recommended: transparent background PNG</p>
+                            <p className="text-xs text-slate-500 mt-1">Recommended: transparent background PNG</p>
                           </>
                         )}
                         <input
@@ -530,7 +530,7 @@ export default function SettingsPage() {
 
                     <div className="flex items-center gap-3">
                       <div className="flex-1 h-px bg-slate-200" />
-                      <span className="text-xs text-slate-400 font-medium">or enter URL directly</span>
+                      <span className="text-xs text-slate-500 font-medium">or enter URL directly</span>
                       <div className="flex-1 h-px bg-slate-200" />
                     </div>
 

@@ -408,7 +408,7 @@ function AssignOwner({
         )}
       </div>
       {msg && <InlineNote tone={msg.ok ? 'success' : 'error'}>{msg.text}</InlineNote>}
-      <p className="text-[11px] text-slate-400">
+      <p className="text-[11px] text-slate-500">
         The unit appears in that user&rsquo;s portal. Works for any registered account, Google or email.
       </p>
     </div>

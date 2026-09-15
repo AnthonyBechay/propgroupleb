@@ -402,17 +402,17 @@ export default function AdminInquiriesPage() {
                         {getPropertyName(inq)}
                       </p>
                       {inq.building?.city ? (
-                        <p className="text-xs text-slate-400 flex items-center justify-end gap-1">
+                        <p className="text-xs text-slate-500 flex items-center justify-end gap-1">
                           <MapPin className="w-3 h-3" /> {inq.building.city}
                         </p>
                       ) : !inq.building && !inq.buildingTitle ? (
-                        <p className="text-xs text-slate-400">General inquiry</p>
+                        <p className="text-xs text-slate-500">General inquiry</p>
                       ) : null}
                     </div>
 
                     {/* Time */}
                     <div className="hidden lg:block text-right flex-shrink-0">
-                      <p className="text-xs text-slate-400">{timeAgo(inq.createdAt)}</p>
+                      <p className="text-xs text-slate-500">{timeAgo(inq.createdAt)}</p>
                     </div>
 
                     {/* Expand toggle */}
@@ -514,7 +514,7 @@ export default function AdminInquiriesPage() {
                           })}
                         </div>
                         {inq.repliedAt && (
-                          <p className="text-xs text-slate-400 mt-2">
+                          <p className="text-xs text-slate-500 mt-2">
                             Replied {new Date(inq.repliedAt).toLocaleString()}
                             {inq.repliedBy && ` by ${inq.repliedBy}`}
                           </p>
@@ -566,7 +566,7 @@ export default function AdminInquiriesPage() {
                             {inq.adminNotes}
                           </div>
                         ) : (
-                          <p className="text-xs text-slate-400 italic">No notes yet</p>
+                          <p className="text-xs text-slate-500 italic">No notes yet</p>
                         )}
                       </div>
 

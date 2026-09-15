@@ -261,7 +261,7 @@ export function ImportModal({ onClose, onImported }: { onClose: () => void; onIm
               >
                 <Upload className="h-7 w-7 text-slate-300 mx-auto mb-1.5" />
                 <p className="text-sm font-medium text-slate-600">{fileName || 'Choose a CSV file'}</p>
-                <p className="text-xs text-slate-400 mt-0.5">.csv exported from Excel or Google Sheets</p>
+                <p className="text-xs text-slate-500 mt-0.5">.csv exported from Excel or Google Sheets</p>
               </button>
               <input
                 ref={fileRef} type="file" accept=".csv,text/csv" className="hidden"
@@ -277,14 +277,14 @@ export function ImportModal({ onClose, onImported }: { onClose: () => void; onIm
                     {rows.slice(0, 20).map((r, i) => (
                       <div key={i} className="px-3 py-2 text-sm flex items-center justify-between gap-2">
                         <span className="font-medium text-slate-800 truncate">{r.name}</span>
-                        <span className="text-xs text-slate-400 shrink-0">
+                        <span className="text-xs text-slate-500 shrink-0">
                           {r.type} · {r.market === 'GEORGIA' ? '🇬🇪' : '🇱🇧'} · {r.phone || 'no phone'}
                           {r.unitKinds.length > 0 && ` · ${r.unitKinds.join('/')}`}
                           {r.areas.length > 0 && ` · ${r.areas.slice(0, 2).join(', ')}`}
                         </span>
                       </div>
                     ))}
-                    {rows.length > 20 && <div className="px-3 py-2 text-xs text-slate-400">…and {rows.length - 20} more</div>}
+                    {rows.length > 20 && <div className="px-3 py-2 text-xs text-slate-500">…and {rows.length - 20} more</div>}
                   </div>
                 </div>
               )}

@@ -299,7 +299,7 @@ export function AdminDashboardClient() {
                 </tbody>
               </table>
             </div>
-            <p className="mt-3 text-xs text-slate-400">
+            <p className="mt-3 text-xs text-slate-500">
               A property appears on a site by its country — International is everything that isn&rsquo;t Lebanon.
             </p>
           </FormSection>
@@ -413,7 +413,7 @@ export function AdminDashboardClient() {
  * with its own denominator.
  */
 function CityBreakdown({ rows }: { rows: Array<{ city: string | null; country: string; count: number }> }) {
-  if (rows.length === 0) return <p className="text-xs text-slate-400">No properties yet</p>
+  if (rows.length === 0) return <p className="text-xs text-slate-500">No properties yet</p>
 
   const groups = new Map<'LEBANON' | 'INTERNATIONAL', Array<{ city: string; count: number }>>()
   for (const r of rows) {
@@ -452,7 +452,7 @@ function CityBreakdown({ rows }: { rows: Array<{ city: string | null; country: s
 }
 
 function StatusList({ rows, empty }: { rows: Array<{ key: string; count: number }>; empty: string }) {
-  if (rows.length === 0) return <p className="text-xs text-slate-400">{empty}</p>
+  if (rows.length === 0) return <p className="text-xs text-slate-500">{empty}</p>
   return (
     <div className="space-y-2.5">
       {rows.map((r) => (
@@ -492,7 +492,7 @@ function FeedCard({
 }
 
 function FeedEmpty({ children }: { children: React.ReactNode }) {
-  return <p className="px-5 py-8 text-center text-sm text-slate-400">{children}</p>
+  return <p className="px-5 py-8 text-center text-sm text-slate-500">{children}</p>
 }
 
 function FeedRow({
@@ -516,7 +516,7 @@ function FeedRow({
             {badge.replace(/_/g, ' ')}
           </span>
         )}
-        <span className="flex items-center gap-0.5 whitespace-nowrap text-[10px] text-slate-400">
+        <span className="flex items-center gap-0.5 whitespace-nowrap text-[10px] text-slate-500">
           <Clock className="h-2.5 w-2.5" />{timeAgo(when)}
         </span>
       </div>

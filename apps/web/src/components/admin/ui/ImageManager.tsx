@@ -336,7 +336,7 @@ export function ImageManager({
             <button
               type="button"
               onClick={() => setSelected(new Set())}
-              className="min-h-9 px-1 text-xs text-slate-400 hover:text-slate-700"
+              className="min-h-9 px-1 text-xs text-slate-500 hover:text-slate-700"
             >
               Clear
             </button>

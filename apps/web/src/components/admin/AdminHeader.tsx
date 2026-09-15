@@ -101,7 +101,7 @@ export function AdminHeader({ onOpenNav }: { onOpenNav: () => void }) {
                     <a.icon className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" />
                     <span className="min-w-0">
                       <span className="block text-sm font-medium text-slate-800">{a.label}</span>
-                      <span className="block text-xs text-slate-400">{a.description}</span>
+                      <span className="block text-xs text-slate-500">{a.description}</span>
                     </span>
                   </Link>
                 ))}

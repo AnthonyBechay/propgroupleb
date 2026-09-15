@@ -71,7 +71,7 @@ export function BuildingDocumentsManager({ buildingId }: { buildingId: string })
   return (
     <div className="space-y-3">
       {loading ? (
-        <div className="text-sm text-slate-400 flex items-center gap-2"><Loader2 className="h-4 w-4 animate-spin" /> Loading documents…</div>
+        <div className="text-sm text-slate-500 flex items-center gap-2"><Loader2 className="h-4 w-4 animate-spin" /> Loading documents…</div>
       ) : docs.length > 0 ? (
         <div className="space-y-2">
           {docs.map((d) => (
@@ -90,13 +90,13 @@ export function BuildingDocumentsManager({ buildingId }: { buildingId: string })
           ))}
         </div>
       ) : (
-        <p className="text-xs text-slate-400">No documents yet.</p>
+        <p className="text-xs text-slate-500">No documents yet.</p>
       )}
 
       <button type="button" onClick={() => inputRef.current?.click()} disabled={uploading} className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium text-slate-700 border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-50">
         {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />} Add documents
       </button>
-      <p className="text-xs text-slate-400">PDF, images, Word or Excel. Public documents show on the property page; private ones are admin-only.</p>
+      <p className="text-xs text-slate-500">PDF, images, Word or Excel. Public documents show on the property page; private ones are admin-only.</p>
       <input ref={inputRef} type="file" accept=".pdf,image/*,.doc,.docx,.xls,.xlsx" multiple className="hidden" onChange={(e) => { if (e.target.files?.length) upload(e.target.files); e.target.value = '' }} />
     </div>
   )

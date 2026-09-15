@@ -87,7 +87,7 @@ export function UserManagementTable({
                   <RoleBadge role={user.role} />
                   <StatusBadge user={user} />
                 </div>
-                <p className="mt-2 text-xs text-slate-400">
+                <p className="mt-2 text-xs text-slate-500">
                   Last login {user.lastLoginAt ? new Date(user.lastLoginAt).toLocaleDateString() : 'never'}
                   {' · '}joined {new Date(user.createdAt).toLocaleDateString()}
                 </p>

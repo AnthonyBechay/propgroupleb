@@ -143,7 +143,7 @@ const inp = 'w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-whit
         <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between shrink-0">
           <div>
             <h2 className="font-semibold text-slate-900">{isEdit ? `Edit ${lead!.name}` : 'Add Client'}</h2>
-            <p className="text-xs text-slate-400 mt-0.5">
+            <p className="text-xs text-slate-500 mt-0.5">
               {isSupply ? 'Someone with a property to sell or rent out' : 'Someone looking for a property'}
             </p>
           </div>
@@ -212,7 +212,7 @@ const inp = 'w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-whit
                   )
                 })}
               </div>
-              <p className="text-[11px] text-slate-400 mt-1">
+              <p className="text-[11px] text-slate-500 mt-1">
                 Pick everything that applies. The first one is their main intent
                 {f.intents.length > 1 && <> — currently <strong>{TYPE_LABELS[f.type as LeadType]}</strong></>}.
               </p>
@@ -243,7 +243,7 @@ const inp = 'w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-whit
                   <option value="GEORGIA">🇬🇪 Georgia</option>
                 </select>
                 {/* It ranks matches; it never hides the other market's stock. */}
-                <p className="text-[11px] text-slate-400 mt-1">
+                <p className="text-[11px] text-slate-500 mt-1">
                   Ranks their matches first — you can still show them either market.
                 </p>
               </div>
@@ -371,7 +371,7 @@ const inp = 'w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-whit
               </select>
               {/* The board derives this from live deals; setting it by hand is
                   the exception, so say what it actually means. */}
-              <p className="text-[11px] text-slate-400 mt-1">
+              <p className="text-[11px] text-slate-500 mt-1">
                 Usually set for you by their deals. A live deal makes them Active again.
               </p>
             </div>
@@ -400,7 +400,7 @@ const inp = 'w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-whit
                 className={`${inp} mt-1.5`}
                 placeholder="What for? (optional)"
               />
-              <p className="text-[11px] text-slate-400 mt-1">Only dates you set here appear as follow-ups.</p>
+              <p className="text-[11px] text-slate-500 mt-1">Only dates you set here appear as follow-ups.</p>
             </div>
           </div>
 

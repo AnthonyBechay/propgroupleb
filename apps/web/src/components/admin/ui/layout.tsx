@@ -39,7 +39,7 @@ export function PageHeader({
     <div className={cn('mb-5', className)}>
       {crumbs && crumbs.length > 0 && (
         <nav aria-label="Breadcrumb" className="mb-2">
-          <ol className="flex flex-wrap items-center gap-1 text-xs text-slate-400">
+          <ol className="flex flex-wrap items-center gap-1 text-xs text-slate-500">
             {crumbs.map((c, i) => (
               <li key={`${c.label}-${i}`} className="flex items-center gap-1">
                 {i > 0 && <ChevronRight className="h-3 w-3 shrink-0" aria-hidden="true" />}
@@ -166,7 +166,7 @@ export function Disclosure({
         />
         <span className="min-w-0 flex-1">
           <span className="block text-sm font-medium text-slate-700">{label}</span>
-          {hint && !open && <span className="block truncate text-xs text-slate-400">{hint}</span>}
+          {hint && !open && <span className="block truncate text-xs text-slate-500">{hint}</span>}
         </span>
         {badge && <span className="shrink-0 text-xs font-medium text-slate-500">{badge}</span>}
       </button>
@@ -373,7 +373,7 @@ export function EmptyState({
     <div className={cn('rounded-xl border border-dashed border-slate-200 bg-white px-6 py-12 text-center', className)}>
       {icon && <div className="mx-auto mb-3 flex justify-center text-slate-300">{icon}</div>}
       <p className="text-sm font-medium text-slate-600">{title}</p>
-      {description && <p className="mx-auto mt-1 max-w-sm text-xs text-slate-400">{description}</p>}
+      {description && <p className="mx-auto mt-1 max-w-sm text-xs text-slate-500">{description}</p>}
       {action && <div className="mt-4 flex justify-center">{action}</div>}
     </div>
   )
@@ -395,7 +395,7 @@ export function StatCard({
     <>
       <div className="flex items-center gap-1.5 text-xs font-medium text-slate-400">{icon}{label}</div>
       <div className={cn('mt-0.5 text-xl font-bold', accent ?? 'text-slate-900')}>{value}</div>
-      {hint && <div className="mt-0.5 text-xs text-slate-400">{hint}</div>}
+      {hint && <div className="mt-0.5 text-xs text-slate-500">{hint}</div>}
     </>
   )
   const cls = 'rounded-xl border border-slate-200 bg-white p-3'

@@ -85,7 +85,7 @@ export function ShareShortlistModal({
 
         <div className="flex-1 overflow-y-auto p-5 space-y-3">
           {shortlist.length === 0 ? (
-            <p className="text-sm text-slate-400 py-6 text-center">
+            <p className="text-sm text-slate-500 py-6 text-center">
               Nothing shortlisted for this client yet.
             </p>
           ) : (

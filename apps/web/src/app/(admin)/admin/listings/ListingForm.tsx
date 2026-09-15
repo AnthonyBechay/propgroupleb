@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Building2, Loader2, Sparkles, Tag } from 'lucide-react'
-import { normalizeApiUrl } from '@/lib/utils/api-url'
+import { normalizeApiUrl, normalizeFileUrl } from '@/lib/utils/api-url'
 import { toast } from '@/components/ui/use-toast'
 import {
   ChipsInput, Field, FieldGrid, InlineNote, MoneyInput, SegmentedControl,
@@ -210,7 +210,15 @@ export function ListingForm({ initialData, listingId, buildings, preselect }: Pr
         title={isEdit ? 'Edit listing' : 'New listing'}
         description={isEdit ? initialData?.headline : 'Put a property or one of its units on the market.'}
         backHref="/admin/listings"
-        crumbs={[{ label: 'Listings', href: '/admin/listings' }, { label: isEdit ? 'Edit' : 'New' }]}
+        crumbs={
+          isEdit && initialData?.building
+            ? [
+                { label: 'Listings', href: '/admin/listings' },
+                { label: initialData.building.title, href: `/admin/buildings/${initialData.building.id}` },
+                { label: 'Listing' },
+              ]
+            : [{ label: 'Listings', href: '/admin/listings' }, { label: isEdit ? 'Edit' : 'New' }]
+        }
       />
 
       <form onSubmit={handleSubmit} className="space-y-5">
@@ -286,16 +294,64 @@ export function ListingForm({ initialData, listingId, buildings, preselect }: Pr
           </FormSection>
         ) : (
           initialData?.building && (
-            <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm">
-              <span className="text-slate-400">{countryFlag(initialData.building.country)}</span>{' '}
-              <span className="font-medium text-slate-900">{initialData.building.title}</span>
-              {initialData.unit && (
-                <span className="ml-2 text-slate-500">
-                  › {initialData.unit.name ?? `Unit ${initialData.unit.unitNumber ?? ''}`}
-                </span>
-              )}
-              {initialData.building.city && <span className="ml-2 text-slate-400">· {initialData.building.city}</span>}
-              <p className="mt-0.5 text-xs text-slate-400">
+            /* This was a dead grey box: it named the property and gave you no
+               way to get to it. From a listing there was no route back to the
+               thing being sold — not here, not from the listings table. */
+            <div className="rounded-xl border border-slate-200 bg-white p-4">
+              <div className="flex items-start gap-3.5">
+                {initialData.building.images?.[0] ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={normalizeFileUrl(initialData.building.images[0])}
+                    alt=""
+                    className="h-14 w-20 shrink-0 rounded-lg object-cover"
+                  />
+                ) : (
+                  <div className="flex h-14 w-20 shrink-0 items-center justify-center rounded-lg bg-slate-100">
+                    <Building2 className="h-5 w-5 text-slate-400" />
+                  </div>
+                )}
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <span className="text-[11px]" title={initialData.building.country}>
+                      {countryFlag(initialData.building.country)}
+                    </span>
+                    {initialData.building.ref && (
+                      <span className="rounded border border-slate-200 bg-slate-100 px-1.5 py-0.5 font-mono text-[10px] font-semibold text-slate-600">
+                        {initialData.building.ref}
+                      </span>
+                    )}
+                    <Link
+                      href={`/admin/buildings/${initialData.building.id}`}
+                      className="truncate text-sm font-semibold text-slate-900 underline-offset-2 hover:underline"
+                    >
+                      {initialData.building.title}
+                    </Link>
+                  </div>
+                  <p className="mt-0.5 truncate text-xs text-slate-500">
+                    {initialData.unit
+                      ? (initialData.unit.name
+                          ?? (initialData.unit.unitNumber ? `Unit ${initialData.unit.unitNumber}` : typeLabel(initialData.unit.kind)))
+                      : 'The whole property'}
+                    {initialData.building.city && ` · ${initialData.building.city}`}
+                  </p>
+                  <div className="mt-2 flex flex-wrap items-center gap-4">
+                    <Link
+                      href={`/admin/buildings/${initialData.building.id}`}
+                      className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-600 hover:text-slate-900"
+                    >
+                      <Building2 className="h-3.5 w-3.5" /> Open the property
+                    </Link>
+                    <Link
+                      href={`/admin/listings?buildingId=${initialData.building.id}`}
+                      className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-600 hover:text-slate-900"
+                    >
+                      <Tag className="h-3.5 w-3.5" /> Its other listings
+                    </Link>
+                  </div>
+                </div>
+              </div>
+              <p className="mt-3 border-t border-slate-100 pt-3 text-xs text-slate-500">
                 What a listing sells can&rsquo;t be changed — create a new one instead.
               </p>
             </div>
@@ -451,7 +507,7 @@ export function ListingForm({ initialData, listingId, buildings, preselect }: Pr
                   {form.negotiable && <span className="ml-1.5 text-xs font-medium text-emerald-600">negotiable</span>}
                 </p>
                 {selectedBuilding && (
-                  <p className="mt-0.5 truncate text-xs text-slate-400">
+                  <p className="mt-0.5 truncate text-xs text-slate-500">
                     {[selectedBuilding.city, selectedBuilding.caza].filter(Boolean).join(', ')}
                   </p>
                 )}

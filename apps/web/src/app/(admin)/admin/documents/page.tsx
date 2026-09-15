@@ -489,7 +489,7 @@ export default function DocumentsPage() {
                         )}
                         {/* Type and size live in their own columns from `sm` up;
                             on a phone they ride along here rather than vanish. */}
-                        <p className="text-xs text-slate-400 sm:hidden">
+                        <p className="text-xs text-slate-500 sm:hidden">
                           {doc.type.replace(/_/g, ' ')} · {formatFileSize(doc.fileSize)}
                         </p>
                       </div>
@@ -501,7 +501,7 @@ export default function DocumentsPage() {
                       <span className="max-w-[140px] truncate">{doc.building.title}</span>
                     </div>
                     {doc.unit && (
-                      <p className="text-xs text-slate-400 mt-0.5 pl-5 truncate max-w-[140px]">
+                      <p className="text-xs text-slate-500 mt-0.5 pl-5 truncate max-w-[140px]">
                         {doc.unit.name}
                         {doc.unitOption ? ` › ${doc.unitOption.name}` : ''}
                       </p>
@@ -772,7 +772,7 @@ export default function DocumentsPage() {
               {uploadPropertyId && (
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1">
-                    Link to Unit <span className="text-xs text-slate-400 font-normal">(optional — leave blank for project-level doc)</span>
+                    Link to Unit <span className="text-xs text-slate-500 font-normal">(optional — leave blank for project-level doc)</span>
                   </label>
                   {loadingUnits ? (
                     <div className="flex items-center gap-2 text-sm text-slate-500 py-2">
@@ -871,7 +871,7 @@ export default function DocumentsPage() {
                     <label className="cursor-pointer">
                       <Upload className="w-8 h-8 text-slate-300 mx-auto mb-2" />
                       <p className="text-sm text-slate-500">Click to select a file</p>
-                      <p className="text-xs text-slate-400 mt-1">PDF, images, Word, Excel (max 25MB)</p>
+                      <p className="text-xs text-slate-500 mt-1">PDF, images, Word, Excel (max 25MB)</p>
                       <input
                         type="file"
                         className="hidden"

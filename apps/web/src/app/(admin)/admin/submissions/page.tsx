@@ -222,7 +222,7 @@ export default function AdminSubmissionsPage() {
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="font-semibold text-slate-900 truncate">{s.title}</span>
                         <span className={`px-2 py-0.5 rounded text-xs font-medium ${meta.cls}`}>{meta.label}</span>
-                        <span className="text-xs text-slate-400">{typeLabel(s.unitKind)} · {s.intent === 'FOR_RENT' ? 'Rent' : 'Sale'}</span>
+                        <span className="text-xs text-slate-500">{typeLabel(s.unitKind)} · {s.intent === 'FOR_RENT' ? 'Rent' : 'Sale'}</span>
                       </div>
                       <div className="flex items-center gap-3 mt-1 text-sm text-slate-500 flex-wrap">
                         <span className="inline-flex items-center gap-1"><MapPin className="h-3.5 w-3.5" />{location}</span>
@@ -254,7 +254,7 @@ export default function AdminSubmissionsPage() {
                           <Mail className="h-3.5 w-3.5" /> {s.sellerEmail}
                         </a>
                       )}
-                      {s.preferredContact && <span className="text-xs text-slate-400">prefers {s.preferredContact}</span>}
+                      {s.preferredContact && <span className="text-xs text-slate-500">prefers {s.preferredContact}</span>}
                     </div>
 
                     {/* Specs */}
@@ -304,7 +304,7 @@ export default function AdminSubmissionsPage() {
                         )}
                       </div>
                       {(!s.visited || !s.dataCollected) && s.status !== 'APPROVED' && (
-                        <p className="text-xs text-slate-400 mt-2">
+                        <p className="text-xs text-slate-500 mt-2">
                           Tip: visit the property and collect the full details before publishing it on the website.
                         </p>
                       )}

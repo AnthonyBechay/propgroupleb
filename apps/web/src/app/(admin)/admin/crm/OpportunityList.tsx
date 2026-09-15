@@ -76,7 +76,7 @@ export function OpportunityList({
 
   if (opportunities.length === 0) {
     return (
-      <p className="text-sm text-slate-400">
+      <p className="text-sm text-slate-500">
         Nothing shortlisted yet — add a match below to start tracking what this client has seen.
       </p>
     )
@@ -117,7 +117,7 @@ export function OpportunityList({
                     <span className="text-[10px] font-bold text-slate-400">{o.matchScore}%</span>
                   )}
                 </div>
-                {subtitle && <p className="text-xs text-slate-400 truncate mt-0.5">{subtitle}</p>}
+                {subtitle && <p className="text-xs text-slate-500 truncate mt-0.5">{subtitle}</p>}
                 {o.stage === 'WON' && (o.soldPrice || (canSeeMoney && o.commissionUsd)) && (
                   <p className="text-xs font-medium text-emerald-700 mt-0.5">
                     {o.soldPrice ? `Sold ${o.soldCurrency} ${o.soldPrice.toLocaleString()}` : 'Closed'}
@@ -295,7 +295,7 @@ export function OpportunityList({
                 >
                   {o.stage === 'VIEWING_BOOKED' ? 'Save new time' : 'Book'}
                 </button>
-                <button onClick={() => { setBookingId(null); setViewingAt('') }} className="text-xs text-slate-400 hover:text-slate-700">Cancel</button>
+                <button onClick={() => { setBookingId(null); setViewingAt('') }} className="text-xs text-slate-500 hover:text-slate-700">Cancel</button>
               </div>
             )}
 
@@ -330,7 +330,7 @@ export function OpportunityList({
                   >
                     Rule out &amp; keep searching
                   </button>
-                  <button onClick={() => setRejectingId(null)} className="text-xs text-slate-400 hover:text-slate-700">Cancel</button>
+                  <button onClick={() => setRejectingId(null)} className="text-xs text-slate-500 hover:text-slate-700">Cancel</button>
                 </div>
               </div>
             )}
