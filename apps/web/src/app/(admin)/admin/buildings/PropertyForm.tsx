@@ -2,9 +2,10 @@
 
 import { useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import {
   Building2, Coins, ExternalLink, FileText, Home, Image as ImageIcon, LayoutList,
-  MapPin, Search, Sparkles,
+  MapPin, Search, Share2, Sparkles,
 } from 'lucide-react'
 import { normalizeApiUrl } from '@/lib/utils/api-url'
 import { toast } from '@/components/ui/use-toast'
@@ -391,15 +392,26 @@ export function PropertyForm({ initialData, buildingId }: Props) {
           </>
         ) : undefined}
         actions={
-          isEdit && initialData?.slug && !hidden ? (
-            <a
-              href={`/listings/${initialData.slug}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-slate-200 px-3.5 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-50"
-            >
-              <ExternalLink className="h-3.5 w-3.5" /> View on site
-            </a>
+          isEdit ? (
+            <>
+              {/* The thing you reach for when a client is on the phone. */}
+              <Link
+                href={`/admin/buildings/${buildingId}/proposal`}
+                className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-slate-300 px-3.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50"
+              >
+                <Share2 className="h-3.5 w-3.5" /> Export / share
+              </Link>
+              {initialData?.slug && !hidden && (
+                <a
+                  href={`/listings/${initialData.slug}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-slate-200 px-3.5 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-50"
+                >
+                  <ExternalLink className="h-3.5 w-3.5" /> View on site
+                </a>
+              )}
+            </>
           ) : undefined
         }
       />

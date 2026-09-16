@@ -513,6 +513,15 @@ export default async function SharedPropertyPage({ params }: { params: Promise<{
 
               {/* CTA */}
               <div className="mt-6 space-y-3">
+                {/* The recipient can take the document away without asking for
+                    it — same content, laid out for A4. */}
+                <Link
+                  href={`/share/${token}/proposal`}
+                  className="flex w-full items-center justify-center gap-2 rounded-xl border border-slate-300 px-4 py-3 text-center font-semibold text-slate-700 transition-colors hover:bg-slate-50"
+                >
+                  <Download className="h-4 w-4" />
+                  Download as PDF
+                </Link>
                 <Link
                   href="/contact"
                   className="block w-full py-3 px-4 bg-[#1B3A5C] text-white font-semibold rounded-xl text-center hover:bg-[#24507D] transition-colors"

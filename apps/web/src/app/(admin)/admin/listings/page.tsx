@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import {
   Archive, Building2, CircleDollarSign, Edit, ExternalLink, Eye, Layers,
-  MapPin, Plus, Search, Tag,
+  MapPin, Plus, Search, Share2, Tag,
 } from 'lucide-react'
 import { apiClient } from '@/lib/api/client'
 import { normalizeApiUrl } from '@/lib/utils/api-url'
@@ -402,6 +402,16 @@ export default function AdminListingsPage() {
                               className="flex h-9 w-9 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700"
                             >
                               <Building2 className="h-3.5 w-3.5" />
+                            </Link>
+                          )}
+                          {buildingId && (
+                            <Link
+                              href={`/admin/buildings/${buildingId}/proposal${l.unit?.id ? `?unitId=${l.unit.id}` : ''}`}
+                              title="Export or share this as a proposal"
+                              aria-label="Export or share this as a proposal"
+                              className="flex h-9 w-9 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700"
+                            >
+                              <Share2 className="h-3.5 w-3.5" />
                             </Link>
                           )}
                           {l.slug && l.status === 'ACTIVE' && (
