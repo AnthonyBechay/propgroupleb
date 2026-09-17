@@ -33,6 +33,8 @@ export interface Opportunity {
   leadId: string
   stage: OpportunityStage
   listingId: string | null
+  /** A project with no listing — Georgian off-plan stock. */
+  buildingId?: string | null
   /** The real catalogue record, when this property is linked to one. */
   listing?: {
     id: string
@@ -61,7 +63,7 @@ export interface Opportunity {
   updatedAt: string
   /** Resolved by the API so ruled-out items still show their real name. */
   subject?: {
-    kind: 'LISTING' | 'CLIENT' | 'SELLER_PROPERTY' | 'EXTERNAL' | 'UNKNOWN'
+    kind: 'LISTING' | 'PROJECT' | 'CLIENT' | 'SELLER_PROPERTY' | 'EXTERNAL' | 'UNKNOWN'
     title: string
     subtitle: string | null
     /** Reference code, present for LISTING subjects. */

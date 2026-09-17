@@ -62,6 +62,8 @@ interface MatchScore {
 
 interface ListingMatch {
   listing: {
+    /** A project with no listing: `id` is the building's, shortlisted by buildingId. */
+    isProject?: boolean
     id: string
     slug: string | null
     headline: string | null
@@ -790,9 +792,7 @@ export function LeadDrawer({ lead, onClose, onChanged }: { lead: Lead; onClose: 
               <div className="flex justify-center py-6 text-slate-400"><Loader2 className="h-5 w-5 animate-spin" /></div>
             ) : matches.length === 0 ? (
               <p className="text-sm text-slate-500">
-                {l.market === 'GEORGIA'
-                  ? 'Georgia inventory lives on propgrp.com — no local matches.'
-                  : 'No live listings fit these criteria closely enough yet.'}
+                No live properties fit these criteria closely enough yet.
               </p>
             ) : (
               <div className="space-y-2">
@@ -813,7 +813,7 @@ export function LeadDrawer({ lead, onClose, onChanged }: { lead: Lead; onClose: 
                     )}
                     <div className="flex items-center gap-3 p-2 rounded-lg hover:bg-slate-50 border border-slate-100">
                     <Link
-                      href={m.slug ? `/listings/${m.slug}` : '#'}
+                      href={m.isProject ? `/admin/buildings/${m.id}` : m.slug ? `/listings/${m.slug}` : '#'}
                       target="_blank"
                       className="flex items-center gap-3 min-w-0 flex-1"
                     >
@@ -828,7 +828,9 @@ export function LeadDrawer({ lead, onClose, onChanged }: { lead: Lead; onClose: 
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-1.5">
                           <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${scoreCls(match.score)}`}>{match.score}%</span>
-                          {listingRef(m) && <span className="font-mono text-[10px] font-semibold text-slate-400 shrink-0">{listingRef(m)}</span>}
+                          {(m.isProject ? b?.ref : listingRef(m)) && (
+                            <span className="font-mono text-[10px] font-semibold text-slate-400 shrink-0">{m.isProject ? b?.ref : listingRef(m)}</span>
+                          )}
                           <p className="text-sm font-medium text-slate-900 truncate">{m.headline || b?.title || 'Listing'}</p>
                         </div>
                         <p className="text-xs text-slate-500 mt-0.5 truncate">
@@ -839,12 +841,14 @@ export function LeadDrawer({ lead, onClose, onChanged }: { lead: Lead; onClose: 
                         )}
                       </div>
                       <div className="text-right shrink-0">
-                        <p className="text-sm font-semibold text-slate-900">{m.currency} {m.price?.toLocaleString()}</p>
+                        {m.price ? (
+                          <p className="text-sm font-semibold text-slate-900">{m.isProject ? 'from ' : ''}{m.currency} {m.price.toLocaleString()}</p>
+                        ) : null}
                         <ExternalLink className="h-3 w-3 text-slate-400 ml-auto" />
                       </div>
                     </Link>
                     <button
-                      onClick={() => addOpportunity({ listingId: m.id, matchScore: match.score })}
+                      onClick={() => addOpportunity({ [m.isProject ? 'buildingId' : 'listingId']: m.id, matchScore: match.score })}
                       disabled={busy}
                       title="Add to shortlist"
                       className="shrink-0 p-1.5 rounded-lg border border-slate-200 text-slate-500 hover:text-slate-900 hover:bg-slate-100 disabled:opacity-50"

@@ -126,9 +126,64 @@ function toLeadData(data: z.infer<typeof leadSchema>): Record<string, any> {
  * there — we resolve them here instead.
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
+/** What a project needs to be scored, shown and priced. */
+const PROJECT_SELECT = {
+  id: true, ref: true, title: true, city: true, caza: true, neighborhood: true,
+  mohafazat: true, images: true, country: true, kind: true,
+  units: {
+    select: {
+      ref: true, kind: true, bedrooms: true, bathrooms: true, areaSqm: true, isUnitType: true,
+      options: { select: { pricePerSqm: true, currency: true } },
+    },
+  },
+} as const;
+
+/**
+ * Cheapest price for units sold off their options — pricePerSqm × area, the
+ * same figure the storefront shows as "from $X" (see derivePrice in
+ * utils/property-mapper.ts).
+ */
+function projectPrice(units: any[]): { price: number | null; currency: string | null } {
+  let price: number | null = null;
+  let currency: string | null = null;
+  for (const u of units ?? []) {
+    const area = Number(u.areaSqm ?? 0);
+    for (const o of u.options ?? []) {
+      const total = Math.round(Number(o.pricePerSqm ?? 0) * area);
+      if (total > 0 && (price == null || total < price)) {
+        price = total;
+        currency = o.currency ?? 'USD';
+      }
+    }
+  }
+  return { price, currency };
+}
+
+/**
+ * A project with no listing, scored as if it were one: each unit type is tried
+ * as the thing on offer and the best fit represents the project. `isProject`
+ * tells the UI to shortlist it by buildingId.
+ */
+function scoreProject(lead: any, project: any): { listing: any; match: ReturnType<typeof matchListingToLead> } {
+  const { units, ...building } = project;
+  const tries = (units?.length ? units : [null]).map((unit: any) => {
+    const own = unit ? projectPrice([unit]) : projectPrice(units);
+    const listing = {
+      id: project.id, isProject: true, slug: null, headline: null, intent: 'FOR_SALE',
+      price: own.price, currency: own.currency ?? 'USD', building, unit,
+    };
+    return { listing, match: matchListingToLead(lead, listing) };
+  });
+  const best = tries.sort((a: any, b: any) => b.match.score - a.match.score)[0];
+  // Show the project's "from" price, not whichever unit happened to score best.
+  const from = projectPrice(units);
+  return { ...best, listing: { ...best.listing, price: from.price ?? best.listing.price, currency: from.currency ?? best.listing.currency } };
+}
+
 async function hydrateOpportunities(opportunities: any[]): Promise<any[]> {
   if (opportunities.length === 0) return [];
   const listingIds = opportunities.map((o) => o.listingId).filter(Boolean) as string[];
+  const buildingIds = opportunities.map((o) => o.buildingId).filter(Boolean) as string[];
   const leadIds = opportunities.map((o) => o.counterpartLeadId).filter(Boolean) as string[];
   const propertyIds = opportunities.map((o) => o.leadPropertyId).filter(Boolean) as string[];
   const properties = propertyIds.length
@@ -139,7 +194,7 @@ async function hydrateOpportunities(opportunities: any[]): Promise<any[]> {
     : [];
   const propertyById = new Map(properties.map((p: any) => [p.id, p]));
 
-  const [listings, leads] = await Promise.all([
+  const [listings, leads, projects] = await Promise.all([
     listingIds.length
       ? prisma.listing.findMany({
           where: { id: { in: listingIds } },
@@ -161,15 +216,20 @@ async function hydrateOpportunities(opportunities: any[]): Promise<any[]> {
           select: { id: true, name: true, type: true, phone: true, whatsapp: true, askingFor: true },
         })
       : [],
+    buildingIds.length
+      ? prisma.building.findMany({ where: { id: { in: buildingIds } }, select: PROJECT_SELECT })
+      : [],
   ]);
 
   const listingById = new Map(listings.map((x) => [x.id, x]));
   const leadById = new Map(leads.map((x) => [x.id, x]));
+  const projectById = new Map(projects.map((x: any) => [x.id, x]));
 
   return opportunities.map((o) => {
     const listing = o.listingId ? listingById.get(o.listingId) : null;
     const counterpart = o.counterpartLeadId ? leadById.get(o.counterpartLeadId) : null;
     const property = o.leadPropertyId ? propertyById.get(o.leadPropertyId) : null;
+    const project = o.buildingId ? projectById.get(o.buildingId) : null;
     const b = listing?.building ?? listing?.unit?.building;
     return {
       ...o,
@@ -199,6 +259,16 @@ async function hydrateOpportunities(opportunities: any[]): Promise<any[]> {
               currency: listing.currency ?? null,
               country: (listing.building ?? listing.unit?.building)?.country ?? null,
               id: listing.id,
+            }
+          : project
+          ? {
+              kind: 'PROJECT',
+              title: project.title,
+              subtitle: [project.neighborhood, project.city].filter(Boolean).join(', ') || null,
+              ref: project.ref ?? null,
+              ...projectPrice(project.units),
+              country: project.country ?? null,
+              id: project.id,
             }
           : { kind: 'UNKNOWN', title: 'No longer available', subtitle: null },
     };
@@ -257,7 +327,7 @@ router.get(
           _count: { select: { contacts: true } },
           opportunities: {
             select: {
-              id: true, stage: true, viewingAt: true, listingId: true,
+              id: true, stage: true, viewingAt: true, listingId: true, buildingId: true,
               counterpartLeadId: true, matchScore: true, leadPropertyId: true,
               // What they actually bought, for the client directory.
               soldUnitRef: true, soldPrice: true, soldCurrency: true,
@@ -295,6 +365,18 @@ router.get(
         })
       : [];
     const byId = new Map(soldListings.map((l: any) => [l.id, l]));
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const wonProjectIds = (items as any[])
+      .flatMap((l) => l.opportunities.filter((o: any) => o.stage === 'WON'))
+      .map((o: any) => o.buildingId)
+      .filter(Boolean) as string[];
+    const soldProjects = wonProjectIds.length
+      ? await prisma.building.findMany({
+          where: { id: { in: wonProjectIds } },
+          select: { id: true, ref: true, title: true, country: true },
+        })
+      : [];
+    const projectById = new Map(soldProjects.map((b: any) => [b.id, b]));
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const withDeals = (items as any[]).map((l) => ({
@@ -303,10 +385,10 @@ router.get(
         .filter((o: any) => o.stage === 'WON')
         .map((o: any) => {
           const li = o.listingId ? byId.get(o.listingId) : null;
-          const b = li?.building ?? li?.unit?.building;
+          const b = li?.building ?? li?.unit?.building ?? (o.buildingId ? projectById.get(o.buildingId) : null);
           return {
             id: o.id,
-            ref: li?.unit?.ref ?? li?.building?.ref ?? null,
+            ref: li?.unit?.ref ?? b?.ref ?? null,
             title: li?.headline || b?.title || o.externalTitle || 'Deal',
             country: b?.country ?? null,
             unitRef: o.soldUnitRef,
@@ -1009,10 +1091,11 @@ router.get(
     const seen = searching
       ? []
       : await prisma.leadOpportunity.findMany({
-          where: { leadId: lead.id, listingId: { not: null } },
-          select: { listingId: true },
+          where: { leadId: lead.id, OR: [{ listingId: { not: null } }, { buildingId: { not: null } }] },
+          select: { listingId: true, buildingId: true },
         });
     const seenIds = seen.map((o) => o.listingId!).filter(Boolean);
+    const seenProjectIds = seen.map((o) => o.buildingId!).filter(Boolean);
 
     const text = { contains: q, mode: 'insensitive' as const };
     const buildingText = [
@@ -1048,6 +1131,32 @@ router.get(
         };
     if (seenIds.length) where.id = { notIn: seenIds };
 
+    // Projects sold off their unit options have no listing at all — that is all
+    // Georgian stock. Looking only at listings meant a Batumi client could
+    // never be offered Batumi, whatever the ranking. A project that does have a
+    // live listing is already covered by it above.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const projectWhere: Record<string, any> = {
+      AND: [
+        { listings: { none: { status: { in: ['ACTIVE', 'UNDER_OFFER'] } } } },
+        { units: { none: { listings: { some: { status: { in: ['ACTIVE', 'UNDER_OFFER'] } } } } } },
+        ...(searching
+          ? [{ OR: [...buildingText, { units: { some: { ref: text } } }] }]
+          : [
+              { visibility: 'PUBLIC' },
+              { units: { some: { options: { some: {} } } } },
+              ...(narrowTo ? [{ country: narrowTo }] : []),
+              ...(seenProjectIds.length ? [{ id: { notIn: seenProjectIds } }] : []),
+            ]),
+      ],
+    };
+    const projects = await prisma.building.findMany({
+      where: projectWhere,
+      take: searching ? 60 : 200,
+      orderBy: { createdAt: 'desc' },
+      select: PROJECT_SELECT,
+    });
+
     const candidates = await prisma.listing.findMany({
       where,
       take: searching ? 60 : 400,
@@ -1079,8 +1188,10 @@ router.get(
     // so a Batumi investor with no areas on file — where location isn't scored
     // at all — got Lebanese flats that happened to fit the budget as their top
     // suggestions. The other market still follows; it's just never first.
-    const scored = candidates
-      .map((listing) => ({ listing, match: matchListingToLead(lead, listing) }))
+    const scored = [
+      ...candidates.map((listing) => ({ listing, match: matchListingToLead(lead, listing) })),
+      ...projects.map((project) => scoreProject(lead, project)),
+    ]
       .filter((r) => searching || r.match.score >= MIN_SCORE)
       .sort((a, b) =>
         Number(sameMarket(b.listing)) - Number(sameMarket(a.listing)) ||
@@ -1547,6 +1658,8 @@ async function syncLeadStatus(leadId: string) {
 
 const opportunitySchema = z.object({
   listingId: z.string().optional().nullable(),
+  // A project with no listing (Georgian off-plan stock).
+  buildingId: z.string().optional().nullable(),
   counterpartLeadId: z.string().optional().nullable(),
   leadPropertyId: z.string().optional().nullable(),
   // Off-platform stock — a Batumi studio on propgrp.com, another agency's
@@ -1579,18 +1692,25 @@ router.post(
     if (!lead) { sendNotFound(res, 'Lead'); return; }
 
     const data = opportunitySchema.parse(stripMoneyInput(req, req.body ?? {}));
-    if (!data.listingId && !data.counterpartLeadId && !data.leadPropertyId && !data.externalTitle) {
-      sendError(res, 400, 'Say what this is: a listing, a client, a seller property, or an external property');
+    if (!data.listingId && !data.buildingId && !data.counterpartLeadId && !data.leadPropertyId && !data.externalTitle) {
+      sendError(res, 400, 'Say what this is: a listing, a project, a client, a seller property, or an external property');
       return;
     }
 
-    // Idempotent: re-adding an existing pairing just returns it.
-    const existing = await prisma.leadOpportunity.findFirst({
-      where: {
-        leadId: lead.id,
-        ...(data.listingId ? { listingId: data.listingId } : { counterpartLeadId: data.counterpartLeadId }),
-      },
-    });
+    // Idempotent: re-adding an existing pairing just returns it. Only pairings
+    // with a unique key can repeat — with none (an external or seller-property
+    // deal) the lookup used to be `{ leadId }` alone, which matched whatever
+    // deal the client already had and silently returned that instead.
+    const pairing = data.listingId
+      ? { listingId: data.listingId }
+      : data.buildingId
+        ? { buildingId: data.buildingId }
+        : data.counterpartLeadId
+          ? { counterpartLeadId: data.counterpartLeadId }
+          : null;
+    const existing = pairing
+      ? await prisma.leadOpportunity.findFirst({ where: { leadId: lead.id, ...pairing } })
+      : null;
     if (existing) {
       // Recording a sale against something already shortlisted must update it,
       // not silently return the untouched row and lose the figures.
@@ -1619,6 +1739,7 @@ router.post(
       data: {
         leadId: lead.id,
         listingId: data.listingId || null,
+        buildingId: data.buildingId || null,
         counterpartLeadId: data.counterpartLeadId || null,
         leadPropertyId: data.leadPropertyId || null,
         // The schema has always accepted these; the create silently dropped

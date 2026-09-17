@@ -135,6 +135,7 @@ export function DealPanel({
 
       {creating && (
         <DealForm
+          leadId={lead.id}
           busy={busy}
           shortlist={shortlist}
           onCancel={() => setCreating(false)}
@@ -213,7 +214,8 @@ export function DealPanel({
 
 /** What the client bought, whichever way it was identified. */
 type Picked = {
-  kind: 'opportunity' | 'listing' | 'external'
+  /** project = a project with no listing (Georgian off-plan), saved by buildingId. */
+  kind: 'opportunity' | 'listing' | 'project' | 'external'
   id: string
   label: string
   ref?: string | null
@@ -255,8 +257,10 @@ const inp = 'w-full px-2 py-1.5 border border-slate-200 rounded-lg text-sm bg-wh
 
 /** Editable sale figures. Every field can be corrected later. */
 function DealForm({
-  initial, busy, onCancel, onSave, allowSubject = false, shortlist = [],
+  leadId, initial, busy, onCancel, onSave, allowSubject = false, shortlist = [],
 }: {
+  /** Needed to search projects, which are looked up through the CRM. */
+  leadId?: string
   initial?: Opportunity
   busy: boolean
   onCancel: () => void
@@ -292,10 +296,21 @@ function DealForm({
       try {
         // No `status` param: staff callers already get every status, and
         // `status=all` is meaningless to a role the API treats as public.
-        const res = await fetch(
-          `${apiUrl}/api/listings?search=${encodeURIComponent(needle)}&limit=8`,
-          { credentials: 'include', cache: 'no-store', signal: ctl.signal }
-        )
+        // Listings alone never include a Georgian project — those have no
+        // listing, only unit options — so projects come from the CRM search.
+        // Best-effort: a failure there still leaves the listing results.
+        const [res, projectRes] = await Promise.all([
+          fetch(
+            `${apiUrl}/api/listings?search=${encodeURIComponent(needle)}&limit=8`,
+            { credentials: 'include', cache: 'no-store', signal: ctl.signal }
+          ),
+          leadId
+            ? fetch(
+                `${apiUrl}/api/crm/${leadId}/matches?${new URLSearchParams({ q: needle })}`,
+                { credentials: 'include', cache: 'no-store', signal: ctl.signal }
+              ).catch(() => null)
+            : Promise.resolve(null),
+        ])
         if (mine !== seq.current) return
         if (!res.ok) {
           setSearchError(`Search failed (${res.status})`)
@@ -303,11 +318,26 @@ function DealForm({
           return
         }
         const j = await res.json().catch(() => ({}))
+        const pj = projectRes?.ok ? await projectRes.json().catch(() => ({})) : {}
         if (mine !== seq.current) return
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const rows: any[] = j.data?.items ?? j.data ?? j.items ?? []
-        setResults(
-          rows.map((li) => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const projects: Picked[] = ((pj.data ?? []) as any[])
+          .map((r) => r.listing)
+          .filter((li) => li?.isProject)
+          .slice(0, 8)
+          .map((li) => ({
+            kind: 'project' as const,
+            id: li.id,
+            label: li.building?.title || 'Project',
+            ref: li.building?.ref ?? null,
+            country: li.building?.country ?? null,
+            sub: [li.building?.neighborhood, li.building?.city].filter(Boolean).join(', ') || null,
+          }))
+        setResults([
+          ...projects,
+          ...rows.map((li) => {
             const b = li.building ?? li.unit?.building
             return {
               kind: 'listing' as const,
@@ -317,8 +347,8 @@ function DealForm({
               country: b?.country ?? null,
               sub: [b?.city, b?.caza].filter(Boolean).join(', ') || null,
             }
-          })
-        )
+          }),
+        ])
       } catch (e) {
         if (mine !== seq.current) return
         setResults([])
@@ -333,7 +363,7 @@ function DealForm({
       }
     }, 250)
     return () => { clearTimeout(t); clearTimeout(bail); ctl.abort() }
-  }, [q, apiUrl])
+  }, [q, apiUrl, leadId])
   const [title, setTitle] = useState(initial?.externalTitle ?? '')
   const [url, setUrl] = useState(initial?.externalUrl ?? '')
   const [price, setPrice] = useState(initial?.soldPrice?.toString() ?? '')
@@ -393,7 +423,7 @@ function DealForm({
 
                   {results.map((r) => (
                     <PickRow
-                      key={r.id}
+                      key={`${r.kind}-${r.id}`}
                       label={r.label}
                       ref_={r.ref ?? null}
                       country={r.country}
@@ -503,6 +533,7 @@ function DealForm({
               // genuine off-platform sale falls back to free text.
               ...(allowSubject && picked?.kind === 'opportunity' ? { opportunityId: picked.id } : {}),
               ...(allowSubject && picked?.kind === 'listing' ? { listingId: picked.id } : {}),
+              ...(allowSubject && picked?.kind === 'project' ? { buildingId: picked.id } : {}),
               ...(allowSubject && picked?.kind === 'external'
                 ? { externalTitle: title || 'Sale', externalUrl: url || null }
                 : {}),

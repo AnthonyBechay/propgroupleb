@@ -1759,6 +1759,10 @@ model LeadOpportunity {
 
   // What's on offer — exactly one of these identifies it:
   listingId         String? // a live listing on our site
+  // A project sold off its unit options, with no listing at all — which is
+  // every Georgian off-plan project. Without it a deal could not point at
+  // anything in Batumi, so suggestions and search only ever offered Lebanon.
+  buildingId        String?
   counterpartLeadId String? // another client (a seller/landlord in the CRM)
   leadPropertyId    String? // a specific property a seller client has on offer
 
@@ -1796,6 +1800,7 @@ model LeadOpportunity {
 
   // One row per client × property so re-suggesting is impossible.
   @@unique([leadId, listingId])
+  @@unique([leadId, buildingId])
   @@unique([leadId, counterpartLeadId])
   @@index([leadId])
   @@index([stage])

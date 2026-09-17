@@ -19,7 +19,8 @@ import { type Lead, type Opportunity, isSupplyType, LIVE_STAGES } from './types'
 
 interface Candidate {
   key: string
-  kind: 'LISTING' | 'CLIENT'
+  /** PROJECT = a project with no listing, booked by its buildingId. */
+  kind: 'LISTING' | 'PROJECT' | 'CLIENT'
   id: string
   title: string
   subtitle: string | null
@@ -73,8 +74,8 @@ export function BookViewingModal({
         .filter((o: Opportunity) => o.stage !== 'REJECTED' && o.stage !== 'WON')
         .map((o: Opportunity) => ({
           key: `op-${o.id}`,
-          kind: (o.subject?.kind === 'CLIENT' ? 'CLIENT' : 'LISTING') as 'LISTING' | 'CLIENT',
-          id: o.listingId ?? o.counterpartLeadId ?? '',
+          kind: (o.subject?.kind === 'CLIENT' ? 'CLIENT' : o.subject?.kind === 'PROJECT' ? 'PROJECT' : 'LISTING') as Candidate['kind'],
+          id: o.listingId ?? o.buildingId ?? o.counterpartLeadId ?? '',
           title: o.subject?.title ?? 'Shortlisted item',
           subtitle: o.subject?.subtitle ?? null,
           ref: o.subject?.ref ?? null,
@@ -165,7 +166,9 @@ export function BookViewingModal({
         // Book that deal rather than creating a duplicate the API would ignore.
         const prior = m.kind === 'LISTING'
           ? (lead.opportunities ?? []).find((o) => o.listingId === m.id)
-          : undefined
+          : m.kind === 'PROJECT'
+            ? (lead.opportunities ?? []).find((o) => o.buildingId === m.id)
+            : undefined
         return prior ? { ...m, opportunityId: prior.id } : m
       })
     return [...mine, ...rest]
@@ -194,7 +197,9 @@ export function BookViewingModal({
               matchScore: picked.score ?? null,
               ...(picked.kind === 'LISTING'
                 ? { listingId: picked.id }
-                : { counterpartLeadId: picked.id }),
+                : picked.kind === 'PROJECT'
+                  ? { buildingId: picked.id }
+                  : { counterpartLeadId: picked.id }),
             }),
           })
       if (!res.ok) {
@@ -232,15 +237,19 @@ export function BookViewingModal({
           </button>
         </div>
 
-        <div className="px-5 py-3 border-b border-slate-100">
+        <div className="px-5 py-4 border-b border-slate-100">
           <div className="relative">
-            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+            <Search className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder={wantsCounterpart ? 'Search buyers…' : 'Search any project, ref (PG-1042) or area…'}
-              className="w-full h-9 pl-8 pr-3 text-sm rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-slate-900/10"
+              autoFocus
+              placeholder={wantsCounterpart ? 'Search buyers…' : 'Search project, PG-1042 or area…'}
+              className="w-full h-11 pl-10 pr-10 text-[15px] rounded-xl border border-slate-300 bg-white placeholder:text-slate-400 focus:outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-900/10"
             />
+            {searching && (
+              <Loader2 className="absolute right-3.5 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-slate-400" />
+            )}
           </div>
         </div>
 
@@ -334,13 +343,15 @@ function listingCandidate(r: any): Candidate {
   const li = r.listing ?? r
   const b = li.building ?? li.unit?.building
   const title = li.headline || b?.title || 'Property'
+  const kind: Candidate['kind'] = li.isProject ? 'PROJECT' : 'LISTING'
   return {
-    key: `listing-${li.id}`, kind: 'LISTING', id: li.id,
+    key: `${kind}-${li.id}`, kind, id: li.id,
     title,
     // Name the project when the headline doesn't, so a search by project name
     // visibly lands on its units.
     subtitle: [b?.title !== title ? b?.title : null, b?.city, b?.caza].filter(Boolean).join(', ') || null,
-    ref: li.unit?.ref ?? li.building?.ref ?? null,
+    // A project stands for all its unit types, so it takes the project code.
+    ref: li.isProject ? b?.ref ?? null : li.unit?.ref ?? li.building?.ref ?? null,
     country: b?.country ?? null,
     score: r.match?.score ?? null,
   }

@@ -80,6 +80,26 @@ function scoreLocation(
 }
 
 /**
+ * Georgian projects store a city but no region, while a client can pick just
+ * "Adjara (Batumi)" — so the region is inferred from the city, or a Batumi
+ * project would miss a client looking in Adjara. Keys match the CRM's region
+ * values in apps/web/src/lib/crm-locations.ts.
+ */
+const GEORGIA_CITY_REGION: Record<string, string> = {
+  batumi: 'GE_ADJARA', gonio: 'GE_ADJARA', kvariati: 'GE_ADJARA', sarpi: 'GE_ADJARA',
+  makhinjauri: 'GE_ADJARA', chakvi: 'GE_ADJARA', kobuleti: 'GE_ADJARA', 'green cape': 'GE_ADJARA',
+  tbilisi: 'GE_TBILISI', kutaisi: 'GE_IMERETI', telavi: 'GE_KAKHETI', sighnaghi: 'GE_KAKHETI',
+  zugdidi: 'GE_SAMEGRELO', anaklia: 'GE_SAMEGRELO', ureki: 'GE_GURIA', shekvetili: 'GE_GURIA',
+  gudauri: 'GE_MTSKHETA', mtskheta: 'GE_MTSKHETA', kazbegi: 'GE_MTSKHETA',
+};
+
+function regionOf(building: any): string | null {
+  if (building?.mohafazat) return building.mohafazat;
+  if (!building?.country || building.country === 'LEBANON') return null;
+  return GEORGIA_CITY_REGION[norm(building.city)] ?? null;
+}
+
+/**
  * Property families for matching purposes.
  *
  * Substituting within a family is a conversation worth having — a villa hunter
@@ -257,13 +277,26 @@ export function matchListingToLead(lead: any, listing: any): MatchResult {
       : `Wants ${wantIntent === 'FOR_RENT' ? 'to rent' : 'to buy'}, this is ${listing.intent === 'FOR_RENT' ? 'for rent' : 'for sale'}`,
   };
 
+  let location = scoreLocation(
+    lead.areas ?? [],
+    lead.regions ?? [],
+    [building?.city, building?.neighborhood, building?.caza],
+    regionOf(building),
+  );
+  // Someone who named places to look in Batumi is not a near miss for a flat in
+  // Beirut, whatever the budget says. Only when they gave a location: a client
+  // with none is open to anything, and search ignores scores altogether.
+  const inLebanon = (building?.country ?? 'LEBANON') === 'LEBANON';
+  if (location && location.score === 0 && lead.market && (lead.market === 'LEBANON') !== inLebanon) {
+    location = {
+      ...location,
+      fatal: true,
+      detail: `In ${inLebanon ? 'Lebanon' : 'Georgia'} — they're looking in ${lead.market === 'LEBANON' ? 'Lebanon' : 'Georgia'}`,
+    };
+  }
+
   return finalize([
-    scoreLocation(
-      lead.areas ?? [],
-      lead.regions ?? [],
-      [building?.city, building?.neighborhood, building?.caza],
-      building?.mohafazat,
-    ),
+    location,
     scoreUnitKind(lead.unitKinds ?? [], unit?.kind),
     scoreBudget(lead.budgetMin ?? null, lead.budgetMax ?? null, listing.price != null ? Number(listing.price) : null),
     isInvestor ? null : scoreBeds(lead.minBeds ?? null, unit?.bedrooms),
