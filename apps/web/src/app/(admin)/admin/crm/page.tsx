@@ -154,13 +154,22 @@ export default function CrmPage() {
         body: JSON.stringify({ stage }),
       })
       if (!res.ok) throw new Error('rejected')
+      // The endpoint answers with the whole client, not the deal. Spreading
+      // that onto the card overwrote the deal's id with the client's, so the
+      // next drag PATCHed a deal that doesn't exist, 404'd and silently rolled
+      // back — until something reloaded the board (e.g. recording feedback in
+      // the drawer), which is why moves looked gated on a "liked it".
       const saved = (await res.json()).data
-      if (saved) setDeals((prev) => prev.map((d) => (d.id === dealId ? { ...d, ...saved } : d)))
+      const fresh = saved?.opportunities?.find((o: { id: string }) => o.id === dealId)
+      if (fresh) {
+        setDeals((prev) => prev.map((d) => (d.id === dealId ? { ...d, ...fresh, lead: d.lead } : d)))
+      }
       // Closing a deal changes the client's standing, so the other views need
       // the fresh figures.
       if (stage === 'WON') load()
     } catch {
       setDeals(before)
+      alert('Could not move that deal — nothing was changed. Try again.')
     } finally {
       setMovingDeal(null)
     }

@@ -996,35 +996,61 @@ router.get(
       ? askedCountry
       : null;
 
+    // `?q=` is the broker looking for something specific by name ("Orbi City",
+    // PG-1059, Gonio). Suggestions are only the top of a scored list, so a
+    // search limited to them could never find a project that scored low —
+    // searching goes to the whole bookable stock instead, regardless of score,
+    // market, visibility or what this client has already been shown.
+    const q = String(req.query.q ?? '').trim();
+    const searching = q.length >= 2;
+
     // Never re-suggest something this client has already been shown or ruled
     // out — that's the whole point of tracking opportunities.
-    const seen = await prisma.leadOpportunity.findMany({
-      where: { leadId: lead.id, listingId: { not: null } },
-      select: { listingId: true },
-    });
+    const seen = searching
+      ? []
+      : await prisma.leadOpportunity.findMany({
+          where: { leadId: lead.id, listingId: { not: null } },
+          select: { listingId: true },
+        });
     const seenIds = seen.map((o) => o.listingId!).filter(Boolean);
+
+    const text = { contains: q, mode: 'insensitive' as const };
+    const buildingText = [
+      { title: text }, { ref: text }, { city: text }, { neighborhood: text }, { caza: text },
+    ];
 
     // Pull a broad candidate pool (cheap filters only) and rank it in memory —
     // scoring is what decides relevance, not a hard SQL filter, so a client
     // still sees near-misses that are worth a phone call.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const where: Record<string, any> = {
-      status: 'ACTIVE',
-      visibility: 'PUBLIC',
-      ...(narrowTo
-        ? {
-            OR: [
-              { building: { country: narrowTo as never } },
-              { unit: { building: { country: narrowTo as never } } },
-            ],
-          }
-        : {}),
-    };
+    const where: Record<string, any> = searching
+      ? {
+          status: { in: ['ACTIVE', 'UNDER_OFFER'] },
+          OR: [
+            { headline: text },
+            { slug: text },
+            { unit: { ref: text } },
+            ...buildingText.map((b) => ({ building: b })),
+            ...buildingText.map((b) => ({ unit: { building: b } })),
+          ],
+        }
+      : {
+          status: 'ACTIVE',
+          visibility: 'PUBLIC',
+          ...(narrowTo
+            ? {
+                OR: [
+                  { building: { country: narrowTo as never } },
+                  { unit: { building: { country: narrowTo as never } } },
+                ],
+              }
+            : {}),
+        };
     if (seenIds.length) where.id = { notIn: seenIds };
 
     const candidates = await prisma.listing.findMany({
       where,
-      take: 400,
+      take: searching ? 60 : 400,
       orderBy: { createdAt: 'desc' },
       select: {
         id: true, slug: true, headline: true, price: true, currency: true, intent: true,
@@ -1049,14 +1075,18 @@ router.get(
       return homeCountry ? c === homeCountry : c !== 'LEBANON';
     };
 
+    // Market leads, score orders within it. Market used to be only a tiebreak,
+    // so a Batumi investor with no areas on file — where location isn't scored
+    // at all — got Lebanese flats that happened to fit the budget as their top
+    // suggestions. The other market still follows; it's just never first.
     const scored = candidates
       .map((listing) => ({ listing, match: matchListingToLead(lead, listing) }))
-      .filter((r) => r.match.score >= MIN_SCORE)
+      .filter((r) => searching || r.match.score >= MIN_SCORE)
       .sort((a, b) =>
-        b.match.score - a.match.score ||
-        Number(sameMarket(b.listing)) - Number(sameMarket(a.listing))
+        Number(sameMarket(b.listing)) - Number(sameMarket(a.listing)) ||
+        b.match.score - a.match.score
       )
-      .slice(0, 20);
+      .slice(0, searching ? 60 : 20);
 
     sendSuccess(res, scored);
   })

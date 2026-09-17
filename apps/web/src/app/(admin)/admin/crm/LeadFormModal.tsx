@@ -121,17 +121,7 @@ export function LeadFormModal({
     }
   }
 
-  /** A titled group of fields. The form was one flat wall of twenty inputs. */
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <section className="space-y-3">
-      <h3 className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">{title}</h3>
-      {children}
-    </section>
-  )
-}
-
-const inp = 'w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-slate-900/10'
+  const inp = 'w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-slate-900/10'
   const lbl = 'block text-xs font-medium text-slate-500 mb-1'
 
   return (
@@ -254,6 +244,7 @@ const inp = 'w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-whit
                   <option value="PHONE">Phone</option>
                   <option value="WHATSAPP">WhatsApp</option>
                   <option value="REFERRAL">Referral</option>
+                  <option value="FACEBOOK_AD">Facebook ads</option>
                   <option value="INQUIRY">Website inquiry</option>
                   <option value="FAVORITE">Saved property</option>
                   <option value="SUBMISSION">Owner submission</option>
@@ -430,5 +421,21 @@ const inp = 'w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-whit
         </div>
       </form>
     </div>
+  )
+}
+
+/**
+ * A titled group of fields. The form was one flat wall of twenty inputs.
+ *
+ * Must live out here: declared inside LeadFormModal it was a new component on
+ * every render, so React remounted every input in it on each keystroke and
+ * focus was lost after one letter.
+ */
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <section className="space-y-3">
+      <h3 className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">{title}</h3>
+      {children}
+    </section>
   )
 }

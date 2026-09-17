@@ -57,6 +57,10 @@ export function BookViewingModal({
     return toLocalInput(d)
   })
   const [query, setQuery] = useState('')
+  // Server-side search results. The suggestions are only the top of a scored
+  // list, so filtering them could never find a project by name.
+  const [found, setFound] = useState<Candidate[] | null>(null)
+  const [searching, setSearching] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -106,16 +110,7 @@ export function BookViewingModal({
                 subtitle: l.askingFor ?? l.type, score: r.match?.score ?? null,
               }
             }
-            const li = r.listing ?? r
-            const b = li.building ?? li.unit?.building
-            return {
-              key: `listing-${li.id}`, kind: 'LISTING', id: li.id,
-              title: li.headline || b?.title || 'Property',
-              subtitle: [b?.city, b?.caza].filter(Boolean).join(', ') || null,
-              ref: li.unit?.ref ?? li.building?.ref ?? null,
-              country: b?.country ?? null,
-              score: r.match?.score ?? null,
-            }
+            return listingCandidate(r)
           })
         )
       } finally {
@@ -126,19 +121,55 @@ export function BookViewingModal({
     return () => { cancelled = true }
   }, [apiUrl, lead.id, wantsCounterpart])
 
+  // Typing searches every bookable listing, not just the suggestions.
+  useEffect(() => {
+    const q = query.trim()
+    if (wantsCounterpart || q.length < 2) { setFound(null); setSearching(false); return }
+    let cancelled = false
+    setSearching(true)
+    const t = setTimeout(async () => {
+      try {
+        const res = await fetch(
+          `${apiUrl}/api/crm/${lead.id}/matches?${new URLSearchParams({ q })}`,
+          { credentials: 'include', cache: 'no-store' },
+        )
+        if (!res.ok || cancelled) return
+        const rows = (await res.json()).data ?? []
+        if (!cancelled) setFound(rows.map(listingCandidate))
+      } finally {
+        if (!cancelled) setSearching(false)
+      }
+    }, 300)
+    return () => { cancelled = true; clearTimeout(t) }
+  }, [apiUrl, lead.id, wantsCounterpart, query])
+
   // Shortlisted first, then matches we haven't shortlisted, de-duplicated.
   const candidates = useMemo(() => {
+    const q = query.trim().toLowerCase()
+    const mine = q
+      ? shortlisted.filter((c) =>
+          c.title.toLowerCase().includes(q) ||
+          (c.ref ?? '').toLowerCase().includes(q) ||
+          (c.subtitle ?? '').toLowerCase().includes(q)
+        )
+      : shortlisted
     const seen = new Set(shortlisted.map((c) => `${c.kind}-${c.id}`))
-    const rest = matches.filter((m) => !seen.has(`${m.kind}-${m.id}`))
-    const all = [...shortlisted, ...rest]
-    if (!query.trim()) return all
-    const q = query.toLowerCase()
-    return all.filter((c) =>
-      c.title.toLowerCase().includes(q) ||
-      (c.ref ?? '').toLowerCase().includes(q) ||
-      (c.subtitle ?? '').toLowerCase().includes(q)
-    )
-  }, [shortlisted, matches, query])
+    // Buyers' names are still filtered locally; listings come from the server.
+    const pool = found ?? (q ? matches.filter((c) =>
+      c.title.toLowerCase().includes(q) || (c.subtitle ?? '').toLowerCase().includes(q)
+    ) : matches)
+    const rest = pool
+      .filter((m) => !seen.has(`${m.kind}-${m.id}`))
+      .map((m) => {
+        // Found something this client already has a deal on (ruled out, say)?
+        // Book that deal rather than creating a duplicate the API would ignore.
+        const prior = m.kind === 'LISTING'
+          ? (lead.opportunities ?? []).find((o) => o.listingId === m.id)
+          : undefined
+        return prior ? { ...m, opportunityId: prior.id } : m
+      })
+    return [...mine, ...rest]
+  }, [shortlisted, matches, found, query, lead.opportunities])
 
   async function book() {
     if (!picked || !when) return
@@ -207,18 +238,20 @@ export function BookViewingModal({
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder={wantsCounterpart ? 'Search buyers…' : 'Search by ref (PG-1042) or title…'}
+              placeholder={wantsCounterpart ? 'Search buyers…' : 'Search any project, ref (PG-1042) or area…'}
               className="w-full h-9 pl-8 pr-3 text-sm rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-slate-900/10"
             />
           </div>
         </div>
 
         <div className="flex-1 overflow-y-auto px-5 py-3">
-          {loading ? (
+          {loading || (searching && found === null) ? (
             <div className="flex justify-center py-10 text-slate-400"><Loader2 className="h-5 w-5 animate-spin" /></div>
           ) : candidates.length === 0 ? (
             <p className="text-sm text-slate-500 text-center py-10">
-              {wantsCounterpart
+              {query.trim()
+                ? <>Nothing matches &ldquo;{query.trim()}&rdquo;.</>
+                : wantsCounterpart
                 ? 'No buyers match this property yet. Shortlist one from the client’s page first.'
                 : 'Nothing to view yet — shortlist a property for this client first.'}
             </p>
@@ -293,4 +326,22 @@ export function BookViewingModal({
       </div>
     </div>
   )
+}
+
+/** A /matches row (a scored listing) as something that can be booked. */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function listingCandidate(r: any): Candidate {
+  const li = r.listing ?? r
+  const b = li.building ?? li.unit?.building
+  const title = li.headline || b?.title || 'Property'
+  return {
+    key: `listing-${li.id}`, kind: 'LISTING', id: li.id,
+    title,
+    // Name the project when the headline doesn't, so a search by project name
+    // visibly lands on its units.
+    subtitle: [b?.title !== title ? b?.title : null, b?.city, b?.caza].filter(Boolean).join(', ') || null,
+    ref: li.unit?.ref ?? li.building?.ref ?? null,
+    country: b?.country ?? null,
+    score: r.match?.score ?? null,
+  }
 }
