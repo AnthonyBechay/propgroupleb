@@ -60,6 +60,18 @@ const LISTING_STATUS_DOT: Record<string, string> = {
 
 export const KIND_OPTIONS = ALL_PROPERTY_KINDS.map((value) => ({ value, label: typeLabel(value) }))
 
+/** The cheapest total across a unit's finish options, or null. */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function optionFrom(unit: any): number | null {
+  const area = Number(unit?.areaSqm) || 0
+  if (area <= 0) return null
+  const totals = (unit.options ?? [])
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    .map((o: any) => Number(o.pricePerSqm) * area)
+    .filter((n: number) => Number.isFinite(n) && n > 0)
+  return totals.length ? Math.round(Math.min(...totals)) : null
+}
+
 export function formatPrice(price: number, currency: string) {
   if (currency === 'LBP') return `${(price / 1_000_000).toFixed(1)}M LBP`
   return `$${Number(price).toLocaleString()}`
@@ -130,6 +142,19 @@ export function UnitsManager({
       active: listings.filter((l: any) => l.status === 'ACTIVE').length,
     }
   }, [units])
+
+  // Units priced both ways at once — the listing wins, the options are dead.
+  const conflicted = useMemo(
+    () => units
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .filter((u: any) =>
+        (u.options?.length ?? 0) > 0
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        && (u.listings ?? []).some((l: any) => ['ACTIVE', 'UNDER_OFFER'].includes(l.status)))
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .map((u: any) => u.name || (u.unitNumber ? `Unit ${u.unitNumber}` : 'A unit')),
+    [units],
+  )
 
   function openPanel(unitId: string, mode: PanelMode, listingId?: string) {
     setExpanded((prev) =>
@@ -338,6 +363,19 @@ export function UnitsManager({
         {/* What the public site will actually print. See PriceSummary. */}
         <PriceSummary units={units} buildingListings={buildingListings} />
 
+        {/* A unit can be priced two ways and only one of them wins. Nothing
+            said so, so a Georgian unit carrying finish options plus a listing
+            quoted the listing and silently ignored every option price. */}
+        {conflicted.length > 0 && (
+          <InlineNote tone="warning">
+            {conflicted.length === 1
+              ? <><strong>{conflicted[0]}</strong> has both a live listing and finish options.</>
+              : <><strong>{conflicted.length} units</strong> have both a live listing and finish options.</>}
+            {' '}The website quotes the listing and ignores the per-m² options. Keep one: a listing
+            for a fixed price, finish options when the buyer picks a specification.
+          </InlineNote>
+        )}
+
         {error && (
           <InlineNote tone="error">
             <div className="flex items-start justify-between gap-2">
@@ -391,7 +429,7 @@ export function UnitsManager({
         )}
 
         {units.length > 0 && (
-          <ul className="space-y-3">
+          <ul className="space-y-2.5">
             {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
             {units.map((unit: any) => {
               const panelUnit = expanded?.id === unit.id
@@ -413,7 +451,7 @@ export function UnitsManager({
                     panelUnit ? 'border-slate-300 shadow-sm' : 'border-slate-200',
                   )}
                 >
-                  <div className="flex flex-col gap-3 px-4 py-3.5 sm:flex-row sm:items-center sm:px-5">
+                  <div className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:px-5">
                     {cover && (
                       <div className="relative h-11 w-16 shrink-0 overflow-hidden rounded-lg border border-slate-200">
                         {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -464,9 +502,6 @@ export function UnitsManager({
                         {unit.areaSqm != null && (
                           <span className="flex items-center gap-1"><Square className="h-3 w-3" /> {unit.areaSqm} m²</span>
                         )}
-                        {unit.options?.length > 0 && (
-                          <span className="text-slate-500">{unit.options.length} finish option{unit.options.length === 1 ? '' : 's'}</span>
-                        )}
                         {unit.ownerUserId && <span className="text-emerald-600">Assigned to a user</span>}
                       </div>
                     </div>
@@ -490,6 +525,23 @@ export function UnitsManager({
                           {l.price ? ` · ${formatPrice(l.price, l.currency)}` : ''}
                         </button>
                       ))}
+
+                      {/* Finish options are the other way a unit is priced, and
+                          they showed only as a word in the row's subtitle — you
+                          had to open Edit to discover that a Georgian unit's
+                          entire price lives in them. */}
+                      {unit.options?.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => openPanel(unit.id, 'unit-edit')}
+                          title="Finish options — the price per m² a buyer chooses between"
+                          className="inline-flex min-h-9 items-center gap-1.5 rounded-full border border-slate-300 bg-slate-50 px-2.5 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-100"
+                        >
+                          <Layers className="h-3.5 w-3.5" />
+                          {unit.options.length} finish{unit.options.length === 1 ? '' : 'es'}
+                          {optionFrom(unit) != null && ` · from ${formatPrice(optionFrom(unit)!, unit.options[0].currency ?? 'USD')}`}
+                        </button>
+                      )}
 
                       <button
                         type="button"

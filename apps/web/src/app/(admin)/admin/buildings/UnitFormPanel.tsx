@@ -5,9 +5,10 @@ import { Loader2, UserCheck } from 'lucide-react'
 import { normalizeApiUrl } from '@/lib/utils/api-url'
 import { ImageManager } from '@/components/admin/ui/ImageManager'
 import {
-  ChipsInput, Field, FieldGrid, InlineNote, NumberInput, PillSelect,
+  ChipsInput, Field, FieldGrid, InlineNote, MoneyInput, NumberInput, PillSelect,
   SelectInput, TextInput, Textarea, Toggle,
 } from '@/components/admin/ui/form'
+import { Disclosure } from '@/components/admin/ui/layout'
 import { typeDef, typeLabel } from '@/lib/property-types'
 import {
   FEATURE_SUGGESTIONS, FURNISHING_OPTIONS, OWNERSHIP_OPTIONS, VIEW_OPTIONS,
@@ -33,6 +34,25 @@ export interface UnitFormState {
   features: string[]
   notes: string
   images: string[]
+
+  /**
+   * What the unit is worth, on the unit itself.
+   *
+   * Normally a price lives on a Listing — that is what the website reads. These
+   * are the client-portal side of the same question: `/portal/portfolio` builds
+   * every owned unit's purchase price from `soldPrice ?? askingPrice`, its
+   * purchase date from `soldAt` and its income from `rentAmount`. None of them
+   * had an input anywhere, so every property in a client's portfolio showed
+   * £0 bought, £0 rent, and a "purchase date" that was really `updatedAt`.
+   */
+  askingPrice: string
+  askingCurrency: string
+  soldPrice: string
+  soldCurrency: string
+  soldAt: string
+  rentAmount: string
+  rentCurrency: string
+  rentPeriod: string
 }
 
 export function emptyUnit(): UnitFormState {
@@ -42,6 +62,9 @@ export function emptyUnit(): UnitFormState {
     lifecycle: 'VACANT', isUnitType: false,
     furnishing: '', ownership: '', views: [], features: [], notes: '',
     images: [],
+    askingPrice: '', askingCurrency: 'USD',
+    soldPrice: '', soldCurrency: 'USD', soldAt: '',
+    rentAmount: '', rentCurrency: 'USD', rentPeriod: 'MONTHLY',
   }
 }
 
@@ -66,6 +89,14 @@ export function unitFormFrom(unit: any): UnitFormState {
     features: unit.features ?? [],
     notes: unit.notes ?? '',
     images: unit.images ?? [],
+    askingPrice: str(unit.askingPrice),
+    askingCurrency: unit.askingCurrency ?? 'USD',
+    soldPrice: str(unit.soldPrice),
+    soldCurrency: unit.soldCurrency ?? 'USD',
+    soldAt: typeof unit.soldAt === 'string' && unit.soldAt.length >= 10 ? unit.soldAt.slice(0, 10) : '',
+    rentAmount: str(unit.rentAmount),
+    rentCurrency: unit.rentCurrency ?? 'USD',
+    rentPeriod: unit.rentPeriod ?? 'MONTHLY',
   }
 }
 
@@ -94,8 +125,20 @@ export function buildUnitPayload(f: UnitFormState) {
     features: f.features,
     notes: f.notes || null,
     images: f.images,
+    // Currencies and periods only travel with a figure — sending a currency for
+    // a null amount writes a value that means nothing.
+    askingPrice: money(f.askingPrice),
+    askingCurrency: f.askingPrice !== '' ? f.askingCurrency : null,
+    soldPrice: money(f.soldPrice),
+    soldCurrency: f.soldPrice !== '' ? f.soldCurrency : null,
+    soldAt: f.soldAt || null,
+    rentAmount: money(f.rentAmount),
+    rentCurrency: f.rentAmount !== '' ? f.rentCurrency : null,
+    rentPeriod: f.rentAmount !== '' ? f.rentPeriod : null,
   }
 }
+
+const money = (v: string): number | null => (v.trim() === '' ? null : Number(v))
 
 // ── Panel ─────────────────────────────────────────────────────────────────────
 
@@ -296,8 +339,112 @@ export function UnitFormPanel({
         />
       </div>
 
+      {/* What it's worth, on the unit — see the note on the state type. */}
+      <div className="border-t border-slate-100 pt-5">
+        <Disclosure
+          label="Ownership record"
+          hint="Asking price · what it sold for · rent — for the client portal"
+          badge={
+            [f.askingPrice, f.soldPrice, f.rentAmount].filter(Boolean).length
+              ? `${[f.askingPrice, f.soldPrice, f.rentAmount].filter(Boolean).length} set`
+              : undefined
+          }
+        >
+          <InlineNote tone="info">
+            The website takes its price from this unit&rsquo;s <strong>listing</strong>, not from here.
+            These figures are what a client sees in their own portfolio once you assign the unit to
+            them — without them it shows nothing bought and no rent.
+          </InlineNote>
+
+          <FieldGrid cols={4}>
+            <Field label="Asking price" optional span={2} hint="What it is on the market for.">
+              <MoneyInput
+                currency={f.askingCurrency}
+                value={f.askingPrice}
+                onChange={(e) => set({ askingPrice: e.target.value })}
+                placeholder="250000"
+                disabled={saving}
+              />
+            </Field>
+            <Field label="Currency">
+              <SelectInput
+                value={f.askingCurrency}
+                onChange={(e) => set({ askingCurrency: e.target.value })}
+                disabled={saving || !f.askingPrice}
+              >
+                <option value="USD">USD</option>
+                <option value="LBP">LBP</option>
+              </SelectInput>
+            </Field>
+          </FieldGrid>
+
+          <FieldGrid cols={4}>
+            <Field label="Sold for" optional span={2} hint="Becomes the client&rsquo;s purchase price.">
+              <MoneyInput
+                currency={f.soldCurrency}
+                value={f.soldPrice}
+                onChange={(e) => set({ soldPrice: e.target.value })}
+                placeholder="240000"
+                disabled={saving}
+              />
+            </Field>
+            <Field label="Currency">
+              <SelectInput
+                value={f.soldCurrency}
+                onChange={(e) => set({ soldCurrency: e.target.value })}
+                disabled={saving || !f.soldPrice}
+              >
+                <option value="USD">USD</option>
+                <option value="LBP">LBP</option>
+              </SelectInput>
+            </Field>
+            <Field label="Sold on" optional hint="The purchase date they see.">
+              <TextInput
+                type="date"
+                value={f.soldAt}
+                onChange={(e) => set({ soldAt: e.target.value })}
+                disabled={saving}
+              />
+            </Field>
+          </FieldGrid>
+
+          <FieldGrid cols={4}>
+            <Field label="Rent received" optional span={2} hint="Income shown against the unit.">
+              <MoneyInput
+                currency={f.rentCurrency}
+                value={f.rentAmount}
+                onChange={(e) => set({ rentAmount: e.target.value })}
+                placeholder="900"
+                disabled={saving}
+              />
+            </Field>
+            <Field label="Currency">
+              <SelectInput
+                value={f.rentCurrency}
+                onChange={(e) => set({ rentCurrency: e.target.value })}
+                disabled={saving || !f.rentAmount}
+              >
+                <option value="USD">USD</option>
+                <option value="LBP">LBP</option>
+              </SelectInput>
+            </Field>
+            <Field label="Per">
+              <SelectInput
+                value={f.rentPeriod}
+                onChange={(e) => set({ rentPeriod: e.target.value })}
+                disabled={saving || !f.rentAmount}
+              >
+                <option value="MONTHLY">Month</option>
+                <option value="QUARTERLY">Quarter</option>
+                <option value="YEARLY">Year</option>
+              </SelectInput>
+            </Field>
+          </FieldGrid>
+        </Disclosure>
+      </div>
+
       {/* Internal note */}
-      <div className="border-t border-slate-100 pt-4">
+      <div className="border-t border-slate-100 pt-5">
         <Field
           label="Internal note"
           optional

@@ -17,6 +17,7 @@ import {
 } from 'lucide-react'
 import { LocationFields } from '@/components/admin/LocationFields'
 import { OwnerPicker, type OwnerRef } from '@/components/admin/OwnerPicker'
+import { AgentPicker } from '@/components/admin/AgentPicker'
 import { PaymentPlansEditor } from '@/components/admin/PaymentPlansEditor'
 import { ImageManager } from '@/components/admin/ui/ImageManager'
 import {
@@ -103,7 +104,7 @@ export function BasicsSection({
       description="What this property is and how it appears on the website."
       icon={<Building2 className="h-4 w-4" />}
     >
-      <div className="space-y-4">
+      <div className="space-y-5">
         <OwnerPicker value={owner} onChange={onOwnerChange} />
 
         <Field
@@ -218,7 +219,7 @@ export function BasicsSection({
             Leaving them in the open cost as much attention as the title. */}
         <Disclosure
           label="More"
-          hint={isDevelopment ? 'How the development is organised · who listed it' : 'Who listed it'}
+          hint={isDevelopment ? 'Structure · who listed it · handling agent' : 'Who listed it · handling agent'}
         >
           {isDevelopment && (
             <Field
@@ -239,6 +240,9 @@ export function BasicsSection({
               <option value="OWNER">The property owner</option>
             </SelectInput>
           </Field>
+          {/* `agentId` has always been a column the public property page renders
+              an entire agent card from, and no screen anywhere could set it. */}
+          <AgentPicker value={f.agentId} onChange={(agentId) => set({ agentId })} disabled={disabled} />
         </Disclosure>
       </div>
     </FormSection>

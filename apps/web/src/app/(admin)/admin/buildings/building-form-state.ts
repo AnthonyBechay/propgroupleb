@@ -110,6 +110,9 @@ export interface BuildingFormState {
   metaTitle: string
   metaDescription: string
 
+  /** Who from the office handles it — shown on the public property page. */
+  agentId: string
+
   paymentPlans: PaymentPlan[]
   investment: InvestmentFormState
 
@@ -181,6 +184,8 @@ export function emptyBuildingForm(initial?: any): BuildingFormState {
 
     metaTitle: initial?.metaTitle ?? '',
     metaDescription: initial?.metaDescription ?? '',
+
+    agentId: initial?.agentId ?? initial?.agent?.id ?? '',
 
     paymentPlans: (initial?.paymentPlans ?? []) as PaymentPlan[],
 
@@ -278,6 +283,9 @@ export function buildingPayload(
 
     metaTitle: f.metaTitle || null,
     metaDescription: f.metaDescription || null,
+
+    // An empty select is "nobody", not a foreign key of "".
+    agentId: f.agentId || null,
 
     paymentPlans: f.paymentPlans?.length ? f.paymentPlans : null,
   }

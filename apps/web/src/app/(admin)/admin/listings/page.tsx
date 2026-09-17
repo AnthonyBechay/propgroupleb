@@ -5,13 +5,13 @@ import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import {
   Archive, Building2, CircleDollarSign, Edit, ExternalLink, Eye, Layers,
-  MapPin, Plus, Search, Share2, Tag,
+  MapPin, Plus, Share2, Tag,
 } from 'lucide-react'
 import { apiClient } from '@/lib/api/client'
 import { normalizeApiUrl } from '@/lib/utils/api-url'
 import { toast } from '@/components/ui/use-toast'
 import { ConfirmDialog } from '@/components/admin/ui/ConfirmDialog'
-import { SelectInput, TextInput } from '@/components/admin/ui/form'
+import { FilterBar, FilterSearch, SelectInput } from '@/components/admin/ui/form'
 import { EmptyState, PageHeader, StatCard } from '@/components/admin/ui/layout'
 import { listingRef, refMatches } from '@/lib/reference'
 import { countryFlag, inMarket, MARKET_OPTIONS, type MarketScope } from '@/lib/market'
@@ -203,52 +203,44 @@ export default function AdminListingsPage() {
       </div>
 
       {/* Filters */}
-      <div className="flex flex-wrap items-center gap-2">
-        <div className="relative min-w-[200px] flex-1">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-          <TextInput
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search a reference or title…"
-            className="pl-9"
-          />
-        </div>
-        <SelectInput value={market} onChange={(e) => setMarket(e.target.value as MarketScope)} className="w-auto min-w-[9rem]">
+      <FilterBar>
+        <FilterSearch value={search} onChange={setSearch} placeholder="Search a reference or title…" />
+        <SelectInput value={market} onChange={(e) => setMarket(e.target.value as MarketScope)}>
           {MARKET_OPTIONS.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
         </SelectInput>
-        <SelectInput value={buildingFilter} onChange={(e) => setBuildingFilter(e.target.value)} className="w-auto min-w-[11rem] max-w-[16rem]">
+        <SelectInput value={buildingFilter} onChange={(e) => setBuildingFilter(e.target.value)}>
           <option value="all">Any property</option>
           {buildings.map((b) => (
             <option key={b.id} value={b.id}>{b.title}{b.city ? ` — ${b.city}` : ''}</option>
           ))}
         </SelectInput>
-        <SelectInput value={intentFilter} onChange={(e) => setIntentFilter(e.target.value)} className="w-auto min-w-[8rem]">
+        <SelectInput value={intentFilter} onChange={(e) => setIntentFilter(e.target.value)}>
           <option value="all">Sale &amp; rent</option>
           <option value="FOR_SALE">For sale</option>
           <option value="FOR_RENT">For rent</option>
         </SelectInput>
-        <SelectInput value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="w-auto min-w-[8.5rem]">
+        <SelectInput value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
           <option value="all">Any status</option>
           {Object.entries(STATUS_META).map(([v, m]) => <option key={v} value={v}>{m.label}</option>)}
         </SelectInput>
         {cazas.length > 0 && (
-          <SelectInput value={cazaFilter} onChange={(e) => setCazaFilter(e.target.value)} className="w-auto min-w-[8.5rem]">
+          <SelectInput value={cazaFilter} onChange={(e) => setCazaFilter(e.target.value)}>
             <option value="all">Any caza</option>
             {cazas.map((c) => <option key={c} value={c}>{c}</option>)}
           </SelectInput>
         )}
-        <SelectInput value={sort} onChange={(e) => setSort(e.target.value as SortKey)} className="w-auto min-w-[9rem]">
+        <SelectInput value={sort} onChange={(e) => setSort(e.target.value as SortKey)}>
           <option value="newest">Newest first</option>
           <option value="priceDesc">Price: high → low</option>
           <option value="priceAsc">Price: low → high</option>
           <option value="caza">Location A–Z</option>
         </SelectInput>
-        <SelectInput value={groupBy} onChange={(e) => setGroupBy(e.target.value as GroupKey)} className="w-auto min-w-[9rem]">
+        <SelectInput value={groupBy} onChange={(e) => setGroupBy(e.target.value as GroupKey)}>
           <option value="none">No grouping</option>
           <option value="building">Group by property</option>
           <option value="caza">Group by caza</option>
         </SelectInput>
-      </div>
+      </FilterBar>
 
       {filtersOn && (
         <div className="-mt-2 flex items-center gap-2 text-xs text-slate-500">
@@ -264,7 +256,7 @@ export default function AdminListingsPage() {
       )}
 
       {loading ? (
-        <ul className="space-y-2">
+        <ul className="space-y-2.5">
           {Array.from({ length: 5 }).map((_, i) => (
             <li key={i} className="h-16 animate-pulse rounded-xl border border-slate-200 bg-slate-50" />
           ))}
@@ -310,7 +302,7 @@ export default function AdminListingsPage() {
               )}
               {/* Cards rather than a table: every column here is short, and a
                   seven-column table in a side-scroller is unusable on a phone. */}
-              <ul className="space-y-2">
+              <ul className="space-y-2.5">
                 {group.items.map((l) => {
                   const buildingId = l.building?.id ?? l.unit?.buildingId ?? null
                   const location = l.building
@@ -331,7 +323,7 @@ export default function AdminListingsPage() {
                   return (
                     <li
                       key={l.id}
-                      className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-white p-3 transition-colors hover:border-slate-300 sm:flex-row sm:items-center sm:px-4"
+                      className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-white p-4 transition-colors hover:border-slate-300 sm:flex-row sm:items-center"
                     >
                       {/* Two destinations, side by side rather than nested —
                           an <a> inside an <a> is invalid, and wrapping the whole

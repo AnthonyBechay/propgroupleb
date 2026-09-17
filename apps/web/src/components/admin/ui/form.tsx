@@ -39,7 +39,7 @@
  */
 
 import { forwardRef, useId, useState } from 'react'
-import { AlertCircle, Check, ChevronDown, Info, Plus, X } from 'lucide-react'
+import { AlertCircle, Check, ChevronDown, Info, Plus, Search, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 // ── Shared class recipes ──────────────────────────────────────────────────────
@@ -559,6 +559,52 @@ export function PillSelect({
           </button>
         )
       })}
+    </div>
+  )
+}
+
+// ── Filter bars ───────────────────────────────────────────────────────────────
+
+/**
+ * The row of controls above a list.
+ *
+ * Every list page sized its own filters by eye — `min-w-[8rem]`,
+ * `min-w-[8.5rem]`, `min-w-[9rem]`, `min-w-[11rem] max-w-[16rem]`,
+ * `min-w-[12rem]` — so they wrapped at different points and never lined up. A
+ * grid gives every control the same width and the same wrap behaviour, and the
+ * search box spans the row on its own because that is the one you type into.
+ */
+export function FilterBar({ children, className }: { children: React.ReactNode; className?: string }) {
+  return (
+    <div
+      className={cn(
+        'grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6',
+        className,
+      )}
+    >
+      {children}
+    </div>
+  )
+}
+
+/** The search field, spanning the full width of the first row. */
+export function FilterSearch({
+  value, onChange, placeholder, className,
+}: {
+  value: string
+  onChange: (v: string) => void
+  placeholder?: string
+  className?: string
+}) {
+  return (
+    <div className={cn('relative col-span-2 sm:col-span-3 lg:col-span-4 xl:col-span-2', className)}>
+      <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+      <TextInput
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        className="pl-9"
+      />
     </div>
   )
 }

@@ -5,14 +5,14 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import {
   Archive, ArrowUpDown, Building2, CircleDollarSign, Edit, Eye, EyeOff, Layers,
-  ListChecks, Plus, Search, Star, Tag, Trash2, X,
+  ListChecks, Plus, Star, Tag, Trash2, X,
 } from 'lucide-react'
 import { apiClient } from '@/lib/api/client'
 import { normalizeFileUrl } from '@/lib/utils/api-url'
 import { toast } from '@/components/ui/use-toast'
 import { ConfirmDialog } from '@/components/admin/ui/ConfirmDialog'
 import { EmptyState, PageHeader, StatCard } from '@/components/admin/ui/layout'
-import { SelectInput, TextInput } from '@/components/admin/ui/form'
+import { FilterBar, FilterSearch, SelectInput } from '@/components/admin/ui/form'
 import { countryFlag, inMarket, MARKET_OPTIONS, type MarketScope } from '@/lib/market'
 import { typeLabel } from '@/lib/property-types'
 import { cn } from '@/lib/utils'
@@ -240,40 +240,32 @@ export function BuildingsAdminClient({ initialBuildings }: Props) {
       </div>
 
       {/* Filters */}
-      <div className="flex flex-wrap items-center gap-2">
-        <div className="relative min-w-[200px] flex-1">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-          <TextInput
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search a reference, title or city…"
-            className="pl-9"
-          />
-        </div>
-        <SelectInput value={market} onChange={(e) => setMarket(e.target.value as MarketScope)} className="w-auto min-w-[9rem]">
+      <FilterBar>
+        <FilterSearch value={search} onChange={setSearch} placeholder="Search a reference, title or city…" />
+        <SelectInput value={market} onChange={(e) => setMarket(e.target.value as MarketScope)}>
           {MARKET_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
         </SelectInput>
-        <SelectInput value={sourceFilter} onChange={(e) => setSourceFilter(e.target.value)} className="w-auto min-w-[9rem]">
+        <SelectInput value={sourceFilter} onChange={(e) => setSourceFilter(e.target.value)}>
           <option value="all">Any source</option>
           <option value="ADMIN">Posted by us</option>
           <option value="OWNER">Owner submitted</option>
         </SelectInput>
-        <SelectInput value={kindFilter} onChange={(e) => setKindFilter(e.target.value)} className="w-auto min-w-[8rem]">
+        <SelectInput value={kindFilter} onChange={(e) => setKindFilter(e.target.value)}>
           <option value="all">Any structure</option>
           {Object.entries(KIND_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
         </SelectInput>
-        <SelectInput value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="w-auto min-w-[8rem]">
+        <SelectInput value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
           <option value="all">Any status</option>
           {Object.entries(STATUS_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
         </SelectInput>
-        <SelectInput value={sort} onChange={(e) => setSort(e.target.value as SortKey)} className="w-auto min-w-[8.5rem]">
+        <SelectInput value={sort} onChange={(e) => setSort(e.target.value as SortKey)}>
           <option value="newest">Newest first</option>
           <option value="oldest">Oldest first</option>
           <option value="views">Most viewed</option>
           <option value="units">Most units</option>
           <option value="title">Title A–Z</option>
         </SelectInput>
-      </div>
+      </FilterBar>
 
       {(activeFilters > 0 || search) && (
         <div className="-mt-2 flex items-center gap-2 text-xs text-slate-500">
@@ -435,7 +427,7 @@ export function BuildingsAdminClient({ initialBuildings }: Props) {
                 <li
                   key={b.id}
                   className={cn(
-                    'rounded-xl border bg-white p-3',
+                    'rounded-xl border bg-white p-4',
                     isSelected ? 'border-slate-800 ring-1 ring-slate-800/10' : 'border-slate-200',
                     hidden && 'opacity-60',
                   )}

@@ -79,6 +79,7 @@ export function ListingForm({ initialData, listingId, buildings, preselect }: Pr
     currency: initialData?.currency ?? 'USD',
     rentPeriod: initialData?.rentPeriod ?? 'MONTHLY',
     negotiable: !!initialData?.negotiable,
+    closingReason: initialData?.closingReason ?? '',
     headline: initialData?.headline ?? '',
     description: initialData?.description ?? '',
     highlights: (initialData?.highlights ?? []) as string[],
@@ -151,6 +152,9 @@ export function ListingForm({ initialData, listingId, buildings, preselect }: Pr
       price: parseFloat(form.price),
       currency: form.currency,
       negotiable: form.negotiable,
+      // Only meaningful once it's off the market; sending it otherwise would
+      // leave a stale explanation attached to a live listing.
+      closingReason: ['CLOSED', 'ARCHIVED'].includes(form.status) ? (form.closingReason || null) : null,
       rentPeriod: form.intent === 'FOR_RENT' ? form.rentPeriod : null,
       headline: form.headline || null,
       description: form.description || null,
@@ -434,6 +438,24 @@ export function ListingForm({ initialData, listingId, buildings, preselect }: Pr
             <InlineNote tone="warning" className="mt-3">
               Active but hidden — nobody will see it. Set visibility to Public to actually publish.
             </InlineNote>
+          )}
+          {['CLOSED', 'ARCHIVED'].includes(form.status) && (
+            /* `closingReason` is a column that could only ever be null: nothing
+               asked for it. Why a listing came off the market is the first
+               thing anyone wants to know when they find it six months later. */
+            <Field
+              label="Why did it come off the market?"
+              optional
+              hint="Kept in here — never shown on the website."
+              className="mt-4"
+            >
+              <TextInput
+                value={form.closingReason}
+                onChange={(e) => set({ closingReason: e.target.value })}
+                placeholder="e.g. Sold to another buyer · owner withdrew · re-listing at a new price"
+                disabled={saving}
+              />
+            </Field>
           )}
         </FormSection>
 

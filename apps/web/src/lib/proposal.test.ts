@@ -164,3 +164,40 @@ describe('instalmentSchedule', () => {
     expect(instalmentSchedule(0, 30, 3)).toBeNull()
   })
 })
+
+// ── Fields the UI shows but nothing could set ────────────────────────────────
+
+describe('proposal reads the fields the admin can now write', () => {
+  it('quotes a unit-level asking price when there is no listing', () => {
+    const withAsking = {
+      ...lebanonFlat,
+      units: [{ id: 'u5', kind: 'APARTMENT', areaSqm: 100, options: [], listings: [],
+                askingPrice: '199000', askingCurrency: 'USD' }],
+    }
+    const p = buildProposal(withAsking)
+    expect(p.price?.amount).toBe(199000)
+    expect(p.price?.source).toBe('asking')
+  })
+
+  it('prefers a live listing over an asking price, as the site does', () => {
+    const both = {
+      ...lebanonFlat,
+      units: [{ ...lebanonFlat.units[0], askingPrice: '199000', askingCurrency: 'USD' }],
+    }
+    expect(buildProposal(both).price?.amount).toBe(285000)
+  })
+
+  it('labels a rental with its period', () => {
+    const rental = {
+      ...lebanonFlat,
+      units: [{ ...lebanonFlat.units[0],
+        listings: [{ id: 'l3', status: 'ACTIVE', visibility: 'PUBLIC', price: '1200',
+                     currency: 'USD', intent: 'FOR_RENT', rentPeriod: 'YEARLY' }] }],
+    }
+    expect(buildProposal(rental).units[0].price?.note).toBe('per year')
+  })
+
+  it('marks a negotiable sale price as negotiable', () => {
+    expect(buildProposal(lebanonFlat).units[0].price?.note).toBe('negotiable')
+  })
+})

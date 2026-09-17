@@ -187,6 +187,12 @@ const unitCreateSchema = z.object({
   ownerUserId: z.string().optional().nullable(),
   askingPrice: z.number().optional().nullable(),
   askingCurrency: z.enum(['USD', 'LBP']).optional().nullable(),
+  // Accepted by `PUT /api/units/:id` but absent here, so a unit's sale could
+  // only be recorded on a second save. The client portal builds a purchase
+  // price and date out of these.
+  soldPrice: z.number().optional().nullable(),
+  soldCurrency: z.enum(['USD', 'LBP']).optional().nullable(),
+  soldAt: z.string().optional().nullable(),
   rentAmount: z.number().optional().nullable(),
   rentCurrency: z.enum(['USD', 'LBP']).optional().nullable(),
   rentPeriod: z.enum(['MONTHLY', 'QUARTERLY', 'YEARLY']).optional().nullable(),
@@ -424,6 +430,9 @@ router.post(
         views: data.views ?? [],
         askingPrice: data.askingPrice !== undefined && data.askingPrice !== null ? data.askingPrice : undefined,
         rentAmount: data.rentAmount !== undefined && data.rentAmount !== null ? data.rentAmount : undefined,
+        // A `DateTime` column, and the schema takes it as an ISO string —
+        // handing Prisma the string throws.
+        soldAt: data.soldAt ? new Date(data.soldAt) : undefined,
       },
       include: { options: true },
     });

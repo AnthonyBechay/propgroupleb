@@ -95,6 +95,7 @@ export function ProposalDocument({
         <Gallery p={p} />
         <Location p={p} />
         <Documents p={p} />
+        <NextSteps p={p} branding={branding} />
         <Contact branding={branding} generatedAt={generatedAt} p={p} />
       </div>
     </article>
@@ -148,46 +149,89 @@ function Cover({ p, branding }: { p: Proposal; branding: ProposalBranding }) {
         </div>
       )}
 
-      {/* The price and the facts that qualify it, together, above the fold. */}
-      <div
-        style={{
-          ...noBreak,
-          display: 'flex',
-          flexWrap: 'wrap',
-          alignItems: 'flex-end',
-          justifyContent: 'space-between',
-          gap: 12,
-          marginTop: 12,
-          paddingBottom: 12,
-          borderBottom: `1px solid ${LINE}`,
-        }}
-      >
-        <div>
-          {p.price ? (
-            <>
-              {p.price.prefix && (
-                <div style={{ fontSize: 9, color: MUTED, letterSpacing: 1, textTransform: 'uppercase' }}>
-                  {p.price.prefix}
-                </div>
-              )}
-              <div style={{ fontSize: 26, fontWeight: 700, color: INK, lineHeight: 1.1 }}>
-                {p.price.formatted}
-              </div>
-            </>
-          ) : (
-            <div style={{ fontSize: 14, fontWeight: 600, color: MUTED }}>Price on application</div>
-          )}
-        </div>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px 18px', maxWidth: '110mm', justifyContent: 'flex-end' }}>
-          {p.facts.slice(0, 6).map((f) => (
-            <div key={f.label} style={{ textAlign: 'right' }}>
-              <div style={{ fontSize: 8, color: MUTED, letterSpacing: 0.8, textTransform: 'uppercase' }}>{f.label}</div>
-              <div style={{ fontSize: 12, fontWeight: 600, color: INK }}>{f.value}</div>
-            </div>
-          ))}
-        </div>
-      </div>
+      <CoverStrip p={p} />
     </header>
+  )
+}
+
+/**
+ * The band under the cover photo: the price, and the four things that qualify it.
+ *
+ * Which four depends on who is reading. An investor's first question after the
+ * price is the return; a family's is how many bedrooms. Both were previously a
+ * right-aligned wrapping flex of up to six facts, which ragged badly and put
+ * "Built 2019" next to "$285,000" at the same weight.
+ */
+function CoverStrip({ p }: { p: Proposal }) {
+  const i = p.investment
+  const fact = (label: string) => p.facts.find((f) => f.label === label)?.value ?? null
+
+  const qualifiers = (p.profile === 'investment'
+    ? [
+        i.expectedROI != null && { label: 'Expected ROI', value: `${i.expectedROI}%` },
+        i.rentalYield != null && { label: 'Rental yield', value: `${i.rentalYield}%` },
+        i.downPaymentPercentage != null && { label: 'Down payment', value: `${i.downPaymentPercentage}%` },
+        fact('Sizes') && { label: 'Sizes', value: fact('Sizes')! },
+        fact('Area') && { label: 'Area', value: fact('Area')! },
+        fact('Units') && { label: 'Units', value: fact('Units')! },
+        i.isGoldenVisaEligible && { label: 'Residency', value: 'Eligible' },
+      ]
+    : [
+        fact('Bedrooms') && { label: 'Bedrooms', value: fact('Bedrooms')! },
+        fact('Bathrooms') && { label: 'Bathrooms', value: fact('Bathrooms')! },
+        fact('Area') && { label: 'Area', value: fact('Area')! },
+        fact('Sizes') && { label: 'Sizes', value: fact('Sizes')! },
+        fact('Floor') && { label: 'Floor', value: fact('Floor')! },
+        fact('Units') && { label: 'Units', value: fact('Units')! },
+        fact('Type') && { label: 'Type', value: fact('Type')! },
+      ]
+  ).filter(Boolean).slice(0, 4) as Array<{ label: string; value: string }>
+
+  return (
+    <div
+      style={{
+        ...noBreak,
+        marginTop: 12,
+        border: `1px solid ${LINE}`,
+        borderTop: `2.5px solid ${INK}`,
+        borderRadius: '2px 2px 5px 5px',
+        display: 'grid',
+        // The price takes the space of two qualifiers — it is the headline.
+        gridTemplateColumns: `1.6fr repeat(${Math.max(qualifiers.length, 1)}, 1fr)`,
+      }}
+    >
+      <div style={{ padding: '11px 13px', borderRight: `1px solid ${LINE}` }}>
+        <div style={{ fontSize: 7.5, color: MUTED, letterSpacing: 0.9, textTransform: 'uppercase' }}>
+          {p.price?.prefix ? `${p.price.prefix} — price` : 'Price'}
+        </div>
+        {p.price ? (
+          <div style={{ fontSize: 23, fontWeight: 700, color: INK, lineHeight: 1.15, marginTop: 2 }}>
+            {p.price.formatted}
+          </div>
+        ) : (
+          <div style={{ fontSize: 14, fontWeight: 600, color: MUTED, marginTop: 4 }}>On application</div>
+        )}
+        {p.buildStatus && (
+          <div style={{ fontSize: 8.5, color: MUTED, marginTop: 2 }}>{p.buildStatus}</div>
+        )}
+      </div>
+      {qualifiers.map((q, idx) => (
+        <div
+          key={q.label}
+          style={{
+            padding: '11px 13px',
+            borderRight: idx === qualifiers.length - 1 ? undefined : `1px solid ${LINE}`,
+          }}
+        >
+          <div style={{ fontSize: 7.5, color: MUTED, letterSpacing: 0.9, textTransform: 'uppercase' }}>
+            {q.label}
+          </div>
+          <div style={{ fontSize: 15, fontWeight: 700, color: INK, lineHeight: 1.2, marginTop: 3 }}>
+            {q.value}
+          </div>
+        </div>
+      ))}
+    </div>
   )
 }
 
@@ -224,22 +268,53 @@ function Section({
   )
 }
 
-/** A figure with its name. The building block of the investment pages. */
-function Metric({ label, value, note }: { label: string; value: string; note?: string | null }) {
+/**
+ * A row of figures, all the same width.
+ *
+ * These were a wrapping flex with `flex: 1 1 0`, so two metrics stretched to
+ * half a page each and four sat at wildly different widths depending on how
+ * long their labels were. A grid with a fixed column count is the only way
+ * boxes on a printed page line up.
+ */
+function MetricRow({
+  items, columns = 4,
+}: {
+  items: Array<{ label: string; value: string; note?: string | null }>
+  columns?: 2 | 3 | 4
+}) {
+  if (items.length === 0) return null
+  // Never more columns than there are figures, or the last box floats alone.
+  const cols = Math.min(columns, items.length)
   return (
     <div
       style={{
         ...noBreak,
-        flex: '1 1 0',
-        minWidth: '38mm',
-        border: `1px solid ${LINE}`,
-        borderRadius: 5,
-        padding: '9px 11px',
+        display: 'grid',
+        gridTemplateColumns: `repeat(${cols}, 1fr)`,
+        gap: 7,
       }}
     >
-      <div style={{ fontSize: 8, color: MUTED, letterSpacing: 0.8, textTransform: 'uppercase' }}>{label}</div>
-      <div style={{ fontSize: 18, fontWeight: 700, color: INK, lineHeight: 1.25, marginTop: 2 }}>{value}</div>
-      {note && <div style={{ fontSize: 9, color: MUTED, marginTop: 1 }}>{note}</div>}
+      {items.map((m) => (
+        <div
+          key={m.label}
+          style={{
+            border: `1px solid ${LINE}`,
+            borderRadius: 5,
+            padding: '10px 11px',
+            // A left rule gives the number something to sit against without
+            // depending on a background colour surviving the printer.
+            borderLeft: `2.5px solid ${INK}`,
+          }}
+        >
+          <div style={{ fontSize: 7.5, color: MUTED, letterSpacing: 0.9, textTransform: 'uppercase' }}>
+            {m.label}
+          </div>
+          <div style={{ fontSize: 19, fontWeight: 700, color: INK, lineHeight: 1.2, marginTop: 3 }}>
+            {m.value}
+          </div>
+          {m.note && <div style={{ fontSize: 8.5, color: MUTED, marginTop: 2, lineHeight: 1.35 }}>{m.note}</div>}
+        </div>
+      ))}
     </div>
   )
 }
@@ -279,9 +354,7 @@ function InvestmentCase({ p }: { p: Proposal }) {
       title="The investment case"
       subtitle={`Projected figures for ${p.countryLabel}. Not a guarantee of future performance.`}
     >
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-        {metrics.map((m) => <Metric key={m.label} {...m} />)}
-      </div>
+      <MetricRow items={metrics} />
       {i.averageRentPerMonth != null && (
         <div style={{ ...noBreak, fontSize: 10.5, color: BODY, marginTop: 9 }}>
           Comparable units in this area let for around{' '}
@@ -360,11 +433,14 @@ function Delivery({ p }: { p: Proposal }) {
 
   return (
     <Section title="Delivery">
-      <div style={{ ...noBreak, display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-        {p.buildStatus && <Metric label="Stage" value={p.buildStatus} />}
-        {completion && <Metric label="Completion" value={completion} note="Building finished" />}
-        {handover && <Metric label="Handover" value={handover} note="Keys to the buyer" />}
-      </div>
+      <MetricRow
+        columns={3}
+        items={[
+          p.buildStatus && { label: 'Stage', value: p.buildStatus },
+          completion && { label: 'Completion', value: completion, note: 'Building finished' },
+          handover && { label: 'Handover', value: handover, note: 'Keys to the buyer' },
+        ].filter(Boolean) as Array<{ label: string; value: string; note?: string }>}
+      />
     </Section>
   )
 }
@@ -657,6 +733,70 @@ function Documents({ p }: { p: Proposal }) {
     <Section title="Documents" subtitle="Available on request, or at the links below.">
       <div style={{ ...noBreak, fontSize: 10.5 }}>
         {p.documents.map((d) => <Row key={d.id} label={d.type} value={d.title} />)}
+      </div>
+    </Section>
+  )
+}
+
+/**
+ * What to do about it.
+ *
+ * A proposal that stops at the specification leaves the reader with no next
+ * move. The steps differ by market for a real reason: an off-plan purchase
+ * abroad is a reservation and a payment schedule, a Lebanese resale is a
+ * viewing.
+ */
+function NextSteps({ p, branding }: { p: Proposal; branding: ProposalBranding }) {
+  const steps = p.profile === 'investment'
+    ? [
+        'Tell us which unit and finish interest you and we will confirm current availability.',
+        p.investment.downPaymentPercentage != null
+          ? `Reserve it with the ${p.investment.downPaymentPercentage}% down payment; the balance follows the schedule above.`
+          : 'Reserve it with the agreed down payment; the balance follows the schedule above.',
+        'We handle the contract, the transfer and the paperwork end to end, remotely if you prefer.',
+      ]
+    : [
+        'Tell us when suits and we will arrange a viewing.',
+        'We negotiate on your behalf and confirm the final terms with the owner.',
+        'We see the sale through — notary, registration and handover.',
+      ]
+
+  return (
+    <Section title="Next steps">
+      <ol style={{ ...noBreak, margin: 0, padding: 0, listStyle: 'none', counterReset: 'step' }}>
+        {steps.map((step, i) => (
+          <li
+            key={step}
+            style={{
+              display: 'flex',
+              gap: 10,
+              padding: '7px 0',
+              borderBottom: i === steps.length - 1 ? undefined : `1px solid ${LINE}`,
+            }}
+          >
+            <span
+              style={{
+                flex: '0 0 auto',
+                width: 17,
+                height: 17,
+                borderRadius: 999,
+                border: `1.5px solid ${INK}`,
+                color: INK,
+                fontSize: 9,
+                fontWeight: 700,
+                lineHeight: '14px',
+                textAlign: 'center',
+              }}
+            >
+              {i + 1}
+            </span>
+            <span style={{ fontSize: 10.5, color: BODY }}>{step}</span>
+          </li>
+        ))}
+      </ol>
+      <div style={{ ...noBreak, fontSize: 10.5, color: INK, marginTop: 9, fontWeight: 600 }}>
+        Call {branding.phone} or email {branding.email}
+        {p.reference && <span style={{ fontWeight: 400, color: MUTED }}> quoting {p.reference}</span>}.
       </div>
     </Section>
   )
