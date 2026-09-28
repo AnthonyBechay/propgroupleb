@@ -7,6 +7,7 @@ import rateLimit from 'express-rate-limit';
 import cookieParser from 'cookie-parser';
 import { prisma } from '@propgroup/db';
 import passport from './config/passport.js';
+import { checkAiAccess, isAiEnabled } from './config/ai.js';
 import { errorHandler } from './utils/errors.js';
 import { logger } from './utils/logger.js';
 import { validateEnv } from './utils/validate-env.js';
@@ -384,6 +385,22 @@ async function startServer() {
         cors: allowedOrigins,
       });
     });
+
+    // Say on every boot whether Claude is actually reachable from this
+    // container. Reads model metadata only — no tokens, no cost. A generation
+    // that hangs until the gateway 502s tells the browser nothing (the 502
+    // carries no CORS headers, so it surfaces as a CORS error); this puts the
+    // real answer in the deploy log. Fire-and-forget: it must never delay boot
+    // or bring the server down.
+    if (isAiEnabled()) {
+      void checkAiAccess()
+        .then(({ ok, detail }) =>
+          ok ? logger.info(`AI ready — ${detail}`) : logger.error(`AI unavailable — ${detail}`),
+        )
+        .catch((err) => logger.error('AI check failed', err));
+    } else {
+      logger.info('AI is off (AI_ENABLED is not "true", or no ANTHROPIC_API_KEY)');
+    }
 
     // Keep-alive must exceed Cloudflare's timeout (100s) to prevent
     // intermittent 520 / ERR_CONNECTION_TIMED_OUT errors.

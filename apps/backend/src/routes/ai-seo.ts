@@ -200,6 +200,7 @@ ${facts}
 
 Rules: be accurate to the facts (never invent amenities, prices or sizes), write natural English, no emojis, no quotes around values, no markdown. Return JSON only.`;
 
+    const startedAt = Date.now();
     try {
       // Routed through config/ai.ts, which pins the model to the cheap-tier
       // allowlist, caps output tokens, logs per-call cost, and refuses to run
@@ -240,7 +241,8 @@ Rules: be accurate to the facts (never invent amenities, prices or sizes), write
       // Say what actually went wrong. The generic message meant every failure —
       // a bad key, an unavailable model, a timeout — looked identical in the
       // admin, and the browser's CORS complaint on a gateway 502 hid it further.
-      logger.error('AI SEO generation failed', err);
+      // Timing matters here: a failure at ~20s is the network, not the model.
+      logger.error(`AI SEO generation failed after ${Date.now() - startedAt}ms`, err);
       sendError(res, 502, `AI generation failed. ${aiFailureMessage(err)}`);
     }
   })

@@ -50,16 +50,21 @@ export function isAiEnabled(): boolean {
 let client: Anthropic | null = null;
 
 /**
- * One call, bounded.
+ * One call, bounded — and bounded well inside the gateway's own limit.
  *
- * The SDK defaults to a 10-minute timeout and 2 retries, so a single click
- * could sit for half an hour and cost three calls. The gateway in front of this
- * API gives up long before that, and the browser then sees only a 502 with no
- * CORS headers — which reads as "blocked by CORS" and hides the real reason.
- * A short timeout and a single retry keep a failure fast, cheap and legible.
+ * The SDK defaults to a 10-minute timeout and 2 retries. Cloudflare gives up on
+ * this API after about 100 seconds, so anything slower never reaches the
+ * browser as our response: the browser gets a gateway 502 carrying no CORS
+ * headers, reports it as "blocked by CORS", and the actual reason is lost. That
+ * is exactly what a server that cannot reach api.anthropic.com looks like — the
+ * call hangs, nothing is ever generated, and Anthropic records no usage.
+ *
+ * 20 seconds with no retry means the worst case is ~20s, so THIS server always
+ * answers first, with a real message. Haiku writes these 600-token replies in a
+ * few seconds; a request still running at 20s is broken, not slow.
  */
 function getClient(): Anthropic {
-  return new Anthropic({ timeout: 45_000, maxRetries: 1 });
+  return new Anthropic({ timeout: 20_000, maxRetries: 0 });
 }
 
 /**
@@ -145,6 +150,7 @@ export async function createMessage(params: GuardedMessageParams) {
 
   const maxTokens = Math.min(params.maxTokens ?? MAX_OUTPUT_TOKENS, MAX_OUTPUT_TOKENS);
 
+  const startedAt = Date.now();
   const response = await client.messages.create({
     model: AI_MODEL,
     max_tokens: maxTokens,
@@ -156,7 +162,8 @@ export async function createMessage(params: GuardedMessageParams) {
   const u = response.usage;
   logger.info(
     `AI call: model=${AI_MODEL} in=${u.input_tokens} out=${u.output_tokens} ` +
-      `≈$${(((u.input_tokens ?? 0) * 1 + (u.output_tokens ?? 0) * 5) / 1e6).toFixed(5)}`,
+      `≈$${(((u.input_tokens ?? 0) * 1 + (u.output_tokens ?? 0) * 5) / 1e6).toFixed(5)} ` +
+      `${Date.now() - startedAt}ms`,
   );
 
   return response;
