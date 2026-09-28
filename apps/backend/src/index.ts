@@ -238,6 +238,11 @@ app.use('/api/auth/register', authLimiter);
 // requests/15min per IP is an email-bombing budget, not a rate limit.
 app.use('/api/auth/forgot-password', authLimiter);
 app.use('/api/auth/reset-password', authLimiter);
+// The expensive bucket existed but was never applied to anything. These two are
+// what it was written for: /api/ai-seo spends model credits per call and
+// /api/contact puts mail in someone's inbox.
+app.use('/api/ai-seo', expensiveLimiter);
+app.use('/api/contact', expensiveLimiter);
 // Public AI search calls Anthropic per request — unmetered, that is somebody
 // else's bill.
 

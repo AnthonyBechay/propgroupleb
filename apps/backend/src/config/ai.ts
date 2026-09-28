@@ -49,6 +49,68 @@ export function isAiEnabled(): boolean {
 
 let client: Anthropic | null = null;
 
+/**
+ * One call, bounded.
+ *
+ * The SDK defaults to a 10-minute timeout and 2 retries, so a single click
+ * could sit for half an hour and cost three calls. The gateway in front of this
+ * API gives up long before that, and the browser then sees only a 502 with no
+ * CORS headers — which reads as "blocked by CORS" and hides the real reason.
+ * A short timeout and a single retry keep a failure fast, cheap and legible.
+ */
+function getClient(): Anthropic {
+  return new Anthropic({ timeout: 45_000, maxRetries: 1 });
+}
+
+/**
+ * Why an AI call failed, in words an admin can act on. The SDK's own error
+ * classes carry the status; a generic "AI generation failed" told nobody
+ * whether the key, the model, the quota or the network was at fault.
+ */
+export function aiFailureMessage(err: unknown): string {
+  if (err instanceof Anthropic.AuthenticationError) {
+    return 'Anthropic rejected the API key. Check ANTHROPIC_API_KEY.';
+  }
+  if (err instanceof Anthropic.NotFoundError) {
+    return `Model "${AI_MODEL}" is not available to this API key.`;
+  }
+  if (err instanceof Anthropic.RateLimitError) {
+    return 'Rate limited by Anthropic. Wait a moment and try again.';
+  }
+  if (err instanceof Anthropic.APIConnectionTimeoutError) {
+    return 'Anthropic did not answer in time. Try again.';
+  }
+  if (err instanceof Anthropic.APIConnectionError) {
+    return 'Could not reach Anthropic from the server.';
+  }
+  if (err instanceof Anthropic.APIError) {
+    return `Anthropic error ${err.status ?? '?'}: ${err.message}`;
+  }
+  return err instanceof Error ? err.message : 'Unknown error';
+}
+
+/**
+ * Is the key valid and the model reachable? Asks the Models API, which returns
+ * metadata and costs nothing — no tokens are generated. This is the way to
+ * check a deployment, rather than burning a real generation to find out.
+ */
+export async function checkAiAccess(): Promise<{ ok: boolean; detail: string }> {
+  if (!isAiEnabled()) {
+    return {
+      ok: false,
+      detail: process.env.ANTHROPIC_API_KEY
+        ? 'AI_ENABLED is not "true".'
+        : 'ANTHROPIC_API_KEY is not set.',
+    };
+  }
+  try {
+    const model = await getClient().models.retrieve(AI_MODEL);
+    return { ok: true, detail: `Key valid, model available: ${model.id}` };
+  } catch (err) {
+    return { ok: false, detail: aiFailureMessage(err) };
+  }
+}
+
 /** Throws unless the model is on the allowlist. */
 function assertAllowedModel(model: string): asserts model is AllowedModel {
   if (!(ALLOWED_MODELS as readonly string[]).includes(model)) {
@@ -79,7 +141,7 @@ export async function createMessage(params: GuardedMessageParams) {
 
   assertAllowedModel(AI_MODEL);
 
-  if (!client) client = new Anthropic();
+  if (!client) client = getClient();
 
   const maxTokens = Math.min(params.maxTokens ?? MAX_OUTPUT_TOKENS, MAX_OUTPUT_TOKENS);
 

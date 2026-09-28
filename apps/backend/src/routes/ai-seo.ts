@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { prisma } from '@propgroup/db';
 import { authenticateToken, requireAdmin, logAdminAction } from '../middleware/auth.js';
 import { asyncHandler } from '../utils/errors.js';
-import { createText, isAiEnabled } from '../config/ai.js';
+import { AI_MODEL, aiFailureMessage, checkAiAccess, createText, isAiEnabled } from '../config/ai.js';
 import { logger } from '../utils/logger.js';
 import { sendSuccess, sendError } from '../utils/response.js';
 import type { AuthenticatedRequest } from '../types/index.js';
@@ -11,6 +11,27 @@ import type { AuthenticatedRequest } from '../types/index.js';
 const router: Router = express.Router();
 
 
+
+// ── GET /status — is AI actually usable here? ────────────────────────────────
+//
+// Costs nothing: it reads model metadata rather than generating anything. Use
+// it to tell a disabled switch, a rejected key and an unavailable model apart
+// without spending a cent on a generation that will fail.
+router.get(
+  '/status',
+  authenticateToken,
+  requireAdmin,
+  asyncHandler(async (_req: Request, res: Response) => {
+    const check = await checkAiAccess();
+    sendSuccess(res, {
+      enabled: process.env.AI_ENABLED === 'true',
+      hasKey: Boolean(process.env.ANTHROPIC_API_KEY),
+      model: AI_MODEL,
+      ok: check.ok,
+      detail: check.detail,
+    });
+  })
+);
 
 const generateSchema = z.object({
   type: z.enum(['building', 'unit']),
@@ -216,8 +237,11 @@ Rules: be accurate to the facts (never invent amenities, prices or sizes), write
       await logAdminAction('AI_GENERATE_SEO', type, id ?? 'draft', { type }, authReq);
       sendSuccess(res, result, 'SEO suggestions generated');
     } catch (err) {
+      // Say what actually went wrong. The generic message meant every failure —
+      // a bad key, an unavailable model, a timeout — looked identical in the
+      // admin, and the browser's CORS complaint on a gateway 502 hid it further.
       logger.error('AI SEO generation failed', err);
-      sendError(res, 502, 'AI generation failed. Please try again.');
+      sendError(res, 502, `AI generation failed. ${aiFailureMessage(err)}`);
     }
   })
 );
