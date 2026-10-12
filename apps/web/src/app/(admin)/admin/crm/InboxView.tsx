@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   Loader2, MessageCircle, Instagram, Send, ArrowLeft, UserPlus, User,
-  Bot, Megaphone, Inbox, Smartphone,
+  Bot, Megaphone, Inbox, Smartphone, Link2, X,
 } from 'lucide-react'
 import { normalizeApiUrl, normalizeFileUrl } from '@/lib/utils/api-url'
 
@@ -116,6 +116,11 @@ export function InboxView({
   const [sending, setSending] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
+  // Attaching a thread to somebody already in the CRM, when the number alone
+  // did not match them (a second phone, an Instagram account).
+  const [linking, setLinking] = useState(false)
+  const [linkQuery, setLinkQuery] = useState('')
+  const [linkResults, setLinkResults] = useState<ThreadLead[]>([])
 
   const call = useCallback(
     (path: string, init?: RequestInit) =>
@@ -128,11 +133,15 @@ export function InboxView({
     [apiUrl]
   )
 
+  // The server searches every thread; the list itself only holds the newest 100.
+  const needle = search.trim()
   const loadThreads = useCallback(async () => {
-    const res = await call('?limit=100')
+    const p = new URLSearchParams({ limit: '100' })
+    if (needle) p.set('search', needle)
+    const res = await call(`?${p}`)
     if (res.ok) setThreads((await res.json()).data ?? [])
     else setThreads((t) => t ?? [])
-  }, [call])
+  }, [call, needle])
 
   const loadDetail = useCallback(async (id: string) => {
     const res = await call(`/${id}`)
@@ -149,6 +158,8 @@ export function InboxView({
     setDetail(null)
     setDraft('')
     setError(null)
+    setLinking(false)
+    setLinkQuery('')
     if (!openId) return
     loadDetail(openId)
     // Opening a thread is reading it.
@@ -178,14 +189,27 @@ export function InboxView({
     } finally { setSending(false) }
   }
 
-  const addAsClient = async () => {
+  const addAsClient = async (leadId?: string) => {
     if (!openId) return
-    const res = await call(`/${openId}/lead`, { method: 'POST', body: JSON.stringify({}) })
+    const res = await call(`/${openId}/lead`, { method: 'POST', body: JSON.stringify(leadId ? { leadId } : {}) })
     if (res.ok) {
+      setLinking(false)
+      setLinkQuery('')
       await Promise.all([loadDetail(openId), loadThreads()])
       onChanged()
     }
   }
+
+  useEffect(() => {
+    const q = linkQuery.trim()
+    if (!linking || q.length < 2) { setLinkResults([]); return }
+    const timer = setTimeout(async () => {
+      const p = new URLSearchParams({ search: q, limit: '8' })
+      const res = await fetch(`${apiUrl}/api/crm?${p}`, { credentials: 'include', cache: 'no-store' })
+      if (res.ok) setLinkResults((await res.json()).data ?? [])
+    }, 250)
+    return () => clearTimeout(timer)
+  }, [linking, linkQuery, apiUrl])
 
   const toggleAi = async () => {
     if (!detail) return
@@ -204,7 +228,7 @@ export function InboxView({
     return <div className="flex justify-center py-20 text-slate-400"><Loader2 className="h-6 w-6 animate-spin" /></div>
   }
 
-  if (threads.length === 0) {
+  if (threads.length === 0 && !needle) {
     return (
       <div className="bg-white border border-slate-200 rounded-xl p-16 text-center">
         <Inbox className="h-12 w-12 mx-auto text-slate-300 mb-3" />
@@ -216,14 +240,7 @@ export function InboxView({
     )
   }
 
-  const needle = search.trim().toLowerCase()
-  const visible = needle
-    ? threads.filter((t) =>
-        [threadName(t), t.externalId, t.lastPreview, t.adLabel]
-          .filter(Boolean)
-          .some((v) => String(v).toLowerCase().includes(needle))
-      )
-    : threads
+  const visible = threads
 
   return (
     <div className="bg-white border border-slate-200 rounded-xl overflow-hidden lg:grid lg:grid-cols-[340px_1fr] lg:h-[70vh]">
@@ -294,11 +311,47 @@ export function InboxView({
                   <User className="h-4 w-4" /> Open client
                 </button>
               ) : (
-                <button onClick={addAsClient} className="min-h-11 px-3 rounded-lg text-sm font-medium inline-flex items-center gap-1.5 bg-slate-900 text-white hover:bg-slate-800">
-                  <UserPlus className="h-4 w-4" /> Add as client
-                </button>
+                <>
+                  <button onClick={() => setLinking((v) => !v)} className="min-h-11 px-3 rounded-lg text-sm font-medium inline-flex items-center gap-1.5 border border-slate-200 text-slate-700 hover:bg-slate-50">
+                    <Link2 className="h-4 w-4" /> Link to client
+                  </button>
+                  <button onClick={() => addAsClient()} className="min-h-11 px-3 rounded-lg text-sm font-medium inline-flex items-center gap-1.5 bg-slate-900 text-white hover:bg-slate-800">
+                    <UserPlus className="h-4 w-4" /> Add as client
+                  </button>
+                </>
               )}
             </div>
+
+            {linking && !detail.lead && (
+              <div className="px-3 sm:px-4 py-3 border-b border-slate-200 bg-slate-50">
+                <div className="flex items-center gap-2">
+                  <input
+                    autoFocus
+                    value={linkQuery}
+                    onChange={(e) => setLinkQuery(e.target.value)}
+                    placeholder="Search existing clients by name or phone"
+                    className="flex-1 min-h-11 rounded-lg border border-slate-300 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-slate-400"
+                  />
+                  <button onClick={() => setLinking(false)} aria-label="Cancel" className="min-h-11 min-w-11 inline-flex items-center justify-center text-slate-500">
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+                {linkResults.length > 0 && (
+                  <ul className="mt-2 divide-y divide-slate-200 bg-white border border-slate-200 rounded-lg">
+                    {linkResults.map((r) => (
+                      <li key={r.id}>
+                        <button onClick={() => addAsClient(r.id)} className="w-full min-h-11 text-left px-3 py-2 text-sm hover:bg-slate-50">
+                          {r.name}
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                {linkQuery.trim().length >= 2 && linkResults.length === 0 && (
+                  <p className="text-sm text-slate-500 mt-2">No client matches.</p>
+                )}
+              </div>
+            )}
 
             <div className="flex-1 overflow-y-auto px-3 sm:px-4 py-4 space-y-2 bg-slate-50 max-h-[55vh] lg:max-h-none">
               {detail.messages.map((m) => (

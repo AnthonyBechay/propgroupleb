@@ -105,4 +105,11 @@ export async function sendReply(conversationId: string, text: string, origin: Re
     body,
     origin,
   });
+  // Instagram echoes our own message back, sometimes before the line above
+  // runs — it is then already stored as typed on the phone. Say where it
+  // really came from, or an automatic reply would read as a person's.
+  await prisma.chatMessage.updateMany({
+    where: { externalId: { in: [sent.id, sent.altId].filter((id): id is string => Boolean(id)) } },
+    data: { origin },
+  });
 }

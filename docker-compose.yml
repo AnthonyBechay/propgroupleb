@@ -21,14 +21,15 @@ services:
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       # Master AI switch. OFF unless explicitly 'true'. Unset this and
       # redeploy to stop ALL Anthropic spend without touching code.
-      AI_ENABLED: ${AI_ENABLED:-true}
+      AI_ENABLED: ${AI_ENABLED:-}
       # Meta webhooks — WhatsApp, Instagram and Lead Ads intake. The endpoints
       # reject everything until the secret and verify token are set.
       META_APP_SECRET: ${META_APP_SECRET:-}
       META_VERIFY_TOKEN: ${META_VERIFY_TOKEN:-}
       META_ACCESS_TOKEN: ${META_ACCESS_TOKEN:-}
       INSTAGRAM_APP_SECRET: ${INSTAGRAM_APP_SECRET:-}
-      # Instagram account token — for sending replies. Not read by any code yet.
+      # Instagram account token — for sending replies. Expires after 60 days
+      # unless refreshed; replies on Instagram stop when it does.
       INSTAGRAM_ACCESS_TOKEN: ${INSTAGRAM_ACCESS_TOKEN:-}
       # YCloud relays the coexistence WhatsApp number; its API key is for sending.
       YCLOUD_WEBHOOK_SECRET: ${YCLOUD_WEBHOOK_SECRET:-}
@@ -40,6 +41,13 @@ services:
       AUTO_REPLY_ENABLED: ${AUTO_REPLY_ENABLED:-}
       AUTO_REPLY_AUDIENCE: ${AUTO_REPLY_AUDIENCE:-ads}
       AUTO_REPLY_DAILY_LIMIT: ${AUTO_REPLY_DAILY_LIMIT:-200}
+      # Market a brand-new client is filed under, by the account they wrote to:
+      # the Facebook Page / Instagram account, and the WhatsApp number.
+      # LEBANON or GEORGIA; editable on the client afterwards. Both default to
+      # GEORGIA because only the Georgian ad account is connected so far —
+      # switch these when Lebanese ads or accounts are added.
+      LEAD_MARKET_META: ${LEAD_MARKET_META:-GEORGIA}
+      LEAD_MARKET_WHATSAPP: ${LEAD_MARKET_WHATSAPP:-GEORGIA}
       # Cloudflare R2 — required for file uploads
       R2_ACCOUNT_ID: ${R2_ACCOUNT_ID:-}
       R2_ACCESS_KEY_ID: ${R2_ACCESS_KEY_ID:-}

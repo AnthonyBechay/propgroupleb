@@ -26,7 +26,18 @@ router.get(
   asyncHandler(async (req: Request, res: Response) => {
     const { page, limit, skip } = parsePagination(req.query as Record<string, string>);
     const channel = req.query.channel;
+    const search = typeof req.query.search === 'string' ? req.query.search.trim() : '';
     const where = {
+      ...(search
+        ? {
+            OR: [
+              { displayName: { contains: search, mode: 'insensitive' as const } },
+              { externalId: { contains: search.replace(/[^\d\w]/g, '') || search } },
+              { lastPreview: { contains: search, mode: 'insensitive' as const } },
+              { lead: { is: { name: { contains: search, mode: 'insensitive' as const } } } },
+            ],
+          }
+        : {}),
       ...(channel === 'WHATSAPP' || channel === 'INSTAGRAM' ? { channel: channel as 'WHATSAPP' | 'INSTAGRAM' } : {}),
       ...(req.query.unread === 'true' ? { unreadCount: { gt: 0 } } : {}),
       ...(typeof req.query.leadId === 'string' ? { leadId: req.query.leadId } : {}),
@@ -74,6 +85,23 @@ router.get(
       sendingConfigured: canSendOn(conversation.channel),
       autoReplyOn: autoReplyEnabled(),
     });
+  })
+);
+
+// GET /api/crm/inbox/by-lead/:leadId — a client's threads with their latest
+// messages, for the activity tab of the client drawer
+router.get(
+  '/by-lead/:leadId',
+  asyncHandler(async (req: Request, res: Response) => {
+    const conversations = await prisma.conversation.findMany({
+      where: { leadId: req.params.leadId },
+      orderBy: { lastMessageAt: 'desc' },
+      include: { messages: { orderBy: { sentAt: 'desc' }, take: 12 } },
+    });
+    sendSuccess(
+      res,
+      conversations.map((c) => ({ ...c, messages: [...c.messages].reverse() }))
+    );
   })
 );
 

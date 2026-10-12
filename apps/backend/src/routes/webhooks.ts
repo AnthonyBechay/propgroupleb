@@ -20,9 +20,11 @@ import { scheduleAutoReply } from '../services/auto-reply.service.js';
  *
  * 1. Verify the sender before trusting a byte. The URL is public and anything
  *    that can POST to it could otherwise fabricate clients.
- * 2. Answer 200 immediately. Meta retries with escalating frequency when a
- *    webhook is slow or errors, so processing failures must not become
- *    delivery failures — we log them and still acknowledge.
+ * 2. Store first, then acknowledge. A 200 tells the sender to forget the
+ *    message, so it is only given once the message is in the database; a
+ *    failure answers 500 and the sender retries. That is safe because every
+ *    message is keyed on the platform's own id — a retry of something already
+ *    stored is a no-op. Slow work (attachments, auto-reply) is not awaited.
  *
  * Setup (Meta App → each use case → Webhooks):
  *   Callback URL : https://<backend>/api/webhooks/meta
@@ -82,20 +84,18 @@ function signatureValid(req: RawBodyRequest): boolean {
   );
 }
 
-/**
- * Acknowledge, then process. Everything after the 200 is best-effort; a thrown
- * error must not turn into a retry storm.
- */
+/** Process, then acknowledge — a failure asks the sender to deliver again. */
 async function acceptAndProcess(req: Request, res: Response): Promise<void> {
-  res.sendStatus(200);
   try {
     const body = req.body ?? {};
     if (body.object === 'whatsapp_business_account') await handleWhatsApp(body);
     else if (body.object === 'instagram') await handleInstagram(body);
     else if (body.object === 'page') await handleLeadgen(body);
     else logger.info('Meta webhook ignored', { object: body.object });
+    res.sendStatus(200);
   } catch (err) {
     logger.error('Meta webhook processing failed', { error: (err as Error).message });
+    res.sendStatus(500);
   }
 }
 
@@ -139,8 +139,9 @@ router.post(
 
 /**
  * Check YCloud's `YCloud-Signature: t=<unix seconds>,s=<hex>` header: HMAC-SHA256
- * over "<t>." + the raw body. A delivery older than five minutes is refused so
- * a captured request cannot be replayed later.
+ * over "<t>." + the raw body. The timestamp window is wide on purpose: YCloud
+ * retries a failed delivery for hours, and a replayed message is harmless
+ * because it is already stored under its own id.
  */
 function ycloudSignatureValid(req: RawBodyRequest): boolean {
   const secret = process.env.YCLOUD_WEBHOOK_SECRET;
@@ -150,7 +151,7 @@ function ycloudSignatureValid(req: RawBodyRequest): boolean {
   const fields = header.split(',').map((part) => part.trim().split('='));
   const timestamp = fields.find(([key]) => key === 't')?.[1];
   if (!timestamp || !/^\d+$/.test(timestamp)) return false;
-  if (Math.abs(Math.floor(Date.now() / 1000) - Number(timestamp)) > 300) return false;
+  if (Math.abs(Math.floor(Date.now() / 1000) - Number(timestamp)) > 3 * 24 * 60 * 60) return false;
 
   const expected = crypto
     .createHmac('sha256', secret)
@@ -174,11 +175,12 @@ router.post(
       return;
     }
 
-    res.sendStatus(200);
     try {
       await handleYCloud(req.body ?? {});
+      res.sendStatus(200);
     } catch (err) {
       logger.error('YCloud webhook processing failed', { error: (err as Error).message });
+      res.sendStatus(500);
     }
   })
 );
@@ -388,11 +390,11 @@ async function handleLeadgen(body: any): Promise<void> {
       const leadgenId = change.value?.leadgen_id;
       if (!leadgenId) continue;
 
-      const fields = await fetchLeadFields(String(leadgenId));
+      const { fields, label } = await fetchLead(String(leadgenId));
       const { lead, created } = await upsertLeadFromForm({
         leadgenId: String(leadgenId),
         adId: change.value?.ad_id ? String(change.value.ad_id) : null,
-        formName: change.value?.form_id ? `Form ${change.value.form_id}` : null,
+        formName: label,
         fields,
       });
       logger.info('Lead Ads submission handled', { leadId: lead.id, newClient: created });
@@ -400,32 +402,40 @@ async function handleLeadgen(body: any): Promise<void> {
   }
 }
 
-/** Pull the submitted answers for a leadgen id. Returns {} when unavailable. */
-async function fetchLeadFields(leadgenId: string): Promise<Record<string, string>> {
+/**
+ * Pull the submitted answers for a leadgen id, plus the ad or campaign name the
+ * team will recognise it by. Empty when unavailable.
+ */
+async function fetchLead(leadgenId: string): Promise<{ fields: Record<string, string>; label: string | null }> {
+  const empty = { fields: {}, label: null };
   const token = process.env.META_ACCESS_TOKEN;
   if (!token) {
     logger.warn('META_ACCESS_TOKEN unset — storing the Lead Ads id without its answers');
-    return {};
+    return empty;
   }
   try {
     // Token in a header, never the query string — URLs end up in access logs.
     const res = await fetch(
-      `https://graph.facebook.com/${GRAPH_VERSION}/${encodeURIComponent(leadgenId)}?fields=field_data`,
+      `https://graph.facebook.com/${GRAPH_VERSION}/${encodeURIComponent(leadgenId)}?fields=field_data,ad_name,campaign_name`,
       { headers: { Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(10_000) }
     );
     if (!res.ok) {
       logger.error('Lead Ads fetch failed', { status: res.status });
-      return {};
+      return empty;
     }
-    const json = (await res.json()) as { field_data?: Array<{ name: string; values: string[] }> };
-    const out: Record<string, string> = {};
+    const json = (await res.json()) as {
+      field_data?: Array<{ name: string; values: string[] }>;
+      ad_name?: string;
+      campaign_name?: string;
+    };
+    const fields: Record<string, string> = {};
     for (const f of json.field_data ?? []) {
-      if (f.values?.[0]) out[f.name] = f.values[0];
+      if (f.values?.[0]) fields[f.name] = f.values[0];
     }
-    return out;
+    return { fields, label: json.ad_name ?? json.campaign_name ?? null };
   } catch (err) {
     logger.error('Lead Ads fetch threw', { error: (err as Error).message });
-    return {};
+    return empty;
   }
 }
 

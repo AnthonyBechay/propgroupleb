@@ -171,6 +171,9 @@ export interface Lead {
   /** Set once the client has a mirrored WhatsApp / Instagram thread. */
   waId?: string | null
   igId?: string | null
+  /** Which Meta ad or lead form brought them in, when the platform said. */
+  adId?: string | null
+  adLabel?: string | null
   market: LeadMarket
   type: LeadType
   status: LeadStatus

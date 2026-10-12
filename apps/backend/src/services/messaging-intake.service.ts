@@ -65,6 +65,18 @@ async function findLeadForSender(channel: Channel, externalId: string): Promise<
   return hit;
 }
 
+/**
+ * Which market a brand-new client is filed under. Meta does not say what the
+ * person wants, so this follows the account they wrote to: the Facebook Page
+ * and Instagram account (`LEAD_MARKET_META`) or the WhatsApp number
+ * (`LEAD_MARKET_WHATSAPP`). It is only a starting point — editable on the
+ * client, and never applied to someone already in the CRM.
+ */
+function marketFor(source: 'META' | 'WHATSAPP'): 'LEBANON' | 'GEORGIA' {
+  const value = (process.env[`LEAD_MARKET_${source}`] ?? '').toUpperCase();
+  return value === 'GEORGIA' ? 'GEORGIA' : 'LEBANON';
+}
+
 export interface AdReferral {
   adId?: string | null;
   label?: string | null;
@@ -130,16 +142,34 @@ export async function recordChatMessage(event: ChatEvent): Promise<string | null
     if (!lead && inbound && !event.history && event.referral?.adId) {
       lead = await createLeadFromChat(event, externalId);
     }
-    conversation = await prisma.conversation.create({
-      data: {
-        channel: event.channel,
-        externalId,
-        displayName: event.displayName || null,
-        leadId: lead?.id ?? null,
-        adId: event.referral?.adId ?? null,
-        adLabel: event.referral?.label ?? null,
-      },
-    });
+    try {
+      conversation = await prisma.conversation.create({
+        data: {
+          channel: event.channel,
+          externalId,
+          displayName: event.displayName || null,
+          leadId: lead?.id ?? null,
+          adId: event.referral?.adId ?? null,
+          adLabel: event.referral?.label ?? null,
+        },
+      });
+    } catch (err: any) {
+      // Two messages from a new sender arrived together (a history import does
+      // this constantly) and the other one created the thread first.
+      if (err?.code !== 'P2002') throw err;
+      conversation = await prisma.conversation.findUniqueOrThrow({
+        where: { channel_externalId: { channel: event.channel, externalId } },
+      });
+    }
+  } else if (!conversation.leadId && !event.history) {
+    // The sender may have been added to the CRM by hand since the thread began.
+    const lead = await findLeadForSender(event.channel, externalId);
+    if (lead) {
+      conversation = await prisma.conversation.update({
+        where: { id: conversation.id },
+        data: { leadId: lead.id },
+      });
+    }
   }
 
   let stored: { id: string };
@@ -187,15 +217,22 @@ export async function recordChatMessage(event: ChatEvent): Promise<string | null
   });
 
   if (conversation.leadId && live) {
-    await prisma.lead.update({
-      where: { id: conversation.leadId },
-      data: inbound
-        ? // The ball is in our court. Deliberately not `lastContactAt`: that
-          // means "when we last contacted them", and a client messaging us is
-          // the opposite.
-          { subStatus: 'AWAITING_REPLY' }
-        : { lastContactAt: sentAt },
-    });
+    if (inbound) {
+      // AWAITING_REPLY means "waiting on them" — and they just replied, so it
+      // no longer holds. Any other sub-status is the team's call and stays.
+      // Deliberately not `lastContactAt`: that is when WE last contacted them.
+      await prisma.lead.updateMany({
+        where: { id: conversation.leadId, subStatus: 'AWAITING_REPLY' },
+        data: { subStatus: null },
+      });
+    } else if (event.origin !== 'AI') {
+      // A person answered. An automatic reply does not count as contact — the
+      // client must stay on the "nobody has spoken to them" list until one has.
+      await prisma.lead.update({
+        where: { id: conversation.leadId },
+        data: { lastContactAt: sentAt },
+      });
+    }
   }
 
   return conversation.id;
@@ -244,9 +281,9 @@ async function createLeadFromChat(event: ChatEvent, externalId: string): Promise
   const isWhatsApp = event.channel === 'WHATSAPP';
   const lead = await prisma.lead.create({
     data: {
+      market: marketFor(isWhatsApp ? 'WHATSAPP' : 'META'),
       type: 'BUYER',
       status: 'ACTIVE',
-      subStatus: 'AWAITING_REPLY',
       source: isWhatsApp ? 'WHATSAPP' : 'FACEBOOK_AD',
       name:
         event.displayName?.trim() ||
@@ -301,6 +338,7 @@ export async function linkConversationToLead(
       (await prisma.lead.findFirst({ where: identity })) ??
       (await prisma.lead.create({
         data: {
+          market: marketFor(isWhatsApp ? 'WHATSAPP' : 'META'),
           type: 'BUYER',
           status: 'ACTIVE',
           source: isWhatsApp ? 'WHATSAPP' : 'MANUAL',
@@ -362,15 +400,19 @@ export async function upsertLeadFromForm(
         outcome: 'Inbound',
       },
     });
-    await prisma.lead.update({ where: { id: existing.id }, data: { subStatus: 'AWAITING_REPLY' } });
+    // They came back to us, so we are no longer "waiting on them".
+    await prisma.lead.updateMany({
+      where: { id: existing.id, subStatus: 'AWAITING_REPLY' },
+      data: { subStatus: null },
+    });
     return { lead: existing, created: false };
   }
 
   const lead = await prisma.lead.create({
     data: {
+      market: marketFor('META'),
       type: 'BUYER',
       status: 'ACTIVE',
-      subStatus: 'AWAITING_REPLY',
       source: 'FACEBOOK_AD',
       name: name?.trim() || (digits ? `Facebook lead +${digits}` : 'Facebook lead'),
       phone,

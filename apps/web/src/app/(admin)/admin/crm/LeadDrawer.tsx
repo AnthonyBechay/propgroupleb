@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import {
-  X, Phone, MessageCircle, Mail, Loader2, Send, Pencil, Trash2, Building2, Clock, CalendarPlus, ExternalLink, History, Handshake, ClipboardCheck, Lightbulb, Sparkles, Plus, StickyNote, Globe, Home, MessagesSquare,
+  X, Phone, MessageCircle, Mail, Loader2, Send, Pencil, Trash2, Building2, Clock, CalendarPlus, ExternalLink, History, Handshake, ClipboardCheck, Lightbulb, Sparkles, Plus, StickyNote, Globe, Home, MessagesSquare, Megaphone,
 } from 'lucide-react'
 import { normalizeApiUrl, normalizeFileUrl } from '@/lib/utils/api-url'
 import { regionLabel } from '@/lib/crm-locations'
@@ -23,6 +23,12 @@ import { canSeeMoney as canSeeMoneyFor } from '@/lib/permissions'
 import { listingRef } from '@/lib/reference'
 
 type TabKey = 'overview' | 'properties' | 'activity' | 'matches'
+
+interface LeadChat {
+  id: string
+  channel: 'WHATSAPP' | 'INSTAGRAM'
+  messages: Array<{ id: string; direction: 'IN' | 'OUT'; body: string; sentAt: string }>
+}
 
 /**
  * The drawer holds requirements, the conversation, the client's stock, live
@@ -129,6 +135,8 @@ export function LeadDrawer({
   // conversation, stock, matches and history, which is too much for one column.
   const [tab, setTab] = useState<TabKey>('overview')
   const [sharing, setSharing] = useState(false)
+  // Their WhatsApp / Instagram threads, shown on the activity tab.
+  const [chats, setChats] = useState<LeadChat[]>([])
 
   const { user } = useAuth()
   // Presentation only: the server strips these fields for roles that may not
@@ -143,6 +151,12 @@ export function LeadDrawer({
         fetch(`${apiUrl}/api/crm/${lead.id}/matches`, { credentials: 'include', cache: 'no-store' }),
         fetch(`${apiUrl}/api/crm/${lead.id}/lead-matches`, { credentials: 'include', cache: 'no-store' }),
       ])
+      // Not part of the Promise.all above: a client with no thread, or an API
+      // that predates the inbox, must not hold up the drawer.
+      fetch(`${apiUrl}/api/crm/inbox/by-lead/${lead.id}`, { credentials: 'include', cache: 'no-store' })
+        .then((r) => (r.ok ? r.json() : null))
+        .then((j) => setChats(j?.data ?? []))
+        .catch(() => setChats([]))
       if (d.ok) setDetail((await d.json()).data ?? null)
       if (m.ok) setMatches((await m.json()).data ?? [])
       if (lm.ok) setLeadMatches((await lm.json()).data ?? [])
@@ -321,6 +335,12 @@ export function LeadDrawer({
                   <span key={t} className="text-xs text-slate-500">{TYPE_LABELS[t]}</span>
                 ))}
               </div>
+              {(l.adLabel || l.adId) && (
+                <p className="text-xs text-slate-500 mt-1 inline-flex items-center gap-1 max-w-full">
+                  <Megaphone className="h-3 w-3 shrink-0" />
+                  <span className="truncate">From an ad{l.adLabel ? `: ${l.adLabel}` : ''}</span>
+                </p>
+              )}
             </div>
             <div className="flex items-center gap-1 shrink-0">
               <button onClick={() => setEditing(true)} className="p-2 rounded-lg text-slate-500 hover:bg-slate-100" title="Edit">
@@ -883,6 +903,35 @@ export function LeadDrawer({
 
           {tab === 'activity' && (
           <>
+          {/* The conversation itself, as mirrored from the phone. The latest
+              few lines only — the Inbox holds the whole thread. */}
+          {chats.map((chat) => (
+            <section key={chat.id} className="bg-white border border-slate-200 rounded-xl p-4">
+              <div className="flex items-center justify-between gap-2 mb-3">
+                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide flex items-center gap-1.5">
+                  <MessagesSquare className="h-3.5 w-3.5" /> {chat.channel === 'WHATSAPP' ? 'WhatsApp' : 'Instagram'} chat
+                </p>
+                {onOpenChat && (
+                  <button onClick={() => onOpenChat(l.id)} className="text-xs font-medium text-slate-700 underline hover:text-slate-900">
+                    Open full chat
+                  </button>
+                )}
+              </div>
+              <ol className="space-y-1.5">
+                {chat.messages.map((m) => (
+                  <li key={m.id} className={`flex ${m.direction === 'OUT' ? 'justify-end' : 'justify-start'}`}>
+                    <div className={`max-w-[85%] rounded-xl px-2.5 py-1.5 text-sm whitespace-pre-wrap break-words ${m.direction === 'OUT' ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-800'}`}>
+                      {m.body}
+                      <span className={`block text-[11px] mt-0.5 text-right ${m.direction === 'OUT' ? 'text-slate-300' : 'text-slate-400'}`}>
+                        {new Date(m.sentAt).toLocaleString(undefined, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                    </div>
+                  </li>
+                ))}
+              </ol>
+            </section>
+          ))}
+
           {/* History */}
           <section className="bg-white border border-slate-200 rounded-xl p-4">
             <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3 flex items-center gap-1.5">
