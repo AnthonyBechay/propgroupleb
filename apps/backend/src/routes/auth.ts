@@ -236,30 +236,25 @@ router.post(
   '/forgot-password',
   asyncHandler(async (req: Request, res: Response) => {
     const { email } = req.body;
-    if (!email) {
-      res.status(400).json({ error: 'Email is required' });
-      return;
-    }
-
-    if (typeof email !== 'string') {
+    if (!email || typeof email !== 'string') {
       res.status(400).json({ error: 'Email is required' });
       return;
     }
 
     const user = await prisma.user.findUnique({ where: { email: email.toLowerCase().trim() } });
 
-    // Always respond success to prevent email enumeration
     if (!user || !user.password) {
       sendSuccess(res, null, 'If an account exists with this email, a reset link has been sent.');
       return;
     }
 
     const resetToken = crypto.randomBytes(32).toString('hex');
-    const resetTokenExpiry = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+    const resetTokenHash = crypto.createHash('sha256').update(resetToken).digest('hex');
+    const resetTokenExpiry = new Date(Date.now() + 60 * 60 * 1000);
 
     await prisma.user.update({
       where: { id: user.id },
-      data: { resetToken, resetTokenExpiry },
+      data: { resetToken: resetTokenHash, resetTokenExpiry },
     });
 
     await sendPasswordResetEmail(user.email, resetToken);
@@ -272,22 +267,25 @@ router.post(
 router.post(
   '/reset-password',
   asyncHandler(async (req: Request, res: Response) => {
-    const { token, password } = req.body;
+    const token = typeof req.body?.token === 'string' ? req.body.token : null;
+    const password = typeof req.body?.password === 'string' ? req.body.password : null;
+
     if (!token || !password) {
       res.status(400).json({ error: 'Token and password are required' });
       return;
     }
-
-    if (password.length < 8 || !/[A-Z]/.test(password) || !/[0-9]/.test(password)) {
+    if (!/^[0-9a-f]{64}$/.test(token)) {
+      res.status(400).json({ error: 'Invalid or expired reset token' });
+      return;
+    }
+    if (password.length < 8 || password.length > 200 || !/[A-Z]/.test(password) || !/[0-9]/.test(password)) {
       res.status(400).json({ error: 'Password must be at least 8 characters with 1 uppercase letter and 1 number' });
       return;
     }
 
+    const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
     const user = await prisma.user.findFirst({
-      where: {
-        resetToken: token,
-        resetTokenExpiry: { gt: new Date() },
-      },
+      where: { resetToken: tokenHash, resetTokenExpiry: { gt: new Date() } },
     });
 
     if (!user) {
@@ -296,14 +294,9 @@ router.post(
     }
 
     const hashedPassword = await bcrypt.hash(password, 12);
-
     await prisma.user.update({
       where: { id: user.id },
-      data: {
-        password: hashedPassword,
-        resetToken: null,
-        resetTokenExpiry: null,
-      },
+      data: { password: hashedPassword, resetToken: null, resetTokenExpiry: null },
     });
 
     sendSuccess(res, null, 'Password reset successfully. You can now log in.');
