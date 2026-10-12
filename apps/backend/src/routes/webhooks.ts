@@ -8,6 +8,7 @@ import {
   upsertLeadFromForm,
   type AdReferral,
 } from '../services/messaging-intake.service.js';
+import { scheduleAutoReply } from '../services/auto-reply.service.js';
 
 /**
  * Meta webhooks — WhatsApp, Instagram messaging and Facebook Lead Ads.
@@ -182,6 +183,14 @@ router.post(
   })
 );
 
+/** The download link YCloud attaches to an image, voice note, video or document. */
+function ycloudMedia(m: any): { url: string; mime?: string; filename?: string } | null {
+  const part = m?.[m?.type];
+  return typeof part?.link === 'string' && part.link
+    ? { url: part.link, mime: part.mime_type, filename: part.filename }
+    : null;
+}
+
 /**
  * YCloud events for the coexistence number.
  *
@@ -196,7 +205,7 @@ async function handleYCloud(event: any): Promise<void> {
 
   if (type === 'whatsapp.message.updated') {
     const m = event.whatsappMessage;
-    if (m?.wamid && m.status) await recordMessageStatus(m.wamid, m.status);
+    if (m?.status) await recordMessageStatus([m.wamid, m.id], m.status);
     return;
   }
 
@@ -204,7 +213,7 @@ async function handleYCloud(event: any): Promise<void> {
     const m = event.whatsappInboundMessage;
     // Group chats are not mirrored — a thread here is one person.
     if (!m?.from || m.groupId) return;
-    await recordChatMessage({
+    const conversationId = await recordChatMessage({
       channel: 'WHATSAPP',
       externalId: m.from,
       displayName: m.customerProfile?.name ?? null,
@@ -213,10 +222,12 @@ async function handleYCloud(event: any): Promise<void> {
       type: m.type ?? 'text',
       body: whatsAppText(m),
       mediaId: m[m.type]?.id ?? null,
+      media: ycloudMedia(m),
       sentAt: m.sendTime ? new Date(m.sendTime) : undefined,
       referral: whatsAppReferral(m),
       history,
     });
+    if (conversationId && !history) scheduleAutoReply(conversationId);
     return;
   }
 
@@ -232,10 +243,12 @@ async function handleYCloud(event: any): Promise<void> {
       externalId: m.to,
       displayName: m.customerProfile?.name ?? null,
       messageId: m.wamid ?? m.id,
+      altMessageId: m.id,
       direction: 'OUT',
       type: m.type ?? 'text',
       body: whatsAppText(m),
       mediaId: m[m.type]?.id ?? null,
+      media: ycloudMedia(m),
       origin: 'PHONE',
       sentAt: m.sendTime ? new Date(m.sendTime) : undefined,
       history,
@@ -288,7 +301,7 @@ async function handleWhatsApp(body: any): Promise<void> {
 
       for (const msg of value.messages ?? []) {
         if (!msg.from || !msg.id) continue;
-        await recordChatMessage({
+        const conversationId = await recordChatMessage({
           channel: 'WHATSAPP',
           externalId: msg.from,
           displayName: profileByWaId.get(msg.from) ?? null,
@@ -300,6 +313,7 @@ async function handleWhatsApp(body: any): Promise<void> {
           sentAt: seconds(msg.timestamp),
           referral: whatsAppReferral(msg),
         });
+        if (conversationId) scheduleAutoReply(conversationId);
       }
 
       for (const msg of value.message_echoes ?? []) {
@@ -318,7 +332,7 @@ async function handleWhatsApp(body: any): Promise<void> {
       }
 
       for (const status of value.statuses ?? []) {
-        if (status.id && status.status) await recordMessageStatus(status.id, status.status);
+        if (status.id && status.status) await recordMessageStatus([status.id], status.status);
       }
     }
   }
@@ -343,17 +357,19 @@ async function handleInstagram(body: any): Promise<void> {
       const attachment = message.attachments?.[0];
       const ad = event.referral ?? message.referral;
 
-      await recordChatMessage({
+      const conversationId = await recordChatMessage({
         channel: 'INSTAGRAM',
         externalId: String(customerId),
         messageId: message.mid,
         direction: echo ? 'OUT' : 'IN',
         type: attachment?.type ?? 'text',
         body: message.text ?? `[${attachment?.type ?? 'message'}]`,
+        media: typeof attachment?.payload?.url === 'string' ? { url: attachment.payload.url } : null,
         origin: echo ? 'PHONE' : null,
         sentAt: event.timestamp ? new Date(Number(event.timestamp)) : undefined,
         referral: ad?.ad_id ? { adId: String(ad.ad_id), label: ad.ads_context_data?.ad_title ?? null } : null,
       });
+      if (conversationId && !echo) scheduleAutoReply(conversationId);
     }
   }
 }

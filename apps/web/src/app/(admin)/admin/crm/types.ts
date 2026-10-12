@@ -168,6 +168,9 @@ export const LIVE_STAGES: OpportunityStage[] = [
 
 export interface Lead {
   id: string
+  /** Set once the client has a mirrored WhatsApp / Instagram thread. */
+  waId?: string | null
+  igId?: string | null
   market: LeadMarket
   type: LeadType
   status: LeadStatus

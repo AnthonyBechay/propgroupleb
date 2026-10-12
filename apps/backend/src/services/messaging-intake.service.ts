@@ -1,5 +1,6 @@
 import { prisma } from '@propgroup/db';
 import { logger } from '../utils/logger.js';
+import { uploadFileSimple } from './upload.service.js';
 
 /**
  * Turning Meta webhook deliveries into inbox threads and CRM clients.
@@ -76,10 +77,14 @@ export interface ChatEvent {
   displayName?: string | null;
   /** The platform's message id — the idempotency key. */
   messageId: string;
+  /** A second id the same message may already be stored under (provider id vs wamid). */
+  altMessageId?: string | null;
   direction: 'IN' | 'OUT';
   type: string;
   body: string;
   mediaId?: string | null;
+  /** Where the platform serves the attachment from, when it gives a link. */
+  media?: { url: string; mime?: string | null; filename?: string | null } | null;
   /** Outbound only: PHONE (typed in the app), CRM or AI. */
   origin?: string | null;
   sentAt?: Date;
@@ -100,14 +105,17 @@ export interface ChatEvent {
  * unknown sender stays an unlinked thread: a work number also hears from
  * suppliers and wrong numbers, and a client per stranger ruins the pipeline.
  */
-export async function recordChatMessage(event: ChatEvent): Promise<void> {
+export async function recordChatMessage(event: ChatEvent): Promise<string | null> {
   const externalId =
     event.channel === 'WHATSAPP' ? normalisePhone(event.externalId) ?? event.externalId : event.externalId;
 
   // Retries carry the same message id; the unique index is the real guard, this
   // just avoids the wasted work in the common case.
-  if (!event.messageId) return;
-  if (await prisma.chatMessage.findUnique({ where: { externalId: event.messageId } })) return;
+  if (!event.messageId) return null;
+  const ids = [event.messageId, event.altMessageId].filter((id): id is string => Boolean(id));
+  if (await prisma.chatMessage.findFirst({ where: { externalId: { in: ids } }, select: { id: true } })) {
+    return null;
+  }
 
   const sentAt = event.sentAt ?? new Date();
   const inbound = event.direction === 'IN';
@@ -134,8 +142,10 @@ export async function recordChatMessage(event: ChatEvent): Promise<void> {
     });
   }
 
+  let stored: { id: string };
   try {
-    await prisma.chatMessage.create({
+    stored = await prisma.chatMessage.create({
+      select: { id: true },
       data: {
         conversationId: conversation.id,
         direction: event.direction,
@@ -149,9 +159,13 @@ export async function recordChatMessage(event: ChatEvent): Promise<void> {
     });
   } catch (err: any) {
     // Two deliveries of the same message raced past the check above.
-    if (err?.code === 'P2002') return;
+    if (err?.code === 'P2002') return null;
     throw err;
   }
+
+  // Not awaited: a slow download must not hold up the thread, and a failed one
+  // only costs the attachment, never the message.
+  if (event.media?.url) void keepMedia(stored.id, event.media);
 
   // History arrives out of order and long after the fact, so a thread's
   // summary only ever moves forward in time.
@@ -183,6 +197,46 @@ export async function recordChatMessage(event: ChatEvent): Promise<void> {
         : { lastContactAt: sentAt },
     });
   }
+
+  return conversation.id;
+}
+
+/** Attachments above this are left on the platform — nobody needs a 200 MB video in the CRM. */
+const MAX_MEDIA_BYTES = 25 * 1024 * 1024;
+
+const EXT_BY_MIME: Record<string, string> = {
+  'image/jpeg': '.jpg', 'image/png': '.png', 'image/webp': '.webp',
+  'audio/ogg': '.ogg', 'audio/mpeg': '.mp3', 'audio/mp4': '.m4a', 'audio/aac': '.aac',
+  'video/mp4': '.mp4', 'application/pdf': '.pdf',
+};
+
+/** Copy an attachment into our own storage before the platform's link expires. */
+async function keepMedia(
+  messageId: string,
+  media: { url: string; mime?: string | null; filename?: string | null }
+): Promise<void> {
+  try {
+    const url = new URL(media.url);
+    if (url.protocol !== 'https:') return;
+    // YCloud serves its own media links to the account that owns them.
+    const headers: Record<string, string> =
+      url.hostname.endsWith('ycloud.com') && process.env.YCLOUD_API_KEY
+        ? { 'X-API-Key': process.env.YCLOUD_API_KEY }
+        : {};
+    const res = await fetch(url, { headers, signal: AbortSignal.timeout(30_000) });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    if (Number(res.headers.get('content-length') ?? 0) > MAX_MEDIA_BYTES) return;
+
+    const buffer = Buffer.from(await res.arrayBuffer());
+    if (buffer.length === 0 || buffer.length > MAX_MEDIA_BYTES) return;
+
+    const mime = (media.mime || res.headers.get('content-type') || 'application/octet-stream').split(';')[0].trim();
+    const name = media.filename || `attachment${EXT_BY_MIME[mime] ?? ''}`;
+    const { url: mediaUrl } = await uploadFileSimple(buffer, name, mime, 'chat-media');
+    await prisma.chatMessage.update({ where: { id: messageId }, data: { mediaUrl } });
+  } catch (err) {
+    logger.warn('Chat attachment not stored', { messageId, error: (err as Error).message });
+  }
 }
 
 /** A new client from an ad-driven first message. */
@@ -212,8 +266,60 @@ async function createLeadFromChat(event: ChatEvent, externalId: string): Promise
 }
 
 /** Delivery receipts for messages we sent. Unknown ids are ignored. */
-export async function recordMessageStatus(messageId: string, status: string): Promise<void> {
-  await prisma.chatMessage.updateMany({ where: { externalId: messageId }, data: { status } });
+export async function recordMessageStatus(
+  messageIds: Array<string | null | undefined>,
+  status: string
+): Promise<void> {
+  const ids = messageIds.filter((id): id is string => Boolean(id));
+  if (ids.length === 0) return;
+  await prisma.chatMessage.updateMany({ where: { externalId: { in: ids } }, data: { status } });
+}
+
+/**
+ * Make a thread's sender a client, or attach the thread to an existing one.
+ * This is the "a person decided" step for senders who did not arrive from an ad.
+ */
+export async function linkConversationToLead(
+  conversationId: string,
+  options: { leadId?: string | null; name?: string | null; createdBy?: string | null }
+): Promise<any> {
+  const conversation = await prisma.conversation.findUnique({ where: { id: conversationId } });
+  if (!conversation) return null;
+
+  const isWhatsApp = conversation.channel === 'WHATSAPP';
+  const identity = isWhatsApp ? { waId: conversation.externalId } : { igId: conversation.externalId };
+
+  let lead: any;
+  if (options.leadId) {
+    lead = await prisma.lead.findUnique({ where: { id: options.leadId } });
+    if (!lead) return null;
+    // Only remember the identity when nobody else holds it — it is unique.
+    const taken = await prisma.lead.findFirst({ where: identity, select: { id: true } });
+    if (!taken) await prisma.lead.update({ where: { id: lead.id }, data: identity });
+  } else {
+    lead =
+      (await prisma.lead.findFirst({ where: identity })) ??
+      (await prisma.lead.create({
+        data: {
+          type: 'BUYER',
+          status: 'ACTIVE',
+          source: isWhatsApp ? 'WHATSAPP' : 'MANUAL',
+          name:
+            options.name?.trim() ||
+            conversation.displayName ||
+            (isWhatsApp ? `WhatsApp +${conversation.externalId}` : 'Instagram contact'),
+          phone: isWhatsApp ? `+${conversation.externalId}` : null,
+          whatsapp: isWhatsApp ? `+${conversation.externalId}` : null,
+          ...identity,
+          adId: conversation.adId,
+          adLabel: conversation.adLabel,
+          createdBy: options.createdBy ?? null,
+        },
+      }));
+  }
+
+  await prisma.conversation.update({ where: { id: conversation.id }, data: { leadId: lead.id } });
+  return lead;
 }
 
 export interface LeadFormSubmission {

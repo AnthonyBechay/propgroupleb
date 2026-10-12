@@ -1744,6 +1744,10 @@ model Conversation {
   lastInboundAt DateTime?
   unreadCount   Int       @default(0)
 
+  // Automatic replies are off for this thread — a person took it over, the
+  // client asked for one, or the team switched it off.
+  aiPaused Boolean @default(false)
+
   // Click-to-WhatsApp / Instagram ad attribution from the first message.
   adId    String?
   adLabel String?
@@ -1771,7 +1775,10 @@ model ChatMessage {
 
   type    String  @default("text") // text, image, audio, document, …
   body    String
-  mediaId String? // platform media id, fetched on demand
+  mediaId String? // platform media id
+  // Our own copy of the attachment. Platform links expire within days, so the
+  // file is copied to storage when the message arrives.
+  mediaUrl String?
   // Outbound only: where it was typed — the phone app, the CRM, or automation.
   origin  String?
   status  String? // sent, delivered, read, failed

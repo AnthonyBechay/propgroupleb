@@ -33,6 +33,13 @@ services:
       # YCloud relays the coexistence WhatsApp number; its API key is for sending.
       YCLOUD_WEBHOOK_SECRET: ${YCLOUD_WEBHOOK_SECRET:-}
       YCLOUD_API_KEY: ${YCLOUD_API_KEY:-}
+      # The business WhatsApp number in E.164 form (+9617…), the sender for replies.
+      YCLOUD_WHATSAPP_FROM: ${YCLOUD_WHATSAPP_FROM:-}
+      # Automatic replies. OFF unless exactly 'true' (and AI_ENABLED too).
+      # AUDIENCE: 'ads' = only people from an ad or lead form; 'all' = everyone.
+      AUTO_REPLY_ENABLED: ${AUTO_REPLY_ENABLED:-}
+      AUTO_REPLY_AUDIENCE: ${AUTO_REPLY_AUDIENCE:-ads}
+      AUTO_REPLY_DAILY_LIMIT: ${AUTO_REPLY_DAILY_LIMIT:-200}
       # Cloudflare R2 — required for file uploads
       R2_ACCOUNT_ID: ${R2_ACCOUNT_ID:-}
       R2_ACCESS_KEY_ID: ${R2_ACCESS_KEY_ID:-}

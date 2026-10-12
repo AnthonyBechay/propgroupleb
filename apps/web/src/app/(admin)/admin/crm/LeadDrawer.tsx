@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import {
-  X, Phone, MessageCircle, Mail, Loader2, Send, Pencil, Trash2, Building2, Clock, CalendarPlus, ExternalLink, History, Handshake, ClipboardCheck, Lightbulb, Sparkles, Plus, StickyNote, Globe, Home,
+  X, Phone, MessageCircle, Mail, Loader2, Send, Pencil, Trash2, Building2, Clock, CalendarPlus, ExternalLink, History, Handshake, ClipboardCheck, Lightbulb, Sparkles, Plus, StickyNote, Globe, Home, MessagesSquare,
 } from 'lucide-react'
 import { normalizeApiUrl, normalizeFileUrl } from '@/lib/utils/api-url'
 import { regionLabel } from '@/lib/crm-locations'
@@ -95,7 +95,15 @@ function scoreCls(score: number): string {
 const CHANNELS = ['CALL', 'WHATSAPP', 'EMAIL', 'MEETING', 'VIEWING', 'NOTE'] as const
 
 /** Full client view: contact history, quick log, and matching live listings. */
-export function LeadDrawer({ lead, onClose, onChanged }: { lead: Lead; onClose: () => void; onChanged: () => void }) {
+export function LeadDrawer({
+  lead, onClose, onChanged, onOpenChat,
+}: {
+  lead: Lead
+  onClose: () => void
+  onChanged: () => void
+  /** Jump to this client's mirrored WhatsApp/Instagram thread in the Inbox. */
+  onOpenChat?: (leadId: string) => void
+}) {
   const apiUrl = normalizeApiUrl(process.env.NEXT_PUBLIC_API_URL || '')
   const [detail, setDetail] = useState<Lead | null>(null)
   const [matches, setMatches] = useState<ListingMatch[]>([])
@@ -342,6 +350,12 @@ export function LeadDrawer({ lead, onClose, onChanged }: { lead: Lead; onClose: 
                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-sm text-slate-700 hover:bg-slate-100">
                 <MessageCircle className="h-3.5 w-3.5" /> WhatsApp
               </a>
+            )}
+            {onOpenChat && (l.waId || l.igId) && (
+              <button onClick={() => onOpenChat(l.id)}
+                 className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-sm text-slate-700 hover:bg-slate-100">
+                <MessagesSquare className="h-3.5 w-3.5" /> Chat history
+              </button>
             )}
             {l.email && (
               <a href={`mailto:${l.email}`} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-sm text-slate-700 hover:bg-slate-100">

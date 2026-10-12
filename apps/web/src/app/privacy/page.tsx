@@ -2,7 +2,7 @@ import Link from 'next/link'
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'
 
-const CONTACT_EMAIL = 'info@propgroup.com'
+const CONTACT_EMAIL = 'propgroupleb@gmail.com'
 const LAST_UPDATED = '12 October 2026'
 
 export const metadata = {

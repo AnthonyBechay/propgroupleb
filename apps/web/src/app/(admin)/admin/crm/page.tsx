@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   UserSearch, Plus, Search, Loader2, Phone, MessageCircle, Mail, Clock,
   CalendarPlus, X, LayoutGrid, List, Download, Upload, MapPin,
-  MessageSquareWarning, Sparkles, Target, DollarSign, Sun, BarChart3, Gauge,
+  MessageSquareWarning, Sparkles, Target, DollarSign, Sun, BarChart3, Gauge, Inbox,
 } from 'lucide-react'
 import { normalizeApiUrl } from '@/lib/utils/api-url'
 import { useAuth } from '@/contexts/AuthContext'
@@ -17,6 +17,7 @@ import { BookViewingModal } from './BookViewingModal'
 import { TodayView } from './TodayView'
 import { OverviewView } from './OverviewView'
 import { ClientDirectory } from './ClientDirectory'
+import { InboxView } from './InboxView'
 import {
   type Lead, type LeadMarket, type LeadType,
   type Deal, type OpportunityStage,
@@ -47,7 +48,7 @@ interface Stats {
   byStatus: Record<string, number>
 }
 
-type View = 'overview' | 'today' | 'board' | 'list'
+type View = 'overview' | 'today' | 'inbox' | 'board' | 'list'
 
 export default function CrmPage() {
   const apiUrl = normalizeApiUrl(process.env.NEXT_PUBLIC_API_URL || '')
@@ -60,6 +61,20 @@ export default function CrmPage() {
   const [view, setView] = useState<View>('today')
   const [market, setMarket] = useState<'all' | LeadMarket>('all')
   const [search, setSearch] = useState('')
+  // Conversations with something unread, for the badge on the Inbox tab.
+  const [unreadChats, setUnreadChats] = useState(0)
+  // Set when a client's drawer sends the page to the Inbox for their thread.
+  const [chatLeadId, setChatLeadId] = useState<string | null>(null)
+  useEffect(() => {
+    const check = () =>
+      fetch(`${apiUrl}/api/crm/inbox/unread/count`, { credentials: 'include', cache: 'no-store' })
+        .then((res) => (res.ok ? res.json() : null))
+        .then((json) => setUnreadChats(json?.data?.count ?? 0))
+        .catch(() => {})
+    check()
+    const timer = setInterval(check, 30_000)
+    return () => clearInterval(timer)
+  }, [apiUrl])
   const [focus, setFocus] = useState<'none' | 'planned' | 'feedback' | 'options' | 'untapped'>('none')
   // leadId -> number of matches nobody has shortlisted yet (computed server-side)
   const [untapped, setUntapped] = useState<Record<string, number>>({})
@@ -254,7 +269,7 @@ export default function CrmPage() {
       {/* One row: what needs attention on the left, actions on the right. The
           page title used to eat a whole row saying what the sidebar says. */}
       <div className="flex items-center justify-between gap-3 flex-wrap">
-        <div className={`flex gap-2 flex-wrap ${['today', 'overview', 'board'].includes(view) ? 'invisible pointer-events-none' : ''}`}>
+        <div className={`flex gap-2 flex-wrap ${['today', 'overview', 'inbox', 'board'].includes(view) ? 'invisible pointer-events-none' : ''}`}>
           <FocusChip
             active={focus === 'planned'} count={counts.planned}
             onClick={() => setFocus((f) => (f === 'planned' ? 'none' : 'planned'))}
@@ -372,6 +387,18 @@ export default function CrmPage() {
             <Sun className="h-4 w-4" /> Today
           </button>
           <button
+            onClick={() => setView('inbox')}
+            title="Inbox — WhatsApp and Instagram conversations"
+            className={`min-h-10 px-2.5 rounded-md transition-all inline-flex items-center gap-1 text-sm font-medium ${view === 'inbox' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-900'}`}
+          >
+            <Inbox className="h-4 w-4" /> Inbox
+            {unreadChats > 0 && (
+              <span className="min-w-5 h-5 px-1.5 rounded-full bg-emerald-600 text-white text-xs font-semibold inline-flex items-center justify-center">
+                {unreadChats}
+              </span>
+            )}
+          </button>
+          <button
             onClick={() => setView('board')}
             title="Pipeline board"
             aria-label="Pipeline board"
@@ -395,6 +422,8 @@ export default function CrmPage() {
         <OverviewView onFocus={(v) => setView(v)} />
       ) : view === 'today' ? (
         <TodayView market={market} onOpen={setOpenId} />
+      ) : view === 'inbox' ? (
+        <InboxView search={search} onOpenLead={setOpenId} onChanged={load} focusLeadId={chatLeadId} />
       ) : loading ? (
         <div className="flex items-center justify-center py-20 text-slate-400"><Loader2 className="h-6 w-6 animate-spin" /></div>
       ) : view === 'board' ? (
@@ -498,7 +527,14 @@ export default function CrmPage() {
         </div>
       )}
 
-      {openLead && <LeadDrawer lead={openLead} onClose={() => setOpenId(null)} onChanged={load} />}
+      {openLead && (
+        <LeadDrawer
+          lead={openLead}
+          onClose={() => setOpenId(null)}
+          onChanged={load}
+          onOpenChat={(leadId) => { setChatLeadId(leadId); setOpenId(null); setView('inbox') }}
+        />
+      )}
       {creating && (
         <LeadFormModal
           initialName={prefillName}
