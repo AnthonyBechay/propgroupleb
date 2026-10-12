@@ -22,6 +22,13 @@ services:
       # Master AI switch. OFF unless explicitly 'true'. Unset this and
       # redeploy to stop ALL Anthropic spend without touching code.
       AI_ENABLED: ${AI_ENABLED:-true}
+      # Meta webhooks — WhatsApp, Instagram and Lead Ads intake. The endpoints
+      # reject everything until the secret and verify token are set.
+      META_APP_SECRET: ${META_APP_SECRET:-}
+      META_VERIFY_TOKEN: ${META_VERIFY_TOKEN:-}
+      META_ACCESS_TOKEN: ${META_ACCESS_TOKEN:-}
+      INSTAGRAM_APP_SECRET: ${INSTAGRAM_APP_SECRET:-}
+      WHATSAPP_WEBHOOK_SECRET: ${WHATSAPP_WEBHOOK_SECRET:-}
       # Cloudflare R2 — required for file uploads
       R2_ACCOUNT_ID: ${R2_ACCOUNT_ID:-}
       R2_ACCESS_KEY_ID: ${R2_ACCESS_KEY_ID:-}

@@ -562,7 +562,7 @@ When generating new share links, always go through the `ShareToken` table. Don't
 - Mobile: the marketing pages, portal and admin have had a responsiveness pass.
   Not re-checked on a device since — verify on a real phone before trusting it.
 - No duplicate detection when adding a client by hand.
-- WhatsApp/Meta intake was built and then removed at the owner's request. If it returns, note that Coexistence (app + API on one number) requires Embedded Signup and Tech Provider status — a business cannot self-onboard its own number.
+- **Meta intake is back, receive-only** (`routes/webhooks.ts`, `services/messaging-intake.service.ts`, `routes/inbox.ts`): WhatsApp, Instagram DMs and Lead Ads land in `Conversation`/`ChatMessage` and create a `Lead` only for ad-driven or form enquiries. Not built yet: the inbox UI, sending replies from the CRM, AI auto-reply. Coexistence (app + API on one number) requires Embedded Signup and Tech Provider status — a business cannot self-onboard its own number, so the real number goes through a provider that relays to `/api/webhooks/whatsapp`.
 
 ---
 

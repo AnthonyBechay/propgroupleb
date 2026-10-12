@@ -1586,11 +1586,21 @@ model Lead {
   userId    String? // registered user this lead corresponds to
   listingId String? // a specific listing they asked about
 
+  // External identities, so an inbound WhatsApp/Instagram message or a Lead Ads
+  // submission lands on the existing client instead of creating a duplicate.
+  waId           String? @unique // WhatsApp id (digits, E.164 without +)
+  igId           String? @unique // Instagram-scoped user id
+  externalLeadId String? @unique // Facebook leadgen id
+  // Which Meta ad brought them in, when the platform tells us.
+  adId    String?
+  adLabel String? // ad headline or form name — what the team recognises
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   createdBy String? // admin who added the lead
 
   contacts      LeadContact[]
+  conversations Conversation[]
   opportunities LeadOpportunity[] @relation("LeadOpportunities")
   properties    LeadProperty[]    @relation("LeadProperties")
 
@@ -1695,6 +1705,84 @@ model ImportedRecord {
   @@unique([sourceSystem, sourceTable, sourceId, targetTable])
   @@index([batch])
   @@map("imported_records")
+}
+
+// ── Messaging inbox ───────────────────────────────────────────────────────────
+// A WhatsApp or Instagram thread with one person, mirrored from Meta's
+// webhooks. A conversation is NOT a client: a work number also hears from
+// suppliers, family and wrong numbers, and auto-creating a client from each is
+// how a pipeline stops being worth trusting. `leadId` is set when the sender
+// matches a known client or arrived from an ad; everyone else stays an
+// unlinked thread until a person decides.
+
+enum ChatChannel {
+  WHATSAPP
+  INSTAGRAM
+}
+
+enum ChatDirection {
+  IN
+  OUT
+}
+
+model Conversation {
+  id      String      @id @default(cuid())
+  channel ChatChannel
+
+  // The other party as the platform names them: WhatsApp id (digits) or
+  // Instagram-scoped user id.
+  externalId  String
+  displayName String?
+
+  leadId String?
+  lead   Lead?   @relation(fields: [leadId], references: [id], onDelete: SetNull)
+
+  lastMessageAt DateTime @default(now())
+  lastPreview   String?
+  // Meta only allows free-form replies within 24h of the customer's last
+  // message, so the inbox needs this to know whether a reply can be sent.
+  lastInboundAt DateTime?
+  unreadCount   Int       @default(0)
+
+  // Click-to-WhatsApp / Instagram ad attribution from the first message.
+  adId    String?
+  adLabel String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  messages ChatMessage[]
+
+  @@unique([channel, externalId])
+  @@index([lastMessageAt])
+  @@index([leadId])
+  @@map("conversations")
+}
+
+// Named ChatMessage because `Message` is a reserved model above.
+model ChatMessage {
+  id             String        @id @default(cuid())
+  conversationId String
+  direction      ChatDirection
+
+  // The platform's own message id. Unique, because Meta retries a webhook
+  // until it gets a 200 and a retry must not duplicate the message.
+  externalId String @unique
+
+  type    String  @default("text") // text, image, audio, document, …
+  body    String
+  mediaId String? // platform media id, fetched on demand
+  // Outbound only: where it was typed — the phone app, the CRM, or automation.
+  origin  String?
+  status  String? // sent, delivered, read, failed
+
+  sentAt    DateTime @default(now())
+  createdAt DateTime @default(now())
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId, sentAt])
+  @@map("chat_messages")
 }
 
 // A property a seller/landlord client has on the market.
