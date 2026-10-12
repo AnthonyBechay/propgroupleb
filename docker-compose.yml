@@ -30,7 +30,9 @@ services:
       INSTAGRAM_APP_SECRET: ${INSTAGRAM_APP_SECRET:-}
       # Instagram account token — for sending replies. Not read by any code yet.
       INSTAGRAM_ACCESS_TOKEN: ${INSTAGRAM_ACCESS_TOKEN:-}
-      WHATSAPP_WEBHOOK_SECRET: ${WHATSAPP_WEBHOOK_SECRET:-}
+      # YCloud relays the coexistence WhatsApp number; its API key is for sending.
+      YCLOUD_WEBHOOK_SECRET: ${YCLOUD_WEBHOOK_SECRET:-}
+      YCLOUD_API_KEY: ${YCLOUD_API_KEY:-}
       # Cloudflare R2 — required for file uploads
       R2_ACCOUNT_ID: ${R2_ACCOUNT_ID:-}
       R2_ACCESS_KEY_ID: ${R2_ACCESS_KEY_ID:-}

@@ -84,6 +84,12 @@ export interface ChatEvent {
   origin?: string | null;
   sentAt?: Date;
   referral?: AdReferral | null;
+  /**
+   * A replay of past chat from when the number was first connected. Stored on
+   * the thread, but it is not news: no unread badge, no new client, and the
+   * client's follow-up state is left alone.
+   */
+  history?: boolean;
 }
 
 /**
@@ -100,6 +106,7 @@ export async function recordChatMessage(event: ChatEvent): Promise<void> {
 
   // Retries carry the same message id; the unique index is the real guard, this
   // just avoids the wasted work in the common case.
+  if (!event.messageId) return;
   if (await prisma.chatMessage.findUnique({ where: { externalId: event.messageId } })) return;
 
   const sentAt = event.sentAt ?? new Date();
@@ -112,7 +119,7 @@ export async function recordChatMessage(event: ChatEvent): Promise<void> {
 
   if (!conversation) {
     let lead = await findLeadForSender(event.channel, externalId);
-    if (!lead && inbound && event.referral?.adId) {
+    if (!lead && inbound && !event.history && event.referral?.adId) {
       lead = await createLeadFromChat(event, externalId);
     }
     conversation = await prisma.conversation.create({
@@ -146,20 +153,26 @@ export async function recordChatMessage(event: ChatEvent): Promise<void> {
     throw err;
   }
 
+  // History arrives out of order and long after the fact, so a thread's
+  // summary only ever moves forward in time.
+  const newest = sentAt >= conversation.lastMessageAt;
+  const live = !event.history;
+
   await prisma.conversation.update({
     where: { id: conversation.id },
     data: {
-      lastMessageAt: sentAt,
-      lastPreview: preview,
+      ...(newest ? { lastMessageAt: sentAt, lastPreview: preview } : {}),
       ...(event.displayName && !conversation.displayName ? { displayName: event.displayName } : {}),
-      ...(inbound
-        ? { lastInboundAt: sentAt, unreadCount: { increment: 1 } }
-        : // We answered, from wherever — nothing is waiting on us any more.
-          { unreadCount: 0 }),
+      ...(inbound && (!conversation.lastInboundAt || sentAt > conversation.lastInboundAt)
+        ? { lastInboundAt: sentAt }
+        : {}),
+      ...(live && inbound ? { unreadCount: { increment: 1 } } : {}),
+      // We answered, from wherever — nothing is waiting on us any more.
+      ...(live && !inbound ? { unreadCount: 0 } : {}),
     },
   });
 
-  if (conversation.leadId) {
+  if (conversation.leadId && live) {
     await prisma.lead.update({
       where: { id: conversation.leadId },
       data: inbound

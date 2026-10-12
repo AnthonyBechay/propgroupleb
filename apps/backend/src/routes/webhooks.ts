@@ -28,10 +28,13 @@ import {
  *   Verify token : META_VERIFY_TOKEN
  *   Subscribe to : messages (WhatsApp, Instagram), leadgen (Page)
  *
- * A WhatsApp provider (needed for app + API coexistence on one number) relays
- * the same payloads but does not sign them with our app secret. Point it at
- *   https://<backend>/api/webhooks/whatsapp
- * with the header `X-Webhook-Secret: WHATSAPP_WEBHOOK_SECRET`.
+ * The real WhatsApp number runs in coexistence (phone app + API on one number),
+ * which Meta only allows through a partner — here YCloud. YCloud delivers its
+ * own event format, signed with its own secret, to
+ *   https://<backend>/api/webhooks/ycloud
+ * Subscribe that endpoint (YCloud Console → Developers → Webhook) to:
+ *   whatsapp.inbound_message.received, whatsapp.smb.message.echoes,
+ *   whatsapp.smb.history, whatsapp.message.updated
  *
  * Env:
  *   META_APP_SECRET         — signs every Meta delivery (App settings → Basic)
@@ -39,7 +42,7 @@ import {
  *                             app's own secret when it differs
  *   META_VERIFY_TOKEN       — any random string; must match what you type in Meta
  *   META_ACCESS_TOKEN       — system-user token, needed to read Lead Ads answers
- *   WHATSAPP_WEBHOOK_SECRET — shared secret for the provider relay
+ *   YCLOUD_WEBHOOK_SECRET   — signing secret YCloud shows when the endpoint is created
  *
  * Without these the endpoints stay live but reject everything, so a half-set-up
  * integration fails loudly at the door instead of quietly inventing clients.
@@ -131,29 +134,117 @@ router.post(
   })
 );
 
-// ── POST /whatsapp — the same payloads relayed by a WhatsApp provider ─────────
+// ── POST /ycloud — the coexistence number, relayed by YCloud ─────────────────
+
+/**
+ * Check YCloud's `YCloud-Signature: t=<unix seconds>,s=<hex>` header: HMAC-SHA256
+ * over "<t>." + the raw body. A delivery older than five minutes is refused so
+ * a captured request cannot be replayed later.
+ */
+function ycloudSignatureValid(req: RawBodyRequest): boolean {
+  const secret = process.env.YCLOUD_WEBHOOK_SECRET;
+  const header = req.get('ycloud-signature');
+  if (!secret || !header || !req.rawBody) return false;
+
+  const fields = header.split(',').map((part) => part.trim().split('='));
+  const timestamp = fields.find(([key]) => key === 't')?.[1];
+  if (!timestamp || !/^\d+$/.test(timestamp)) return false;
+  if (Math.abs(Math.floor(Date.now() / 1000) - Number(timestamp)) > 300) return false;
+
+  const expected = crypto
+    .createHmac('sha256', secret)
+    .update(timestamp + '.')
+    .update(req.rawBody)
+    .digest('hex');
+  return fields.some(([key, value]) => key === 's' && typeof value === 'string' && safeEqual(value.toLowerCase(), expected));
+}
 
 router.post(
-  '/whatsapp',
+  '/ycloud',
   asyncHandler(async (req: Request, res: Response) => {
-    const expected = process.env.WHATSAPP_WEBHOOK_SECRET;
-    if (!expected) {
-      logger.warn('WhatsApp provider webhook hit but WHATSAPP_WEBHOOK_SECRET is unset');
+    if (!process.env.YCLOUD_WEBHOOK_SECRET) {
+      logger.warn('YCloud webhook hit but YCLOUD_WEBHOOK_SECRET is unset');
       res.sendStatus(503);
       return;
     }
-    const given = req.get('x-webhook-secret') ?? '';
-    if (!safeEqual(given, expected)) {
-      logger.warn('WhatsApp provider webhook rejected: bad secret');
+    if (!ycloudSignatureValid(req as RawBodyRequest)) {
+      logger.warn('YCloud webhook rejected: bad signature');
       res.sendStatus(401);
       return;
     }
-    // Providers omit the `object` field on some deliveries; this route only
-    // ever carries WhatsApp.
-    if (req.body && !req.body.object) req.body.object = 'whatsapp_business_account';
-    await acceptAndProcess(req, res);
+
+    res.sendStatus(200);
+    try {
+      await handleYCloud(req.body ?? {});
+    } catch (err) {
+      logger.error('YCloud webhook processing failed', { error: (err as Error).message });
+    }
   })
 );
+
+/**
+ * YCloud events for the coexistence number.
+ *
+ * `whatsappInboundMessage` is always something the customer sent;
+ * `whatsappMessage` is always something we sent. `smb.message.echoes` is a
+ * message typed in the WhatsApp Business app on the phone, and `smb.history`
+ * replays up to 180 days of past chat when the number is first connected.
+ */
+async function handleYCloud(event: any): Promise<void> {
+  const type: string = event.type ?? '';
+  const history = type === 'whatsapp.smb.history';
+
+  if (type === 'whatsapp.message.updated') {
+    const m = event.whatsappMessage;
+    if (m?.wamid && m.status) await recordMessageStatus(m.wamid, m.status);
+    return;
+  }
+
+  if (type === 'whatsapp.inbound_message.received' || (history && event.whatsappInboundMessage)) {
+    const m = event.whatsappInboundMessage;
+    // Group chats are not mirrored — a thread here is one person.
+    if (!m?.from || m.groupId) return;
+    await recordChatMessage({
+      channel: 'WHATSAPP',
+      externalId: m.from,
+      displayName: m.customerProfile?.name ?? null,
+      messageId: m.wamid ?? m.id,
+      direction: 'IN',
+      type: m.type ?? 'text',
+      body: whatsAppText(m),
+      mediaId: m[m.type]?.id ?? null,
+      sentAt: m.sendTime ? new Date(m.sendTime) : undefined,
+      referral: whatsAppReferral(m),
+      history,
+    });
+    return;
+  }
+
+  if (
+    type === 'whatsapp.smb.message.echoes' ||
+    type === 'whatsapp.smb.message.created' ||
+    (history && event.whatsappMessage)
+  ) {
+    const m = event.whatsappMessage;
+    if (!m?.to || m.groupId) return;
+    await recordChatMessage({
+      channel: 'WHATSAPP',
+      externalId: m.to,
+      displayName: m.customerProfile?.name ?? null,
+      messageId: m.wamid ?? m.id,
+      direction: 'OUT',
+      type: m.type ?? 'text',
+      body: whatsAppText(m),
+      mediaId: m[m.type]?.id ?? null,
+      origin: 'PHONE',
+      sentAt: m.sendTime ? new Date(m.sendTime) : undefined,
+      history,
+    });
+    return;
+  }
+
+  logger.info('YCloud webhook ignored', { type });
+}
 
 /** Something readable for any message type — an image of a floor plan is still a message. */
 function whatsAppText(msg: any): string {

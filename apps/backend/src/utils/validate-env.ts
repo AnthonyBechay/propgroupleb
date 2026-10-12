@@ -50,6 +50,10 @@ const RECOMMENDED_GROUPS: Array<{ feature: string; vars: string[] }> = [
     feature: 'Facebook Lead Ads answers (needs a system-user token)',
     vars: ['META_ACCESS_TOKEN'],
   },
+  {
+    feature: 'WhatsApp number via YCloud (coexistence)',
+    vars: ['YCLOUD_WEBHOOK_SECRET'],
+  },
 ];
 
 export function validateEnv(): void {
