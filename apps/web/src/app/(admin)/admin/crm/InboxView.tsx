@@ -65,6 +65,30 @@ const timeLabel = (iso: string) => {
     : d.toLocaleDateString(undefined, { day: 'numeric', month: 'short' })
 }
 
+const sameDay = (a: string, b: string) => new Date(a).toDateString() === new Date(b).toDateString()
+
+const clockLabel = (iso: string) =>
+  new Date(iso).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })
+
+/** "Today", "Yesterday", or the date — the divider between two days of a thread. */
+const dayLabel = (iso: string) => {
+  const d = new Date(iso)
+  const days = Math.round((new Date().setHours(0, 0, 0, 0) - new Date(d).setHours(0, 0, 0, 0)) / 86_400_000)
+  if (days === 0) return 'Today'
+  if (days === 1) return 'Yesterday'
+  return d.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short', year: days > 300 ? 'numeric' : undefined })
+}
+
+const STATUS_LABEL: Record<string, string> = { delivered: 'Delivered', read: 'Read', failed: 'Not delivered' }
+
+type Filter = 'all' | 'unread' | 'WHATSAPP' | 'INSTAGRAM'
+const FILTERS: Array<{ key: Filter; label: string }> = [
+  { key: 'all', label: 'All' },
+  { key: 'unread', label: 'Unread' },
+  { key: 'WHATSAPP', label: 'WhatsApp' },
+  { key: 'INSTAGRAM', label: 'Instagram' },
+]
+
 const ORIGIN_LABEL: Record<string, string> = { PHONE: 'Phone', CRM: 'CRM', AI: 'Auto-reply' }
 
 function ChannelIcon({ channel, className }: { channel: Thread['channel']; className?: string }) {
@@ -115,7 +139,8 @@ export function InboxView({
   const [draft, setDraft] = useState('')
   const [sending, setSending] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const bottomRef = useRef<HTMLDivElement>(null)
+  const [filter, setFilter] = useState<Filter>('all')
+  const scrollRef = useRef<HTMLDivElement>(null)
   // Attaching a thread to somebody already in the CRM, when the number alone
   // did not match them (a second phone, an Instagram account).
   const [linking, setLinking] = useState(false)
@@ -138,14 +163,20 @@ export function InboxView({
   const loadThreads = useCallback(async () => {
     const p = new URLSearchParams({ limit: '100' })
     if (needle) p.set('search', needle)
+    if (filter === 'unread') p.set('unread', 'true')
+    else if (filter !== 'all') p.set('channel', filter)
     const res = await call(`?${p}`)
     if (res.ok) setThreads((await res.json()).data ?? [])
     else setThreads((t) => t ?? [])
-  }, [call, needle])
+  }, [call, needle, filter])
 
   const loadDetail = useCallback(async (id: string) => {
     const res = await call(`/${id}`)
-    if (res.ok) setDetail((await res.json()).data ?? null)
+    if (!res.ok) return
+    const data: ThreadDetail | null = (await res.json()).data ?? null
+    setDetail(data)
+    // A message that arrives while the thread is on screen has been read.
+    if (data && data.unreadCount > 0) call(`/${id}/read`, { method: 'POST' })
   }, [call])
 
   useEffect(() => {
@@ -162,15 +193,18 @@ export function InboxView({
     setLinkQuery('')
     if (!openId) return
     loadDetail(openId)
-    // Opening a thread is reading it.
-    call(`/${openId}/read`, { method: 'POST' }).then(loadThreads)
     const timer = setInterval(() => loadDetail(openId), POLL_MS)
     return () => clearInterval(timer)
-  }, [openId, loadDetail, loadThreads, call])
+    // Not keyed on the thread list: typing in the search box reloads that
+    // list, and must not wipe the open thread or a half-written reply.
+  }, [openId, loadDetail])
 
+  // Keep the newest message in view by scrolling the thread itself — never
+  // the page, which would yank the whole CRM down on every incoming message.
   const messageCount = detail?.messages.length ?? 0
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ block: 'end' })
+    const el = scrollRef.current
+    if (el) el.scrollTop = el.scrollHeight
   }, [messageCount, openId])
 
   const send = async () => {
@@ -228,7 +262,7 @@ export function InboxView({
     return <div className="flex justify-center py-20 text-slate-400"><Loader2 className="h-6 w-6 animate-spin" /></div>
   }
 
-  if (threads.length === 0 && !needle) {
+  if (threads.length === 0 && !needle && filter === 'all') {
     return (
       <div className="bg-white border border-slate-200 rounded-xl p-16 text-center">
         <Inbox className="h-12 w-12 mx-auto text-slate-300 mb-3" />
@@ -245,7 +279,19 @@ export function InboxView({
   return (
     <div className="bg-white border border-slate-200 rounded-xl overflow-hidden lg:grid lg:grid-cols-[340px_1fr] lg:h-[70vh]">
       {/* Threads — below lg, one pane at a time */}
-      <ul className={`divide-y divide-slate-100 overflow-y-auto lg:border-r lg:border-slate-200 ${openId ? 'hidden lg:block' : ''}`}>
+      <div className={`lg:border-r lg:border-slate-200 lg:flex lg:flex-col lg:min-h-0 ${openId ? 'hidden lg:flex' : ''}`}>
+      <div className="flex gap-1 p-2 border-b border-slate-200 overflow-x-auto">
+        {FILTERS.map((f) => (
+          <button
+            key={f.key}
+            onClick={() => setFilter(f.key)}
+            className={`min-h-9 px-3 rounded-full text-sm font-medium whitespace-nowrap ${filter === f.key ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-100'}`}
+          >
+            {f.label}
+          </button>
+        ))}
+      </div>
+      <ul className="divide-y divide-slate-100 overflow-y-auto lg:flex-1">
         {visible.map((t) => (
           <li key={t.id}>
             <button
@@ -268,13 +314,18 @@ export function InboxView({
                     </span>
                   )}
                 </span>
-                {!t.lead && <span className="text-xs text-amber-700">Not a client yet</span>}
+                {t.lead && (
+                  <span className="text-xs text-slate-500 inline-flex items-center gap-1 mt-0.5">
+                    <User className="h-3 w-3" /> Client
+                  </span>
+                )}
               </span>
             </button>
           </li>
         ))}
         {visible.length === 0 && <li className="px-4 py-10 text-center text-sm text-slate-500">No conversation matches.</li>}
       </ul>
+      </div>
 
       {/* Open thread */}
       <div className={`flex-col min-h-[60vh] lg:min-h-0 ${openId ? 'flex' : 'hidden lg:flex'}`}>
@@ -291,6 +342,9 @@ export function InboxView({
               <ChannelIcon channel={detail.channel} className="h-5 w-5 shrink-0" />
               <div className="min-w-0 flex-1">
                 <p className="font-semibold text-slate-900 truncate">{threadName(detail)}</p>
+                {detail.channel === 'WHATSAPP' && threadName(detail) !== `+${detail.externalId}` && (
+                  <p className="text-xs text-slate-500">+{detail.externalId}</p>
+                )}
                 {detail.adId && (
                   <p className="text-xs text-slate-500 truncate inline-flex items-center gap-1">
                     <Megaphone className="h-3 w-3" /> From an ad{detail.adLabel ? `: ${detail.adLabel}` : ''}
@@ -353,9 +407,18 @@ export function InboxView({
               </div>
             )}
 
-            <div className="flex-1 overflow-y-auto px-3 sm:px-4 py-4 space-y-2 bg-slate-50 max-h-[55vh] lg:max-h-none">
-              {detail.messages.map((m) => (
-                <div key={m.id} className={`flex ${m.direction === 'OUT' ? 'justify-end' : 'justify-start'}`}>
+            <div ref={scrollRef} className="flex-1 overflow-y-auto px-3 sm:px-4 py-4 space-y-2 bg-slate-50 max-h-[55vh] lg:max-h-none">
+              {detail.messages.length === 0 && (
+                <p className="text-center text-sm text-slate-400 py-10">No messages in this conversation yet.</p>
+              )}
+              {detail.messages.map((m, i) => (
+                <div key={m.id}>
+                {(i === 0 || !sameDay(detail.messages[i - 1].sentAt, m.sentAt)) && (
+                  <p className="text-center text-xs text-slate-500 my-3">
+                    <span className="bg-white border border-slate-200 rounded-full px-3 py-1">{dayLabel(m.sentAt)}</span>
+                  </p>
+                )}
+                <div className={`flex ${m.direction === 'OUT' ? 'justify-end' : 'justify-start'}`}>
                   <div className={`max-w-[85%] sm:max-w-[70%] rounded-2xl px-3 py-2 text-sm whitespace-pre-wrap break-words ${m.direction === 'OUT' ? 'bg-slate-900 text-white' : 'bg-white border border-slate-200 text-slate-800'}`}>
                     <Attachment message={m} />
                     {/* "[image]" is only a stand-in for an attachment we could not keep. */}
@@ -367,13 +430,15 @@ export function InboxView({
                           {ORIGIN_LABEL[m.origin] ?? m.origin} ·
                         </>
                       )}
-                      {timeLabel(m.sentAt)}
-                      {m.status === 'failed' && <span className="text-red-400 font-medium">· failed</span>}
+                      {clockLabel(m.sentAt)}
+                      {m.direction === 'OUT' && m.status && STATUS_LABEL[m.status] && (
+                        <span className={m.status === 'failed' ? 'text-red-400 font-medium' : ''}>· {STATUS_LABEL[m.status]}</span>
+                      )}
                     </span>
                   </div>
                 </div>
+                </div>
               ))}
-              <div ref={bottomRef} />
             </div>
 
             <div className="border-t border-slate-200 p-3">
@@ -391,7 +456,15 @@ export function InboxView({
                   <textarea
                     value={draft}
                     onChange={(e) => setDraft(e.target.value)}
-                    onKeyDown={(e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) send() }}
+                    onKeyDown={(e) => {
+                      // Enter sends with a keyboard; on a phone Enter is a new
+                      // line and the Send button sends.
+                      const touch = window.matchMedia('(pointer: coarse)').matches
+                      if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing && !touch) {
+                        e.preventDefault()
+                        send()
+                      }
+                    }}
                     rows={2}
                     placeholder="Write a reply"
                     className="flex-1 resize-none rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-400"
