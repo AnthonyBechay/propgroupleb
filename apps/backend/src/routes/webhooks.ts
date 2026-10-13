@@ -263,6 +263,15 @@ async function handleYCloud(event: any): Promise<void> {
 
 /** Something readable for any message type — an image of a floor plan is still a message. */
 function whatsAppText(msg: any): string {
+  // WhatsApp tells us a message exists but will not hand it over — most often
+  // a view-once voice note or photo, sometimes a type the API does not carry.
+  // The reason it gives is kept, because "[unsupported]" explains nothing.
+  if (msg.type === 'unsupported' || msg.type === 'unknown') {
+    const why = msg.errors?.[0];
+    const detail = why?.error_data?.details ?? why?.message ?? why?.title;
+    logger.warn('WhatsApp message not passed on', { from: msg.from, code: why?.code, detail });
+    return `Not received: WhatsApp did not pass this message on${detail ? ` (${detail})` : ''}. It is visible on the phone.`;
+  }
   if (msg.type === 'reaction') return `Reacted ${msg.reaction?.emoji ?? ''}`.trim();
   if (msg.type === 'location' && msg.location) {
     const { name, address, latitude, longitude } = msg.location;

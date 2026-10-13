@@ -1,5 +1,6 @@
 import { prisma } from '@propgroup/db';
 import { CHAT_MODEL_COUNT, ChatModelUnavailableError, ChatSession, chatAiEnabled, chatModelResting, type ChatContent, type ChatPart, type ChatTool } from '../config/chat-ai.js';
+import { createText, isAiEnabled } from '../config/ai.js';
 import { aiBudget } from '../utils/ai-budget.js';
 import { logger } from '../utils/logger.js';
 import { cardCaption, cardsByRef, formatPrice, marketNames, projectsNamedIn, searchCatalogue, type Market } from './catalogue.service.js';
@@ -58,6 +59,9 @@ const MAX_MODEL_TURNS = 4;
 const MAX_LISTINGS = 3;
 
 const pending = new Map<string, NodeJS.Timeout>();
+/** How many times a failed reply has been retried, per thread, and the waits between. */
+const retries = new Map<string, number>();
+const RETRY_AFTER_MS = [60_000, 3 * 60_000, 10 * 60_000];
 
 export function autoReplyEnabled(): boolean {
   return process.env.AUTO_REPLY_ENABLED === 'true' && chatAiEnabled();
@@ -69,7 +73,7 @@ const envNumber = (name: string, fallback: number): number => {
 };
 
 /** Queue a reply for this thread. Safe to call on every inbound message. */
-export function scheduleAutoReply(conversationId: string): void {
+export function scheduleAutoReply(conversationId: string, delayMs: number = DEBOUNCE_MS): void {
   if (!autoReplyEnabled()) return;
   clearTimeout(pending.get(conversationId));
   pending.set(
@@ -79,9 +83,24 @@ export function scheduleAutoReply(conversationId: string): void {
       void run(conversationId, false)
         // Every outcome is logged with its reason: "it did not reply" must
         // always be answerable from the log without guessing.
-        .then((outcome) => logger.info(`Auto-reply: ${outcome.sent ? 'sent' : 'not sent'}`, { conversationId, reason: outcome.reason }))
-        .catch((err) => logger.error('Auto-reply failed', { conversationId, error: (err as Error).message }));
-    }, DEBOUNCE_MS)
+        .then((outcome) => {
+          retries.delete(conversationId);
+          logger.info(`Auto-reply: ${outcome.sent ? 'sent' : 'not sent'}`, { conversationId, reason: outcome.reason });
+        })
+        .catch((err) => {
+          // Nobody is watching, so a failure must not be the end of it: the
+          // client is still waiting. Try again a few times, further apart.
+          const attempt = retries.get(conversationId) ?? 0;
+          const wait = RETRY_AFTER_MS[attempt];
+          logger.error('Auto-reply failed', err, { conversationId, retryInSeconds: wait ? wait / 1000 : 'no more retries' });
+          if (wait === undefined) {
+            retries.delete(conversationId);
+            return;
+          }
+          retries.set(conversationId, attempt + 1);
+          scheduleAutoReply(conversationId, wait);
+        });
+    }, delayMs)
   );
 }
 
@@ -265,6 +284,7 @@ How to write:
 ${LANGUAGE_RULE[replyStyle]}
 - Write like a helpful person texting: one to three short sentences, at most one question at a time. No lists, no markdown, no emojis unless the client uses them.
 - If the client sends a voice note, listen to it and answer what it says as if they had typed it.
+- A message that reads "Not received: …" means the client sent something that did not reach us — usually a voice note or photo set to "view once". Do not guess what it said. Ask them, briefly and kindly, to send it again as a normal voice note or as text.
 
 What to do:
 - Work out what they need from what you already know, and ask only for what is genuinely missing, one question at a time. Never ask something the ad they came from, their earlier messages or the notes below already answer.
@@ -286,6 +306,46 @@ Hard rules:
 - Hand off only when it is really needed: the client asks for a person, is upset, wants to negotiate or to book a viewing, or asks something that is neither in the search results nor on the property's page. Then call hand_off_to_team and tell them a member of the team will message them shortly.
 
 ${context}`;
+}
+
+/**
+ * A reply written without Gemini, for when all of its models are unavailable.
+ *
+ * Deliberately limited: no stock search and no hearing voice notes, so it only
+ * keeps the conversation going — acknowledges, asks the next useful question,
+ * or asks for a voice note to be typed. It must never describe a property.
+ */
+async function fallbackReply(
+  ordered: Array<{ id: string; direction: string; type: string; body: string; transcript: string | null }>,
+  unansweredIds: Set<string>,
+  replyStyle: ChatAiSettings['replyStyle'],
+  market: Market
+): Promise<string> {
+  if (!isAiEnabled()) return '';
+  const lines = ordered.slice(-12).map((m) => {
+    const who = m.direction === 'IN' ? 'Client' : 'Us';
+    if (m.type === 'audio' && !m.transcript) {
+      return `${who}: [a voice note${unansweredIds.has(m.id) ? ' you could not listen to' : ''}]`;
+    }
+    return `${who}: ${m.transcript ?? m.body}`;
+  });
+  return (
+    await createText({
+      maxTokens: 250,
+      system: `You are the assistant for PropGroup, a real estate brokerage, replying to a client on WhatsApp. This conversation is about property in ${market === 'LEBANON' ? 'Lebanon' : 'Georgia'}.
+
+${LANGUAGE_RULE[replyStyle]}
+- One or two short sentences, at most one question. No lists, no markdown.
+
+Right now you cannot look up properties and you cannot listen to voice notes. So:
+- If the client's latest message is a voice note you could not listen to, apologise briefly and ask them to send it as text.
+- Otherwise reply naturally and ask for whichever of these is still missing: their budget, the area they prefer, the size they need.
+- Never name, describe or price any property, and never promise a specific time. You may say you will send suitable options shortly.
+
+Write only the message to send.`,
+      messages: [{ role: 'user', content: `The conversation so far:\n${lines.join('\n')}\n\nWrite the next message from us.` }],
+    })
+  ).trim();
 }
 
 /** The bytes of a stored attachment, or null when it is missing or too large. */
@@ -346,10 +406,20 @@ async function run(conversationId: string, manual: boolean): Promise<AutoReplyOu
     await new Promise((resolve) => setTimeout(resolve, MEDIA_WAIT_MS));
     recent = await loadRecent();
   }
-  // Only answer a client who is actually waiting on us.
+  // Only answer a client who is actually waiting on us. "Waiting" goes by when
+  // a message ARRIVED, not when it was sent: a voice note is stamped with the
+  // moment the client pressed send, can take many seconds to upload, and so
+  // lands after a reply of ours while carrying an earlier time. Judged by send
+  // time it looked already answered, and was silently skipped.
   if (recent.length === 0) return skip('There are no messages on this conversation yet.');
-  if (recent[0].direction !== 'IN') return skip('The last message is ours — the client is not waiting on a reply.');
-  const latestId = recent[0].id;
+  const lastReplyAt = Math.max(0, ...recent.filter((m) => m.direction === 'OUT').map((m) => m.createdAt.getTime()));
+  const unansweredIds = new Set(
+    recent.filter((m) => m.direction === 'IN' && m.createdAt.getTime() > lastReplyAt).map((m) => m.id)
+  );
+  if (unansweredIds.size === 0) return skip('The last message is ours — the client is not waiting on a reply.');
+  const newestArrival = () =>
+    prisma.chatMessage.findFirst({ where: { conversationId }, orderBy: { createdAt: 'desc' }, select: { id: true } });
+  const latestId = (await newestArrival())?.id;
 
   const [threadCount, globalCount] = await Promise.all([
     prisma.chatMessage.count({
@@ -374,16 +444,21 @@ async function run(conversationId: string, manual: boolean): Promise<AutoReplyOu
 
   // Oldest first. The messages the client sent since our last reply are the
   // ones being answered — only those have their voice notes and photos attached.
-  const ordered = [...recent].reverse();
-  const lastOut = ordered.map((m) => m.direction).lastIndexOf('OUT');
+  // In the order they were sent, except that what is still unanswered goes
+  // last — it is what the model is replying to, whatever its timestamp says.
+  const bySendTime = [...recent].reverse();
+  const ordered = [
+    ...bySendTime.filter((m) => !unansweredIds.has(m.id)),
+    ...bySendTime.filter((m) => unansweredIds.has(m.id)),
+  ];
   const voiceNotes: string[] = []; // message ids, by voice-note number
   let attached = 0;
 
   const contents: ChatContent[] = [];
-  for (const [i, m] of ordered.entries()) {
+  for (const m of ordered) {
     const role = m.direction === 'IN' ? 'user' : 'model';
     const parts: ChatPart[] = [];
-    const unanswered = i > lastOut && m.direction === 'IN';
+    const unanswered = unansweredIds.has(m.id);
     const isAudio = m.type === 'audio';
 
     if (unanswered && m.mediaUrl && (isAudio || m.type === 'image') && attached < MAX_ATTACHMENTS) {
@@ -567,8 +642,23 @@ async function run(conversationId: string, manual: boolean): Promise<AutoReplyOu
       }
       break;
     } catch (err) {
-      if (!(err instanceof ChatModelUnavailableError) || model >= CHAT_MODEL_COUNT - 1) throw err;
-      logger.warn('Chat AI: switching model', { conversationId, reason: err.message });
+      if (!(err instanceof ChatModelUnavailableError)) throw err;
+      if (model < CHAT_MODEL_COUNT - 1) {
+        logger.warn('Chat AI: switching model', { conversationId, reason: err.message });
+        continue;
+      }
+      // Every Gemini model is down. A client left in silence is the worst
+      // outcome, so a plain holding reply is written by Claude instead: it
+      // cannot hear voice notes or search stock, but it can answer a person.
+      logger.warn('Chat AI: all Gemini models unavailable, using the text fallback', { conversationId });
+      toSend = [];
+      handoff = false;
+      reply = await fallbackReply(ordered, unansweredIds, settings.replyStyle, defaultMarket).catch((fallbackErr) => {
+        logger.error('Chat AI: text fallback failed too', fallbackErr, { conversationId });
+        return '';
+      });
+      if (!reply) throw err;
+      break;
     }
   }
 
@@ -576,11 +666,7 @@ async function run(conversationId: string, manual: boolean): Promise<AutoReplyOu
 
   // The client may have written again, or a person may have answered, while the
   // model was working. Never talk over either.
-  const latest = await prisma.chatMessage.findFirst({
-    where: { conversationId },
-    orderBy: { sentAt: 'desc' },
-    select: { id: true },
-  });
+  const latest = await newestArrival();
   if (latest?.id !== latestId) {
     return skip('A new message arrived while the assistant was working, so it held back rather than talk over it.');
   }

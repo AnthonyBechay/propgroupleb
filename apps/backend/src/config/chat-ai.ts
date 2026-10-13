@@ -41,8 +41,13 @@ const MODELS = [
 export const CHAT_MODEL_COUNT = MODELS.length;
 
 const MAX_OUTPUT_TOKENS = 800;
-/** An overloaded model sometimes hangs instead of refusing. */
-const TIMEOUT_MS = 12_000;
+/**
+ * An overloaded model sometimes hangs instead of refusing — but a merely slow
+ * one takes 15 seconds or more to answer, and cutting that off as "down" is
+ * how a working model gets skipped. Long enough for slow, short enough that a
+ * hung one does not hold a client for a minute.
+ */
+const TIMEOUT_MS = 25_000;
 /** Wait before the one retry on the same model; after that, the next model. */
 const RETRY_DELAYS_MS = [1000];
 
