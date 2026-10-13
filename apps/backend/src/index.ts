@@ -40,6 +40,7 @@ import submissionRoutes from './routes/submissions.js';
 import crmRoutes from './routes/crm.js';
 import inboxRoutes from './routes/inbox.js';
 import webhookRoutes from './routes/webhooks.js';
+import { privateFieldGuard } from './middleware/auth.js';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -47,6 +48,11 @@ const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3000';
 
 // Trust proxy for reverse proxy deployments (Coolify/nginx)
 app.set('trust proxy', 1);
+
+// Flat query strings only. The default parser turns `?status[not]=x` into an
+// object, and an object dropped into a Prisma `where` is a filter the caller
+// wrote — the same class of bug as the reset-token bypass, on every list route.
+app.set('query parser', 'simple');
 
 // Security middleware
 app.use(
@@ -311,11 +317,11 @@ app.get('/health', (_req, res) => {
 
 // API routes — core
 app.use('/api/auth', authRoutes);
-app.use('/api/buildings', buildingRoutes);
-app.use('/api/units', unitRoutes);
-app.use('/api/listings', listingRoutes);
+app.use('/api/buildings', privateFieldGuard, buildingRoutes);
+app.use('/api/units', privateFieldGuard, unitRoutes);
+app.use('/api/listings', privateFieldGuard, listingRoutes);
 app.use('/api/users', userRoutes);
-app.use('/api/favorites', favoriteRoutes);
+app.use('/api/favorites', privateFieldGuard, favoriteRoutes);
 app.use('/api/inquiries', inquiryRoutes);
 app.use('/api/portfolio', portfolioRoutes);
 app.use('/api/admin', adminRoutes);
@@ -339,7 +345,7 @@ app.use('/api/upload', uploadRoutes);
 app.use('/api/documents', documentRoutes);
 app.use('/api/files', fileRoutes);
 app.use('/api/location-guides', locationGuideRoutes);
-app.use('/api/share', shareRoutes);
+app.use('/api/share', privateFieldGuard, shareRoutes);
 app.use('/api/submissions', submissionRoutes);
 // Mounted ahead of the CRM router so /api/crm/inbox/* is not read as /:id.
 app.use('/api/crm/inbox', inboxRoutes);
@@ -350,7 +356,7 @@ app.use('/api/webhooks', webhookRoutes);
 app.use('/api/fx-rates', fxRateRoutes);
 
 // Legacy alias — keep /api/properties working during transition
-app.use('/api/properties', propertyRoutes);
+app.use('/api/properties', privateFieldGuard, propertyRoutes);
 
 // Global error handler
 app.use(errorHandler);

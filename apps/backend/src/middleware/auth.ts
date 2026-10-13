@@ -172,6 +172,66 @@ export const requireAdmin = requireRole('ADMIN', 'SUPER_ADMIN');
 export const requireSuperAdmin = requireRole('SUPER_ADMIN');
 export const requireAgent = requireRole('AGENT', 'ADMIN', 'SUPER_ADMIN');
 
+/** Anyone who works in the back office. Everybody else is the public. */
+const STAFF_ROLES = ['AGENT', 'CRM_MANAGER', 'ADMIN', 'SUPER_ADMIN'];
+
+export function isStaff(req: Request): boolean {
+  const role = (req as AuthenticatedRequest).user?.role;
+  return Boolean(role && STAFF_ROLES.includes(role));
+}
+
+/**
+ * Fields the back office keeps on a property that must never reach a visitor:
+ * who owns it and how to reach them.
+ *
+ * The public detail endpoints share their Prisma includes with the admin, so
+ * the owner's CRM record (name, phone, WhatsApp, email) and each unit's owner
+ * contact used to go out to anyone who opened a property page's JSON.
+ */
+const PRIVATE_FIELDS = new Set([
+  'ownerLead',
+  'ownerLeadId',
+  'ownerName',
+  'ownerPhone',
+  'ownerUserId',
+  'managedByUserId',
+  'managementNote',
+]);
+
+/** Strip owner details from anything on its way to a non-staff caller. */
+export function redactPrivate<T>(req: Request, payload: T): T {
+  if (isStaff(req)) return payload;
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const walk = (value: any): any => {
+    if (Array.isArray(value)) return value.map(walk);
+    // Plain objects only — a Date or a Prisma Decimal must pass through whole.
+    if (value && typeof value === 'object' && Object.getPrototypeOf(value) === Object.prototype) {
+      const out: Record<string, unknown> = {};
+      for (const [k, v] of Object.entries(value)) {
+        if (PRIVATE_FIELDS.has(k)) continue;
+        out[k] = walk(v);
+      }
+      return out;
+    }
+    return value;
+  };
+  return walk(payload) as T;
+}
+
+/**
+ * Mounted in front of every catalogue router. Applied at send time, once,
+ * rather than per handler — a route that forgets is a leaked phone number.
+ * A route that never authenticates has no `req.user`, so it is treated as
+ * public, which is the safe direction to be wrong in.
+ */
+export function privateFieldGuard(req: Request, res: Response, next: NextFunction) {
+  const json = res.json.bind(res);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  res.json = (body: any) => json(redactPrivate(req, body));
+  next();
+}
+
 /**
  * Who may work the CRM. CRM_MANAGER runs the whole pipeline but never sees the
  * office's commission — see `canSeeMoney`.

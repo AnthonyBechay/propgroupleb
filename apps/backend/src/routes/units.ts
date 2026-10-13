@@ -1,7 +1,7 @@
 import express, { type Request, type Response, type Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '@propgroup/db';
-import { authenticateToken, requireAdmin, logAdminAction } from '../middleware/auth.js';
+import { authenticateToken, requireAdmin, logAdminAction, optionalAuthenticateToken } from '../middleware/auth.js';
 import { asyncHandler } from '../utils/errors.js';
 import { logger } from '../utils/logger.js';
 import { sendSuccess, sendCreated, sendPaginated, sendNotFound, sendError } from '../utils/response.js';
@@ -121,6 +121,7 @@ router.get(
 // ── GET /:id — detail (public if FOR_SALE|FOR_RENT, else admin) ───────────────
 router.get(
   '/:id',
+  optionalAuthenticateToken,
   asyncHandler(async (req: Request, res: Response) => {
     const authReq = req as AuthenticatedRequest;
     const unit = await prisma.unit.findUnique({

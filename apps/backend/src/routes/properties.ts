@@ -205,7 +205,7 @@ router.get(
       include: FLAT_PROPERTY_INCLUDE,
     });
 
-    if (!building) {
+    if (!building || building.visibility === 'HIDDEN') {
       sendNotFound(res, 'Property');
       return;
     }
@@ -233,7 +233,7 @@ router.get(
         include: FLAT_PROPERTY_INCLUDE,
       }));
 
-    if (!building) {
+    if (!building || building.visibility === 'HIDDEN') {
       sendNotFound(res, 'Property');
       return;
     }

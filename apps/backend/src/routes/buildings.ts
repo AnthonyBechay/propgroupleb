@@ -1,7 +1,7 @@
 import express, { type Request, type Response, type Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '@propgroup/db';
-import { authenticateToken, requireAdmin, logAdminAction, optionalAuthenticateToken } from '../middleware/auth.js';
+import { authenticateToken, requireAdmin, logAdminAction, optionalAuthenticateToken, isStaff } from '../middleware/auth.js';
 import { asyncHandler } from '../utils/errors.js';
 import { shouldCountView } from '../utils/view-counting.js';
 import { logger } from '../utils/logger.js';
@@ -220,8 +220,11 @@ router.get(
 
     const { kind, mohafazat, caza, city, status, featured, search, visibility } = req.query as Record<string, string>;
 
-    // Default to PUBLIC unless admin passes visibility=all
-    if (visibility && visibility !== 'all') {
+    // PUBLIC only, unless staff ask otherwise. This used to honour the query
+    // param for anyone, so `?visibility=all` listed hidden properties.
+    if (!isStaff(req)) {
+      where.visibility = 'PUBLIC';
+    } else if (visibility && visibility !== 'all') {
       where.visibility = visibility;
     } else if (!visibility) {
       where.visibility = 'PUBLIC';
@@ -275,13 +278,15 @@ router.get(
 
 router.get(
   '/slug/:slug',
+  optionalAuthenticateToken,
   asyncHandler(async (req: Request, res: Response) => {
     const building = await prisma.building.findUnique({
       where: { slug: req.params.slug },
       include: BUILDING_DETAIL_INCLUDE,
     });
 
-    if (!building) {
+    // A hidden property does not exist as far as a visitor is concerned.
+    if (!building || (building.visibility === 'HIDDEN' && !isStaff(req))) {
       sendNotFound(res, 'Building');
       return;
     }
@@ -303,13 +308,14 @@ router.get(
 
 router.get(
   '/:id',
+  optionalAuthenticateToken,
   asyncHandler(async (req: Request, res: Response) => {
     const building = await prisma.building.findUnique({
       where: { id: req.params.id },
       include: BUILDING_DETAIL_INCLUDE,
     });
 
-    if (!building) {
+    if (!building || (building.visibility === 'HIDDEN' && !isStaff(req))) {
       sendNotFound(res, 'Building');
       return;
     }
