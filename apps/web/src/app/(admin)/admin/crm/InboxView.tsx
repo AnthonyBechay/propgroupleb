@@ -56,7 +56,7 @@ interface ThreadDetail extends Thread {
   messages: ChatMessage[]
   canReply: boolean
   /** Would the assistant answer this thread's next message — and if not, why. */
-  autoReply: { sent: boolean; reason: string }
+  autoReply: { sent: boolean; reason: string; canResume?: boolean }
   /** What the chat assistant understood they want, waiting for a decision. */
   suggestion: Suggestion | null
   /** The thread has older messages than the ones loaded. */
@@ -289,9 +289,20 @@ export function InboxView({
     } finally { setAiBusy(false) }
   }
 
+  // One way back for every thread-level hold — a pause, or the team having replied.
+  const resumeAi = async () => {
+    if (!detail) return
+    const res = await call(`/${detail.id}`, { method: 'PATCH', body: JSON.stringify({ aiPaused: false }) })
+    if (res.ok) {
+      setAiNote(null)
+      loadDetail(detail.id)
+    }
+  }
+
   const toggleAi = async () => {
     if (!detail) return
-    const res = await call(`/${detail.id}`, { method: 'PATCH', body: JSON.stringify({ aiPaused: !detail.aiPaused }) })
+    // The header button: pause it when it is answering, resume it otherwise.
+    const res = await call(`/${detail.id}`, { method: 'PATCH', body: JSON.stringify({ aiPaused: detail.autoReply.sent }) })
     if (res.ok) {
       setAiNote(null)
       loadDetail(detail.id)
@@ -482,12 +493,13 @@ export function InboxView({
                   <Bot className="h-4 w-4 inline -mt-0.5 mr-1 text-slate-500" />
                   {aiNote ?? detail.autoReply.reason}
                 </p>
-                {detail.aiPaused && (
+                {detail.autoReply.canResume && (
                   <button
-                    onClick={toggleAi}
+                    onClick={resumeAi}
+                    title="The assistant answers this conversation for the next 24 hours, even if the team replies too"
                     className="min-h-11 px-3 rounded-lg bg-slate-900 text-white text-sm font-medium inline-flex items-center gap-1.5"
                   >
-                    Resume auto-reply
+                    Resume auto-reply for 24h
                   </button>
                 )}
                 <button
@@ -514,6 +526,10 @@ export function InboxView({
               </div>
             )}
 
+            {/* The conversation, with matching properties beside it on a wide
+                screen and in a short strip above it on a narrow one — never
+                in place of it. */}
+            <div className="flex-1 min-h-0 flex flex-col xl:flex-row-reverse">
             {showListings && (
               <ListingPicker
                 // Re-fetch when what they want changes.
@@ -521,6 +537,7 @@ export function InboxView({
                 conversationId={detail.id}
                 canSend={detail.canReply}
                 onSent={() => { loadDetail(detail.id); loadThreads() }}
+                onClose={() => setShowListings(false)}
               />
             )}
 
@@ -571,6 +588,8 @@ export function InboxView({
                 </div>
                 </div>
               ))}
+            </div>
+
             </div>
 
             <div className="border-t border-slate-200 p-3">

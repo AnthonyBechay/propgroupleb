@@ -42,7 +42,7 @@ export const CHAT_MODEL_COUNT = MODELS.length;
 
 const MAX_OUTPUT_TOKENS = 800;
 /** An overloaded model sometimes hangs instead of refusing. */
-const TIMEOUT_MS = 15_000;
+const TIMEOUT_MS = 12_000;
 /** Wait before the one retry on the same model; after that, the next model. */
 const RETRY_DELAYS_MS = [1000];
 
@@ -55,6 +55,19 @@ export class ChatModelUnavailableError extends Error {
 }
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/**
+ * A model that has just failed is left alone for a few minutes. Without this,
+ * every reply during an outage would first spend half a minute finding out,
+ * again, that the same model is still down.
+ */
+const REST_MS = 5 * 60 * 1000;
+const restingUntil = new Map<number, number>();
+
+/** True while this model is being skipped after failing. */
+export function chatModelResting(modelIndex: number): boolean {
+  return (restingUntil.get(modelIndex) ?? 0) > Date.now();
+}
 
 export function chatAiEnabled(): boolean {
   return Boolean(process.env.GEMINI_API_KEY);
@@ -144,7 +157,10 @@ export class ChatSession {
         failure = name === 'TypeError' ? 'network error' : 'no answer in time';
       }
 
-      if (attempt >= RETRY_DELAYS_MS.length) throw new ChatModelUnavailableError(model.id, failure);
+      if (attempt >= RETRY_DELAYS_MS.length) {
+        restingUntil.set(this.modelIndex, Date.now() + REST_MS);
+        throw new ChatModelUnavailableError(model.id, failure);
+      }
       logger.warn('Chat AI: model busy, retrying', { model: model.id, failure, attempt: attempt + 1 });
       await sleep(RETRY_DELAYS_MS[attempt]);
     }

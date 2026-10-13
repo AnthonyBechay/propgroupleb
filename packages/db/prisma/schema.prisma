@@ -1752,6 +1752,9 @@ model Conversation {
   aiPaused Boolean @default(false)
   // Why, in words — so "paused" on a thread explains itself.
   aiPausedReason String?
+  // When somebody last pressed "Resume auto-reply". For 24 hours from then the
+  // assistant keeps answering even though a person has replied on the thread.
+  aiResumedAt DateTime?
 
   // Click-to-WhatsApp / Instagram ad attribution from the first message.
   adId    String?

@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
-import { Loader2, Send, Building2, ExternalLink } from 'lucide-react'
+import { Loader2, Send, Building2, ExternalLink, X } from 'lucide-react'
 import { normalizeApiUrl, normalizeFileUrl } from '@/lib/utils/api-url'
 
 /**
@@ -34,7 +34,9 @@ export function ListingPicker({
   conversationId,
   canSend,
   onSent,
+  onClose,
 }: {
+  onClose: () => void
   conversationId: string
   canSend: boolean
   onSent: () => void
@@ -85,24 +87,30 @@ export function ListingPicker({
     : ''
 
   return (
-    <div className="border-b border-slate-200 bg-slate-50 px-3 sm:px-4 py-3">
-      <p className="text-xs text-slate-500 mb-2">
-        Available now{fit ? ` for: ${fit}` : ''}
-      </p>
+    <div className="shrink-0 border-b border-slate-200 bg-slate-50 px-3 py-2 max-h-64 overflow-y-auto xl:max-h-none xl:w-72 xl:border-b-0 xl:border-l">
+      <div className="flex items-start justify-between gap-2 mb-2">
+        <p className="text-xs text-slate-600">
+          <span className="font-semibold text-slate-800">Properties</span>
+          {fit ? ` · ${fit}` : ' · available now'}
+        </p>
+        <button onClick={onClose} aria-label="Close properties" className="min-h-9 min-w-9 -mt-1 -mr-1 inline-flex items-center justify-center rounded-lg text-slate-600 hover:bg-slate-200">
+          <X className="h-4 w-4" />
+        </button>
+      </div>
       {error && <p className="text-sm text-red-600 mb-2">{error}</p>}
       {cards === null ? (
         <div className="flex justify-center py-6 text-slate-400"><Loader2 className="h-5 w-5 animate-spin" /></div>
       ) : cards.length === 0 ? (
         <p className="text-sm text-slate-500 py-3">Nothing public and available fits yet.</p>
       ) : (
-        <div className="flex gap-3 overflow-x-auto pb-1">
+        <div className="flex gap-3 overflow-x-auto pb-1 xl:flex-col xl:overflow-visible">
           {cards.map((c) => (
-            <div key={c.ref} className="w-56 shrink-0 bg-white border border-slate-200 rounded-xl overflow-hidden flex flex-col">
+            <div key={c.ref} className="w-52 shrink-0 xl:w-full bg-white border border-slate-200 rounded-xl overflow-hidden flex flex-col">
               {c.image ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={normalizeFileUrl(c.image)} alt="" className="h-28 w-full object-cover" />
+                <img src={normalizeFileUrl(c.image)} alt="" className="h-20 xl:h-28 w-full object-cover" />
               ) : (
-                <div className="h-28 w-full bg-slate-100 flex items-center justify-center text-slate-300"><Building2 className="h-6 w-6" /></div>
+                <div className="h-20 xl:h-28 w-full bg-slate-100 flex items-center justify-center text-slate-300"><Building2 className="h-6 w-6" /></div>
               )}
               <div className="p-2.5 flex-1 flex flex-col">
                 <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">

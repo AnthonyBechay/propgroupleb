@@ -111,8 +111,25 @@ function toCard(building: any): CatalogueCard | null {
   };
 }
 
+/**
+ * One reply reads the catalogue several times over — the ad's project, the
+ * preferred list, the place names, then each search. It is the same stock each
+ * time, so it is held for a minute rather than re-queried with every unit and
+ * option attached.
+ */
+const CACHE_MS = 60_000;
+const marketCache = new Map<Market, { at: number; cards: CatalogueCard[] }>();
+
 /** Public, available stock in one market. */
 async function loadMarket(market: Market): Promise<CatalogueCard[]> {
+  const hit = marketCache.get(market);
+  if (hit && Date.now() - hit.at < CACHE_MS) return hit.cards;
+  const cards = await queryMarket(market);
+  marketCache.set(market, { at: Date.now(), cards });
+  return cards;
+}
+
+async function queryMarket(market: Market): Promise<CatalogueCard[]> {
   const buildings = await prisma.building.findMany({
     where: {
       visibility: 'PUBLIC',

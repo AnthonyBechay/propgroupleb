@@ -1,9 +1,11 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useCallback, useEffect, useState } from 'react'
 import { Search, X } from 'lucide-react'
+import { normalizeApiUrl } from '@/lib/utils/api-url'
 import { InboxView } from '../crm/InboxView'
+import { LeadDrawer } from '../crm/LeadDrawer'
+import type { Lead } from '../crm/types'
 
 /**
  * Conversations, on a page of their own.
@@ -14,8 +16,14 @@ import { InboxView } from '../crm/InboxView'
  * the whole screen and nothing on it that is not about the conversation.
  */
 export default function InboxPage() {
-  const router = useRouter()
+  const apiUrl = normalizeApiUrl(process.env.NEXT_PUBLIC_API_URL || '')
   const [search, setSearch] = useState('')
+  // The client's card opens over the conversation, so the chat stays where it is.
+  const [openLead, setOpenLead] = useState<Lead | null>(null)
+  const openClient = useCallback(async (leadId: string) => {
+    const res = await fetch(`${apiUrl}/api/crm/${leadId}`, { credentials: 'include', cache: 'no-store' })
+    if (res.ok) setOpenLead((await res.json()).data ?? null)
+  }, [apiUrl])
   // Arriving from a client's card or a deal: open that client's thread.
   const [focusLeadId, setFocusLeadId] = useState<string | null>(null)
   useEffect(() => {
@@ -43,9 +51,17 @@ export default function InboxPage() {
         fill
         search={search}
         focusLeadId={focusLeadId}
-        onOpenLead={(leadId) => router.push(`/admin/crm?lead=${leadId}`)}
+        onOpenLead={openClient}
         onChanged={() => {}}
       />
+
+      {openLead && (
+        <LeadDrawer
+          lead={openLead}
+          onClose={() => setOpenLead(null)}
+          onChanged={() => openClient(openLead.id)}
+        />
+      )}
     </div>
   )
 }

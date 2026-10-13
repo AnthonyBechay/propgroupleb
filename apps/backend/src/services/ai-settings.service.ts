@@ -27,6 +27,14 @@ export interface ChatAiSettings {
    * the ad or the client has not already named a project.
    */
   preferred: PreferredProject[];
+  /**
+   * How it writes to Arabic speakers.
+   *   match        — the client's own language and script
+   *   latin        — Lebanese Arabic in Latin letters ("kifak, shu badak?")
+   *                  for anyone writing Arabic; English and French as they are
+   *   latin_always — Lebanese in Latin letters to everyone
+   */
+  replyStyle: 'match' | 'latin' | 'latin_always';
   /** Anything else it should know or do, in the office's own words. */
   guidance: string;
 }
@@ -36,6 +44,7 @@ export function defaultChatAiSettings(): ChatAiSettings {
     enabled: true,
     audience: process.env.AUTO_REPLY_AUDIENCE === 'all' ? 'all' : 'ads',
     preferred: [],
+    replyStyle: 'latin',
     guidance: '',
   };
 }
@@ -50,6 +59,10 @@ export async function getChatAiSettings(): Promise<ChatAiSettings> {
     preferred: Array.isArray(saved.preferred)
       ? saved.preferred.filter((p) => p && typeof p.ref === 'string').map((p) => ({ ref: p.ref, pitch: p.pitch ?? '' }))
       : [],
+    replyStyle:
+      saved.replyStyle === 'match' || saved.replyStyle === 'latin' || saved.replyStyle === 'latin_always'
+        ? saved.replyStyle
+        : defaults.replyStyle,
     guidance: typeof saved.guidance === 'string' ? saved.guidance : '',
   };
 }

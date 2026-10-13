@@ -365,7 +365,11 @@ router.patch(
     const { aiPaused } = z.object({ aiPaused: z.boolean() }).parse(req.body);
     const { count } = await prisma.conversation.updateMany({
       where: { id: req.params.id },
-      data: { aiPaused, aiPausedReason: aiPaused ? 'Paused by the team' : null },
+      // Resuming hands the thread back to the assistant for 24 hours, even
+      // though a person has been replying on it.
+      data: aiPaused
+        ? { aiPaused: true, aiPausedReason: 'Paused by the team', aiResumedAt: null }
+        : { aiPaused: false, aiPausedReason: null, aiResumedAt: new Date() },
     });
     if (count === 0) {
       sendNotFound(res, 'Conversation');

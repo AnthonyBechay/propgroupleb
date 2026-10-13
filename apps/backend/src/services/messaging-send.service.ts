@@ -113,10 +113,23 @@ export async function sendReply(
   const body = text.trim().slice(0, 4000);
   if (!body) throw new AppError('Empty message', 400);
 
-  const sent =
+  const deliver = (image?: string) =>
     conversation.channel === 'WHATSAPP'
-      ? await sendWhatsApp(conversation.externalId, body, imageUrl)
-      : await sendInstagram(conversation.externalId, body, imageUrl);
+      ? sendWhatsApp(conversation.externalId, body, image)
+      : sendInstagram(conversation.externalId, body, image);
+
+  let sent: { id: string; altId?: string };
+  try {
+    sent = await deliver(imageUrl);
+  } catch (err) {
+    if (!imageUrl) throw err;
+    // WhatsApp refuses some photos (a format it does not take, a file too
+    // large, a link it cannot fetch). The words matter more than the picture,
+    // and the link in them leads to every photo anyway — send them without it.
+    logger.warn('Photo not accepted, sending the text alone', { error: (err as Error).message });
+    imageUrl = undefined;
+    sent = await deliver();
+  }
 
   await recordChatMessage({
     channel: conversation.channel,

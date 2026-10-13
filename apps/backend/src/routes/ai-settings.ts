@@ -57,6 +57,7 @@ const settingsSchema = z.object({
   preferred: z
     .array(z.object({ ref: z.string().trim().min(1).max(40), pitch: z.string().trim().max(300).default('') }))
     .max(10),
+  replyStyle: z.enum(['match', 'latin', 'latin_always']).default('latin'),
   guidance: z.string().trim().max(1500).default(''),
 });
 

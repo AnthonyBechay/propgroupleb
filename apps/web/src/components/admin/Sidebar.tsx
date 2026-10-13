@@ -71,7 +71,6 @@ const GROUPS: NavGroup[] = [
     items: [
       { name: 'Inbox', href: '/admin/inbox', icon: MessagesSquare },
       { name: 'CRM', href: '/admin/crm', icon: UserSearch },
-      { name: 'Chat assistant', href: '/admin/ai-settings', icon: Bot },
       { name: 'Inquiries', href: '/admin/inquiries', icon: MessageSquare },
       { name: 'Contact messages', href: '/admin/contacts', icon: Inbox },
     ],
@@ -82,6 +81,7 @@ const GROUPS: NavGroup[] = [
     items: [
       { name: 'Analytics', href: '/admin/analytics', icon: BarChart3 },
       { name: 'Users', href: '/admin/users', icon: Users },
+      { name: 'Chat assistant', href: '/admin/ai-settings', icon: Bot },
       { name: 'Settings', href: '/admin/settings', icon: Settings },
     ],
   },

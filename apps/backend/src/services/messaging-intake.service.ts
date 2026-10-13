@@ -142,6 +142,25 @@ export async function recordChatMessage(event: ChatEvent): Promise<string | null
 
   const sentAt = event.sentAt ?? new Date();
   const inbound = event.direction === 'IN';
+
+  // A message we sent through the API can come back as an echo "from the
+  // phone" under an id we were never given. Stored twice it would look as if a
+  // person had answered — and the assistant steps aside for a person. So an
+  // echo that repeats, word for word, what the CRM or the assistant sent on
+  // this thread moments ago is that same message, not a new one.
+  if (!inbound && event.origin === 'PHONE' && !event.history) {
+    const twin = await prisma.chatMessage.findFirst({
+      where: {
+        direction: 'OUT',
+        origin: { in: ['AI', 'CRM'] },
+        body: event.body.slice(0, 4000),
+        sentAt: { gte: new Date(Date.now() - 3 * 60 * 1000) },
+        conversation: { channel: event.channel, externalId },
+      },
+      select: { id: true },
+    });
+    if (twin) return null;
+  }
   const preview = event.body.slice(0, 140);
 
   let conversation = await prisma.conversation.findUnique({

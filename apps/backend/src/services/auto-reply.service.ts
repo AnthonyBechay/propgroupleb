@@ -1,10 +1,11 @@
 import { prisma } from '@propgroup/db';
-import { CHAT_MODEL_COUNT, ChatModelUnavailableError, ChatSession, chatAiEnabled, type ChatContent, type ChatPart, type ChatTool } from '../config/chat-ai.js';
+import { CHAT_MODEL_COUNT, ChatModelUnavailableError, ChatSession, chatAiEnabled, chatModelResting, type ChatContent, type ChatPart, type ChatTool } from '../config/chat-ai.js';
 import { aiBudget } from '../utils/ai-budget.js';
 import { logger } from '../utils/logger.js';
 import { cardCaption, cardsByRef, formatPrice, marketNames, projectsNamedIn, searchCatalogue, type Market } from './catalogue.service.js';
 import { recordListingsShared } from './deal-sync.service.js';
-import { getChatAiSettings } from './ai-settings.service.js';
+import { getChatAiSettings, type ChatAiSettings } from './ai-settings.service.js';
+import { linkConversationToLead } from './messaging-intake.service.js';
 import { canSendOn, replyWindowOpen, sendReply } from './messaging-send.service.js';
 import { extractKeyFromUrl, getFileStream } from './upload.service.js';
 
@@ -35,8 +36,15 @@ import { extractKeyFromUrl, getFileStream } from './upload.service.js';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-/** Replies per thread per 24h. A conversation needing more than this needs a person. */
-const PER_THREAD_LIMIT = 8;
+/**
+ * Replies per thread per 24h. High enough for a real back-and-forth — the
+ * assistant runs unattended, and pausing mid-conversation leaves a client in
+ * silence — but still a ceiling on what one person can make it send.
+ */
+const PER_THREAD_LIMIT = 20;
+/** How long to wait for a just-arrived voice note or photo to finish being stored. */
+const MEDIA_WAIT_MS = 3_000;
+const MEDIA_WAIT_TRIES = 4;
 const DAY_MS = 24 * 60 * 60 * 1000;
 /** People send three short messages in a row; answer once, after they stop. */
 const DEBOUNCE_MS = 12_000;
@@ -81,6 +89,8 @@ export interface AutoReplyOutcome {
   sent: boolean;
   /** Why, in words somebody can act on. */
   reason: string;
+  /** The block is one "Resume auto-reply" lifts (a pause, or the team having replied). */
+  canResume?: boolean;
 }
 
 /**
@@ -102,7 +112,20 @@ export async function autoReplyStatus(conversationId: string): Promise<AutoReply
   });
   if (!conversation) return { sent: false, reason: 'Conversation not found.' };
   const blocked = await standingBlock(conversation, await getChatAiSettings(), false);
-  return blocked ? { sent: false, reason: blocked } : { sent: true, reason: 'It will answer the next message.' };
+  if (blocked) {
+    return { sent: false, reason: blocked, canResume: conversation.aiPaused || blocked.startsWith('Someone on the team') };
+  }
+  return {
+    sent: true,
+    reason: resumedRecently(conversation)
+      ? `Resumed by the team — it keeps answering here until ${new Date((conversation.aiResumedAt as Date).getTime() + DAY_MS).toISOString().slice(0, 16).replace('T', ' ')} UTC.`
+      : 'It will answer the next message.',
+  };
+}
+
+/** "Resume auto-reply" was pressed within the last 24 hours. */
+function resumedRecently(conversation: { aiResumedAt: Date | null }): boolean {
+  return Boolean(conversation.aiResumedAt && Date.now() - conversation.aiResumedAt.getTime() < DAY_MS);
 }
 
 /**
@@ -110,7 +133,7 @@ export async function autoReplyStatus(conversationId: string): Promise<AutoReply
  * ones that only exist to keep the assistant out of a person's way.
  */
 async function standingBlock(
-  conversation: { id: string; channel: 'WHATSAPP' | 'INSTAGRAM'; aiPaused: boolean; aiPausedReason: string | null; adId: string | null; lastInboundAt: Date | null; lead: { adId: string | null; source: string } | null },
+  conversation: { id: string; channel: 'WHATSAPP' | 'INSTAGRAM'; aiPaused: boolean; aiPausedReason: string | null; aiResumedAt: Date | null; adId: string | null; lastInboundAt: Date | null; lead: { adId: string | null; source: string } | null },
   settings: { enabled: boolean; audience: 'ads' | 'all' },
   manual: boolean
 ): Promise<string | null> {
@@ -134,14 +157,18 @@ async function standingBlock(
         Boolean(conversation.adId) || Boolean(conversation.lead?.adId) || conversation.lead?.source === 'FACEBOOK_AD';
       if (!fromAd) return 'This person did not come from an ad or a lead form, and the settings say to answer only those.';
     }
-    // A person replied from the phone or the CRM: the thread is theirs now.
-    const humanReplied = await prisma.chatMessage.count({
-      where: {
-        conversationId: conversation.id, direction: 'OUT',
-        sentAt: { gte: new Date(Date.now() - DAY_MS) }, NOT: { origin: 'AI' },
-      },
-    });
-    if (humanReplied > 0) return 'Someone on the team replied on this conversation in the last 24 hours, so the assistant is staying out of it.';
+    // A person replied from the phone or the CRM: the thread is theirs now —
+    // unless somebody pressed "Resume auto-reply", which hands it back to the
+    // assistant for 24 hours whatever the team writes in the meantime.
+    if (!resumedRecently(conversation)) {
+      const humanReplied = await prisma.chatMessage.count({
+        where: {
+          conversationId: conversation.id, direction: 'OUT',
+          sentAt: { gte: new Date(Date.now() - DAY_MS) }, NOT: { origin: 'AI' },
+        },
+      });
+      if (humanReplied > 0) return 'Someone on the team replied on this conversation in the last 24 hours, so the assistant is staying out of it.';
+    }
   }
   const budget = await aiBudget();
   if (budget.exhausted) return 'The AI budget is used up, so all AI is paused.';
@@ -222,11 +249,20 @@ const TOOLS: ChatTool[] = [
   },
 ];
 
-function systemPrompt(context: string): string {
+const LANGUAGE_RULE: Record<ChatAiSettings['replyStyle'], string> = {
+  match:
+    '- Reply in the language the client uses, and the same script. Lebanese Arabic in Arabic letters gets Lebanese Arabic in Arabic letters; Arabic typed in Latin letters and numbers (e.g. "badde shi2a") gets the same style back; English gets English; French gets French. Never ask which language they prefer.',
+  latin:
+    '- If the client writes or speaks Arabic — in Arabic letters, in Latin letters, or in a voice note — reply in Lebanese Arabic written in LATIN letters with the usual chat numbers (2 for ء, 3 for ع, 7 for ح, 5 for خ), the way Lebanese people text: "Ahla w sahla! Shu l budget li 3am tfakkir fi?". Never use Arabic script. If they write English, reply in English; French, in French. Never ask which language they prefer.',
+  latin_always:
+    '- Always reply in Lebanese Arabic written in LATIN letters with the usual chat numbers (2 for ء, 3 for ع, 7 for ح, 5 for خ), the way Lebanese people text: "Ahla w sahla! Shu l budget li 3am tfakkir fi?". Never use Arabic script, whatever language the client writes in.',
+};
+
+function systemPrompt(context: string, replyStyle: ChatAiSettings['replyStyle']): string {
   return `You are the assistant for PropGroup, a real estate brokerage, replying to a client on WhatsApp or Instagram. PropGroup sells and rents property in Lebanon and sells investment property abroad, mainly in Georgia.
 
 How to write:
-- Reply in the language the client uses, and the same script. Lebanese Arabic in Arabic letters gets Lebanese Arabic in Arabic letters; Arabic typed in Latin letters and numbers (e.g. "badde shi2a") gets the same style back; English gets English; French gets French. Never ask which language they prefer.
+${LANGUAGE_RULE[replyStyle]}
 - Write like a helpful person texting: one to three short sentences, at most one question at a time. No lists, no markdown, no emojis unless the client uses them.
 - If the client sends a voice note, listen to it and answer what it says as if they had typed it.
 
@@ -235,6 +271,7 @@ What to do:
 - Each reply is one message and costs money to send. Say everything for this turn in that one reply; never plan a follow-up message.
 - As soon as you know the country and either a budget, an area or a project, call search_listings and attach the best matches with send_listings. Two or three well-matched options beat many. If nothing fits, say so plainly and ask what they could flex on.
 - Each time the client tells you a requirement, call save_client_requirements.
+- Photos, floor plans, the location and the full details of every property are on its own page, and send_listings puts the link to that page in your message. So when a client asks for pictures, more details, the location or "more info" about a property, attach it with send_listings and tell them everything is at the link. That is an answer you can give yourself — never hand off, and never promise that a colleague will send photos or details.
 
 How the two markets work:
 - Abroad (Georgia) PropGroup sells PROJECTS: developments with several unit types and a "from" price. It is always a purchase, usually for investment. Never ask a Georgia client whether they want to buy or rent, never offer rentals, and do not bring up Lebanon unless they do. Useful questions there are budget, unit size, and when they want to buy.
@@ -246,7 +283,7 @@ Hard rules:
 - Only state facts about a property that search_listings returned. Never invent or estimate a price, availability, yield, payment plan, delivery date or legal detail.
 - Never mention owners, sellers, developers' terms, commission, fees, discounts or anything about how PropGroup is paid. If asked, say a colleague will go through the details.
 - Never negotiate, never confirm a viewing time, never ask for ID or payment details.
-- If the client wants a person, is upset, wants to negotiate or book a viewing, or asks something you cannot answer, call hand_off_to_team and tell them a member of the team will message them shortly.
+- Hand off only when it is really needed: the client asks for a person, is upset, wants to negotiate or to book a viewing, or asks something that is neither in the search results nor on the property's page. Then call hand_off_to_team and tell them a member of the team will message them shortly.
 
 ${context}`;
 }
@@ -288,18 +325,40 @@ async function run(conversationId: string, manual: boolean): Promise<AutoReplyOu
   if (blocked) return skip(blocked);
 
   const since = new Date(Date.now() - DAY_MS);
-  const recent = await prisma.chatMessage.findMany({
-    where: { conversationId },
-    orderBy: { sentAt: 'desc' },
-    take: HISTORY_MESSAGES,
-  });
+  const loadRecent = () =>
+    prisma.chatMessage.findMany({
+      where: { conversationId },
+      orderBy: { sentAt: 'desc' },
+      take: HISTORY_MESSAGES,
+    });
+  let recent = await loadRecent();
+
+  // A voice note is copied into storage in the background when it arrives. If
+  // the newest ones are not there yet, give them a moment — answering "[audio]"
+  // without having heard it is worse than answering ten seconds later.
+  const stillStoring = () =>
+    recent.some(
+      (m) =>
+        m.direction === 'IN' && (m.type === 'audio' || m.type === 'image') && !m.mediaUrl &&
+        Date.now() - m.createdAt.getTime() < 60_000
+    );
+  for (let i = 0; i < MEDIA_WAIT_TRIES && stillStoring(); i++) {
+    await new Promise((resolve) => setTimeout(resolve, MEDIA_WAIT_MS));
+    recent = await loadRecent();
+  }
   // Only answer a client who is actually waiting on us.
   if (recent.length === 0) return skip('There are no messages on this conversation yet.');
   if (recent[0].direction !== 'IN') return skip('The last message is ours — the client is not waiting on a reply.');
   const latestId = recent[0].id;
 
   const [threadCount, globalCount] = await Promise.all([
-    prisma.chatMessage.count({ where: { conversationId, origin: 'AI', sentAt: { gte: since } } }),
+    prisma.chatMessage.count({
+      where: {
+        conversationId, origin: 'AI',
+        // Resuming starts the day's count again; otherwise it would pause straight back.
+        sentAt: { gte: resumedRecently(conversation) ? (conversation.aiResumedAt as Date) : since },
+      },
+    }),
     prisma.chatMessage.count({ where: { origin: 'AI', sentAt: { gte: since } } }),
   ]);
   if (!manual && threadCount >= PER_THREAD_LIMIT) {
@@ -349,8 +408,11 @@ async function run(conversationId: string, manual: boolean): Promise<AutoReplyOu
   while (contents.length > 0 && contents[0].role !== 'user') contents.shift();
   if (contents.length === 0) return skip('There is nothing from the client to answer.');
 
-  // Reference codes the model may attach: search results and the ad's project.
+  // Reference codes the model may attach: search results, the ad's project,
+  // and anything already named in this conversation — "send me the pictures of
+  // the first one" has to work without searching all over again.
   const offered = new Set<string>();
+  for (const m of recent) for (const ref of m.body.match(/\bPG-\d+(?:-\d+)?\b/gi) ?? []) offered.add(ref.toUpperCase());
 
   const lead = conversation.lead;
   const defaultMarket: Market =
@@ -413,17 +475,20 @@ async function run(conversationId: string, manual: boolean): Promise<AutoReplyOu
   // the reply is started again from this point on the next model down — a turn
   // already produced cannot be handed to a different model.
   const opening = contents.length;
+  let leadId: string | null = lead?.id ?? null;
   let handoffReason = '';
   let toSend: string[] = [];
   let handoff = false;
   let reply = '';
 
   for (let model = 0; ; model++) {
+    // Skip a model that failed minutes ago — unless it is the last one left.
+    if (chatModelResting(model) && model < CHAT_MODEL_COUNT - 1) continue;
     contents.length = opening;
     toSend = [];
     handoff = false;
     reply = '';
-    const session = new ChatSession(systemPrompt(context), TOOLS, { feature: 'chat-reply', conversationId }, model);
+    const session = new ChatSession(systemPrompt(context, settings.replyStyle), TOOLS, { feature: 'chat-reply', conversationId }, model);
     try {
   for (let turn = 0; turn < MAX_MODEL_TURNS; turn++) {
     const result = await session.send(contents);
@@ -434,6 +499,10 @@ async function run(conversationId: string, manual: boolean): Promise<AutoReplyOu
     const responses: ChatPart[] = [];
     for (const call of result.calls) {
       const args = call.args ?? {};
+      // Models return "Lebanon" or "studio" as readily as the exact value asked for.
+      for (const key of ['market', 'deal', 'kind', 'intent']) {
+        if (typeof args[key] === 'string') args[key] = args[key].trim().toUpperCase().replace(/\s+/g, '_');
+      }
       let response: Record<string, any> = { ok: true };
 
       if (call.name === 'search_listings') {
@@ -463,7 +532,11 @@ async function run(conversationId: string, manual: boolean): Promise<AutoReplyOu
         toSend = [...new Set(refs)].slice(0, MAX_LISTINGS);
         response = { queued: toSend };
       } else if (call.name === 'save_client_requirements') {
-        await saveSuggestion(conversationId, lead?.id ?? null, args);
+        // Somebody telling us what they want to buy is a client, whether or
+        // not anyone is at a screen to say so. The assistant works unattended,
+        // so it files them itself; the details still wait as a suggestion.
+        if (!leadId) leadId = (await linkConversationToLead(conversationId, {}))?.id ?? null;
+        await saveSuggestion(conversationId, leadId, args);
       } else if (call.name === 'save_voice_transcripts') {
         for (const t of Array.isArray(args.transcripts) ? args.transcripts : []) {
           const messageId = voiceNotes[Number(t?.note) - 1];
@@ -489,7 +562,7 @@ async function run(conversationId: string, manual: boolean): Promise<AutoReplyOu
       // It used its tools (wrote down the voice note, searched) and stopped
       // without saying anything. The client is still waiting: ask for the reply.
       if (!reply) {
-        contents.push({ role: 'user', parts: [{ text: '[Not from the client] You have not replied to the client yet. Write your reply to them now, in their language.' }] });
+        contents.push({ role: 'user', parts: [{ text: '[Not from the client] You have not replied to the client yet. Write your reply to them now, following the language rule you were given.' }] });
         reply = (await session.send(contents)).text;
       }
       break;
@@ -520,8 +593,10 @@ async function run(conversationId: string, manual: boolean): Promise<AutoReplyOu
   await sendReply(conversationId, message, 'AI', message.length <= CAPTION_LIMIT ? photo : undefined);
 
   // Sending a property is the "Details sent" step of a deal — put it on the board.
-  if (lead && cards.length > 0) {
-    await recordListingsShared(lead.id, cards.map((c) => c.buildingId));
+  if (cards.length > 0) {
+    // Being sent a property makes them a client too, for the same reason.
+    if (!leadId) leadId = (await linkConversationToLead(conversationId, {}))?.id ?? null;
+    if (leadId) await recordListingsShared(leadId, cards.map((c) => c.buildingId));
   }
 
   // A hand-off pauses the assistant so it does not carry on over the person

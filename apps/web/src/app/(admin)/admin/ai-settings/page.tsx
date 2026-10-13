@@ -19,6 +19,7 @@ interface Settings {
   enabled: boolean
   audience: 'ads' | 'all'
   preferred: Preferred[]
+  replyStyle: 'match' | 'latin' | 'latin_always'
   guidance: string
 }
 
@@ -173,6 +174,31 @@ export default function AiSettingsPage() {
                 <input
                   type="radio" name="audience" checked={settings.audience === value}
                   onChange={() => update({ audience: value })}
+                  className="mt-1 h-4 w-4 border-slate-300"
+                />
+                <span>
+                  <span className="block text-sm text-slate-900">{title}</span>
+                  <span className="block text-xs text-slate-600">{hint}</span>
+                </span>
+              </label>
+            ))}
+          </div>
+        </fieldset>
+      </section>
+
+      <section className="bg-white border border-slate-200 rounded-xl p-4">
+        <fieldset>
+          <legend className="text-sm font-semibold text-slate-900 mb-2">How it writes</legend>
+          <div className="space-y-2">
+            {([
+              ['latin', 'Lebanese in English letters for Arabic speakers', 'Anyone writing or speaking Arabic gets "Ahla w sahla, shu l budget?" style. English and French speakers get their own language.'],
+              ['latin_always', 'Lebanese in English letters for everyone', 'Whatever language the client writes in.'],
+              ['match', 'The client\'s own language and script', 'Arabic letters for Arabic letters, English for English.'],
+            ] as const).map(([value, title, hint]) => (
+              <label key={value} className="flex items-start gap-3 cursor-pointer">
+                <input
+                  type="radio" name="replyStyle" checked={settings.replyStyle === value}
+                  onChange={() => update({ replyStyle: value })}
                   className="mt-1 h-4 w-4 border-slate-300"
                 />
                 <span>
