@@ -17,7 +17,7 @@ import { recordChatMessage } from './messaging-intake.service.js';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-const GRAPH_VERSION = process.env.META_GRAPH_VERSION || 'v23.0';
+const GRAPH_VERSION = process.env.META_GRAPH_VERSION || 'v26.0';
 
 /** Meta only accepts a free-form reply within 24h of the customer's last message. */
 const REPLY_WINDOW_MS = 24 * 60 * 60 * 1000;

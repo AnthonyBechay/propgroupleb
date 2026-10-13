@@ -55,7 +55,7 @@ import { scheduleAutoReply } from '../services/auto-reply.service.js';
 
 const router: Router = express.Router();
 
-const GRAPH_VERSION = process.env.META_GRAPH_VERSION || 'v23.0';
+const GRAPH_VERSION = process.env.META_GRAPH_VERSION || 'v26.0';
 
 /** Raw body captured by the JSON parser — signatures cover bytes, not objects. */
 interface RawBodyRequest extends Request {

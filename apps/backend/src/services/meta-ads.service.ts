@@ -11,7 +11,7 @@ import { logger } from '../utils/logger.js';
  *   META_ACCESS_TOKEN  — the system-user token (needs ads_read or ads_management)
  */
 
-const GRAPH_VERSION = process.env.META_GRAPH_VERSION || 'v23.0';
+const GRAPH_VERSION = process.env.META_GRAPH_VERSION || 'v26.0';
 
 /** Meta rate-limits insights hard, and yesterday's spend does not change by the minute. */
 const CACHE_MS = 15 * 60 * 1000;

@@ -9,17 +9,22 @@ import { logger } from '../utils/logger.js';
  * a form", so it finds more people who fill in forms. Reporting the leads that
  * reached a viewing, and the ones that bought, lets it look for more of those.
  *
- * Each client is reported at most once per stage, and only ever forwards.
+ * Meta asks for every stage of the funnel, starting with the raw lead, so
+ * three are sent: "Lead" when the client arrives, "Qualified" when a deal of
+ * theirs reaches a viewing, "Converted" when one closes. Each client is
+ * reported at most once per stage, and only ever forwards.
  *
  * Env:
  *   META_DATASET_ID   — the dataset (pixel) id from Meta Events Manager, set up
  *                       for CRM / conversion leads
  *   META_ACCESS_TOKEN — the system-user token
+ *   META_TEST_EVENT_CODE — optional; while set, events land in Events
+ *                       Manager's "Test events" tab instead of the real data
  */
 
-const GRAPH_VERSION = process.env.META_GRAPH_VERSION || 'v23.0';
+const GRAPH_VERSION = process.env.META_GRAPH_VERSION || 'v26.0';
 
-const STAGES = { Qualified: 1, Converted: 2 } as const;
+const STAGES = { Lead: 1, Qualified: 2, Converted: 3 } as const;
 type Stage = keyof typeof STAGES;
 
 /** A viewing or beyond means a real buyer; a closed deal means a customer. */
@@ -46,19 +51,19 @@ export async function reportLeadStage(leadId: string): Promise<void> {
     if (!lead || (!lead.adId && !lead.externalLeadId)) return;
 
     const stages = lead.opportunities.map((o) => o.stage as string);
-    const reached: Stage | null = stages.includes('WON')
+    const reached: Stage = stages.includes('WON')
       ? 'Converted'
       : stages.some((s) => QUALIFIED.includes(s))
         ? 'Qualified'
-        : null;
-    if (!reached) return;
+        : 'Lead';
     if (STAGES[reached] <= (STAGES[lead.metaStage as Stage] ?? 0)) return;
 
     // Meta matches the event to the person by the lead-form id when there is
     // one, otherwise by hashed contact details. Nothing is sent in the clear.
     const digits = lead.phone?.replace(/\D/g, '').replace(/^0+/, '');
+    const leadFormId = /^\d{10,20}$/.test(lead.externalLeadId ?? '') ? (lead.externalLeadId as string) : null;
     const userData: Record<string, unknown> = {
-      ...(lead.externalLeadId ? { lead_id: lead.externalLeadId } : {}),
+      ...(leadFormId ? { lead_id: leadFormId } : {}),
       ...(digits ? { ph: [sha256(digits)] } : {}),
       ...(lead.email ? { em: [sha256(lead.email.trim().toLowerCase())] } : {}),
     };
@@ -72,6 +77,9 @@ export async function reportLeadStage(leadId: string): Promise<void> {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${process.env.META_ACCESS_TOKEN}`,
         },
+        // Meta wants lead_id as a bare number, but its ids run to 17 digits —
+        // past what a JavaScript number holds exactly — so it travels through
+        // JSON.stringify as text and is unquoted afterwards.
         body: JSON.stringify({
           data: [
             {
@@ -82,7 +90,8 @@ export async function reportLeadStage(leadId: string): Promise<void> {
               user_data: userData,
             },
           ],
-        }),
+          ...(process.env.META_TEST_EVENT_CODE ? { test_event_code: process.env.META_TEST_EVENT_CODE } : {}),
+        }).replace(/"lead_id":"(\d+)"/, '"lead_id":$1'),
         signal: AbortSignal.timeout(15_000),
       }
     );

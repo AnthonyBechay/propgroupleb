@@ -33,6 +33,8 @@ services:
       # Dataset (pixel) id from Meta Events Manager. When set, ad leads that
       # reach a viewing or close are reported back so Meta optimises for buyers.
       META_DATASET_ID: ${META_DATASET_ID:-}
+      # While set, those reports go to Events Manager's "Test events" tab only.
+      META_TEST_EVENT_CODE: ${META_TEST_EVENT_CODE:-}
       INSTAGRAM_APP_SECRET: ${INSTAGRAM_APP_SECRET:-}
       # Instagram account token — for sending replies. Expires after 60 days
       # unless refreshed; replies on Instagram stop when it does.

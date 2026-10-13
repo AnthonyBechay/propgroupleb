@@ -4,6 +4,7 @@ import { randomUUID } from 'node:crypto';
 import { uploadFileAtKey } from './upload.service.js';
 import { recordAdEnquiry } from './deal-sync.service.js';
 import { describeAd } from './meta-ads.service.js';
+import { reportLeadStage } from './meta-conversions.service.js';
 
 /**
  * Turning Meta webhook deliveries into inbox threads and CRM clients.
@@ -375,6 +376,8 @@ async function createLeadFromChat(event: ChatEvent, externalId: string): Promise
     },
   });
   logger.info('Client auto-created from ad message', { channel: event.channel, leadId: lead.id });
+  // The first stage of the funnel, as Meta counts it.
+  void reportLeadStage(lead.id);
   return lead;
 }
 
@@ -504,5 +507,7 @@ export async function upsertLeadFromForm(
   logger.info('Client auto-created from lead form', { leadId: lead.id });
   // A form on an ad that names a project is an enquiry about that project.
   void recordAdEnquiry(lead.id, input.formName, marketFor('META'));
+  // The first stage of the funnel, as Meta counts it.
+  void reportLeadStage(lead.id);
   return { lead, created: true };
 }
