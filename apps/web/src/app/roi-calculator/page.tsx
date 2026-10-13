@@ -1,4 +1,5 @@
 import { RoiCalculatorTool } from '@/components/tools/RoiCalculatorTool'
+import { jsonLdScript } from '@/lib/json-ld'
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'
 
@@ -21,7 +22,7 @@ export default function PublicRoiCalculatorPage() {
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{
-          __html: JSON.stringify({
+          __html: jsonLdScript({
             '@context': 'https://schema.org',
             '@type': 'WebApplication',
             name: 'Property Investment ROI Calculator',

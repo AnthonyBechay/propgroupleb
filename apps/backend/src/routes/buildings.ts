@@ -1,7 +1,7 @@
 import express, { type Request, type Response, type Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '@propgroup/db';
-import { authenticateToken, requireAdmin, logAdminAction, optionalAuthenticateToken, isStaff } from '../middleware/auth.js';
+import { authenticateToken, requireAdmin, logAdminAction, optionalAuthenticateToken, isStaff, canSeeVisibility } from '../middleware/auth.js';
 import { asyncHandler } from '../utils/errors.js';
 import { shouldCountView } from '../utils/view-counting.js';
 import { logger } from '../utils/logger.js';
@@ -286,7 +286,7 @@ router.get(
     });
 
     // A hidden property does not exist as far as a visitor is concerned.
-    if (!building || (building.visibility === 'HIDDEN' && !isStaff(req))) {
+    if (!building || !canSeeVisibility(req, building.visibility)) {
       sendNotFound(res, 'Building');
       return;
     }
@@ -315,7 +315,7 @@ router.get(
       include: BUILDING_DETAIL_INCLUDE,
     });
 
-    if (!building || (building.visibility === 'HIDDEN' && !isStaff(req))) {
+    if (!building || !canSeeVisibility(req, building.visibility)) {
       sendNotFound(res, 'Building');
       return;
     }

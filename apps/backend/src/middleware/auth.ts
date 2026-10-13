@@ -181,6 +181,24 @@ export function isStaff(req: Request): boolean {
 }
 
 /**
+ * May this caller be shown a record with this visibility?
+ *
+ * Non-staff see PUBLIC only. ELITE_ONLY and HIDDEN both mean "not on the open
+ * web", but every detail endpoint used to test `visibility === 'HIDDEN'` on
+ * its own, which left ELITE_ONLY readable by anyone holding the id or the
+ * slug - the one visibility that exists specifically to keep a property off
+ * the open web. Lists already filter to PUBLIC in SQL; this is the detail
+ * routes catching up.
+ *
+ * Letting elite *clients* open an ELITE_ONLY property is a separate change: it
+ * needs a membership check here and a surface that links them to it. Nothing
+ * does today, so this grants no access that did not already exist.
+ */
+export function canSeeVisibility(req: Request, visibility: string | null | undefined): boolean {
+  return visibility === 'PUBLIC' || isStaff(req);
+}
+
+/**
  * Fields the back office keeps on a property that must never reach a visitor:
  * who owns it and how to reach them.
  *
@@ -271,7 +289,10 @@ export function redactMoney<T>(req: Request, payload: T): T {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const walk = (value: any): any => {
     if (Array.isArray(value)) return value.map(walk);
-    if (value && typeof value === 'object' && !(value instanceof Date)) {
+    // Plain objects only - the same guard `redactPrivate` uses above. Without
+    // it a Prisma `Decimal` is walked like a bag of fields and serialises as
+    // {s, e, d}, so every listing price reaching a CRM_MANAGER was unreadable.
+    if (value && typeof value === 'object' && Object.getPrototypeOf(value) === Object.prototype) {
       const out: Record<string, unknown> = {};
       for (const [k, v] of Object.entries(value)) {
         if ((MONEY_FIELDS as readonly string[]).includes(k)) continue;

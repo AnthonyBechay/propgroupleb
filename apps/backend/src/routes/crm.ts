@@ -873,14 +873,14 @@ async function markListingSold(listingId: string, closedAt: Date): Promise<void>
     // state, so the sale is recorded by soldAt and by hiding it.
     await prisma.building.update({
       where: { id: listing.buildingId },
-      data: { soldAt: closedAt, visibility: 'PRIVATE' as never },
+      data: { soldAt: closedAt, visibility: 'HIDDEN' },
     });
   }
 
   // ListingStatus has no SOLD — a finished listing is CLOSED.
   await prisma.listing.update({
     where: { id: listing.id },
-    data: { status: 'CLOSED' as never, visibility: 'PRIVATE' as never },
+    data: { status: 'CLOSED', visibility: 'HIDDEN' },
   });
 }
 

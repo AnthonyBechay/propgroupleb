@@ -1,7 +1,7 @@
 import express, { type Request, type Response, type Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '@propgroup/db';
-import { authenticateToken, requireAdmin, logAdminAction, optionalAuthenticateToken } from '../middleware/auth.js';
+import { authenticateToken, requireAdmin, logAdminAction, optionalAuthenticateToken, isStaff, canSeeVisibility } from '../middleware/auth.js';
 import { asyncHandler } from '../utils/errors.js';
 import { shouldCountView } from '../utils/view-counting.js';
 import { sendSuccess, sendCreated, sendPaginated, sendNotFound, sendError } from '../utils/response.js';
@@ -408,6 +408,7 @@ router.get(
 
 router.get(
   '/:id',
+  optionalAuthenticateToken,
   asyncHandler(async (req: Request, res: Response) => {
     const listing = await prisma.listing.findUnique({
       where: { id: req.params.id },
@@ -424,6 +425,17 @@ router.get(
     });
 
     if (!listing) { sendNotFound(res, 'Listing'); return; }
+
+    // The same rule as /slug/:slug above, which was hardened while this route
+    // was missed: it had no visibility and no status check at all, so a DRAFT,
+    // HIDDEN or ELITE_ONLY listing came back in full to anyone with its id.
+    if (!isStaff(req)) {
+      const viewableStatus = ['ACTIVE', 'UNDER_OFFER', 'CLOSED'].includes(listing.status);
+      if (!canSeeVisibility(req, listing.visibility) || !viewableStatus) {
+        sendNotFound(res, 'Listing');
+        return;
+      }
+    }
 
     const buildingId = listing.buildingId ?? (listing.unit as { buildingId?: string } | null)?.buildingId;
     if (buildingId && shouldCountView(req)) {

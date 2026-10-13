@@ -50,20 +50,23 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
       return null
     }
 
-    const data = JSON.parse(text)
+    const body = JSON.parse(text)
+    // The API answers { success, message, data }. Reading `body.user` made
+    // getCurrentUser() return null for everybody, signed in or not.
+    const user = body?.data
 
-    if (data.success && data.user) {
+    if (body.success && user) {
       return {
-        id: data.user.id,
-        email: data.user.email,
-        role: data.user.role,
-        isActive: data.user.isActive,
-        bannedAt: data.user.bannedAt,
-        emailVerifiedAt: data.user.emailVerifiedAt,
+        id: user.id,
+        email: user.email,
+        role: user.role,
+        isActive: user.isActive,
+        bannedAt: user.bannedAt,
+        emailVerifiedAt: user.emailVerifiedAt,
       }
     }
 
-    console.error('[rbac] Response missing user data:', data)
+    console.error('[rbac] Response missing user data:', body)
     return null
   } catch (error: any) {
     console.error('[rbac] Error getting current user:', error.message || error)

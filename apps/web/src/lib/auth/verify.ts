@@ -43,10 +43,18 @@ export async function verifyAuth(request: NextRequest): Promise<AuthResult> {
       return { authenticated: false, user: null }
     }
 
-    const data = await response.json()
+    // The API answers { success, message, data }, so `data.user` was always
+    // undefined and every caller saw an authenticated request with no user.
+    //
+    // /api/auth/me also answers 200 with `data: null` for an expired or forged
+    // token, so "authenticated" has to mean "a user came back" rather than
+    // "the request returned 200".
+    const body = await response.json()
+    const user = (body?.data ?? null) as AuthUser | null
+
     return {
-      authenticated: true,
-      user: data.user,
+      authenticated: user !== null,
+      user,
     }
   } catch (error) {
     console.error('[verifyAuth] Error:', error)
