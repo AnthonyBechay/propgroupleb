@@ -27,6 +27,12 @@ services:
       META_APP_SECRET: ${META_APP_SECRET:-}
       META_VERIFY_TOKEN: ${META_VERIFY_TOKEN:-}
       META_ACCESS_TOKEN: ${META_ACCESS_TOKEN:-}
+      # Ad account whose spend is shown next to the clients each ad produced
+      # (Ads Manager → account dropdown; the number, with or without "act_").
+      META_AD_ACCOUNT_ID: ${META_AD_ACCOUNT_ID:-}
+      # Dataset (pixel) id from Meta Events Manager. When set, ad leads that
+      # reach a viewing or close are reported back so Meta optimises for buyers.
+      META_DATASET_ID: ${META_DATASET_ID:-}
       INSTAGRAM_APP_SECRET: ${INSTAGRAM_APP_SECRET:-}
       # Instagram account token — for sending replies. Expires after 60 days
       # unless refreshed; replies on Instagram stop when it does.
@@ -36,11 +42,20 @@ services:
       YCLOUD_API_KEY: ${YCLOUD_API_KEY:-}
       # The business WhatsApp number in E.164 form (+9617…), the sender for replies.
       YCLOUD_WHATSAPP_FROM: ${YCLOUD_WHATSAPP_FROM:-}
-      # Automatic replies. OFF unless exactly 'true' (and AI_ENABLED too).
+      # Automatic replies. OFF unless exactly 'true' (and GEMINI_API_KEY set).
       # AUDIENCE: 'ads' = only people from an ad or lead form; 'all' = everyone.
       AUTO_REPLY_ENABLED: ${AUTO_REPLY_ENABLED:-}
       AUTO_REPLY_AUDIENCE: ${AUTO_REPLY_AUDIENCE:-ads}
       AUTO_REPLY_DAILY_LIMIT: ${AUTO_REPLY_DAILY_LIMIT:-200}
+      # Chat AI (Google Gemini): listens to voice notes, replies, offers stock.
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      # THE hard stop on AI spend, in dollars — every model (Gemini and Claude)
+      # and every feature together. When either is reached, all AI stops until
+      # it resets or the number is raised.
+      AI_DAILY_BUDGET_USD: ${AI_DAILY_BUDGET_USD:-3}
+      AI_MONTHLY_BUDGET_USD: ${AI_MONTHLY_BUDGET_USD:-30}
+      # Where a Georgian listing's link points (Lebanese ones use FRONTEND_URL).
+      INTERNATIONAL_SITE_URL: ${INTERNATIONAL_SITE_URL:-https://propgrp.com}
       # Market a brand-new client is filed under, by the account they wrote to:
       # the Facebook Page / Instagram account, and the WhatsApp number.
       # LEBANON or GEORGIA; editable on the client afterwards. Both default to

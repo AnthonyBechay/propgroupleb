@@ -65,7 +65,7 @@ async function generateUniqueSlug(
 const LIVE_LISTING_STATUSES: Array<'ACTIVE' | 'UNDER_OFFER'> = ['ACTIVE', 'UNDER_OFFER'];
 
 /** Everything the flat shape needs, in one query. */
-const FLAT_PROPERTY_INCLUDE = {
+export const FLAT_PROPERTY_INCLUDE = {
   developer: true,
   locationGuide: true,
   investmentData: true,

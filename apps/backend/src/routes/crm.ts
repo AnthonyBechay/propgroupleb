@@ -8,6 +8,7 @@ import { parsePagination, buildPaginationResponse } from '../utils/pagination.js
 import type { AuthenticatedRequest } from '../types/index.js';
 import { matchListingToLead, matchLeadToLead, SUPPLY_TYPES, DEMAND_TYPES, MATCH_MIN_SCORE, STRONG_MATCH_SCORE, PAIRABLE_STATUSES } from '../utils/lead-matching.js';
 import { deriveLeadStatus, needsNewOptions, rejectionInsights } from '../utils/lead-pipeline.js';
+import { reportLeadStage } from '../services/meta-conversions.service.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // CRM — the team's buyer/seller pipeline (replaces the follow-up spreadsheet).
@@ -942,9 +943,27 @@ router.get(
 
     // Pair each hydrated deal back with its client. hydrateOpportunities
     // preserves order, so index alignment is safe.
+    // Whether each client has a chat, and whether something in it is waiting —
+    // so a card can say "they wrote back" without opening the client.
+    const leadIds = [...new Set(opportunities.map((o) => o.leadId))];
+    const chats = leadIds.length
+      ? await prisma.conversation.findMany({
+          where: { leadId: { in: leadIds } },
+          select: { leadId: true, unreadCount: true, lastMessageAt: true },
+        })
+      : [];
+    const chatOf = new Map<string, { unread: number; lastMessageAt: Date }>();
+    for (const c of chats) {
+      const row = chatOf.get(c.leadId as string) ?? { unread: 0, lastMessageAt: c.lastMessageAt };
+      row.unread += c.unreadCount;
+      if (c.lastMessageAt > row.lastMessageAt) row.lastMessageAt = c.lastMessageAt;
+      chatOf.set(c.leadId as string, row);
+    }
+
     const deals = hydrated.map((o: any, i: number) => ({
       ...o,
       lead: (opportunities[i] as any).lead,
+      chat: chatOf.get(opportunities[i].leadId) ?? null,
     }));
 
     sendSuccess(res, deals);
@@ -1628,12 +1647,17 @@ const REJECTION_REASONS = [
  * shortlist edit — the board sorts on "last action", and shortlisting a
  * property for someone is very much an action.
  */
-async function syncLeadStatus(leadId: string) {
+export async function syncLeadStatus(leadId: string) {
   const lead = await prisma.lead.findUnique({
     where: { id: leadId },
     include: { opportunities: { select: { stage: true } } },
   });
   if (!lead) return;
+
+  // Every deal change passes through here, so this is where Meta hears that an
+  // ad lead reached a viewing or closed. Not awaited: the board must not wait
+  // on Meta, and the call logs its own failures.
+  void reportLeadStage(leadId);
 
   const next = deriveLeadStatus(lead.status, lead.opportunities);
   const status = next ?? lead.status;

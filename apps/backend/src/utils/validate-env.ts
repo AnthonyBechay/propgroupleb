@@ -51,6 +51,10 @@ const RECOMMENDED_GROUPS: Array<{ feature: string; vars: string[] }> = [
     vars: ['META_ACCESS_TOKEN'],
   },
   {
+    feature: 'Chat AI — voice notes, replies, listing suggestions (Gemini)',
+    vars: ['GEMINI_API_KEY'],
+  },
+  {
     feature: 'WhatsApp number via YCloud (coexistence)',
     vars: ['YCLOUD_WEBHOOK_SECRET'],
   },

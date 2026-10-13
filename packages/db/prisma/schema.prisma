@@ -1594,6 +1594,9 @@ model Lead {
   // Which Meta ad brought them in, when the platform tells us.
   adId    String?
   adLabel String? // ad headline or form name — what the team recognises
+  // The furthest stage already reported back to Meta ("Qualified",
+  // "Converted"), so each is sent once and never backwards.
+  metaStage String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1755,12 +1758,59 @@ model Conversation {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  messages ChatMessage[]
+  messages    ChatMessage[]
+  suggestions LeadSuggestion[]
 
   @@unique([channel, externalId])
   @@index([lastMessageAt])
   @@index([leadId])
   @@map("conversations")
+}
+
+// What the chat AI understood a client to want, waiting for a person to accept
+// or dismiss it. Never applied on its own: a misheard voice note must not be
+// able to overwrite a budget somebody agreed on the phone.
+model LeadSuggestion {
+  id             String  @id @default(cuid())
+  conversationId String
+  leadId         String?
+
+  // Only the fields the conversation actually established:
+  // { intent, market, areas, minBeds, budgetMax, unitKinds, isInvestor }
+  patch   Json
+  summary String // one line, in English, for the team
+
+  status     String    @default("PENDING") // PENDING, ACCEPTED, DISMISSED
+  resolvedAt DateTime?
+  resolvedBy String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([leadId, status])
+  @@index([conversationId, status])
+  @@map("lead_suggestions")
+}
+
+// One row per model call, so AI spend can be read off a screen instead of
+// discovered on an invoice.
+model AiUsage {
+  id      String @id @default(cuid())
+  feature String // chat-reply, seo
+  model   String
+
+  inputTokens  Int
+  outputTokens Int
+  costUsd      Float
+
+  conversationId String?
+  createdAt      DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([feature, createdAt])
+  @@map("ai_usage")
 }
 
 // Named ChatMessage because `Message` is a reserved model above.
@@ -1779,6 +1829,9 @@ model ChatMessage {
   // Our own copy of the attachment. Platform links expire within days, so the
   // file is copied to storage when the message arrives.
   mediaUrl String?
+  // What a voice note says, written out by the chat AI so it can be read and
+  // searched without playing it.
+  transcript String?
   // Outbound only: where it was typed — the phone app, the CRM, or automation.
   origin  String?
   status  String? // sent, delivered, read, failed

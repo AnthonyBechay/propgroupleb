@@ -553,6 +553,8 @@ export function lastActivityAt(lead: Lead): number {
  */
 
 export interface Deal extends Opportunity {
+  /** The client's WhatsApp / Instagram thread, when they have one. */
+  chat?: { unread: number; lastMessageAt: string } | null
   lead: {
     id: string
     name: string

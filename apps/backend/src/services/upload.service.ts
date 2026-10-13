@@ -216,6 +216,28 @@ export async function uploadFile(
 }
 
 /**
+ * Upload a buffer to an exact, caller-chosen key. For files whose place in the
+ * bucket is decided by what they belong to (a chat thread) rather than by an
+ * upload folder.
+ */
+export async function uploadFileAtKey(
+  buffer: Buffer,
+  key: string,
+  contentType: string
+): Promise<{ url: string; key: string }> {
+  await s3Client.send(
+    new PutObjectCommand({
+      Bucket: BUCKET_NAME,
+      Key: key,
+      Body: buffer,
+      ContentType: contentType,
+      CacheControl: 'public, max-age=31536000, immutable',
+    })
+  );
+  return { url: `${getFileBaseUrl()}/${key}`, key };
+}
+
+/**
  * Upload a file buffer to Cloudflare R2 (legacy — simple folder/uuid path)
  * Kept for backward compatibility
  */

@@ -263,6 +263,15 @@ async function handleYCloud(event: any): Promise<void> {
 
 /** Something readable for any message type — an image of a floor plan is still a message. */
 function whatsAppText(msg: any): string {
+  if (msg.type === 'reaction') return `Reacted ${msg.reaction?.emoji ?? ''}`.trim();
+  if (msg.type === 'location' && msg.location) {
+    const { name, address, latitude, longitude } = msg.location;
+    return `Location: ${[name, address].filter(Boolean).join(', ') || `${latitude}, ${longitude}`}`;
+  }
+  if (msg.type === 'contacts' && Array.isArray(msg.contacts)) {
+    const names = msg.contacts.map((c: any) => c.name?.formatted_name).filter(Boolean);
+    return `Contact card: ${names.join(', ') || 'shared contact'}`;
+  }
   return (
     msg.text?.body ??
     msg.button?.text ??
@@ -276,7 +285,10 @@ function whatsAppText(msg: any): string {
 function whatsAppReferral(msg: any): AdReferral | null {
   const r = msg.referral;
   if (!r?.source_id) return null;
-  return { adId: String(r.source_id), label: r.headline ?? r.body ?? null };
+  // Headline AND the ad's main text: a project named in either is enough to
+  // know what the client is asking about.
+  const label = [r.headline, r.body].filter(Boolean).join(' — ').slice(0, 300);
+  return { adId: String(r.source_id), label: label || null };
 }
 
 function seconds(ts: unknown): Date | undefined {

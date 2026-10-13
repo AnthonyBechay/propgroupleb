@@ -1,6 +1,9 @@
 import { prisma } from '@propgroup/db';
 import { logger } from '../utils/logger.js';
-import { uploadFileSimple } from './upload.service.js';
+import { randomUUID } from 'node:crypto';
+import { uploadFileAtKey } from './upload.service.js';
+import { recordAdEnquiry } from './deal-sync.service.js';
+import { describeAd } from './meta-ads.service.js';
 
 /**
  * Turning Meta webhook deliveries into inbox threads and CRM clients.
@@ -33,15 +36,22 @@ function phoneMatches(stored: string | null, e164: string): boolean {
 
 /**
  * The client a phone number already belongs to, without creating anything.
- * Postgres can't do "endsWith" across formats, so pull the plausible candidates
- * by suffix and compare properly in memory.
+ *
+ * Numbers are typed into the CRM however the broker likes — "+961 71 952 211",
+ * "71-952211", "03 212 385" — so the stored text is stripped to digits in SQL
+ * before comparing its tail. A plain `contains` on the raw column silently
+ * missed every number written with a space or a dash. The suffix match only
+ * narrows the candidates; the real comparison happens in memory.
  */
 async function findLeadByPhone(digits: string): Promise<any | null> {
-  const tail = digits.slice(-7);
-  const candidates = await prisma.lead.findMany({
-    where: { OR: [{ phone: { contains: tail } }, { whatsapp: { contains: tail } }] },
-    take: 20,
-  });
+  const tail = `%${digits.slice(-7)}`;
+  const rows = await prisma.$queryRaw<Array<{ id: string }>>`
+    SELECT id FROM leads
+    WHERE regexp_replace(coalesce(phone, ''), '[^0-9]', '', 'g') LIKE ${tail}
+       OR regexp_replace(coalesce(whatsapp, ''), '[^0-9]', '', 'g') LIKE ${tail}
+    LIMIT 20`;
+  if (rows.length === 0) return null;
+  const candidates = await prisma.lead.findMany({ where: { id: { in: rows.map((r) => r.id) } } });
   return (
     candidates.find(
       (c: any) => phoneMatches(c.phone, digits) || phoneMatches(c.whatsapp, digits)
@@ -151,8 +161,15 @@ export async function recordChatMessage(event: ChatEvent): Promise<string | null
           leadId: lead?.id ?? null,
           adId: event.referral?.adId ?? null,
           adLabel: event.referral?.label ?? null,
+          // Backdated a moment so the first message, stamped by the platform
+          // slightly before this row exists, still counts as the newest and
+          // gets to set the thread's preview and position.
+          lastMessageAt: new Date(sentAt.getTime() - 1),
         },
       });
+      if (!event.history && event.referral?.adId) {
+        void noteAd(conversation.id, lead?.id ?? null, event.referral.adId, event.referral.label ?? null, event.channel);
+      }
     } catch (err: any) {
       // Two messages from a new sender arrived together (a history import does
       // this constantly) and the other one created the thread first.
@@ -195,7 +212,15 @@ export async function recordChatMessage(event: ChatEvent): Promise<string | null
 
   // Not awaited: a slow download must not hold up the thread, and a failed one
   // only costs the attachment, never the message.
-  if (event.media?.url) void keepMedia(stored.id, event.media);
+  if (event.media?.url) {
+    void keepMedia(stored.id, event.media, {
+      channel: event.channel,
+      externalId,
+      direction: event.direction,
+      type: event.type,
+      sentAt,
+    });
+  }
 
   // History arrives out of order and long after the fact, so a thread's
   // summary only ever moves forward in time.
@@ -238,6 +263,32 @@ export async function recordChatMessage(event: ChatEvent): Promise<string | null
   return conversation.id;
 }
 
+/**
+ * Find out what the advert was — campaign and ad name, not just the headline
+ * the client saw — and, when it names a project, open an enquiry on it. Both
+ * tell the team and the assistant what this person is asking about before
+ * they have typed a word. Best effort, never awaited by the message itself.
+ */
+async function noteAd(
+  conversationId: string,
+  leadId: string | null,
+  adId: string,
+  headline: string | null,
+  channel: Channel
+): Promise<void> {
+  try {
+    const named = await describeAd(adId);
+    const label = [named, headline].filter(Boolean).join(' — ').slice(0, 300) || null;
+    if (label && label !== headline) {
+      await prisma.conversation.update({ where: { id: conversationId }, data: { adLabel: label } });
+      if (leadId) await prisma.lead.update({ where: { id: leadId }, data: { adLabel: label } });
+    }
+    if (leadId) await recordAdEnquiry(leadId, label, marketFor(channel === 'WHATSAPP' ? 'WHATSAPP' : 'META'));
+  } catch (err) {
+    logger.warn('Advert details not recorded', { adId, error: (err as Error).message });
+  }
+}
+
 /** Attachments above this are left on the platform — nobody needs a 200 MB video in the CRM. */
 const MAX_MEDIA_BYTES = 25 * 1024 * 1024;
 
@@ -247,10 +298,34 @@ const EXT_BY_MIME: Record<string, string> = {
   'video/mp4': '.mp4', 'application/pdf': '.pdf',
 };
 
+/**
+ * Where a chat attachment lives in the bucket — one folder per person, one per
+ * month inside it, and a name that says what the file is without opening it:
+ *
+ *   chats/whatsapp/96171952211/2026-10/20261013-142507-in-image-3f9a1c2e.jpg
+ *   chats/instagram/<user id>/2026-10/20261013-150211-out-audio-8b0d44aa.ogg
+ */
+function mediaKey(
+  at: { channel: Channel; externalId: string; direction: 'IN' | 'OUT'; type: string; sentAt: Date },
+  ext: string
+): string {
+  const stamp = at.sentAt.toISOString().replace(/[-:]/g, '').replace('T', '-').slice(0, 15);
+  const person = at.externalId.replace(/[^A-Za-z0-9]/g, '') || 'unknown';
+  const kind = at.type.replace(/[^a-z]/gi, '').toLowerCase() || 'file';
+  return [
+    'chats',
+    at.channel.toLowerCase(),
+    person,
+    at.sentAt.toISOString().slice(0, 7),
+    `${stamp}-${at.direction.toLowerCase()}-${kind}-${randomUUID().slice(0, 8)}${ext}`,
+  ].join('/');
+}
+
 /** Copy an attachment into our own storage before the platform's link expires. */
 async function keepMedia(
   messageId: string,
-  media: { url: string; mime?: string | null; filename?: string | null }
+  media: { url: string; mime?: string | null; filename?: string | null },
+  at: { channel: Channel; externalId: string; direction: 'IN' | 'OUT'; type: string; sentAt: Date }
 ): Promise<void> {
   try {
     const url = new URL(media.url);
@@ -268,8 +343,9 @@ async function keepMedia(
     if (buffer.length === 0 || buffer.length > MAX_MEDIA_BYTES) return;
 
     const mime = (media.mime || res.headers.get('content-type') || 'application/octet-stream').split(';')[0].trim();
-    const name = media.filename || `attachment${EXT_BY_MIME[mime] ?? ''}`;
-    const { url: mediaUrl } = await uploadFileSimple(buffer, name, mime, 'chat-media');
+    const ext =
+      EXT_BY_MIME[mime] ?? (media.filename?.match(/\.[A-Za-z0-9]{1,5}$/)?.[0].toLowerCase() || '');
+    const { url: mediaUrl } = await uploadFileAtKey(buffer, mediaKey(at, ext), mime);
     await prisma.chatMessage.update({ where: { id: messageId }, data: { mediaUrl } });
   } catch (err) {
     logger.warn('Chat attachment not stored', { messageId, error: (err as Error).message });
@@ -426,5 +502,7 @@ export async function upsertLeadFromForm(
     },
   });
   logger.info('Client auto-created from lead form', { leadId: lead.id });
+  // A form on an ad that names a project is an enquiry about that project.
+  void recordAdEnquiry(lead.id, input.formName, marketFor('META'));
   return { lead, created: true };
 }

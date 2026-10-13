@@ -9,6 +9,9 @@ import type { AuthenticatedRequest } from '../types/index.js';
 import { linkConversationToLead } from '../services/messaging-intake.service.js';
 import { canSendOn, replyWindowOpen, sendReply } from '../services/messaging-send.service.js';
 import { autoReplyEnabled } from '../services/auto-reply.service.js';
+import { cardCaption, cardsByRef, searchCatalogue, type Market } from '../services/catalogue.service.js';
+import { AppError } from '../utils/errors.js';
+import { recordListingsShared } from '../services/deal-sync.service.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // CRM inbox — WhatsApp and Instagram threads mirrored from Meta's webhooks
@@ -71,16 +74,26 @@ router.get(
       return;
     }
 
-    const messages = await prisma.chatMessage.findMany({
-      where: { conversationId: conversation.id },
-      orderBy: { sentAt: 'desc' },
-      take: 200,
-    });
+    // Newest first from the database, so a long thread opens on its latest
+    // messages; `take` grows when the reader asks for earlier ones.
+    const take = Math.min(2000, Math.max(1, Number(req.query.take) || 100));
+    const [messages, total] = await Promise.all([
+      prisma.chatMessage.findMany({
+        where: { conversationId: conversation.id },
+        orderBy: { sentAt: 'desc' },
+        take,
+      }),
+      prisma.chatMessage.count({ where: { conversationId: conversation.id } }),
+    ]);
 
     sendSuccess(res, {
       ...conversation,
       messages: messages.reverse(),
+      hasEarlier: total > messages.length,
       // Why the reply box is or is not usable, so the UI can say so up front.
+      suggestion: await prisma.leadSuggestion.findFirst({
+        where: { conversationId: conversation.id, status: 'PENDING' },
+      }),
       canReply: canSendOn(conversation.channel) && replyWindowOpen(conversation.lastInboundAt),
       sendingConfigured: canSendOn(conversation.channel),
       autoReplyOn: autoReplyEnabled(),
@@ -96,12 +109,184 @@ router.get(
     const conversations = await prisma.conversation.findMany({
       where: { leadId: req.params.leadId },
       orderBy: { lastMessageAt: 'desc' },
-      include: { messages: { orderBy: { sentAt: 'desc' }, take: 12 } },
+      include: {
+        messages: { orderBy: { sentAt: 'desc' }, take: 12 },
+        suggestions: { where: { status: 'PENDING' }, take: 1 },
+      },
     });
     sendSuccess(
       res,
       conversations.map((c) => ({ ...c, messages: [...c.messages].reverse() }))
     );
+  })
+);
+
+// ── What the chat AI understood, waiting for a person ────────────────────────
+
+const UNIT_KINDS = ['APARTMENT', 'STUDIO', 'DUPLEX', 'PENTHOUSE', 'VILLA', 'TOWNHOUSE', 'SHOP', 'OFFICE', 'LAND_PARCEL'];
+
+// POST /api/crm/inbox/suggestions/:sid/accept — apply it to the client
+router.post(
+  '/suggestions/:sid/accept',
+  asyncHandler(async (req: Request, res: Response) => {
+    const authReq = req as AuthenticatedRequest;
+    const suggestion = await prisma.leadSuggestion.findUnique({ where: { id: req.params.sid } });
+    if (!suggestion || suggestion.status !== 'PENDING') {
+      sendNotFound(res, 'Suggestion');
+      return;
+    }
+
+    // Accepting what a stranger wants is also the decision that they are a client.
+    const lead = await linkConversationToLead(suggestion.conversationId, {
+      leadId: suggestion.leadId ?? undefined,
+      createdBy: authReq.user?.id ?? null,
+    });
+    if (!lead) {
+      sendNotFound(res, 'Conversation');
+      return;
+    }
+
+    const patch = (suggestion.patch ?? {}) as Record<string, any>;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const data: Record<string, any> = {};
+    const changes: string[] = [];
+    const note = (label: string, from: unknown, to: unknown) =>
+      changes.push(from === null || from === undefined || from === '' ? `${label}: ${to}` : `${label}: ${from} → ${to}`);
+
+    if (['BUYER', 'RENTER', 'SELLER', 'LANDLORD'].includes(patch.intent) && patch.intent !== lead.type) {
+      data.type = patch.intent;
+      data.intents = Array.from(new Set([patch.intent, ...(lead.intents ?? [])]));
+      note('Looking to', lead.type, patch.intent);
+    }
+    if ((patch.market === 'LEBANON' || patch.market === 'GEORGIA') && patch.market !== lead.market) {
+      data.market = patch.market;
+      note('Market', lead.market, patch.market);
+    }
+    if (Number.isFinite(patch.budgetMax) && patch.budgetMax !== lead.budgetMax) {
+      data.budgetMax = patch.budgetMax;
+      note('Budget up to', lead.budgetMax, patch.budgetMax);
+    }
+    if (Number.isInteger(patch.minBeds) && patch.minBeds !== lead.minBeds) {
+      data.minBeds = patch.minBeds;
+      note('Bedrooms from', lead.minBeds, patch.minBeds);
+    }
+    if (UNIT_KINDS.includes(patch.kind) && !(lead.unitKinds ?? []).includes(patch.kind)) {
+      data.unitKinds = [...(lead.unitKinds ?? []), patch.kind];
+      note('Property type', null, patch.kind);
+    }
+    if (typeof patch.isInvestor === 'boolean' && patch.isInvestor !== lead.isInvestor) {
+      data.isInvestor = patch.isInvestor;
+      note('Investor', lead.isInvestor ? 'yes' : 'no', patch.isInvestor ? 'yes' : 'no');
+    }
+    // Areas on a client come from the curated location catalogue, so a name
+    // the client typed goes into the free-text line, not into `areas`.
+    const asking = [suggestion.summary, patch.area ? `Area: ${patch.area}` : null].filter(Boolean).join(' · ');
+    if (asking && asking !== lead.askingFor) {
+      data.askingFor = asking.slice(0, 200);
+      note('Asking for', lead.askingFor, asking);
+    }
+
+    await prisma.$transaction([
+      prisma.lead.update({ where: { id: lead.id }, data }),
+      prisma.leadSuggestion.update({
+        where: { id: suggestion.id },
+        data: { status: 'ACCEPTED', leadId: lead.id, resolvedAt: new Date(), resolvedBy: authReq.user?.id ?? null },
+      }),
+      // The trail: what changed, from what, and that it came from the chat.
+      prisma.leadContact.create({
+        data: {
+          leadId: lead.id,
+          channel: 'NOTE',
+          body: `Updated from chat\n${changes.join('\n') || suggestion.summary}`.slice(0, 4000),
+          createdBy: authReq.user?.id ?? null,
+        },
+      }),
+    ]);
+    await logAdminAction('ACCEPT_CHAT_SUGGESTION', 'lead', lead.id, { changes }, authReq);
+    sendSuccess(res, { leadId: lead.id, changes });
+  })
+);
+
+// POST /api/crm/inbox/suggestions/:sid/dismiss
+router.post(
+  '/suggestions/:sid/dismiss',
+  asyncHandler(async (req: Request, res: Response) => {
+    const { count } = await prisma.leadSuggestion.updateMany({
+      where: { id: req.params.sid, status: 'PENDING' },
+      data: { status: 'DISMISSED', resolvedAt: new Date(), resolvedBy: (req as AuthenticatedRequest).user?.id ?? null },
+    });
+    if (count === 0) {
+      sendNotFound(res, 'Suggestion');
+      return;
+    }
+    sendSuccess(res, null);
+  })
+);
+
+// ── Offering stock from the thread ───────────────────────────────────────────
+
+// GET /api/crm/inbox/:id/listings — public stock that fits this client
+router.get(
+  '/:id/listings',
+  asyncHandler(async (req: Request, res: Response) => {
+    const conversation = await prisma.conversation.findUnique({
+      where: { id: req.params.id },
+      include: {
+        lead: { select: { market: true, budgetMax: true, minBeds: true, unitKinds: true, type: true } },
+        suggestions: { where: { status: 'PENDING' }, take: 1 },
+      },
+    });
+    if (!conversation) {
+      sendNotFound(res, 'Conversation');
+      return;
+    }
+    // What they said in this chat wins over what is on file — it is newer.
+    const said = (conversation.suggestions[0]?.patch ?? {}) as Record<string, any>;
+    const lead = conversation.lead;
+    const market: Market =
+      said.market ?? lead?.market ??
+      ((process.env.LEAD_MARKET_WHATSAPP ?? '').toUpperCase() === 'LEBANON' ? 'LEBANON' : 'GEORGIA');
+
+    // Selling or renting out is not a search for stock; only a renter rents.
+    const intent = said.intent ?? lead?.type;
+    const query = {
+      market,
+      deal: (req.query.deal === 'RENT' || (req.query.deal !== 'SALE' && intent === 'RENTER') ? 'RENT' : 'SALE') as 'RENT' | 'SALE',
+      area: typeof req.query.area === 'string' ? req.query.area : said.area ?? null,
+      budgetMax: said.budgetMax ?? lead?.budgetMax ?? null,
+      minBeds: said.minBeds ?? lead?.minBeds ?? null,
+      kind: said.kind ?? null,
+      limit: 8,
+    };
+    let cards = await searchCatalogue(query);
+    // Nothing in the area they named: show what fits the budget anyway, rather
+    // than an empty box.
+    if (cards.length === 0 && query.area) cards = await searchCatalogue({ ...query, area: null });
+    sendSuccess(res, {
+      basis: { market, deal: query.deal, budgetMax: query.budgetMax, minBeds: query.minBeds, area: query.area },
+      cards,
+    });
+  })
+);
+
+// POST /api/crm/inbox/:id/listings — send one as a photo card
+router.post(
+  '/:id/listings',
+  asyncHandler(async (req: Request, res: Response) => {
+    const { ref } = z.object({ ref: z.string().trim().min(1).max(40) }).parse(req.body);
+    const [card] = await cardsByRef([ref]);
+    if (!card) throw new AppError('That property is not publicly available', 404);
+    await sendReply(req.params.id, cardCaption(card), 'CRM', card.image ?? undefined);
+    // Sending a property is the "Details sent" step of a deal — put it on the board.
+    const conversation = await prisma.conversation.findUnique({
+      where: { id: req.params.id },
+      select: { leadId: true },
+    });
+    if (conversation?.leadId) {
+      await recordListingsShared(conversation.leadId, [card.buildingId], (req as AuthenticatedRequest).user?.id);
+    }
+    await logAdminAction('INBOX_SEND_LISTING', 'Conversation', req.params.id, { ref: card.ref }, req as AuthenticatedRequest);
+    sendSuccess(res, null);
   })
 );
 

@@ -58,7 +58,8 @@ export default function CrmPage() {
   const [movingDeal, setMovingDeal] = useState<string | null>(null)
   const [stats, setStats] = useState<Stats | null>(null)
   const [loading, setLoading] = useState(true)
-  const [view, setView] = useState<View>('today')
+  // Conversations are where the day starts — who wrote, and who is waiting.
+  const [view, setView] = useState<View>('inbox')
   const [market, setMarket] = useState<'all' | LeadMarket>('all')
   const [search, setSearch] = useState('')
   // Conversations with something unread, for the badge on the Inbox tab.
@@ -439,6 +440,7 @@ export default function CrmPage() {
           search={search}
           clientsWithNoDeal={clientsWithNoDeal}
           onShowClients={() => setView('list')}
+          onOpenChat={(leadId) => { setChatLeadId(leadId); setView('inbox') }}
         />
       ) : visible.length === 0 ? (
         <div className="bg-white border rounded-xl p-16 text-center text-slate-400">

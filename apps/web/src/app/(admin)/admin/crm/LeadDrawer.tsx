@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
+import { ChatSuggestion, type Suggestion } from './ChatSuggestion'
 import {
   X, Phone, MessageCircle, Mail, Loader2, Send, Pencil, Trash2, Building2, Clock, CalendarPlus, ExternalLink, History, Handshake, ClipboardCheck, Lightbulb, Sparkles, Plus, StickyNote, Globe, Home, MessagesSquare, Megaphone,
 } from 'lucide-react'
@@ -28,6 +29,7 @@ interface LeadChat {
   id: string
   channel: 'WHATSAPP' | 'INSTAGRAM'
   messages: Array<{ id: string; direction: 'IN' | 'OUT'; body: string; sentAt: string }>
+  suggestions: Suggestion[]
 }
 
 /**
@@ -469,6 +471,11 @@ export function LeadDrawer({
         <div className="p-5 space-y-4">
           {tab === 'overview' && (
           <>
+          {/* What the chat assistant heard them ask for — applied only on a click. */}
+          {chats.flatMap((c) => c.suggestions ?? []).map((s) => (
+            <ChatSuggestion key={s.id} suggestion={s} hasClient onResolved={() => { load(); onChanged() }} />
+          ))}
+
           {/* What they already bought or sold, first.
               Opening a client who closed months ago and being shown what they
               were once looking for is backwards — the deal is the headline. */}
@@ -920,9 +927,9 @@ export function LeadDrawer({
               <ol className="space-y-1.5">
                 {chat.messages.map((m) => (
                   <li key={m.id} className={`flex ${m.direction === 'OUT' ? 'justify-end' : 'justify-start'}`}>
-                    <div className={`max-w-[85%] rounded-xl px-2.5 py-1.5 text-sm whitespace-pre-wrap break-words ${m.direction === 'OUT' ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-800'}`}>
+                    <div className={`max-w-[85%] rounded-xl px-2.5 py-1.5 text-sm whitespace-pre-wrap break-words ${m.direction === 'OUT' ? 'bg-emerald-100 text-slate-900' : 'bg-slate-100 text-slate-900'}`}>
                       {m.body}
-                      <span className={`block text-[11px] mt-0.5 text-right ${m.direction === 'OUT' ? 'text-slate-300' : 'text-slate-400'}`}>
+                      <span className="block text-[11px] mt-0.5 text-right text-slate-600">
                         {new Date(m.sentAt).toLocaleString(undefined, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
                       </span>
                     </div>

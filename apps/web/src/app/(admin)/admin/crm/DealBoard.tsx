@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react'
 import {
   Phone, MessageCircle, Calendar, AlertCircle, Handshake,
-  TrendingUp, Loader2, Check, Plus, X, ChevronRight,
+  TrendingUp, Loader2, Check, Plus, X, ChevronRight, MessagesSquare,
 } from 'lucide-react'
 import {
   type Deal, type OpportunityStage, DEAL_COLUMNS, dealColumnOf, STAGE_LABELS,
@@ -35,7 +35,10 @@ export function DealBoard({
   search,
   clientsWithNoDeal,
   onShowClients,
+  onOpenChat,
 }: {
+  /** Jump to this client's conversation in the Inbox. */
+  onOpenChat: (leadId: string) => void
   deals: Deal[]
   canSeeMoney: boolean
   busyId: string | null
@@ -223,6 +226,7 @@ export function DealBoard({
                     busy={busyId === d.id}
                     onDragStart={() => setDragging(d.id)}
                     onOpenClient={onOpenClient}
+                    onOpenChat={onOpenChat}
                     onSetCommission={onSetCommission}
                     onMove={onMove}
                     onRemove={onRemoveDeal}
@@ -251,8 +255,9 @@ export function DealBoard({
 }
 
 function DealCard({
-  deal: d, canSeeMoney, busy, onDragStart, onOpenClient, onSetCommission, onMove, onRemove,
+  deal: d, canSeeMoney, busy, onDragStart, onOpenClient, onOpenChat, onSetCommission, onMove, onRemove,
 }: {
+  onOpenChat: (leadId: string) => void
   deal: Deal
   canSeeMoney: boolean
   busy: boolean
@@ -312,6 +317,19 @@ function DealCard({
       <div className="flex items-center gap-1.5 mt-1.5 pt-1.5 border-t border-slate-100">
         <span className="text-xs font-medium text-slate-700 truncate flex-1">{d.lead.name}</span>
         <span className="text-[10px] text-slate-500 shrink-0">{TYPE_LABELS[d.lead.type]}</span>
+        {d.chat && (
+          // Their conversation — green with a count when they are waiting on us.
+          <button
+            onClick={(e) => { e.stopPropagation(); onOpenChat(d.lead.id) }}
+            title={d.chat.unread > 0 ? `${d.chat.unread} unread — open the chat` : 'Open the chat'}
+            className={`shrink-0 min-h-7 px-1.5 rounded-md inline-flex items-center gap-1 text-[11px] font-semibold ${
+              d.chat.unread > 0 ? 'bg-emerald-600 text-white' : 'text-slate-500 hover:bg-slate-100'
+            }`}
+          >
+            <MessagesSquare className="h-3.5 w-3.5" />
+            {d.chat.unread > 0 && d.chat.unread}
+          </button>
+        )}
       </div>
 
       {/* When it's happening */}

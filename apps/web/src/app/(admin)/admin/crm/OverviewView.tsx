@@ -8,6 +8,8 @@ import {
 import { normalizeApiUrl } from '@/lib/utils/api-url'
 import { SUB_STATUS_META, TYPE_LABELS, type LeadSubStatus, type LeadType } from './types'
 import { countryFlag } from '@/lib/market'
+import { AdsPanel } from './AdsPanel'
+import { AiUsagePanel } from './AiUsagePanel'
 
 /**
  * The state of the business on one screen.
@@ -160,6 +162,9 @@ export function OverviewView({ onFocus }: { onFocus: (view: 'today' | 'board' | 
           )}
         </Panel>
       </div>
+
+      <AdsPanel />
+      <AiUsagePanel />
     </div>
   )
 }

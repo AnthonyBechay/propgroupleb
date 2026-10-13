@@ -3,9 +3,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   Loader2, MessageCircle, Instagram, Send, ArrowLeft, UserPlus, User,
-  Bot, Megaphone, Inbox, Smartphone, Link2, X,
+  Bot, Megaphone, Inbox, Smartphone, Link2, X, Building2,
 } from 'lucide-react'
 import { normalizeApiUrl, normalizeFileUrl } from '@/lib/utils/api-url'
+import { ChatSuggestion, type Suggestion } from './ChatSuggestion'
+import { ListingPicker } from './ListingPicker'
 
 /**
  * WhatsApp and Instagram threads, mirrored from the phone.
@@ -26,6 +28,7 @@ interface Thread {
   externalId: string
   displayName: string | null
   lastMessageAt: string
+  createdAt: string
   lastPreview: string | null
   unreadCount: number
   aiPaused: boolean
@@ -40,6 +43,8 @@ interface ChatMessage {
   type: string
   body: string
   mediaUrl: string | null
+  /** What a voice note says, written out by the chat assistant. */
+  transcript: string | null
   origin: string | null
   status: string | null
   sentAt: string
@@ -48,12 +53,16 @@ interface ChatMessage {
 interface ThreadDetail extends Thread {
   messages: ChatMessage[]
   canReply: boolean
+  /** What the chat assistant understood they want, waiting for a decision. */
+  suggestion: Suggestion | null
+  /** The thread has older messages than the ones loaded. */
+  hasEarlier: boolean
   sendingConfigured: boolean
   autoReplyOn: boolean
 }
 
 /** How often an open inbox asks for new messages. */
-const POLL_MS = 10_000
+const POLL_MS = 6_000
 
 const threadName = (t: Thread) =>
   t.lead?.name || t.displayName || (t.channel === 'WHATSAPP' ? `+${t.externalId}` : 'Instagram user')
@@ -140,12 +149,18 @@ export function InboxView({
   const [sending, setSending] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [filter, setFilter] = useState<Filter>('all')
+  // How many of the thread's latest messages are loaded.
+  const [take, setTake] = useState(100)
+  // Loading earlier messages grows the thread upwards; that must not snap the
+  // reader back down to the newest message.
+  const keepPosition = useRef(false)
   const scrollRef = useRef<HTMLDivElement>(null)
   // Attaching a thread to somebody already in the CRM, when the number alone
   // did not match them (a second phone, an Instagram account).
   const [linking, setLinking] = useState(false)
   const [linkQuery, setLinkQuery] = useState('')
   const [linkResults, setLinkResults] = useState<ThreadLead[]>([])
+  const [showListings, setShowListings] = useState(false)
 
   const call = useCallback(
     (path: string, init?: RequestInit) =>
@@ -171,13 +186,13 @@ export function InboxView({
   }, [call, needle, filter])
 
   const loadDetail = useCallback(async (id: string) => {
-    const res = await call(`/${id}`)
+    const res = await call(`/${id}?take=${take}`)
     if (!res.ok) return
     const data: ThreadDetail | null = (await res.json()).data ?? null
     setDetail(data)
     // A message that arrives while the thread is on screen has been read.
     if (data && data.unreadCount > 0) call(`/${id}/read`, { method: 'POST' })
-  }, [call])
+  }, [call, take])
 
   useEffect(() => {
     loadThreads()
@@ -191,6 +206,11 @@ export function InboxView({
     setError(null)
     setLinking(false)
     setLinkQuery('')
+    setShowListings(false)
+    setTake(100)
+  }, [openId])
+
+  useEffect(() => {
     if (!openId) return
     loadDetail(openId)
     const timer = setInterval(() => loadDetail(openId), POLL_MS)
@@ -203,6 +223,7 @@ export function InboxView({
   // the page, which would yank the whole CRM down on every incoming message.
   const messageCount = detail?.messages.length ?? 0
   useEffect(() => {
+    if (keepPosition.current) { keepPosition.current = false; return }
     const el = scrollRef.current
     if (el) el.scrollTop = el.scrollHeight
   }, [messageCount, openId])
@@ -296,29 +317,40 @@ export function InboxView({
           <li key={t.id}>
             <button
               onClick={() => setOpenId(t.id)}
-              className={`w-full min-h-11 text-left px-4 py-3 flex gap-3 hover:bg-slate-50 ${openId === t.id ? 'bg-slate-100' : ''}`}
+              className={`w-full min-h-11 text-left px-4 py-3 flex gap-3 hover:bg-slate-50 ${openId === t.id ? 'bg-slate-100' : t.unreadCount > 0 ? 'bg-emerald-50/60' : ''}`}
             >
               <ChannelIcon channel={t.channel} className="h-5 w-5 mt-0.5 shrink-0" />
               <span className="min-w-0 flex-1">
                 <span className="flex items-baseline justify-between gap-2">
-                  <span className={`truncate text-sm ${t.unreadCount > 0 ? 'font-semibold text-slate-900' : 'font-medium text-slate-700'}`}>
+                  <span className={`truncate text-sm ${t.unreadCount > 0 ? 'font-semibold text-slate-900' : 'font-medium text-slate-800'}`}>
                     {threadName(t)}
                   </span>
-                  <span className="text-xs text-slate-400 shrink-0">{timeLabel(t.lastMessageAt)}</span>
+                  <span className={`text-xs shrink-0 ${t.unreadCount > 0 ? 'text-emerald-700 font-semibold' : 'text-slate-500'}`}>{timeLabel(t.lastMessageAt)}</span>
                 </span>
                 <span className="flex items-center justify-between gap-2 mt-0.5">
-                  <span className="truncate text-sm text-slate-500">{t.lastPreview}</span>
+                  <span className={`truncate text-sm ${t.unreadCount > 0 ? 'text-slate-800' : 'text-slate-600'}`}>{t.lastPreview}</span>
                   {t.unreadCount > 0 && (
                     <span className="shrink-0 min-w-5 h-5 px-1.5 rounded-full bg-emerald-600 text-white text-xs font-semibold inline-flex items-center justify-center">
                       {t.unreadCount}
                     </span>
                   )}
                 </span>
-                {t.lead && (
-                  <span className="text-xs text-slate-500 inline-flex items-center gap-1 mt-0.5">
-                    <User className="h-3 w-3" /> Client
-                  </span>
-                )}
+                <span className="flex items-center gap-2 mt-0.5 empty:hidden">
+                  {/* First wrote in the last day, and nobody has decided who they are yet. */}
+                  {!t.lead && Date.now() - new Date(t.createdAt).getTime() < 86_400_000 && (
+                    <span className="px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 text-[11px] font-semibold">New</span>
+                  )}
+                  {t.lead && (
+                    <span className="text-xs text-slate-600 inline-flex items-center gap-1">
+                      <User className="h-3 w-3" /> Client
+                    </span>
+                  )}
+                  {t.adId && (
+                    <span className="text-xs text-slate-600 inline-flex items-center gap-1">
+                      <Megaphone className="h-3 w-3" /> Ad
+                    </span>
+                  )}
+                </span>
               </span>
             </button>
           </li>
@@ -360,6 +392,12 @@ export function InboxView({
                   <Bot className="h-4 w-4" /> {detail.aiPaused ? 'Auto-reply off' : 'Auto-reply on'}
                 </button>
               )}
+              <button
+                onClick={() => setShowListings((v) => !v)}
+                className={`min-h-11 px-3 rounded-lg text-sm font-medium inline-flex items-center gap-1.5 border ${showListings ? 'border-slate-900 bg-slate-900 text-white' : 'border-slate-200 text-slate-700 hover:bg-slate-50'}`}
+              >
+                <Building2 className="h-4 w-4" /> Properties
+              </button>
               {detail.lead ? (
                 <button onClick={() => onOpenLead(detail.lead!.id)} className="min-h-11 px-3 rounded-lg text-sm font-medium inline-flex items-center gap-1.5 border border-slate-200 text-slate-700 hover:bg-slate-50">
                   <User className="h-4 w-4" /> Open client
@@ -407,7 +445,41 @@ export function InboxView({
               </div>
             )}
 
-            <div ref={scrollRef} className="flex-1 overflow-y-auto px-3 sm:px-4 py-4 space-y-2 bg-slate-50 max-h-[55vh] lg:max-h-none">
+            {detail.suggestion && (
+              <div className="px-3 sm:px-4 py-3 border-b border-slate-200">
+                <ChatSuggestion
+                  suggestion={detail.suggestion}
+                  hasClient={Boolean(detail.lead)}
+                  onResolved={(accepted) => {
+                    loadDetail(detail.id)
+                    loadThreads()
+                    if (accepted) onChanged()
+                  }}
+                />
+              </div>
+            )}
+
+            {showListings && (
+              <ListingPicker
+                // Re-fetch when what they want changes.
+                key={`${detail.id}:${detail.suggestion?.id ?? ''}:${JSON.stringify(detail.suggestion?.patch ?? {})}`}
+                conversationId={detail.id}
+                canSend={detail.canReply}
+                onSent={() => { loadDetail(detail.id); loadThreads() }}
+              />
+            )}
+
+            <div ref={scrollRef} className="flex-1 overflow-y-auto px-3 sm:px-4 py-4 space-y-2 bg-slate-100 max-h-[55vh] lg:max-h-none">
+              {detail.hasEarlier && (
+                <p className="text-center">
+                  <button
+                    onClick={() => { keepPosition.current = true; setTake((n) => n + 200) }}
+                    className="min-h-9 px-3 rounded-full text-sm font-medium text-slate-600 bg-white border border-slate-200 hover:bg-slate-100"
+                  >
+                    Load earlier messages
+                  </button>
+                </p>
+              )}
               {detail.messages.length === 0 && (
                 <p className="text-center text-sm text-slate-400 py-10">No messages in this conversation yet.</p>
               )}
@@ -415,15 +487,20 @@ export function InboxView({
                 <div key={m.id}>
                 {(i === 0 || !sameDay(detail.messages[i - 1].sentAt, m.sentAt)) && (
                   <p className="text-center text-xs text-slate-500 my-3">
-                    <span className="bg-white border border-slate-200 rounded-full px-3 py-1">{dayLabel(m.sentAt)}</span>
+                    <span className="bg-white text-slate-700 rounded-full px-3 py-1 shadow-sm">{dayLabel(m.sentAt)}</span>
                   </p>
                 )}
                 <div className={`flex ${m.direction === 'OUT' ? 'justify-end' : 'justify-start'}`}>
-                  <div className={`max-w-[85%] sm:max-w-[70%] rounded-2xl px-3 py-2 text-sm whitespace-pre-wrap break-words ${m.direction === 'OUT' ? 'bg-slate-900 text-white' : 'bg-white border border-slate-200 text-slate-800'}`}>
+                  <div className={`max-w-[85%] sm:max-w-[70%] rounded-2xl px-3 py-2 text-sm whitespace-pre-wrap break-words ${m.direction === 'OUT' ? 'bg-emerald-100 text-slate-900' : 'bg-white text-slate-900 shadow-sm'}`}>
                     <Attachment message={m} />
                     {/* "[image]" is only a stand-in for an attachment we could not keep. */}
                     {!(m.mediaUrl && /^\[\w+\]$/.test(m.body)) && m.body}
-                    <span className={`flex items-center justify-end gap-1 text-[11px] mt-1 ${m.direction === 'OUT' ? 'text-slate-300' : 'text-slate-400'}`}>
+                    {m.transcript && (
+                      <span className="block text-sm italic mt-1 text-slate-700">
+                        &ldquo;{m.transcript}&rdquo;
+                      </span>
+                    )}
+                    <span className="flex items-center justify-end gap-1 text-[11px] mt-1 text-slate-600">
                       {m.direction === 'OUT' && m.origin && (
                         <>
                           {m.origin === 'AI' ? <Bot className="h-3 w-3" /> : m.origin === 'PHONE' ? <Smartphone className="h-3 w-3" /> : null}
@@ -432,7 +509,7 @@ export function InboxView({
                       )}
                       {clockLabel(m.sentAt)}
                       {m.direction === 'OUT' && m.status && STATUS_LABEL[m.status] && (
-                        <span className={m.status === 'failed' ? 'text-red-400 font-medium' : ''}>· {STATUS_LABEL[m.status]}</span>
+                        <span className={m.status === 'failed' ? 'text-red-700 font-semibold' : ''}>· {STATUS_LABEL[m.status]}</span>
                       )}
                     </span>
                   </div>

@@ -39,6 +39,9 @@ import locationGuideRoutes from './routes/location-guides.js';
 import submissionRoutes from './routes/submissions.js';
 import crmRoutes from './routes/crm.js';
 import inboxRoutes from './routes/inbox.js';
+import adsRoutes from './routes/ads.js';
+import aiUsageRoutes from './routes/ai-usage.js';
+import aiSettingsRoutes from './routes/ai-settings.js';
 import webhookRoutes from './routes/webhooks.js';
 import { privateFieldGuard } from './middleware/auth.js';
 
@@ -349,6 +352,9 @@ app.use('/api/share', privateFieldGuard, shareRoutes);
 app.use('/api/submissions', submissionRoutes);
 // Mounted ahead of the CRM router so /api/crm/inbox/* is not read as /:id.
 app.use('/api/crm/inbox', inboxRoutes);
+app.use('/api/crm/ads', adsRoutes);
+app.use('/api/crm/ai-usage', aiUsageRoutes);
+app.use('/api/crm/ai-settings', aiSettingsRoutes);
 app.use('/api/crm', crmRoutes);
 // Public by design — Meta calls it. Guarded by signature, not by auth.
 app.use('/api/webhooks', webhookRoutes);

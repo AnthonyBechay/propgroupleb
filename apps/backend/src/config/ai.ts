@@ -18,6 +18,8 @@
  * Never call the Anthropic SDK directly elsewhere in this codebase.
  */
 import Anthropic from '@anthropic-ai/sdk';
+import { prisma } from '@propgroup/db';
+import { assertAiBudget } from '../utils/ai-budget.js';
 import { logger } from '../utils/logger.js';
 
 /**
@@ -145,6 +147,8 @@ export async function createMessage(params: GuardedMessageParams) {
   }
 
   assertAllowedModel(AI_MODEL);
+  // The hard stop, shared with every other AI feature.
+  await assertAiBudget();
 
   if (!client) client = getClient();
 
@@ -160,11 +164,24 @@ export async function createMessage(params: GuardedMessageParams) {
 
   // Cost visibility: without this, a runaway loop is invisible until the bill.
   const u = response.usage;
+  // Haiku 4.5: $1 in / $5 out per million tokens.
+  const costUsd = ((u.input_tokens ?? 0) * 1 + (u.output_tokens ?? 0) * 5) / 1e6;
   logger.info(
     `AI call: model=${AI_MODEL} in=${u.input_tokens} out=${u.output_tokens} ` +
-      `≈$${(((u.input_tokens ?? 0) * 1 + (u.output_tokens ?? 0) * 5) / 1e6).toFixed(5)} ` +
-      `${Date.now() - startedAt}ms`,
+      `≈$${costUsd.toFixed(5)} ${Date.now() - startedAt}ms`,
   );
+  // Same ledger as the chat AI, so one panel shows all AI spend.
+  void prisma.aiUsage
+    .create({
+      data: {
+        feature: 'seo',
+        model: AI_MODEL,
+        inputTokens: u.input_tokens ?? 0,
+        outputTokens: u.output_tokens ?? 0,
+        costUsd,
+      },
+    })
+    .catch((err) => logger.warn('AI usage not recorded', { error: (err as Error).message }));
 
   return response;
 }

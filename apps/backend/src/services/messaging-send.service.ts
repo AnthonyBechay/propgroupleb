@@ -51,18 +51,32 @@ async function postJson(url: string, headers: Record<string, string>, body: unkn
 }
 
 /** Returns the platform ids the sent message may later be echoed under. */
-async function sendWhatsApp(to: string, text: string): Promise<{ id: string; altId?: string }> {
+async function sendWhatsApp(to: string, text: string, imageUrl?: string): Promise<{ id: string; altId?: string }> {
   const json = await postJson(
     'https://api.ycloud.com/v2/whatsapp/messages/sendDirectly',
     { 'X-API-Key': process.env.YCLOUD_API_KEY as string },
-    { from: process.env.YCLOUD_WHATSAPP_FROM, to: `+${to}`, type: 'text', text: { body: text } }
+    {
+      from: process.env.YCLOUD_WHATSAPP_FROM,
+      to: `+${to}`,
+      ...(imageUrl
+        ? { type: 'image', image: { link: imageUrl, caption: text } }
+        : { type: 'text', text: { body: text } }),
+    }
   );
   const id = json.wamid ?? json.id;
   if (!id) throw new AppError('The message was sent but YCloud returned no id', 502);
   return { id, altId: json.wamid && json.id ? json.id : undefined };
 }
 
-async function sendInstagram(to: string, text: string): Promise<{ id: string; altId?: string }> {
+async function sendInstagram(to: string, text: string, imageUrl?: string): Promise<{ id: string; altId?: string }> {
+  // Instagram has no captioned image: the photo goes first, the text after it.
+  if (imageUrl) {
+    await postJson(
+      `https://graph.instagram.com/${GRAPH_VERSION}/me/messages`,
+      { Authorization: `Bearer ${process.env.INSTAGRAM_ACCESS_TOKEN}` },
+      { recipient: { id: to }, message: { attachment: { type: 'image', payload: { url: imageUrl } } } }
+    ).catch(() => undefined);
+  }
   const json = await postJson(
     `https://graph.instagram.com/${GRAPH_VERSION}/me/messages`,
     { Authorization: `Bearer ${process.env.INSTAGRAM_ACCESS_TOKEN}` },
@@ -72,8 +86,17 @@ async function sendInstagram(to: string, text: string): Promise<{ id: string; al
   return { id: json.message_id };
 }
 
-/** Send `text` on a thread and store it, so the CRM shows it without waiting for the echo. */
-export async function sendReply(conversationId: string, text: string, origin: ReplyOrigin): Promise<void> {
+/**
+ * Send `text` on a thread and store it, so the CRM shows it without waiting
+ * for the echo. With `imageUrl` the text travels as the photo's caption — how
+ * a listing is offered.
+ */
+export async function sendReply(
+  conversationId: string,
+  text: string,
+  origin: ReplyOrigin,
+  imageUrl?: string
+): Promise<void> {
   const conversation = await prisma.conversation.findUnique({ where: { id: conversationId } });
   if (!conversation) throw new AppError('Conversation not found', 404);
 
@@ -92,8 +115,8 @@ export async function sendReply(conversationId: string, text: string, origin: Re
 
   const sent =
     conversation.channel === 'WHATSAPP'
-      ? await sendWhatsApp(conversation.externalId, body)
-      : await sendInstagram(conversation.externalId, body);
+      ? await sendWhatsApp(conversation.externalId, body, imageUrl)
+      : await sendInstagram(conversation.externalId, body, imageUrl);
 
   await recordChatMessage({
     channel: conversation.channel,
@@ -101,10 +124,15 @@ export async function sendReply(conversationId: string, text: string, origin: Re
     messageId: sent.id,
     altMessageId: sent.altId,
     direction: 'OUT',
-    type: 'text',
+    type: imageUrl ? 'image' : 'text',
     body,
     origin,
   });
+  // The photo is already public on the website, so the thread can show it
+  // straight from there — nothing to copy.
+  if (imageUrl) {
+    await prisma.chatMessage.updateMany({ where: { externalId: sent.id }, data: { mediaUrl: imageUrl } });
+  }
   // Instagram echoes our own message back, sometimes before the line above
   // runs — it is then already stored as typed on the phone. Say where it
   // really came from, or an automatic reply would read as a person's.
