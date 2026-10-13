@@ -168,6 +168,7 @@ export async function recordChatMessage(event: ChatEvent): Promise<string | null
           lastMessageAt: new Date(sentAt.getTime() - 1),
         },
       });
+      if (event.channel === 'INSTAGRAM' && !event.displayName) void nameInstagramSender(conversation.id, externalId);
       if (!event.history && event.referral?.adId) {
         void noteAd(conversation.id, lead?.id ?? null, event.referral.adId, event.referral.label ?? null, event.channel);
       }
@@ -262,6 +263,29 @@ export async function recordChatMessage(event: ChatEvent): Promise<string | null
   }
 
   return conversation.id;
+}
+
+/**
+ * Instagram delivers a message with the sender's id and nothing else, so every
+ * thread would read "Instagram user". Ask who it is, once, when the thread
+ * starts. Best effort — a private account or a missing token leaves the
+ * fallback name in place.
+ */
+async function nameInstagramSender(conversationId: string, userId: string): Promise<void> {
+  const token = process.env.INSTAGRAM_ACCESS_TOKEN;
+  if (!token) return;
+  try {
+    const res = await fetch(
+      `https://graph.instagram.com/${process.env.META_GRAPH_VERSION || 'v26.0'}/${encodeURIComponent(userId)}?fields=name,username`,
+      { headers: { Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(10_000) }
+    );
+    if (!res.ok) return;
+    const profile = (await res.json()) as { name?: string; username?: string };
+    const displayName = profile.name || (profile.username ? `@${profile.username}` : null);
+    if (displayName) await prisma.conversation.update({ where: { id: conversationId }, data: { displayName } });
+  } catch (err) {
+    logger.warn('Instagram sender name not available', { error: (err as Error).message });
+  }
 }
 
 /**

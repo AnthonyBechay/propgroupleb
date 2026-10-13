@@ -8,7 +8,7 @@ import { parsePagination, buildPaginationResponse } from '../utils/pagination.js
 import type { AuthenticatedRequest } from '../types/index.js';
 import { linkConversationToLead } from '../services/messaging-intake.service.js';
 import { canSendOn, replyWindowOpen, sendReply } from '../services/messaging-send.service.js';
-import { autoReplyEnabled } from '../services/auto-reply.service.js';
+import { autoReplyEnabled, autoReplyStatus, runAutoReplyNow } from '../services/auto-reply.service.js';
 import { cardCaption, cardsByRef, searchCatalogue, type Market } from '../services/catalogue.service.js';
 import { AppError } from '../utils/errors.js';
 import { recordListingsShared } from '../services/deal-sync.service.js';
@@ -52,12 +52,20 @@ router.get(
         orderBy: { lastMessageAt: 'desc' },
         skip,
         take: limit,
-        include: { lead: { select: { id: true, name: true, status: true, market: true } } },
+        include: {
+          lead: { select: { id: true, name: true, status: true, market: true } },
+          // Only to know whether anybody has answered yet.
+          messages: { where: { direction: 'OUT' }, select: { id: true }, take: 1 },
+        },
       }),
       prisma.conversation.count({ where }),
     ]);
 
-    sendPaginated(res, conversations, buildPaginationResponse(page, limit, total));
+    sendPaginated(
+      res,
+      conversations.map(({ messages, ...c }) => ({ ...c, answered: messages.length > 0 })),
+      buildPaginationResponse(page, limit, total)
+    );
   })
 );
 
@@ -97,6 +105,9 @@ router.get(
       canReply: canSendOn(conversation.channel) && replyWindowOpen(conversation.lastInboundAt),
       sendingConfigured: canSendOn(conversation.channel),
       autoReplyOn: autoReplyEnabled(),
+      // Whether the assistant would answer THIS thread's next message — and
+      // when it would not, the reason, so nobody has to guess.
+      autoReply: await autoReplyStatus(conversation.id),
     });
   })
 );
@@ -307,6 +318,23 @@ router.post(
     await sendReply(req.params.id, text, 'CRM');
     await logAdminAction('INBOX_REPLY', 'Conversation', req.params.id, {}, req as AuthenticatedRequest);
     sendSuccess(res, null);
+  })
+);
+
+// POST /api/crm/inbox/:id/ai-reply — have the assistant answer now. Also the
+// way to find out why it is not answering: the outcome comes back in words.
+router.post(
+  '/:id/ai-reply',
+  asyncHandler(async (req: Request, res: Response) => {
+    let outcome;
+    try {
+      outcome = await runAutoReplyNow(req.params.id);
+    } catch (err) {
+      // The model or the send failed. That message is the diagnosis.
+      outcome = { sent: false, reason: (err as Error).message };
+    }
+    await logAdminAction('INBOX_AI_REPLY', 'Conversation', req.params.id, { sent: outcome.sent }, req as AuthenticatedRequest);
+    sendSuccess(res, outcome);
   })
 );
 

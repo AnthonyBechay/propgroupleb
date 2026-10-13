@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Megaphone } from 'lucide-react'
+import { Megaphone, Loader2, PlugZap, CheckCircle2, XCircle } from 'lucide-react'
 import { normalizeApiUrl } from '@/lib/utils/api-url'
 
 /**
@@ -34,10 +34,22 @@ interface AdsReport {
 
 const RANGES = [30, 90, 365] as const
 
+interface Check { name: string; ok: boolean; detail: string }
+
 export function AdsPanel() {
   const apiUrl = normalizeApiUrl(process.env.NEXT_PUBLIC_API_URL || '')
   const [days, setDays] = useState<(typeof RANGES)[number]>(90)
   const [report, setReport] = useState<AdsReport | null>(null)
+  const [checks, setChecks] = useState<Check[] | null>(null)
+  const [testing, setTesting] = useState(false)
+
+  const test = async () => {
+    setTesting(true)
+    try {
+      const res = await fetch(`${apiUrl}/api/crm/ads/test`, { credentials: 'include', cache: 'no-store' })
+      setChecks(res.ok ? (await res.json()).data.checks : [{ name: 'Test', ok: false, detail: 'The test could not be run.' }])
+    } finally { setTesting(false) }
+  }
 
   useEffect(() => {
     let live = true
@@ -63,6 +75,13 @@ export function AdsPanel() {
           </h3>
           <p className="text-[11px] text-slate-500 mt-0.5">What each ad cost, and the clients and deals it produced</p>
         </div>
+        <button
+          onClick={test}
+          disabled={testing}
+          className="min-h-9 px-3 rounded-lg border border-slate-300 text-slate-800 text-xs font-medium inline-flex items-center gap-1.5 disabled:opacity-50"
+        >
+          {testing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <PlugZap className="h-3.5 w-3.5" />} Test the Meta connection
+        </button>
         <div className="flex gap-1 bg-slate-100 rounded-lg p-1">
           {RANGES.map((r) => (
             <button
@@ -75,6 +94,22 @@ export function AdsPanel() {
           ))}
         </div>
       </div>
+
+      {checks && (
+        <ul className="border-b border-slate-100 divide-y divide-slate-50">
+          {checks.map((c) => (
+            <li key={c.name} className="flex items-start gap-2 px-3.5 py-2">
+              {c.ok
+                ? <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0 mt-0.5" />
+                : <XCircle className="h-4 w-4 text-red-600 shrink-0 mt-0.5" />}
+              <span className="text-sm min-w-0">
+                <span className="font-semibold text-slate-900">{c.name}</span>
+                <span className="block text-slate-700 break-words">{c.detail}</span>
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
 
       {!report.spendConnected && (
         <p className="text-xs text-slate-500 px-3.5 py-2.5 border-b border-slate-100">

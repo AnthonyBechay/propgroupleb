@@ -68,11 +68,82 @@ export function scheduleAutoReply(conversationId: string): void {
     conversationId,
     setTimeout(() => {
       pending.delete(conversationId);
-      void run(conversationId).catch((err) =>
-        logger.error('Auto-reply failed', { conversationId, error: (err as Error).message })
-      );
+      void run(conversationId, false)
+        // Every outcome is logged with its reason: "it did not reply" must
+        // always be answerable from the log without guessing.
+        .then((outcome) => logger.info(`Auto-reply: ${outcome.sent ? 'sent' : 'not sent'}`, { conversationId, reason: outcome.reason }))
+        .catch((err) => logger.error('Auto-reply failed', { conversationId, error: (err as Error).message }));
     }, DEBOUNCE_MS)
   );
+}
+
+export interface AutoReplyOutcome {
+  sent: boolean;
+  /** Why, in words somebody can act on. */
+  reason: string;
+}
+
+/**
+ * Have the assistant answer this thread now, because a person asked it to.
+ * Skips the checks that exist to keep it out of a person's way (who it
+ * answers, the pause, "someone already replied") and keeps every one that
+ * protects the client or the bill. Throws with the real error if the model or
+ * the send fails, so the cause reaches the screen.
+ */
+export function runAutoReplyNow(conversationId: string): Promise<AutoReplyOutcome> {
+  return run(conversationId, true);
+}
+
+/** Would the assistant answer the next message on this thread, and if not, why? */
+export async function autoReplyStatus(conversationId: string): Promise<AutoReplyOutcome> {
+  const conversation = await prisma.conversation.findUnique({
+    where: { id: conversationId },
+    include: { lead: { select: { adId: true, source: true } } },
+  });
+  if (!conversation) return { sent: false, reason: 'Conversation not found.' };
+  const blocked = await standingBlock(conversation, await getChatAiSettings(), false);
+  return blocked ? { sent: false, reason: blocked } : { sent: true, reason: 'It will answer the next message.' };
+}
+
+/**
+ * The reasons that hold whatever the client writes next. `manual` drops the
+ * ones that only exist to keep the assistant out of a person's way.
+ */
+async function standingBlock(
+  conversation: { id: string; channel: 'WHATSAPP' | 'INSTAGRAM'; aiPaused: boolean; adId: string | null; lastInboundAt: Date | null; lead: { adId: string | null; source: string } | null },
+  settings: { enabled: boolean; audience: 'ads' | 'all' },
+  manual: boolean
+): Promise<string | null> {
+  if (!chatAiEnabled()) return 'No Gemini key is set on the server (GEMINI_API_KEY).';
+  if (!canSendOn(conversation.channel)) {
+    return conversation.channel === 'WHATSAPP'
+      ? 'WhatsApp sending is not configured on the server (YCLOUD_API_KEY and YCLOUD_WHATSAPP_FROM).'
+      : 'Instagram sending is not configured on the server (INSTAGRAM_ACCESS_TOKEN).';
+  }
+  if (!replyWindowOpen(conversation.lastInboundAt)) {
+    return 'More than 24 hours since the client last wrote, so the platform does not allow a reply.';
+  }
+  if (!manual) {
+    if (process.env.AUTO_REPLY_ENABLED !== 'true') return 'The master switch is off on the server (AUTO_REPLY_ENABLED is not "true").';
+    if (!settings.enabled) return 'Automatic replies are switched off in the Chat assistant settings.';
+    if (conversation.aiPaused) return 'Auto-reply is paused on this conversation.';
+    if (settings.audience !== 'all') {
+      const fromAd =
+        Boolean(conversation.adId) || Boolean(conversation.lead?.adId) || conversation.lead?.source === 'FACEBOOK_AD';
+      if (!fromAd) return 'This person did not come from an ad or a lead form, and the settings say to answer only those.';
+    }
+    // A person replied from the phone or the CRM: the thread is theirs now.
+    const humanReplied = await prisma.chatMessage.count({
+      where: {
+        conversationId: conversation.id, direction: 'OUT',
+        sentAt: { gte: new Date(Date.now() - DAY_MS) }, NOT: { origin: 'AI' },
+      },
+    });
+    if (humanReplied > 0) return 'Someone on the team replied on this conversation in the last 24 hours, so the assistant is staying out of it.';
+  }
+  const budget = await aiBudget();
+  if (budget.exhausted) return 'The AI budget is used up, so all AI is paused.';
+  return null;
 }
 
 const UNIT_KINDS = ['APARTMENT', 'STUDIO', 'DUPLEX', 'PENTHOUSE', 'VILLA', 'TOWNHOUSE', 'SHOP', 'OFFICE', 'LAND_PARCEL'];
@@ -195,7 +266,8 @@ async function loadAttachment(mediaUrl: string): Promise<{ data: string; mimeTyp
   }
 }
 
-async function run(conversationId: string): Promise<void> {
+async function run(conversationId: string, manual: boolean): Promise<AutoReplyOutcome> {
+  const skip = (reason: string): AutoReplyOutcome => ({ sent: false, reason });
   const conversation = await prisma.conversation.findUnique({
     where: { id: conversationId },
     include: {
@@ -207,19 +279,11 @@ async function run(conversationId: string): Promise<void> {
       },
     },
   });
-  if (!conversation || conversation.aiPaused) return;
-  if (!canSendOn(conversation.channel) || !replyWindowOpen(conversation.lastInboundAt)) return;
+  if (!conversation) return skip('Conversation not found.');
 
   const settings = await getChatAiSettings();
-  if (!settings.enabled) return;
-
-  if (settings.audience !== 'all') {
-    const fromAd =
-      Boolean(conversation.adId) ||
-      Boolean(conversation.lead?.adId) ||
-      conversation.lead?.source === 'FACEBOOK_AD';
-    if (!fromAd) return;
-  }
+  const blocked = await standingBlock(conversation, settings, manual);
+  if (blocked) return skip(blocked);
 
   const since = new Date(Date.now() - DAY_MS);
   const recent = await prisma.chatMessage.findMany({
@@ -228,32 +292,20 @@ async function run(conversationId: string): Promise<void> {
     take: HISTORY_MESSAGES,
   });
   // Only answer a client who is actually waiting on us.
-  if (recent.length === 0 || recent[0].direction !== 'IN') return;
+  if (recent.length === 0) return skip('There are no messages on this conversation yet.');
+  if (recent[0].direction !== 'IN') return skip('The last message is ours — the client is not waiting on a reply.');
   const latestId = recent[0].id;
 
-  // A person replied from the phone or the CRM: the thread is theirs now.
-  const humanReplied = await prisma.chatMessage.count({
-    where: { conversationId, direction: 'OUT', sentAt: { gte: since }, NOT: { origin: 'AI' } },
-  });
-  if (humanReplied > 0) return;
-
-  const [threadCount, globalCount, budget] = await Promise.all([
+  const [threadCount, globalCount] = await Promise.all([
     prisma.chatMessage.count({ where: { conversationId, origin: 'AI', sentAt: { gte: since } } }),
     prisma.chatMessage.count({ where: { origin: 'AI', sentAt: { gte: since } } }),
-    aiBudget(),
   ]);
-  if (threadCount >= PER_THREAD_LIMIT) {
+  if (!manual && threadCount >= PER_THREAD_LIMIT) {
     await prisma.conversation.update({ where: { id: conversationId }, data: { aiPaused: true } });
-    logger.info('Auto-reply paused: thread limit reached', { conversationId });
-    return;
+    return skip(`The assistant has already sent ${PER_THREAD_LIMIT} replies here today, so it has paused for a person to take over.`);
   }
   if (globalCount >= envNumber('AUTO_REPLY_DAILY_LIMIT', 200)) {
-    logger.warn('Auto-reply skipped: daily message limit reached');
-    return;
-  }
-  if (budget.exhausted) {
-    logger.warn('Auto-reply skipped: AI budget reached', { daily: budget.dailyUsd, monthly: budget.monthlyUsd });
-    return;
+    return skip('The daily limit on assistant messages has been reached (AUTO_REPLY_DAILY_LIMIT).');
   }
 
   // Oldest first. The messages the client sent since our last reply are the
@@ -290,7 +342,7 @@ async function run(conversationId: string): Promise<void> {
     else contents.push({ role, parts });
   }
   while (contents.length > 0 && contents[0].role !== 'user') contents.shift();
-  if (contents.length === 0) return;
+  if (contents.length === 0) return skip('There is nothing from the client to answer.');
 
   // Reference codes the model may attach: search results and the ad's project.
   const offered = new Set<string>();
@@ -418,10 +470,7 @@ async function run(conversationId: string): Promise<void> {
     contents.push({ role: 'user', parts: responses });
   }
 
-  if (!reply) {
-    logger.warn('Auto-reply produced nothing to send', { conversationId });
-    return;
-  }
+  if (!reply) return skip('The model returned no reply text.');
 
   // The client may have written again, or a person may have answered, while the
   // model was working. Never talk over either.
@@ -430,7 +479,9 @@ async function run(conversationId: string): Promise<void> {
     orderBy: { sentAt: 'desc' },
     select: { id: true },
   });
-  if (latest?.id !== latestId) return;
+  if (latest?.id !== latestId) {
+    return skip('A new message arrived while the assistant was working, so it held back rather than talk over it.');
+  }
 
   // One message: the reply, then the properties under it. The first one's
   // photo heads the message when the whole thing fits in a caption.
@@ -447,7 +498,7 @@ async function run(conversationId: string): Promise<void> {
   if (handoff) {
     await prisma.conversation.update({ where: { id: conversationId }, data: { aiPaused: true } });
   }
-  logger.info('Auto-reply sent', { conversationId, listings: toSend.length, handoff });
+  return { sent: true, reason: `Replied${cards.length ? ` with ${cards.length} propert${cards.length === 1 ? 'y' : 'ies'}` : ''}${handoff ? ' and handed over to the team' : ''}.` };
 }
 
 /**

@@ -3,7 +3,7 @@ import { prisma } from '@propgroup/db';
 import { authenticateToken, requireAdmin } from '../middleware/auth.js';
 import { asyncHandler } from '../utils/errors.js';
 import { sendSuccess } from '../utils/response.js';
-import { adsConfigured, fetchAdSpend } from '../services/meta-ads.service.js';
+import { adsConfigured, checkMetaConnection, fetchAdSpend } from '../services/meta-ads.service.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // What each Meta ad cost, next to what it produced.
@@ -94,6 +94,33 @@ router.get(
       },
       ads: rows,
     });
+  })
+);
+
+// GET /api/crm/ads/test — is the link to Meta actually working, piece by piece?
+router.get(
+  '/test',
+  asyncHandler(async (_req: Request, res: Response) => {
+    const checks = await checkMetaConnection();
+
+    // The other half: has anything from an ad actually arrived here?
+    const [lastLead, adLeads] = await Promise.all([
+      prisma.lead.findFirst({
+        where: { OR: [{ adId: { not: null } }, { externalLeadId: { not: null } }] },
+        orderBy: { createdAt: 'desc' },
+        select: { name: true, createdAt: true, adLabel: true },
+      }),
+      prisma.lead.count({ where: { OR: [{ adId: { not: null } }, { externalLeadId: { not: null } }] } }),
+    ]);
+    checks.push({
+      name: 'Leads received from ads',
+      ok: adLeads > 0,
+      detail: lastLead
+        ? `${adLeads} so far. Latest: ${lastLead.name} on ${lastLead.createdAt.toISOString().slice(0, 10)}${lastLead.adLabel ? ` (${lastLead.adLabel})` : ''}.`
+        : 'None yet. Create a test lead with Meta\'s Lead Ads testing tool, then run this again.',
+    });
+
+    sendSuccess(res, { ok: checks.every((c) => c.ok), checks });
   })
 );
 

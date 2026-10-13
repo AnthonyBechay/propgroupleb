@@ -29,6 +29,8 @@ interface Thread {
   displayName: string | null
   lastMessageAt: string
   createdAt: string
+  /** Somebody on our side has replied at least once. */
+  answered?: boolean
   lastPreview: string | null
   unreadCount: number
   aiPaused: boolean
@@ -53,6 +55,8 @@ interface ChatMessage {
 interface ThreadDetail extends Thread {
   messages: ChatMessage[]
   canReply: boolean
+  /** Would the assistant answer this thread's next message — and if not, why. */
+  autoReply: { sent: boolean; reason: string }
   /** What the chat assistant understood they want, waiting for a decision. */
   suggestion: Suggestion | null
   /** The thread has older messages than the ones loaded. */
@@ -161,6 +165,9 @@ export function InboxView({
   const [linkQuery, setLinkQuery] = useState('')
   const [linkResults, setLinkResults] = useState<ThreadLead[]>([])
   const [showListings, setShowListings] = useState(false)
+  // Asking the assistant to answer now, and what came of it.
+  const [aiBusy, setAiBusy] = useState(false)
+  const [aiNote, setAiNote] = useState<string | null>(null)
 
   const call = useCallback(
     (path: string, init?: RequestInit) =>
@@ -207,6 +214,7 @@ export function InboxView({
     setLinking(false)
     setLinkQuery('')
     setShowListings(false)
+    setAiNote(null)
     setTake(100)
   }, [openId])
 
@@ -265,6 +273,18 @@ export function InboxView({
     }, 250)
     return () => clearTimeout(timer)
   }, [linking, linkQuery, apiUrl])
+
+  const askAi = async () => {
+    if (!detail || aiBusy) return
+    setAiBusy(true)
+    setAiNote(null)
+    try {
+      const res = await call(`/${detail.id}/ai-reply`, { method: 'POST' })
+      const outcome = res.ok ? (await res.json()).data : null
+      setAiNote(outcome ? outcome.reason : 'The assistant could not be reached.')
+      await Promise.all([loadDetail(detail.id), loadThreads()])
+    } finally { setAiBusy(false) }
+  }
 
   const toggleAi = async () => {
     if (!detail) return
@@ -336,8 +356,9 @@ export function InboxView({
                   )}
                 </span>
                 <span className="flex items-center gap-2 mt-0.5 empty:hidden">
-                  {/* First wrote in the last day, and nobody has decided who they are yet. */}
-                  {!t.lead && Date.now() - new Date(t.createdAt).getTime() < 86_400_000 && (
+                  {/* A first contact nobody has answered yet. Goes once we reply,
+                      or after a day either way. */}
+                  {!t.answered && Date.now() - new Date(t.createdAt).getTime() < 86_400_000 && (
                     <span className="px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 text-[11px] font-semibold">New</span>
                   )}
                   {t.lead && (
@@ -384,12 +405,15 @@ export function InboxView({
                 )}
               </div>
               {detail.autoReplyOn && (
+                // Green only when the assistant really will answer the next
+                // message here; the reason it won't is on hover and below.
                 <button
                   onClick={toggleAi}
-                  title={detail.aiPaused ? 'Auto-reply is paused on this conversation' : 'Auto-reply may answer this conversation'}
-                  className={`min-h-11 px-3 rounded-lg text-sm font-medium inline-flex items-center gap-1.5 border ${detail.aiPaused ? 'border-slate-200 text-slate-500' : 'border-emerald-200 bg-emerald-50 text-emerald-700'}`}
+                  title={detail.autoReply.reason}
+                  className={`min-h-11 px-3 rounded-lg text-sm font-medium inline-flex items-center gap-1.5 border ${detail.autoReply.sent ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-slate-200 text-slate-600'}`}
                 >
-                  <Bot className="h-4 w-4" /> {detail.aiPaused ? 'Auto-reply off' : 'Auto-reply on'}
+                  <Bot className="h-4 w-4" />
+                  {detail.aiPaused ? 'Auto-reply paused' : detail.autoReply.sent ? 'Auto-reply on' : 'Auto-reply not active'}
                 </button>
               )}
               <button
@@ -442,6 +466,23 @@ export function InboxView({
                 {linkQuery.trim().length >= 2 && linkResults.length === 0 && (
                   <p className="text-sm text-slate-500 mt-2">No client matches.</p>
                 )}
+              </div>
+            )}
+
+            {/* Why the assistant is quiet here, and a way to make it answer once. */}
+            {(aiNote || (detail.autoReplyOn && !detail.autoReply.sent)) && (
+              <div className="px-3 sm:px-4 py-2.5 border-b border-slate-200 bg-slate-50 flex items-center gap-3 flex-wrap">
+                <p className="text-sm text-slate-700 flex-1 min-w-[200px]">
+                  <Bot className="h-4 w-4 inline -mt-0.5 mr-1 text-slate-500" />
+                  {aiNote ?? detail.autoReply.reason}
+                </p>
+                <button
+                  onClick={askAi}
+                  disabled={aiBusy}
+                  className="min-h-11 px-3 rounded-lg border border-slate-300 bg-white text-slate-800 text-sm font-medium inline-flex items-center gap-1.5 disabled:opacity-50"
+                >
+                  {aiBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Bot className="h-4 w-4" />} Reply with the assistant now
+                </button>
               </div>
             )}
 

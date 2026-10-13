@@ -114,3 +114,94 @@ export async function fetchAdSpend(days: number): Promise<AdAccountSpend> {
   logger.info('Meta ad spend fetched', { days, ads: ads.length });
   return data;
 }
+
+export interface ConnectionCheck {
+  name: string;
+  ok: boolean;
+  /** What was found, or what is wrong and where to fix it. */
+  detail: string;
+}
+
+/**
+ * Walk the whole Meta link end to end and say, in order, what works.
+ *
+ * Read-only: it looks things up and changes nothing. Each step is independent,
+ * so one failure does not hide the state of the others.
+ */
+export async function checkMetaConnection(): Promise<ConnectionCheck[]> {
+  const checks: ConnectionCheck[] = [];
+  const add = (name: string, ok: boolean, detail: string) => checks.push({ name, ok, detail });
+  const attempt = async (name: string, fn: () => Promise<string>) => {
+    try {
+      add(name, true, await fn());
+    } catch (err) {
+      add(name, false, (err as Error).message);
+    }
+  };
+  const base = `https://graph.facebook.com/${GRAPH_VERSION}`;
+
+  add(
+    'Webhook secrets',
+    Boolean(process.env.META_APP_SECRET && process.env.META_VERIFY_TOKEN),
+    process.env.META_APP_SECRET && process.env.META_VERIFY_TOKEN
+      ? 'META_APP_SECRET and META_VERIFY_TOKEN are set, so lead forms and Instagram messages can be received.'
+      : 'META_APP_SECRET or META_VERIFY_TOKEN is missing on the server, so nothing from Meta is accepted.'
+  );
+
+  if (!process.env.META_ACCESS_TOKEN) {
+    add('Access token', false, 'META_ACCESS_TOKEN is not set on the server. Nothing below can be checked without it.');
+    return checks;
+  }
+
+  await attempt('Access token', async () => {
+    const me = await graph(`${base}/me?fields=id,name`);
+    return `Valid. Meta sees it as "${me.name ?? me.id}".`;
+  });
+
+  // Lead forms: the Page must be reachable AND subscribed to this app for leadgen.
+  await attempt('Facebook Page and lead forms', async () => {
+    const pages = (await graph(`${base}/me/accounts?fields=id,name,access_token&limit=50`)).data ?? [];
+    if (pages.length === 0) throw new Error('The token cannot reach any Facebook Page. Assign the Page to the system user in Business Settings.');
+    const lines: string[] = [];
+    let anySubscribed = false;
+    for (const page of pages) {
+      const res = await fetch(`${base}/${page.id}/subscribed_apps`, {
+        headers: { Authorization: `Bearer ${page.access_token}` },
+        signal: AbortSignal.timeout(15_000),
+      });
+      const json: any = await res.json().catch(() => ({})); // eslint-disable-line @typescript-eslint/no-explicit-any
+      const subscribed = (json.data ?? []).some((app: any) => (app.subscribed_fields ?? []).includes('leadgen')); // eslint-disable-line @typescript-eslint/no-explicit-any
+      anySubscribed ||= subscribed;
+      lines.push(`${page.name}: ${subscribed ? 'sending lead forms to the CRM' : 'NOT subscribed for lead forms'}`);
+    }
+    if (!anySubscribed) throw new Error(`${lines.join('; ')}. Subscribe the Page to the app for "leadgen".`);
+    return lines.join('; ') + '.';
+  });
+
+  if (!process.env.META_AD_ACCOUNT_ID) {
+    add('Ad account', false, 'META_AD_ACCOUNT_ID is not set on the server, so spend cannot be read.');
+  } else {
+    const account = `act_${String(process.env.META_AD_ACCOUNT_ID).replace(/^act_/, '')}`;
+    await attempt('Ad account', async () => {
+      const a = await graph(`${base}/${account}?fields=name,currency,account_status`);
+      return `"${a.name}" in ${a.currency}${a.account_status === 1 ? ', active' : `, status code ${a.account_status}`}.`;
+    });
+    await attempt('Ad spend', async () => {
+      const rows = (await graph(`${base}/${account}/insights?date_preset=last_30d&fields=spend,impressions`)).data ?? [];
+      return rows.length
+        ? `Readable. Last 30 days: ${rows[0].spend} spent, ${rows[0].impressions} impressions.`
+        : 'Readable, but there was no ad activity in the last 30 days.';
+    });
+  }
+
+  if (!process.env.META_DATASET_ID) {
+    add('Reporting results back', false, 'META_DATASET_ID is not set on the server, so Meta is not told which leads became buyers.');
+  } else {
+    await attempt('Reporting results back', async () => {
+      const d = await graph(`${base}/${encodeURIComponent(process.env.META_DATASET_ID as string)}?fields=id,name`);
+      return `Dataset "${d.name ?? d.id}" is reachable with this token.`;
+    });
+  }
+
+  return checks;
+}
