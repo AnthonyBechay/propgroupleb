@@ -111,7 +111,7 @@ export async function fetchAdSpend(days: number): Promise<AdAccountSpend> {
 
   const data = { currency: currency ?? 'USD', ads };
   cache.set(days, { at: Date.now(), data });
-  logger.info('Meta ad spend fetched', { days, ads: ads.length });
+  logger.debug('Meta ad spend fetched', { days, ads: ads.length });
   return data;
 }
 

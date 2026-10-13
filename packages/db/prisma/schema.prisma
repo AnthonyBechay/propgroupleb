@@ -1750,6 +1750,8 @@ model Conversation {
   // Automatic replies are off for this thread — a person took it over, the
   // client asked for one, or the team switched it off.
   aiPaused Boolean @default(false)
+  // Why, in words — so "paused" on a thread explains itself.
+  aiPausedReason String?
 
   // Click-to-WhatsApp / Instagram ad attribution from the first message.
   adId    String?

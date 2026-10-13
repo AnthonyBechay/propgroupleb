@@ -136,7 +136,10 @@ export function InboxView({
   onOpenLead,
   onChanged,
   focusLeadId,
+  fill = false,
 }: {
+  /** Take the full height of the screen, as the page of its own does. */
+  fill?: boolean
   /** Open this client's conversation, when the page was sent here from their drawer. */
   focusLeadId?: string | null
   /** The page's single search box. The inbox doesn't own one. */
@@ -289,7 +292,10 @@ export function InboxView({
   const toggleAi = async () => {
     if (!detail) return
     const res = await call(`/${detail.id}`, { method: 'PATCH', body: JSON.stringify({ aiPaused: !detail.aiPaused }) })
-    if (res.ok) loadDetail(detail.id)
+    if (res.ok) {
+      setAiNote(null)
+      loadDetail(detail.id)
+    }
   }
 
   // Arriving from a client's drawer: go straight to their thread.
@@ -318,7 +324,7 @@ export function InboxView({
   const visible = threads
 
   return (
-    <div className="bg-white border border-slate-200 rounded-xl overflow-hidden lg:grid lg:grid-cols-[340px_1fr] lg:h-[70vh]">
+    <div className={`bg-white border border-slate-200 rounded-xl overflow-hidden lg:grid lg:grid-cols-[360px_1fr] ${fill ? 'lg:h-[calc(100dvh-12.5rem)]' : 'lg:h-[70vh]'}`}>
       {/* Threads — below lg, one pane at a time */}
       <div className={`lg:border-r lg:border-slate-200 lg:flex lg:flex-col lg:min-h-0 ${openId ? 'hidden lg:flex' : ''}`}>
       <div className="flex gap-1 p-2 border-b border-slate-200 overflow-x-auto">
@@ -476,6 +482,14 @@ export function InboxView({
                   <Bot className="h-4 w-4 inline -mt-0.5 mr-1 text-slate-500" />
                   {aiNote ?? detail.autoReply.reason}
                 </p>
+                {detail.aiPaused && (
+                  <button
+                    onClick={toggleAi}
+                    className="min-h-11 px-3 rounded-lg bg-slate-900 text-white text-sm font-medium inline-flex items-center gap-1.5"
+                  >
+                    Resume auto-reply
+                  </button>
+                )}
                 <button
                   onClick={askAi}
                   disabled={aiBusy}
@@ -510,7 +524,7 @@ export function InboxView({
               />
             )}
 
-            <div ref={scrollRef} className="flex-1 overflow-y-auto px-3 sm:px-4 py-4 space-y-2 bg-slate-100 max-h-[55vh] lg:max-h-none">
+            <div ref={scrollRef} className={`flex-1 overflow-y-auto px-3 sm:px-4 py-4 space-y-2 bg-slate-100 lg:max-h-none ${fill ? 'max-h-[calc(100dvh-22rem)]' : 'max-h-[55vh]'}`}>
               {detail.hasEarlier && (
                 <p className="text-center">
                   <button

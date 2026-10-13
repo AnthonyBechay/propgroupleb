@@ -80,55 +80,45 @@ app.use(
       req.headers['x-no-compression'] ? false : compression.filter(req, res),
   })
 );
-// Request logging — structured JSON in production, readable in dev
-const isProduction = process.env.NODE_ENV === 'production';
+// Request logging. The log is for things that happened, so a request only
+// earns a line when it tells you something:
+//   - anything that failed (4xx / 5xx)
+//   - anything that changed data (POST / PUT / PATCH / DELETE)
+//   - anything slow
+// A successful read says nothing — and the CRM's screens poll every few
+// seconds, which used to bury everything else under identical GET lines.
+// Webhook deliveries are left to the handlers, which log what the message WAS
+// rather than that a POST arrived.
+const SLOW_MS = 2000;
 app.use(
   morgan(
     (tokens, req, res) => {
-      const method = tokens.method(req, res);
-      const url = tokens.url(req, res);
-      const status = tokens.status(req, res);
-      const responseTime = tokens['response-time'](req, res);
-
-      if (isProduction) {
-        return JSON.stringify({
-          level: Number(status) >= 500 ? 'error' : Number(status) >= 400 ? 'warn' : 'info',
-          message: 'request',
-          timestamp: new Date().toISOString(),
-          method,
-          path: url,
-          status: Number(status),
-          responseTime: `${responseTime}ms`,
-          ip: req.ip,
-          userAgent: req.headers['user-agent'],
-        });
-      }
-
-      const icon = Number(status) >= 500 ? 'ERR' : Number(status) >= 400 ? 'WARN' : 'OK';
-      return `[${icon}] ${method} ${url} ${status} ${responseTime}ms`;
+      const status = Number(tokens.status(req, res));
+      const ms = Math.round(Number(tokens['response-time'](req, res)) || 0);
+      const line = `${tokens.method(req, res)} ${tokens.url(req, res)}`;
+      const meta = { status, ms, ...(status >= 400 ? { ip: req.ip } : {}) };
+      if (status >= 500) logger.error(line, undefined, meta);
+      else if (status >= 400 || ms >= SLOW_MS) logger.warn(ms >= SLOW_MS && status < 400 ? `${line} (slow)` : line, meta);
+      else logger.info(line, meta);
+      // The logger has written the line; morgan itself prints nothing.
+      return null;
     },
     {
-      // In production, log only what's worth reading: errors, slow requests,
-      // mutations, and uncommon GETs. Drops the routine high-volume noise that
-      // otherwise drowns the signal — health checks, OPTIONS preflights,
-      // image proxy hits, and the auth/me poll fired by every admin page.
       skip: (req, res) => {
         if (req.url === '/health' || req.url === '/api/health') return true;
-        if (!isProduction) return false;
-
-        const status = res.statusCode;
-        // Always keep anything that smells like a problem
-        if (status >= 400) return false;
-        // Drop OPTIONS preflights (handled by cors, always 204, never useful)
+        if (res.statusCode >= 400) return false;
         if (req.method === 'OPTIONS') return true;
-        // Always keep mutations
-        if (req.method !== 'GET' && req.method !== 'HEAD') return false;
-        // Drop the file proxy — this is the #1 source of log volume during
-        // admin work and marketing page renders. R2 outcomes are observable
-        // from R2 itself; here we only care if it 4xx/5xxs (kept above).
-        if (req.url.startsWith('/api/files/')) return true;
-        // Drop the session-poll endpoint hit on every admin page mount
-        if (req.url.startsWith('/api/auth/me')) return true;
+        if (req.url.startsWith('/api/webhooks/')) return true;
+        // Marking a thread read is the inbox poll's shadow, not a real change.
+        if (/^\/api\/crm\/inbox\/[^/]+\/read/.test(req.url)) return true;
+        if (req.method === 'GET' || req.method === 'HEAD') {
+          // Keep only the slow ones; response time is not known here, so let
+          // the formatter decide by returning false for nothing else.
+          const started = (req as express.Request & { _startAt?: [number, number] })._startAt;
+          if (!started) return true;
+          const [s, ns] = process.hrtime(started);
+          return s * 1000 + ns / 1e6 < SLOW_MS;
+        }
         return false;
       },
     }

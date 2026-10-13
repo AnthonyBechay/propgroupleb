@@ -20,24 +20,41 @@ import { logger } from '../utils/logger.js';
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 /**
- * Tried in order. The first is the stronger model; the second is the cheaper
- * one, used when the first is overloaded (Google answers 503 under load).
- * USD per million tokens — the first row is Google's rate until 2026-12-31,
- * after which it doubles; update it then or the usage panel under-reports.
+ * Tried in order, strongest first. Google's Flash models answer 503 ("high
+ * demand") or simply hang often enough that one model is not a service: a
+ * call is retried, and if the model stays unavailable the whole reply is
+ * redone on the next one down. USD per million tokens — the first row is
+ * Google's rate until 2026-12-31, after which it doubles; update it then or
+ * the usage panel under-reports.
  *
  * gemini-3.8-flash is deliberately not here: over two days of testing it
- * answered 503 or hung on every call, and a model that costs each client a
- * 12-second wait before the fallback is worse than not listing it. It is the
- * same price as 3.6 — put it first again once it is dependable.
+ * failed or hung on every call. Same price as 3.6 — put it first once it is
+ * dependable.
  */
 const MODELS = [
   { id: 'gemini-3.6-flash', inputPerM: 0.75, outputPerM: 3.75 },
   { id: 'gemini-3.5-flash-lite', inputPerM: 0.3, outputPerM: 2.5 },
+  { id: 'gemini-3.1-flash-lite', inputPerM: 0.25, outputPerM: 1.5 },
 ] as const;
 
+/** How many models there are to fall back through. */
+export const CHAT_MODEL_COUNT = MODELS.length;
+
 const MAX_OUTPUT_TOKENS = 800;
-const TIMEOUT_MS = 30_000;
-const FIRST_TRY_TIMEOUT_MS = 12_000;
+/** An overloaded model sometimes hangs instead of refusing. */
+const TIMEOUT_MS = 15_000;
+/** Wait before the one retry on the same model; after that, the next model. */
+const RETRY_DELAYS_MS = [1000];
+
+/** The model could not be reached after retries — try the next one. */
+export class ChatModelUnavailableError extends Error {
+  constructor(model: string, cause: string) {
+    super(`${model} is unavailable (${cause})`);
+    this.name = 'ChatModelUnavailableError';
+  }
+}
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 export function chatAiEnabled(): boolean {
   return Boolean(process.env.GEMINI_API_KEY);
@@ -67,73 +84,79 @@ export interface ChatTurnResult {
   calls: Array<{ name: string; args: Record<string, any>; id?: string }>;
 }
 
-/** One conversation with the model, pinned to whichever model answered first. */
+/**
+ * One conversation with one model. A turn carries signatures only its own
+ * model accepts, so a session never switches model mid-way — when its model
+ * gives out it throws ChatModelUnavailableError and the caller starts the
+ * reply again on the next (`modelIndex + 1`).
+ */
 export class ChatSession {
-  private modelIndex = 0;
-  private started = false;
-
   constructor(
     private readonly system: string,
     private readonly tools: ChatTool[],
-    private readonly usage: { feature: string; conversationId?: string | null }
+    private readonly usage: { feature: string; conversationId?: string | null },
+    private readonly modelIndex = 0
   ) {}
+
+  get modelId(): string {
+    return MODELS[this.modelIndex].id;
+  }
 
   async send(contents: ChatContent[]): Promise<ChatTurnResult> {
     if (!chatAiEnabled()) throw new Error('Chat AI is disabled (GEMINI_API_KEY is not set).');
     // The hard stop, shared with every other AI feature.
     await assertAiBudget();
 
-    for (;;) {
-      const model = MODELS[this.modelIndex];
-      const canFallBack = !this.started && this.modelIndex < MODELS.length - 1;
-      let res: Response;
+    const model = MODELS[this.modelIndex];
+    for (let attempt = 0; ; attempt++) {
+      let failure: string;
       try {
-        res = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/${model.id}:generateContent`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            // Key in a header, never the URL — URLs end up in logs.
-            'x-goog-api-key': process.env.GEMINI_API_KEY as string,
-          },
-          body: JSON.stringify({
-            systemInstruction: { parts: [{ text: this.system }] },
-            contents,
-            tools: [{ functionDeclarations: this.tools }],
-            generationConfig: { maxOutputTokens: MAX_OUTPUT_TOKENS },
-          }),
-          // An overloaded model sometimes hangs instead of refusing; give the
-          // first attempt less rope so the fallback still answers in time.
-          signal: AbortSignal.timeout(canFallBack ? FIRST_TRY_TIMEOUT_MS : TIMEOUT_MS),
+        const res = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/${model.id}:generateContent`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              // Key in a header, never the URL — URLs end up in logs.
+              'x-goog-api-key': process.env.GEMINI_API_KEY as string,
+            },
+            body: JSON.stringify({
+              systemInstruction: { parts: [{ text: this.system }] },
+              contents,
+              tools: [{ functionDeclarations: this.tools }],
+              generationConfig: { maxOutputTokens: MAX_OUTPUT_TOKENS },
+            }),
+            signal: AbortSignal.timeout(TIMEOUT_MS),
           }
         );
+        const json: any = await res.json().catch(() => ({}));
+        if (res.ok) return this.finish(model, json);
+
+        // Overloaded, rate-limited or a server fault: worth another go. Anything
+        // else (bad request, bad key) will not get better by asking again.
+        if (![429, 500, 502, 503, 504].includes(res.status)) {
+          throw new Error(`Gemini ${res.status}: ${json?.error?.message ?? 'request failed'}`);
+        }
+        failure = `HTTP ${res.status}`;
       } catch (err) {
-        if (!canFallBack) throw err;
-        logger.warn(`Chat AI: ${model.id} did not answer (${(err as Error).name}), falling back`);
-        this.modelIndex += 1;
-        continue;
+        const name = (err as Error).name;
+        if (name !== 'TimeoutError' && name !== 'AbortError' && !(err instanceof TypeError)) throw err;
+        failure = name === 'TypeError' ? 'network error' : 'no answer in time';
       }
-      const json: any = await res.json().catch(() => ({}));
 
-      // Overloaded or rate-limited on the first call: drop to the next model.
-      // Not mid-conversation — a turn carries signatures only its own model accepts.
-      if ((res.status === 503 || res.status === 429) && canFallBack) {
-        logger.warn(`Chat AI: ${model.id} unavailable (${res.status}), falling back`);
-        this.modelIndex += 1;
-        continue;
-      }
-      if (!res.ok) {
-        throw new Error(`Gemini ${res.status}: ${json?.error?.message ?? 'request failed'}`);
-      }
-      this.started = true;
+      if (attempt >= RETRY_DELAYS_MS.length) throw new ChatModelUnavailableError(model.id, failure);
+      logger.warn('Chat AI: model busy, retrying', { model: model.id, failure, attempt: attempt + 1 });
+      await sleep(RETRY_DELAYS_MS[attempt]);
+    }
+  }
 
+  private finish(model: (typeof MODELS)[number], json: any): ChatTurnResult {
       const u = json.usageMetadata ?? {};
       const inputTokens = u.promptTokenCount ?? 0;
       // Thinking is billed as output.
       const outputTokens = (u.candidatesTokenCount ?? 0) + (u.thoughtsTokenCount ?? 0);
       const costUsd = (inputTokens * model.inputPerM + outputTokens * model.outputPerM) / 1e6;
-      logger.info(`Chat AI call: model=${model.id} in=${inputTokens} out=${outputTokens} ≈$${costUsd.toFixed(5)}`);
+      logger.debug('Chat AI call', { model: model.id, in: inputTokens, out: outputTokens, usd: costUsd.toFixed(5) });
       void prisma.aiUsage
         .create({
           data: {
@@ -154,7 +177,6 @@ export class ChatSession {
         text: parts.map((p) => p.text ?? '').join('').trim(),
         calls: parts.filter((p) => p.functionCall).map((p) => p.functionCall),
       };
-    }
   }
 }
 

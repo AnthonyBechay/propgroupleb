@@ -212,6 +212,16 @@ export async function recordChatMessage(event: ChatEvent): Promise<string | null
     throw err;
   }
 
+  logger.info('Chat message stored', {
+    channel: event.channel,
+    direction: event.direction,
+    type: event.type,
+    ...(event.history ? { history: true } : {}),
+    ...(event.origin ? { origin: event.origin } : {}),
+    conversation: conversation.id,
+    client: conversation.leadId ?? 'none',
+  });
+
   // Not awaited: a slow download must not hold up the thread, and a failed one
   // only costs the attachment, never the message.
   if (event.media?.url) {

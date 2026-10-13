@@ -1,5 +1,5 @@
 import { prisma } from '@propgroup/db';
-import { ChatSession, chatAiEnabled, type ChatContent, type ChatPart, type ChatTool } from '../config/chat-ai.js';
+import { CHAT_MODEL_COUNT, ChatModelUnavailableError, ChatSession, chatAiEnabled, type ChatContent, type ChatPart, type ChatTool } from '../config/chat-ai.js';
 import { aiBudget } from '../utils/ai-budget.js';
 import { logger } from '../utils/logger.js';
 import { cardCaption, cardsByRef, formatPrice, marketNames, projectsNamedIn, searchCatalogue, type Market } from './catalogue.service.js';
@@ -110,7 +110,7 @@ export async function autoReplyStatus(conversationId: string): Promise<AutoReply
  * ones that only exist to keep the assistant out of a person's way.
  */
 async function standingBlock(
-  conversation: { id: string; channel: 'WHATSAPP' | 'INSTAGRAM'; aiPaused: boolean; adId: string | null; lastInboundAt: Date | null; lead: { adId: string | null; source: string } | null },
+  conversation: { id: string; channel: 'WHATSAPP' | 'INSTAGRAM'; aiPaused: boolean; aiPausedReason: string | null; adId: string | null; lastInboundAt: Date | null; lead: { adId: string | null; source: string } | null },
   settings: { enabled: boolean; audience: 'ads' | 'all' },
   manual: boolean
 ): Promise<string | null> {
@@ -126,7 +126,9 @@ async function standingBlock(
   if (!manual) {
     if (process.env.AUTO_REPLY_ENABLED !== 'true') return 'The master switch is off on the server (AUTO_REPLY_ENABLED is not "true").';
     if (!settings.enabled) return 'Automatic replies are switched off in the Chat assistant settings.';
-    if (conversation.aiPaused) return 'Auto-reply is paused on this conversation.';
+    if (conversation.aiPaused) {
+      return `Auto-reply is paused on this conversation${conversation.aiPausedReason ? `: ${conversation.aiPausedReason.charAt(0).toLowerCase()}${conversation.aiPausedReason.slice(1)}` : ''}.`;
+    }
     if (settings.audience !== 'all') {
       const fromAd =
         Boolean(conversation.adId) || Boolean(conversation.lead?.adId) || conversation.lead?.source === 'FACEBOOK_AD';
@@ -301,7 +303,10 @@ async function run(conversationId: string, manual: boolean): Promise<AutoReplyOu
     prisma.chatMessage.count({ where: { origin: 'AI', sentAt: { gte: since } } }),
   ]);
   if (!manual && threadCount >= PER_THREAD_LIMIT) {
-    await prisma.conversation.update({ where: { id: conversationId }, data: { aiPaused: true } });
+    await prisma.conversation.update({
+      where: { id: conversationId },
+      data: { aiPaused: true, aiPausedReason: `It had already sent ${PER_THREAD_LIMIT} replies in a day` },
+    });
     return skip(`The assistant has already sent ${PER_THREAD_LIMIT} replies here today, so it has paused for a person to take over.`);
   }
   if (globalCount >= envNumber('AUTO_REPLY_DAILY_LIMIT', 200)) {
@@ -404,12 +409,22 @@ async function run(conversationId: string, manual: boolean): Promise<AutoReplyOu
     .filter(Boolean)
     .join('\n\n');
 
-  const session = new ChatSession(systemPrompt(context), TOOLS, { feature: 'chat-reply', conversationId });
-
+  // Everything up to here is the client's side. If a model gives out half-way
+  // the reply is started again from this point on the next model down — a turn
+  // already produced cannot be handed to a different model.
+  const opening = contents.length;
+  let handoffReason = '';
   let toSend: string[] = [];
   let handoff = false;
   let reply = '';
 
+  for (let model = 0; ; model++) {
+    contents.length = opening;
+    toSend = [];
+    handoff = false;
+    reply = '';
+    const session = new ChatSession(systemPrompt(context), TOOLS, { feature: 'chat-reply', conversationId }, model);
+    try {
   for (let turn = 0; turn < MAX_MODEL_TURNS; turn++) {
     const result = await session.send(contents);
     contents.push(result.content);
@@ -461,6 +476,7 @@ async function run(conversationId: string, manual: boolean): Promise<AutoReplyOu
         }
       } else if (call.name === 'hand_off_to_team') {
         handoff = true;
+        handoffReason = typeof args.reason === 'string' ? args.reason.trim().slice(0, 200) : '';
       } else {
         response = { error: 'unknown tool' };
       }
@@ -468,6 +484,19 @@ async function run(conversationId: string, manual: boolean): Promise<AutoReplyOu
       responses.push({ functionResponse: { name: call.name, response, ...(call.id ? { id: call.id } : {}) } });
     }
     contents.push({ role: 'user', parts: responses });
+  }
+
+      // It used its tools (wrote down the voice note, searched) and stopped
+      // without saying anything. The client is still waiting: ask for the reply.
+      if (!reply) {
+        contents.push({ role: 'user', parts: [{ text: '[Not from the client] You have not replied to the client yet. Write your reply to them now, in their language.' }] });
+        reply = (await session.send(contents)).text;
+      }
+      break;
+    } catch (err) {
+      if (!(err instanceof ChatModelUnavailableError) || model >= CHAT_MODEL_COUNT - 1) throw err;
+      logger.warn('Chat AI: switching model', { conversationId, reason: err.message });
+    }
   }
 
   if (!reply) return skip('The model returned no reply text.');
@@ -495,8 +524,14 @@ async function run(conversationId: string, manual: boolean): Promise<AutoReplyOu
     await recordListingsShared(lead.id, cards.map((c) => c.buildingId));
   }
 
-  if (handoff) {
-    await prisma.conversation.update({ where: { id: conversationId }, data: { aiPaused: true } });
+  // A hand-off pauses the assistant so it does not carry on over the person
+  // taking the conversation — unless a person asked for this reply themselves,
+  // in which case they are already there and the pause would only confuse.
+  if (handoff && !manual) {
+    await prisma.conversation.update({
+      where: { id: conversationId },
+      data: { aiPaused: true, aiPausedReason: handoffReason || 'It handed the conversation to the team' },
+    });
   }
   return { sent: true, reason: `Replied${cards.length ? ` with ${cards.length} propert${cards.length === 1 ? 'y' : 'ies'}` : ''}${handoff ? ' and handed over to the team' : ''}.` };
 }

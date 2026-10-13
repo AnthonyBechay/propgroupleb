@@ -18,7 +18,7 @@ import {
   ListFilter,
   ClipboardList,
   UserSearch,
-  X, Bot,
+  X, Bot, MessagesSquare,
 } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { canAccessAdminPath, isSuperAdmin, ROLE_LABELS, type Role } from '@/lib/permissions'
@@ -69,6 +69,7 @@ const GROUPS: NavGroup[] = [
     id: 'clients',
     label: 'Clients',
     items: [
+      { name: 'Inbox', href: '/admin/inbox', icon: MessagesSquare },
       { name: 'CRM', href: '/admin/crm', icon: UserSearch },
       { name: 'Chat assistant', href: '/admin/ai-settings', icon: Bot },
       { name: 'Inquiries', href: '/admin/inquiries', icon: MessageSquare },
