@@ -17,6 +17,9 @@ import { createToken, setTokenCookie, clearTokenCookie } from '../utils/session.
 
 const router: Router = express.Router();
 
+// Exactly what forgot-password issues: 32 random bytes, hex-encoded.
+const RESET_TOKEN_RE = /^[a-f0-9]{64}$/;
+
 // No-cache headers for all auth routes
 router.use((_req: Request, res: Response, next: NextFunction) => {
   res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, private');
@@ -273,8 +276,11 @@ router.post(
   '/reset-password',
   asyncHandler(async (req: Request, res: Response) => {
     const { token, password } = req.body;
-    if (!token || !password) {
-      res.status(400).json({ error: 'Token and password are required' });
+    // Both must be plain strings. `token` goes straight into a Prisma `where`,
+    // so a JSON object like {"not": null} would be read as a filter and match
+    // any account with a live reset link — a reset without knowing the token.
+    if (typeof token !== 'string' || typeof password !== 'string' || !RESET_TOKEN_RE.test(token)) {
+      res.status(400).json({ error: 'Invalid or expired reset token' });
       return;
     }
 
