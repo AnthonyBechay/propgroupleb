@@ -55,7 +55,7 @@ const HISTORY_MESSAGES = 24;
 /** Voice notes and photos from the unanswered messages that are handed to the model. */
 const MAX_ATTACHMENTS = 3;
 const MAX_ATTACHMENT_BYTES = 6 * 1024 * 1024;
-const MAX_MODEL_TURNS = 4;
+const MAX_MODEL_TURNS = 6;
 const MAX_LISTINGS = 3;
 
 const pending = new Map<string, NodeJS.Timeout>();
@@ -638,7 +638,7 @@ async function run(conversationId: string, manual: boolean): Promise<AutoReplyOu
       // without saying anything. The client is still waiting: ask for the reply.
       if (!reply) {
         contents.push({ role: 'user', parts: [{ text: '[Not from the client] You have not replied to the client yet. Write your reply to them now, following the language rule you were given.' }] });
-        reply = (await session.send(contents)).text;
+        reply = (await session.send(contents, true)).text;
       }
       break;
     } catch (err) {

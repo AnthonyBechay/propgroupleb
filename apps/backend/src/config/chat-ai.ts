@@ -40,7 +40,13 @@ const MODELS = [
 /** How many models there are to fall back through. */
 export const CHAT_MODEL_COUNT = MODELS.length;
 
-const MAX_OUTPUT_TOKENS = 800;
+/**
+ * The ceiling covers the model's THINKING as well as its answer. These models
+ * think for 400–1,000 tokens before a tool call or a two-line reply, so a
+ * ceiling sized for the reply alone (it was 800) is spent on thinking and the
+ * answer comes back empty — no text, no error. Sized for both.
+ */
+const MAX_OUTPUT_TOKENS = 4096;
 /**
  * An overloaded model sometimes hangs instead of refusing — but a merely slow
  * one takes 15 seconds or more to answer, and cutting that off as "down" is
@@ -120,7 +126,8 @@ export class ChatSession {
     return MODELS[this.modelIndex].id;
   }
 
-  async send(contents: ChatContent[]): Promise<ChatTurnResult> {
+  /** `textOnly` forbids tool calls for this turn, so the model has to write. */
+  async send(contents: ChatContent[], textOnly = false): Promise<ChatTurnResult> {
     if (!chatAiEnabled()) throw new Error('Chat AI is disabled (GEMINI_API_KEY is not set).');
     // The hard stop, shared with every other AI feature.
     await assertAiBudget();
@@ -142,6 +149,7 @@ export class ChatSession {
               systemInstruction: { parts: [{ text: this.system }] },
               contents,
               tools: [{ functionDeclarations: this.tools }],
+              ...(textOnly ? { toolConfig: { functionCallingConfig: { mode: 'NONE' } } } : {}),
               generationConfig: { maxOutputTokens: MAX_OUTPUT_TOKENS },
             }),
             signal: AbortSignal.timeout(TIMEOUT_MS),
@@ -191,8 +199,20 @@ export class ChatSession {
         })
         .catch((err) => logger.warn('AI usage not recorded', { error: (err as Error).message }));
 
-      const content: ChatContent = json.candidates?.[0]?.content ?? { role: 'model', parts: [] };
+      const candidate = json.candidates?.[0];
+      const content: ChatContent = candidate?.content ?? { role: 'model', parts: [] };
       const parts: any[] = content.parts ?? [];
+      // A turn with nothing in it is never normal. Say why the model stopped —
+      // MAX_TOKENS, SAFETY, a blocked prompt — or it is undiagnosable later.
+      if (!parts.some((p) => p.text || p.functionCall)) {
+        logger.warn('Chat AI: the model returned an empty turn', {
+          model: model.id,
+          finishReason: candidate?.finishReason ?? 'none',
+          blockReason: json.promptFeedback?.blockReason,
+          thinkingTokens: u.thoughtsTokenCount ?? 0,
+          outputTokens: u.candidatesTokenCount ?? 0,
+        });
+      }
       return {
         content: { role: 'model', parts },
         text: parts.map((p) => p.text ?? '').join('').trim(),
