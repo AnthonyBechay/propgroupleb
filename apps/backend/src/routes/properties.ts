@@ -1,6 +1,6 @@
 import express, { type Request, type Response, type Router } from 'express';
 import { prisma } from '@propgroup/db';
-import { authenticateToken, requireAdmin, logAdminAction } from '../middleware/auth.js';
+import { authenticateToken, requireAdmin, logAdminAction, optionalAuthenticateToken, canSeeVisibility } from '../middleware/auth.js';
 import { asyncHandler } from '../utils/errors.js';
 import { shouldCountView } from '../utils/view-counting.js';
 import { logger } from '../utils/logger.js';
@@ -199,13 +199,14 @@ router.get(
 // Get property by slug — flat shape (public)
 router.get(
   '/slug/:slug',
+  optionalAuthenticateToken,
   asyncHandler(async (req: Request, res: Response) => {
     const building = await prisma.building.findUnique({
       where: { slug: req.params.slug },
       include: FLAT_PROPERTY_INCLUDE,
     });
 
-    if (!building || building.visibility === 'HIDDEN') {
+    if (!building || !canSeeVisibility(req, building.visibility)) {
       sendNotFound(res, 'Property');
       return;
     }
@@ -220,6 +221,7 @@ router.get(
 // `/property/{slug}` from the compare page.
 router.get(
   '/:id',
+  optionalAuthenticateToken,
   asyncHandler(async (req: Request, res: Response) => {
     const idOrSlug = req.params.id;
 
@@ -233,7 +235,7 @@ router.get(
         include: FLAT_PROPERTY_INCLUDE,
       }));
 
-    if (!building || building.visibility === 'HIDDEN') {
+    if (!building || !canSeeVisibility(req, building.visibility)) {
       sendNotFound(res, 'Property');
       return;
     }

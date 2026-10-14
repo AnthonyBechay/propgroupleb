@@ -21,12 +21,16 @@ export default async function PortfolioPage() {
         headers: { Cookie: `token=${tokenCookie.value}` },
       })
       const authResult = await verifyAuth(mockReq as unknown as NextRequest)
-      if (authResult.authenticated && authResult.user) {
+      // Pulled out and tested on its own: `where: { userId: undefined }` is not
+      // an empty result in Prisma, it is no filter at all - every favourite in
+      // the database.
+      const userId = authResult.user?.id
+      if (userId) {
         // Two independent queries — awaited together, so the page costs one
         // round trip instead of two.
         ;[favorites, ownedUnits] = await Promise.all([
           prisma.favoriteProperty.findMany({
-            where: { userId: authResult.user.id },
+            where: { userId },
             include: {
               listing: {
                 include: {
@@ -40,7 +44,7 @@ export default async function PortfolioPage() {
           }),
           // Units an admin has assigned to this user (real owned properties).
           prisma.unit.findMany({
-            where: { ownerUserId: authResult.user.id },
+            where: { ownerUserId: userId },
             include: {
               building: { select: { id: true, title: true, city: true, mohafazat: true, status: true } },
             },

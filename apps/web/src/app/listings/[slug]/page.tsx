@@ -29,6 +29,7 @@ import { TrackListingView } from '@/components/analytics/TrackListingView'
 import { ProposalExport } from '@/components/listing/ProposalExport'
 import { FavoriteButton } from '@/components/listing/FavoriteButton'
 import { listingRef } from '@/lib/reference'
+import { jsonLdScript } from '@/lib/json-ld'
 import { CopyRef } from '@/components/listing/CopyRef'
 import type { Listing } from '@/types'
 import {
@@ -242,7 +243,7 @@ export default async function ListingDetailPage({ params }: PageProps) {
 
   return (
     <div className="min-h-screen bg-slate-50">
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdScript(jsonLd) }} />
       <TrackListingView
         listingId={listing.id}
         buildingId={building?.id}

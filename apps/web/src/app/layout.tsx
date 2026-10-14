@@ -9,6 +9,7 @@ import { Toaster } from "@/components/ui/toast";
 import { ConditionalScrollToTop } from "@/components/layout/ConditionalScrollToTop";
 import { AnalyticsTracker } from "@/components/analytics/AnalyticsTracker";
 import { ComparatorBar } from "@/components/ComparatorBar";
+import { jsonLdScript } from "@/lib/json-ld";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -129,7 +130,7 @@ export default function RootLayout({
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{
-            __html: JSON.stringify({
+            __html: jsonLdScript({
               "@context": "https://schema.org",
               "@graph": [
                 {
