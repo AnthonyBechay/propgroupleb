@@ -568,7 +568,7 @@ async function run(conversationId: string, manual: boolean): Promise<AutoReplyOu
     settings.guidance ? `Keep in mind (from the office):\n${settings.guidance}` : null,
     knownMarket
       ? `This is about ${knownMarket === 'LEBANON' ? 'Lebanon' : 'Georgia'} — do not ask which country unless they bring up another.`
-      : 'You do not know yet whether they want property in Lebanon or abroad (Georgia — Batumi or Tbilisi). Ask that first, in one short question, before searching or suggesting anything. Lebanon has homes to buy or rent; abroad is investment property to buy.',
+      : 'You do not know yet whether they want property in Lebanon or an investment abroad. Before searching or suggesting anything, ask exactly that, in one short question — in substance: "Are you looking for an investment abroad in Georgia, or for a property in Lebanon?" (in the client\'s language style). Do not ask which area of Lebanon until they have chosen Lebanon.',
     `Offer at most ${settings.maxListings} propert${settings.maxListings === 1 ? 'y' : 'ies'} in one reply.`,
     office.address
       ? `If they ask where you are, for the address, or to visit or meet: the office is ${office.name || 'PropGroup'}, ${office.address}.${office.mapsUrl ? ` Map: ${office.mapsUrl}` : ''} Give the map link exactly as it is.`

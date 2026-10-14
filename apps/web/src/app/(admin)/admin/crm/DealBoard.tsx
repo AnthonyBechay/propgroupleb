@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react'
 import {
   Phone, MessageCircle, Calendar, AlertCircle, Handshake,
-  TrendingUp, Loader2, Check, Plus, X, ChevronRight, MessagesSquare,
+  TrendingUp, Loader2, Check, Plus, X, ChevronRight, MessagesSquare, Instagram,
 } from 'lucide-react'
 import {
   type Deal, type OpportunityStage, DEAL_COLUMNS, BOARD_DEAL_COLUMNS, CLIENT_COLUMNS, type PipelineClient, dealColumnOf, STAGE_LABELS,
@@ -295,6 +295,9 @@ function ClientCard({
 }) {
   // Abroad, the next step is a meeting at the office; in Lebanon, a viewing.
   const meeting = c.market !== 'LEBANON'
+  // "Form 918167797875002" is a Meta id, not something anyone recognises.
+  const adName = c.adLabel && !/^form \d+$/i.test(c.adLabel.trim()) ? c.adLabel : null
+  const from = c.lastFrom === 'assistant' ? 'Assistant: ' : c.lastFrom === 'team' ? 'You: ' : ''
   return (
     <div
       onClick={() => onOpenClient(c.id)}
@@ -303,17 +306,27 @@ function ClientCard({
       <div className="flex items-start gap-1.5">
         <span className="text-[11px] shrink-0 mt-0.5">{countryFlag(c.market)}</span>
         <span className="text-sm font-medium text-slate-900 leading-snug truncate flex-1">{c.name}</span>
+        {c.chat && (
+          c.chat.channel === 'INSTAGRAM'
+            ? <Instagram className="h-3.5 w-3.5 text-pink-600 shrink-0 mt-0.5" aria-label="Instagram" />
+            : <MessageCircle className="h-3.5 w-3.5 text-emerald-600 shrink-0 mt-0.5" aria-label="WhatsApp" />
+        )}
         {c.waitingSince && (
           <span className="shrink-0 px-1.5 py-0.5 rounded bg-red-50 text-red-700 text-[10px] font-semibold" title="Waiting for a reply">
             {sinceLabel(c.waitingSince)}
           </span>
         )}
       </div>
-      {(c.askingFor || c.adLabel) && (
-        <p className="text-[11px] text-slate-600 truncate mt-0.5">{c.askingFor ?? `Ad: ${c.adLabel}`}</p>
+      {(c.askingFor || adName) && (
+        <p className="text-[11px] text-slate-700 truncate mt-0.5">{c.askingFor ?? `From the ad: ${adName}`}</p>
       )}
-      {c.chat?.lastPreview && (
-        <p className="text-xs text-slate-500 line-clamp-2 mt-1">{c.chat.lastPreview}</p>
+      {c.chat?.lastPreview ? (
+        <p className="text-xs text-slate-600 line-clamp-2 mt-1">
+          {from && <span className="font-medium text-slate-700">{from}</span>}
+          {c.chat.lastPreview}
+        </p>
+      ) : (
+        <p className="text-[11px] text-slate-500 mt-1">{c.source === 'FACEBOOK_AD' ? 'Lead form — no chat yet' : 'No chat yet'}</p>
       )}
       {c.reason && c.bucket === 'WITH_YOU' && <p className="text-[11px] text-amber-800 mt-1">{c.reason}</p>}
       <div className="flex items-center gap-1.5 mt-1.5 pt-1.5 border-t border-slate-100 flex-wrap">
@@ -338,13 +351,15 @@ function ClientCard({
             {c.chat.unread > 0 && c.chat.unread}
           </button>
         )}
-        <button
-          onClick={(e) => { e.stopPropagation(); onBook(c.id) }}
-          className="min-h-7 px-1.5 rounded-md text-[11px] font-semibold text-slate-700 hover:bg-slate-100 inline-flex items-center gap-1"
-          title={meeting ? 'Book a meeting at the office' : 'Book a viewing'}
-        >
-          <Calendar className="h-3.5 w-3.5" /> {meeting ? 'Meeting' : 'Viewing'}
-        </button>
+        {!c.supplyOnly && (
+          <button
+            onClick={(e) => { e.stopPropagation(); onBook(c.id) }}
+            className="min-h-7 px-1.5 rounded-md text-[11px] font-semibold text-slate-700 hover:bg-slate-100 inline-flex items-center gap-1"
+            title={meeting ? 'Book a meeting at the office' : 'Book a viewing'}
+          >
+            <Calendar className="h-3.5 w-3.5" /> {meeting ? 'Meeting' : 'Viewing'}
+          </button>
+        )}
       </div>
     </div>
   )

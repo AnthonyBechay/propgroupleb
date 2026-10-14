@@ -4,6 +4,7 @@ import { authenticateToken, requireAdmin } from '../middleware/auth.js';
 import { asyncHandler } from '../utils/errors.js';
 import { sendSuccess } from '../utils/response.js';
 import { adsConfigured, checkMetaConnection, fetchAdSpend } from '../services/meta-ads.service.js';
+import { conversionsConfigured, reportLeadStage } from '../services/meta-conversions.service.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // What each Meta ad cost, next to what it produced.
@@ -121,6 +122,32 @@ router.get(
     });
 
     sendSuccess(res, { ok: checks.every((c) => c.ok), checks });
+  })
+);
+
+// POST /api/crm/ads/report-leads — tell Meta about every ad lead now: each one's
+// furthest stage, once. For catching up after the dataset was first connected,
+// and for seeing straight away whether Meta accepts the events.
+router.post(
+  '/report-leads',
+  asyncHandler(async (_req: Request, res: Response) => {
+    if (!conversionsConfigured()) {
+      sendSuccess(res, { sent: 0, skipped: 0, failed: 0, firstError: 'META_DATASET_ID is not set on the server.' });
+      return;
+    }
+    const leads = await prisma.lead.findMany({
+      where: { OR: [{ adId: { not: null } }, { externalLeadId: { not: null } }] },
+      orderBy: { createdAt: 'desc' },
+      select: { id: true },
+      take: 300,
+    });
+    const tally = { sent: 0, skipped: 0, failed: 0, firstError: null as string | null };
+    for (const l of leads) {
+      const outcome = await reportLeadStage(l.id);
+      tally[outcome.status] += 1;
+      if (outcome.status === 'failed' && !tally.firstError) tally.firstError = outcome.detail;
+    }
+    sendSuccess(res, { ...tally, leads: leads.length });
   })
 );
 

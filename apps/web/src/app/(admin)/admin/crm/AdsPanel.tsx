@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Megaphone, Loader2, PlugZap, CheckCircle2, XCircle } from 'lucide-react'
+import { Megaphone, Loader2, PlugZap, CheckCircle2, XCircle, Send } from 'lucide-react'
 import { normalizeApiUrl } from '@/lib/utils/api-url'
 
 /**
@@ -42,6 +42,22 @@ export function AdsPanel() {
   const [report, setReport] = useState<AdsReport | null>(null)
   const [checks, setChecks] = useState<Check[] | null>(null)
   const [testing, setTesting] = useState(false)
+  const [reporting, setReporting] = useState(false)
+  const [reported, setReported] = useState<string | null>(null)
+
+  const sendResults = async () => {
+    setReporting(true)
+    setReported(null)
+    try {
+      const res = await fetch(`${apiUrl}/api/crm/ads/report-leads`, { method: 'POST', credentials: 'include' })
+      const r = res.ok ? (await res.json()).data : null
+      setReported(
+        !r ? 'The report could not be run.'
+          : r.firstError && !r.sent ? `Meta did not accept them: ${r.firstError}`
+          : `Sent ${r.sent} to Meta${r.failed ? `, ${r.failed} refused (${r.firstError})` : ''}${r.skipped ? `, ${r.skipped} already up to date` : ''}.`
+      )
+    } finally { setReporting(false) }
+  }
 
   const test = async () => {
     setTesting(true)
@@ -82,6 +98,14 @@ export function AdsPanel() {
         >
           {testing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <PlugZap className="h-3.5 w-3.5" />} Test the Meta connection
         </button>
+        <button
+          onClick={sendResults}
+          disabled={reporting}
+          title="Tell Meta which ad leads reached which stage, so it can optimise the ads for buyers"
+          className="min-h-9 px-3 rounded-lg border border-slate-300 text-slate-800 text-xs font-medium inline-flex items-center gap-1.5 disabled:opacity-50"
+        >
+          {reporting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />} Send lead results to Meta
+        </button>
         <div className="flex gap-1 bg-slate-100 rounded-lg p-1">
           {RANGES.map((r) => (
             <button
@@ -94,6 +118,8 @@ export function AdsPanel() {
           ))}
         </div>
       </div>
+
+      {reported && <p className="text-sm text-slate-800 px-3.5 py-2.5 border-b border-slate-100">{reported}</p>}
 
       {checks && (
         <ul className="border-b border-slate-100 divide-y divide-slate-50">

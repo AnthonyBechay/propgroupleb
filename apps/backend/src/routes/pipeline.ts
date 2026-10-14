@@ -30,8 +30,17 @@ const ADVANCED = ['VIEWING_BOOKED', 'VIEWED', 'INTERESTED', 'OFFER_MADE', 'RESER
 const SHORTLISTED = ['SUGGESTED', 'SHARED'];
 /** Unanswered for this long and the assistant has not picked it up: a person is needed. */
 const WAITING_MS = 10 * 60 * 1000;
-/** A client with no conversation drops off the front of the board after this. */
+/** An inbound lead with no conversation drops off the front of the board after this. */
 const FRESH_MS = 30 * 24 * 60 * 60 * 1000;
+/**
+ * Where a lead came in by itself — the only kind that belongs in "New" without
+ * a conversation. A client the team typed in, imported, or met by phone has
+ * already been spoken to; it lives in the client list, not at the front of a
+ * board about who is reaching out.
+ */
+const INBOUND_SOURCES = ['FACEBOOK_AD', 'INQUIRY', 'WHATSAPP', 'FAVORITE'];
+/** Selling or renting out: someone to list, not someone to show property to. */
+const SUPPLY = ['SELLER', 'LANDLORD'];
 
 type Bucket = 'NEW' | 'ASSISTANT' | 'WITH_YOU';
 
@@ -47,12 +56,16 @@ router.get(
         status: { notIn: ['WON', 'LOST', 'ARCHIVED'] },
         ...(market === 'LEBANON' || market === 'GEORGIA' ? { market } : {}),
         opportunities: { none: { stage: { in: ADVANCED as never } } },
-        // Someone in a conversation, or new in the last month. Older clients
-        // nobody has spoken to are in the client list, not on the board.
-        OR: [{ conversations: { some: {} } }, { createdAt: { gte: new Date(now - FRESH_MS) } }],
+        // Someone in a live conversation, or a lead that came in on its own in
+        // the last month (an ad form, a website enquiry). Everybody else is in
+        // the client list.
+        OR: [
+          { conversations: { some: { archivedAt: null } } },
+          { source: { in: INBOUND_SOURCES as never }, createdAt: { gte: new Date(now - FRESH_MS) } },
+        ],
       },
       select: {
-        id: true, name: true, market: true, type: true, isInvestor: true, source: true,
+        id: true, name: true, market: true, type: true, intents: true, isInvestor: true, source: true,
         adLabel: true, askingFor: true, budgetMax: true, lastContactAt: true, createdAt: true,
         opportunities: { select: { stage: true } },
         conversations: {
@@ -91,7 +104,13 @@ router.get(
     const outOf = new Map(lastOut.map((m) => [m.conversationId, m]));
     const inOf = new Map(lastIn.map((m) => [m.conversationId, m]));
 
-    const clients = leads.map((l) => {
+    // A seller or landlord with no buyer side is not someone to book a viewing
+    // for — unless they are actually writing to us.
+    const relevant = leads.filter(
+      (l) => l.conversations.length > 0 || !(l.intents.length ? l.intents : [l.type]).every((t) => SUPPLY.includes(t))
+    );
+
+    const clients = relevant.map((l) => {
       const chat = l.conversations[0] ?? null;
       const out = chat ? outOf.get(chat.id) : undefined;
       const inbound = chat ? inOf.get(chat.id) : undefined;
@@ -99,18 +118,31 @@ router.get(
         inbound && (!out || inbound.createdAt > out.createdAt) ? inbound.createdAt : null;
       const waitingLong = waitingSince !== null && now - waitingSince.getTime() > WAITING_MS;
 
+      // Who spoke last: the client, the assistant, or one of us.
+      const lastFrom: 'client' | 'assistant' | 'team' | null = waitingSince
+        ? 'client'
+        : out
+          ? out.origin === 'AI' ? 'assistant' : 'team'
+          : null;
+
       let bucket: Bucket;
       let reason: string | null = null;
       if (chat?.aiPaused) {
         bucket = 'WITH_YOU';
         reason = chat.aiPausedReason ?? 'The assistant handed this to the team';
       } else if (!out && !l.lastContactAt) {
-        bucket = 'NEW';
+        bucket = waitingLong && chat ? 'WITH_YOU' : 'NEW';
+        if (bucket === 'WITH_YOU') reason = 'Nobody has answered, and the assistant is not replying here';
       } else if (out?.origin === 'AI') {
         bucket = waitingLong ? 'WITH_YOU' : 'ASSISTANT';
         if (waitingLong) reason = 'Waiting for a reply the assistant has not sent';
       } else {
         bucket = 'WITH_YOU';
+        reason = waitingSince
+          ? 'They replied to you'
+          : out
+            ? 'You are talking to them'
+            : 'Contacted outside the chat';
       }
 
       return {
@@ -125,6 +157,8 @@ router.get(
         budgetMax: l.budgetMax,
         bucket,
         reason,
+        lastFrom,
+        supplyOnly: (l.intents.length ? l.intents : [l.type]).every((t) => SUPPLY.includes(t)),
         waitingSince,
         shortlisted: l.opportunities.filter((o) => SHORTLISTED.includes(o.stage)).length,
         chat: chat

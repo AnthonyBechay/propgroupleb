@@ -633,6 +633,10 @@ export interface PipelineClient {
   budgetMax: number | null
   bucket: 'NEW' | 'ASSISTANT' | 'WITH_YOU'
   reason: string | null
+  /** Who sent the last message on their chat. */
+  lastFrom: 'client' | 'assistant' | 'team' | null
+  /** Only selling or renting out — no viewing to book. */
+  supplyOnly: boolean
   waitingSince: string | null
   shortlisted: number
   chat: {

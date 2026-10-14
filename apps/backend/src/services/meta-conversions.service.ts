@@ -36,9 +36,14 @@ export function conversionsConfigured(): boolean {
   return Boolean(process.env.META_DATASET_ID && process.env.META_ACCESS_TOKEN);
 }
 
+export interface ReportOutcome {
+  status: 'sent' | 'skipped' | 'failed';
+  detail: string;
+}
+
 /** Report this client's furthest stage to Meta, if it is news. Never throws. */
-export async function reportLeadStage(leadId: string): Promise<void> {
-  if (!conversionsConfigured()) return;
+export async function reportLeadStage(leadId: string): Promise<ReportOutcome> {
+  if (!conversionsConfigured()) return { status: 'skipped', detail: 'META_DATASET_ID is not set' };
   try {
     const lead = await prisma.lead.findUnique({
       where: { id: leadId },
@@ -48,7 +53,7 @@ export async function reportLeadStage(leadId: string): Promise<void> {
       },
     });
     // Only people an ad brought in: anyone else tells Meta nothing about its ads.
-    if (!lead || (!lead.adId && !lead.externalLeadId)) return;
+    if (!lead || (!lead.adId && !lead.externalLeadId)) return { status: 'skipped', detail: 'not from an ad' };
 
     const stages = lead.opportunities.map((o) => o.stage as string);
     const reached: Stage = stages.includes('WON')
@@ -56,7 +61,9 @@ export async function reportLeadStage(leadId: string): Promise<void> {
       : stages.some((s) => QUALIFIED.includes(s))
         ? 'Qualified'
         : 'Lead';
-    if (STAGES[reached] <= (STAGES[lead.metaStage as Stage] ?? 0)) return;
+    if (STAGES[reached] <= (STAGES[lead.metaStage as Stage] ?? 0)) {
+      return { status: 'skipped', detail: `"${lead.metaStage}" already reported` };
+    }
 
     // Meta matches the event to the person by the lead-form id when there is
     // one, otherwise by hashed contact details. Nothing is sent in the clear.
@@ -67,7 +74,7 @@ export async function reportLeadStage(leadId: string): Promise<void> {
       ...(digits ? { ph: [sha256(digits)] } : {}),
       ...(lead.email ? { em: [sha256(lead.email.trim().toLowerCase())] } : {}),
     };
-    if (Object.keys(userData).length === 0) return;
+    if (Object.keys(userData).length === 0) return { status: 'skipped', detail: 'no lead id, phone or email to match on' };
 
     const res = await fetch(
       `https://graph.facebook.com/${GRAPH_VERSION}/${encodeURIComponent(process.env.META_DATASET_ID as string)}/events`,
@@ -97,12 +104,15 @@ export async function reportLeadStage(leadId: string): Promise<void> {
     );
     if (!res.ok) {
       const json: any = await res.json().catch(() => ({})); // eslint-disable-line @typescript-eslint/no-explicit-any
-      logger.error('Meta conversion not accepted', { leadId, status: res.status, reason: json?.error?.message });
-      return;
+      const reason = json?.error?.error_user_msg ?? json?.error?.message ?? `HTTP ${res.status}`;
+      logger.error('Meta conversion not accepted', { leadId, status: res.status, reason });
+      return { status: 'failed', detail: reason };
     }
     await prisma.lead.update({ where: { id: lead.id }, data: { metaStage: reached } });
     logger.info('Meta conversion reported', { leadId, stage: reached });
+    return { status: 'sent', detail: reached };
   } catch (err) {
     logger.error('Meta conversion failed', { leadId, error: (err as Error).message });
+    return { status: 'failed', detail: (err as Error).message };
   }
 }
