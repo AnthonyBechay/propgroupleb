@@ -1,7 +1,7 @@
 import { prisma } from '@propgroup/db';
 import { logger } from '../utils/logger.js';
 import { randomUUID } from 'node:crypto';
-import { uploadFileAtKey } from './upload.service.js';
+import { processImageBuffer, uploadFileAtKey } from './upload.service.js';
 import { recordAdEnquiry } from './deal-sync.service.js';
 import { describeAd } from './meta-ads.service.js';
 import { reportLeadStage } from './meta-conversions.service.js';
@@ -266,7 +266,7 @@ export async function recordChatMessage(event: ChatEvent): Promise<string | null
       ...(inbound && (!conversation.lastInboundAt || sentAt > conversation.lastInboundAt)
         ? { lastInboundAt: sentAt }
         : {}),
-      ...(live && inbound ? { unreadCount: { increment: 1 } } : {}),
+      ...(live && inbound ? { unreadCount: { increment: 1 }, archivedAt: null } : {}),
       // We answered, from wherever — nothing is waiting on us any more.
       ...(live && !inbound ? { unreadCount: 0 } : {}),
     },
@@ -399,7 +399,11 @@ async function keepMedia(
     const mime = (media.mime || res.headers.get('content-type') || 'application/octet-stream').split(';')[0].trim();
     const ext =
       EXT_BY_MIME[mime] ?? (media.filename?.match(/\.[A-Za-z0-9]{1,5}$/)?.[0].toLowerCase() || '');
-    const { url: mediaUrl } = await uploadFileAtKey(buffer, mediaKey(at, ext), mime);
+    // Phone photos arrive at full camera size. Scaled down and recompressed the
+    // same way as property photos (same format, metadata stripped) — usually a
+    // fraction of the original, and still far sharper than a chat needs.
+    const body = await processImageBuffer(buffer, mime);
+    const { url: mediaUrl } = await uploadFileAtKey(body, mediaKey(at, ext), mime);
     await prisma.chatMessage.update({ where: { id: messageId }, data: { mediaUrl } });
   } catch (err) {
     logger.warn('Chat attachment not stored', { messageId, error: (err as Error).message });

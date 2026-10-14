@@ -591,12 +591,12 @@ export const DEAL_COLUMNS: DealColumn[] = [
     hint: 'Photos, price and plans are with them', accent: 'bg-sky-500',
   },
   {
-    key: 'VIEWING_BOOKED', label: 'Viewing booked', stage: 'VIEWING_BOOKED', stages: ['VIEWING_BOOKED'],
-    hint: 'A date is in the diary', accent: 'bg-violet-500',
+    key: 'VIEWING_BOOKED', label: 'Viewing / meeting', stage: 'VIEWING_BOOKED', stages: ['VIEWING_BOOKED'],
+    hint: 'A date is set — a viewing in Lebanon, an office meeting for abroad', accent: 'bg-violet-500',
   },
   {
-    key: 'VIEWED', label: 'Viewed', stage: 'VIEWED', stages: ['VIEWED'],
-    hint: 'Been to see it — waiting on a verdict', accent: 'bg-indigo-500',
+    key: 'VIEWED', label: 'Viewed / met', stage: 'VIEWED', stages: ['VIEWED'],
+    hint: 'Seen it or met us — waiting on a verdict', accent: 'bg-indigo-500',
   },
   {
     key: 'NEGOTIATING', label: 'Negotiating', stage: 'INTERESTED',
@@ -611,6 +611,45 @@ export const DEAL_COLUMNS: DealColumn[] = [
     key: 'WON', label: 'Closed', stage: 'WON', stages: ['WON'],
     hint: 'Paid in full. Record what we made.', accent: 'bg-emerald-600',
   },
+]
+
+/**
+ * The deal columns on the board. Shortlisted properties (picked or sent, nothing
+ * booked) are not cards: before a viewing the board follows the person, and the
+ * properties they were sent are a count on their card.
+ */
+export const BOARD_DEAL_COLUMNS = DEAL_COLUMNS.filter((c) => c.key !== 'SUGGESTED' && c.key !== 'SHARED')
+
+/** A client at the front of the pipeline — see GET /api/crm/pipeline. */
+export interface PipelineClient {
+  id: string
+  name: string
+  market: LeadMarket
+  type: LeadType
+  isInvestor: boolean
+  source: string
+  adLabel: string | null
+  askingFor: string | null
+  budgetMax: number | null
+  bucket: 'NEW' | 'ASSISTANT' | 'WITH_YOU'
+  reason: string | null
+  waitingSince: string | null
+  shortlisted: number
+  chat: {
+    id: string
+    channel: 'WHATSAPP' | 'INSTAGRAM'
+    lastMessageAt: string
+    lastPreview: string | null
+    unread: number
+    detailsToConfirm: boolean
+  } | null
+  lastActivity: string
+}
+
+export const CLIENT_COLUMNS: Array<{ key: PipelineClient['bucket']; label: string; hint: string; accent: string }> = [
+  { key: 'NEW', label: 'New', hint: 'Reached out — nobody has answered yet', accent: 'bg-sky-500' },
+  { key: 'ASSISTANT', label: 'Assistant', hint: 'The assistant is talking to them', accent: 'bg-emerald-500' },
+  { key: 'WITH_YOU', label: 'With you', hint: 'Handed over, waiting on you, or you are talking', accent: 'bg-amber-500' },
 ]
 
 /** Which column a deal sits in. */

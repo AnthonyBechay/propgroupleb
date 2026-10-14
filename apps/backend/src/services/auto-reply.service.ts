@@ -1,5 +1,5 @@
 import { prisma } from '@propgroup/db';
-import { CHAT_MODEL_COUNT, ChatModelUnavailableError, ChatSession, chatAiEnabled, chatModelResting, type ChatContent, type ChatPart, type ChatTool } from '../config/chat-ai.js';
+import { ChatModelUnavailableError, ChatSession, chatAiEnabled, chatModelOrder, chatModelResting, type ChatContent, type ChatPart, type ChatTool } from '../config/chat-ai.js';
 import { createText, isAiEnabled } from '../config/ai.js';
 import { aiBudget } from '../utils/ai-budget.js';
 import { logger } from '../utils/logger.js';
@@ -51,7 +51,8 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 const DEBOUNCE_MS = 12_000;
 /** WhatsApp cuts a photo caption at 1024 characters. */
 const CAPTION_LIMIT = 1000;
-const HISTORY_MESSAGES = 24;
+/** Enough history to keep the thread of a conversation; each message is resent on every model call. */
+const HISTORY_MESSAGES = 16;
 /** Voice notes and photos from the unanswered messages that are handed to the model. */
 const MAX_ATTACHMENTS = 3;
 const MAX_ATTACHMENT_BYTES = 6 * 1024 * 1024;
@@ -291,6 +292,7 @@ What to do:
 - Each reply is one message and costs money to send. Say everything for this turn in that one reply; never plan a follow-up message.
 - As soon as you know the country and either a budget, an area or a project, call search_listings and attach the best matches with send_listings. Two or three well-matched options beat many. If nothing fits, say so plainly and ask what they could flex on.
 - Each time the client tells you a requirement, call save_client_requirements.
+- Results marked "priority" are the projects the office most wants to sell. When one fits what the client asked for, recommend it first and use its "whyRecommend" to say why it is a good choice. Never push one that does not fit their budget or what they asked for.
 - Photos, floor plans, the location and the full details of every property are on its own page, and send_listings puts the link to that page in your message. So when a client asks for pictures, more details, the location or "more info" about a property, attach it with send_listings and tell them everything is at the link. That is an answer you can give yourself — never hand off, and never promise that a colleague will send photos or details.
 
 How the two markets work:
@@ -490,8 +492,30 @@ async function run(conversationId: string, manual: boolean): Promise<AutoReplyOu
   for (const m of recent) for (const ref of m.body.match(/\bPG-\d+(?:-\d+)?\b/gi) ?? []) offered.add(ref.toUpperCase());
 
   const lead = conversation.lead;
-  const defaultMarket: Market =
-    lead?.market ?? ((process.env.LEAD_MARKET_WHATSAPP ?? '').toUpperCase() === 'LEBANON' ? 'LEBANON' : 'GEORGIA');
+
+  // Which country this is about. An ad settles it (the ad's market); so does
+  // anything the client already said here. Otherwise it is the setting — by
+  // default, ask. A client's stored market is NOT used: every client gets
+  // Lebanon by default, which is how the assistant once told a Batumi buyer
+  // it would look in Lebanon.
+  const fromAd =
+    Boolean(conversation.adId) || Boolean(lead?.adId) || lead?.source === 'FACEBOOK_AD';
+  const pendingSuggestion = await prisma.leadSuggestion.findFirst({
+    where: { conversationId, status: 'PENDING' },
+    select: { patch: true },
+  });
+  const said = (pendingSuggestion?.patch ?? {}) as { market?: string };
+  const adMarket: Market = (process.env.LEAD_MARKET_META ?? 'GEORGIA').toUpperCase() === 'LEBANON' ? 'LEBANON' : 'GEORGIA';
+  const knownMarket: Market | null =
+    said.market === 'LEBANON' || said.market === 'GEORGIA'
+      ? said.market
+      : fromAd
+        ? adMarket
+        : settings.marketWhenUnknown === 'ask'
+          ? null
+          : settings.marketWhenUnknown;
+  // For the ad's project and the preferred list when nothing is known yet.
+  const defaultMarket: Market = knownMarket ?? 'GEORGIA';
   const known = [
     lead?.name ? `Client name: ${lead.name}` : null,
     lead?.askingFor ? `Already on file: ${lead.askingFor}` : null,
@@ -521,6 +545,7 @@ async function run(conversationId: string, manual: boolean): Promise<AutoReplyOu
   const preferredCards = adProjects.length ? [] : await cardsByRef(settings.preferred.map((p) => p.ref));
   for (const c of preferredCards) offered.add(c.ref.toUpperCase());
   const pitchOf = new Map(settings.preferred.map((p) => [p.ref.toUpperCase(), p.pitch]));
+  const priorityOrder = settings.preferred.map((p) => p.ref.toUpperCase());
   const preferred = preferredCards.length
     ? [
         'The client has not named a project. Ask their budget and where they would like to be (one question at a time, skipping whatever you already know). Then recommend from the office\'s preferred list below, most wanted first, choosing those that fit their budget and location — you may attach them with send_listings without searching. If none of them fits, use search_listings instead; never push one that is clearly over their budget.',
@@ -531,13 +556,26 @@ async function run(conversationId: string, manual: boolean): Promise<AutoReplyOu
       ].join('\n')
     : null;
 
-  const names = await marketNames(defaultMarket);
+  // Only needed to make sense of a place heard in a voice note — and it is a
+  // long list to resend on every call, so it is left out otherwise.
+  const hasVoice = ordered.some((m) => unansweredIds.has(m.id) && m.type === 'audio');
+  const names = hasVoice && knownMarket ? await marketNames(knownMarket) : { places: [] as string[], projects: [] as string[] };
+  const office = settings.office;
 
   const context = [
     ad,
     preferred,
-    settings.guidance ? `From the office:\n${settings.guidance}` : null,
-    `Unless they say otherwise, this is about ${defaultMarket === 'LEBANON' ? 'Lebanon' : 'Georgia'} — do not ask which country.`,
+    settings.guidance ? `Keep in mind (from the office):\n${settings.guidance}` : null,
+    knownMarket
+      ? `This is about ${knownMarket === 'LEBANON' ? 'Lebanon' : 'Georgia'} — do not ask which country unless they bring up another.`
+      : 'You do not know yet whether they want property in Lebanon or abroad (Georgia — Batumi or Tbilisi). Ask that first, in one short question, before searching or suggesting anything. Lebanon has homes to buy or rent; abroad is investment property to buy.',
+    `Offer at most ${settings.maxListings} propert${settings.maxListings === 1 ? 'y' : 'ies'} in one reply.`,
+    office.address
+      ? `If they ask where you are, for the address, or to visit or meet: the office is ${office.name || 'PropGroup'}, ${office.address}.${office.mapsUrl ? ` Map: ${office.mapsUrl}` : ''} Give the map link exactly as it is.`
+      : null,
+    settings.knowledge.length
+      ? `Answers the office has given you. When a client asks one of these, answer with this — in the client's language and your own words:\n${settings.knowledge.map((k) => `Q: ${k.question}\nA: ${k.answer}`).join('\n')}`
+      : null,
     names.places.length
       ? `Places we have stock in there: ${names.places.join(', ')}.${names.projects.length ? ` Projects: ${names.projects.join(', ')}.` : ''} A name you hear that sounds like one of these is that one.`
       : null,
@@ -556,9 +594,12 @@ async function run(conversationId: string, manual: boolean): Promise<AutoReplyOu
   let handoff = false;
   let reply = '';
 
-  for (let model = 0; ; model++) {
+  const order = chatModelOrder(settings.modelTier);
+  for (let step = 0; ; step++) {
+    const model = order[step];
+    const lastChance = step === order.length - 1;
     // Skip a model that failed minutes ago — unless it is the last one left.
-    if (chatModelResting(model) && model < CHAT_MODEL_COUNT - 1) continue;
+    if (chatModelResting(model) && !lastChance) continue;
     contents.length = opening;
     toSend = [];
     handoff = false;
@@ -590,10 +631,19 @@ async function run(conversationId: string, manual: boolean): Promise<AutoReplyOu
           kind: typeof args.kind === 'string' ? args.kind : null,
         });
         for (const c of cards) offered.add(c.ref.toUpperCase());
+        // The office's priority projects go first whenever they fit.
+        const rank = (ref: string) => {
+          const i = priorityOrder.indexOf(ref.toUpperCase());
+          return i === -1 ? Number.MAX_SAFE_INTEGER : i;
+        };
+        cards.sort((a, b) => rank(a.ref) - rank(b.ref));
         // Deliberately not the URL or the photo: the model has no reason to
         // type either out, and the card carries both.
         response = {
           results: cards.map((c) => ({
+            ...(rank(c.ref) !== Number.MAX_SAFE_INTEGER
+              ? { priority: true, whyRecommend: pitchOf.get(c.ref.toUpperCase()) || undefined }
+              : {}),
             ref: c.ref, title: c.title, location: c.location,
             kind: c.isProject ? 'project with several units' : c.type,
             deal: c.deal === 'RENT' ? 'for rent' : 'for sale',
@@ -604,7 +654,7 @@ async function run(conversationId: string, manual: boolean): Promise<AutoReplyOu
         const refs: string[] = (Array.isArray(args.refs) ? args.refs : [])
           .map((r: unknown) => String(r).toUpperCase())
           .filter((r: string) => offered.has(r));
-        toSend = [...new Set(refs)].slice(0, MAX_LISTINGS);
+        toSend = [...new Set(refs)].slice(0, settings.maxListings);
         response = { queued: toSend };
       } else if (call.name === 'save_client_requirements') {
         // Somebody telling us what they want to buy is a client, whether or
@@ -643,7 +693,7 @@ async function run(conversationId: string, manual: boolean): Promise<AutoReplyOu
       break;
     } catch (err) {
       if (!(err instanceof ChatModelUnavailableError)) throw err;
-      if (model < CHAT_MODEL_COUNT - 1) {
+      if (!lastChance) {
         logger.warn('Chat AI: switching model', { conversationId, reason: err.message });
         continue;
       }

@@ -1,7 +1,9 @@
 import express, { type Request, type Response, type Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '@propgroup/db';
-import { authenticateToken, requireCrm, logAdminAction } from '../middleware/auth.js';
+import { authenticateToken, requireCrm, requireAdmin, logAdminAction } from '../middleware/auth.js';
+import { deleteFile, extractKeyFromUrl } from '../services/upload.service.js';
+import { logger } from '../utils/logger.js';
 import { asyncHandler } from '../utils/errors.js';
 import { sendSuccess, sendPaginated, sendNotFound } from '../utils/response.js';
 import { parsePagination, buildPaginationResponse } from '../utils/pagination.js';
@@ -29,8 +31,11 @@ router.get(
   asyncHandler(async (req: Request, res: Response) => {
     const { page, limit, skip } = parsePagination(req.query as Record<string, string>);
     const channel = req.query.channel;
+    // Archived threads are out of the way unless asked for.
+    const archived = req.query.archived === 'true';
     const search = typeof req.query.search === 'string' ? req.query.search.trim() : '';
     const where = {
+      archivedAt: archived ? { not: null } : null,
       ...(search
         ? {
             OR: [
@@ -305,7 +310,7 @@ router.post(
 router.get(
   '/unread/count',
   asyncHandler(async (_req: Request, res: Response) => {
-    const count = await prisma.conversation.count({ where: { unreadCount: { gt: 0 } } });
+    const count = await prisma.conversation.count({ where: { unreadCount: { gt: 0 }, archivedAt: null } });
     sendSuccess(res, { count });
   })
 );
@@ -317,6 +322,60 @@ router.post(
     const { text } = z.object({ text: z.string().trim().min(1).max(4000) }).parse(req.body);
     await sendReply(req.params.id, text, 'CRM');
     await logAdminAction('INBOX_REPLY', 'Conversation', req.params.id, {}, req as AuthenticatedRequest);
+    sendSuccess(res, null);
+  })
+);
+
+// POST /api/crm/inbox/:id/archive — hide from the list (or bring back). A new
+// message from them brings it back on its own.
+router.post(
+  '/:id/archive',
+  asyncHandler(async (req: Request, res: Response) => {
+    const { archived } = z.object({ archived: z.boolean() }).parse(req.body);
+    const { count } = await prisma.conversation.updateMany({
+      where: { id: req.params.id },
+      data: { archivedAt: archived ? new Date() : null, ...(archived ? { unreadCount: 0 } : {}) },
+    });
+    if (count === 0) {
+      sendNotFound(res, 'Conversation');
+      return;
+    }
+    sendSuccess(res, { archived });
+  })
+);
+
+// DELETE /api/crm/inbox/:id — remove the conversation from the CRM for good:
+// its messages, transcripts, stored photos and voice notes. The client record,
+// their deals and the chat on the phone are not touched. Admin only.
+router.delete(
+  '/:id',
+  requireAdmin,
+  asyncHandler(async (req: Request, res: Response) => {
+    const conversation = await prisma.conversation.findUnique({
+      where: { id: req.params.id },
+      include: { messages: { where: { mediaUrl: { not: null } }, select: { mediaUrl: true } } },
+    });
+    if (!conversation) {
+      sendNotFound(res, 'Conversation');
+      return;
+    }
+
+    // Only files this inbox stored itself — a property photo it merely linked
+    // to belongs to the listing and must stay.
+    const keys = conversation.messages
+      .map((m) => extractKeyFromUrl(m.mediaUrl as string))
+      .filter((k): k is string => Boolean(k && k.startsWith('chats/')));
+    for (const key of keys) {
+      await deleteFile(key).catch((err) => logger.warn('Chat file not deleted', { key, error: (err as Error).message }));
+    }
+
+    await prisma.conversation.delete({ where: { id: conversation.id } });
+    await logAdminAction(
+      'DELETE_CONVERSATION', 'Conversation', conversation.id,
+      { channel: conversation.channel, files: keys.length, leadId: conversation.leadId },
+      req as AuthenticatedRequest
+    );
+    logger.info('Conversation deleted', { conversation: conversation.id, files: keys.length });
     sendSuccess(res, null);
   })
 );

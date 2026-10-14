@@ -3,9 +3,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   Loader2, MessageCircle, Instagram, Send, ArrowLeft, UserPlus, User,
-  Bot, Megaphone, Inbox, Smartphone, Link2, X, Building2,
+  Bot, Megaphone, Inbox, Smartphone, Link2, X, Building2, Search, Archive, ArchiveRestore, Trash2,
 } from 'lucide-react'
 import { normalizeApiUrl, normalizeFileUrl } from '@/lib/utils/api-url'
+import { useAuth } from '@/contexts/AuthContext'
+import { canDeleteConversations } from '@/lib/permissions'
 import { ChatSuggestion, type Suggestion } from './ChatSuggestion'
 import { ListingPicker } from './ListingPicker'
 
@@ -94,12 +96,13 @@ const dayLabel = (iso: string) => {
 
 const STATUS_LABEL: Record<string, string> = { delivered: 'Delivered', read: 'Read', failed: 'Not delivered' }
 
-type Filter = 'all' | 'unread' | 'WHATSAPP' | 'INSTAGRAM'
+type Filter = 'all' | 'unread' | 'WHATSAPP' | 'INSTAGRAM' | 'archived'
 const FILTERS: Array<{ key: Filter; label: string }> = [
   { key: 'all', label: 'All' },
   { key: 'unread', label: 'Unread' },
   { key: 'WHATSAPP', label: 'WhatsApp' },
   { key: 'INSTAGRAM', label: 'Instagram' },
+  { key: 'archived', label: 'Archived' },
 ]
 
 const ORIGIN_LABEL: Record<string, string> = { PHONE: 'Phone', CRM: 'CRM', AI: 'Auto-reply' }
@@ -132,7 +135,6 @@ function Attachment({ message }: { message: ChatMessage }) {
 }
 
 export function InboxView({
-  search,
   onOpenLead,
   onChanged,
   focusLeadId,
@@ -142,8 +144,6 @@ export function InboxView({
   fill?: boolean
   /** Open this client's conversation, when the page was sent here from their drawer. */
   focusLeadId?: string | null
-  /** The page's single search box. The inbox doesn't own one. */
-  search: string
   onOpenLead: (id: string) => void
   /** A client was created or linked — the page should reload its client list. */
   onChanged: () => void
@@ -156,6 +156,10 @@ export function InboxView({
   const [sending, setSending] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [filter, setFilter] = useState<Filter>('all')
+  // Searched on the server, so it reaches every thread, not just the newest 100.
+  const [search, setSearch] = useState('')
+  const { user } = useAuth()
+  const canDelete = canDeleteConversations(user?.role)
   // How many of the thread's latest messages are loaded.
   const [take, setTake] = useState(100)
   // Loading earlier messages grows the thread upwards; that must not snap the
@@ -189,6 +193,7 @@ export function InboxView({
     const p = new URLSearchParams({ limit: '100' })
     if (needle) p.set('search', needle)
     if (filter === 'unread') p.set('unread', 'true')
+    else if (filter === 'archived') p.set('archived', 'true')
     else if (filter !== 'all') p.set('channel', filter)
     const res = await call(`?${p}`)
     if (res.ok) setThreads((await res.json()).data ?? [])
@@ -277,6 +282,28 @@ export function InboxView({
     return () => clearTimeout(timer)
   }, [linking, linkQuery, apiUrl])
 
+  const archive = async (archived: boolean) => {
+    if (!detail) return
+    const res = await call(`/${detail.id}/archive`, { method: 'POST', body: JSON.stringify({ archived }) })
+    if (res.ok) {
+      setOpenId(null)
+      loadThreads()
+    }
+  }
+
+  const remove = async () => {
+    if (!detail) return
+    const sure = window.confirm(
+      `Delete this conversation with ${threadName(detail)} from the CRM?\n\nIts messages, transcripts, photos and voice notes are removed for good. The client record and the chat on your phone stay.`
+    )
+    if (!sure) return
+    const res = await call(`/${detail.id}`, { method: 'DELETE' })
+    if (res.ok) {
+      setOpenId(null)
+      loadThreads()
+    }
+  }
+
   const askAi = async () => {
     if (!detail || aiBusy) return
     setAiBusy(true)
@@ -335,28 +362,44 @@ export function InboxView({
   const visible = threads
 
   return (
-    <div className={`bg-white border border-slate-200 rounded-xl overflow-hidden lg:grid lg:grid-cols-[360px_1fr] ${fill ? 'lg:h-[calc(100dvh-12.5rem)]' : 'lg:h-[70vh]'}`}>
+    <div className={`bg-white border border-slate-200 rounded-xl overflow-hidden lg:grid lg:grid-cols-[360px_1fr] ${fill ? 'lg:h-[calc(100dvh-9rem)]' : 'lg:h-[70vh]'}`}>
       {/* Threads — below lg, one pane at a time */}
       <div className={`lg:border-r lg:border-slate-200 lg:flex lg:flex-col lg:min-h-0 ${openId ? 'hidden lg:flex' : ''}`}>
-      <div className="flex gap-1 p-2 border-b border-slate-200 overflow-x-auto">
+      <div className="p-2 pb-1.5 border-b border-slate-200 space-y-1.5">
+      <div className="relative">
+        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+        <input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search name, number or message"
+          className="w-full min-h-10 pl-8 pr-8 rounded-lg bg-slate-100 text-sm placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-400"
+        />
+        {search && (
+          <button onClick={() => setSearch('')} aria-label="Clear search" className="absolute right-0.5 top-1/2 -translate-y-1/2 min-h-9 min-w-9 inline-flex items-center justify-center text-slate-500">
+            <X className="h-4 w-4" />
+          </button>
+        )}
+      </div>
+      <div className="flex gap-1 overflow-x-auto">
         {FILTERS.map((f) => (
           <button
             key={f.key}
             onClick={() => setFilter(f.key)}
-            className={`min-h-9 px-3 rounded-full text-sm font-medium whitespace-nowrap ${filter === f.key ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-100'}`}
+            className={`min-h-8 px-2.5 rounded-full text-xs font-medium whitespace-nowrap ${filter === f.key ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-100'}`}
           >
             {f.label}
           </button>
         ))}
+      </div>
       </div>
       <ul className="divide-y divide-slate-100 overflow-y-auto lg:flex-1">
         {visible.map((t) => (
           <li key={t.id}>
             <button
               onClick={() => setOpenId(t.id)}
-              className={`w-full min-h-11 text-left px-4 py-3 flex gap-3 hover:bg-slate-50 ${openId === t.id ? 'bg-slate-100' : t.unreadCount > 0 ? 'bg-emerald-50/60' : ''}`}
+              className={`w-full min-h-11 text-left px-3 py-2 flex gap-2.5 hover:bg-slate-50 ${openId === t.id ? 'bg-slate-100' : t.unreadCount > 0 ? 'bg-emerald-50/60' : ''}`}
             >
-              <ChannelIcon channel={t.channel} className="h-5 w-5 mt-0.5 shrink-0" />
+              <ChannelIcon channel={t.channel} className="h-4 w-4 mt-0.5 shrink-0" />
               <span className="min-w-0 flex-1">
                 <span className="flex items-baseline justify-between gap-2">
                   <span className={`truncate text-sm ${t.unreadCount > 0 ? 'font-semibold text-slate-900' : 'font-medium text-slate-800'}`}>
@@ -431,6 +474,24 @@ export function InboxView({
                 >
                   <Bot className="h-4 w-4" />
                   {detail.aiPaused ? 'Auto-reply paused' : detail.autoReply.sent ? 'Auto-reply on' : 'Auto-reply not active'}
+                </button>
+              )}
+              <button
+                onClick={() => archive(filter !== 'archived')}
+                title={filter === 'archived' ? 'Back to the inbox' : 'Archive — hide it until they write again'}
+                aria-label={filter === 'archived' ? 'Unarchive' : 'Archive'}
+                className="min-h-11 min-w-11 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 inline-flex items-center justify-center"
+              >
+                {filter === 'archived' ? <ArchiveRestore className="h-4 w-4" /> : <Archive className="h-4 w-4" />}
+              </button>
+              {canDelete && (
+                <button
+                  onClick={remove}
+                  title="Delete this conversation from the CRM"
+                  aria-label="Delete conversation"
+                  className="min-h-11 min-w-11 rounded-lg border border-slate-200 text-slate-500 hover:bg-red-50 hover:text-red-700 inline-flex items-center justify-center"
+                >
+                  <Trash2 className="h-4 w-4" />
                 </button>
               )}
               <button

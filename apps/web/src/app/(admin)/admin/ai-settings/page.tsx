@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Bot, Loader2, Check, X, ArrowUp, ArrowDown, Plus, AlertTriangle, CheckCircle2 } from 'lucide-react'
+import { Bot, Loader2, Check, X, ArrowUp, ArrowDown, Plus, AlertTriangle, CheckCircle2, Trash2 } from 'lucide-react'
 import { normalizeApiUrl } from '@/lib/utils/api-url'
 
 /**
@@ -15,12 +15,49 @@ import { normalizeApiUrl } from '@/lib/utils/api-url'
 
 interface Preferred { ref: string; pitch: string }
 
+interface Knowledge { question: string; answer: string }
+
 interface Settings {
   enabled: boolean
   audience: 'ads' | 'all'
+  marketWhenUnknown: 'ask' | 'LEBANON' | 'GEORGIA'
   preferred: Preferred[]
+  maxListings: 1 | 2 | 3
   replyStyle: 'match' | 'latin' | 'latin_always'
+  modelTier: 'quality' | 'economy'
+  office: { name: string; address: string; mapsUrl: string }
+  knowledge: Knowledge[]
   guidance: string
+}
+
+const field = 'w-full min-h-11 rounded-lg border border-slate-300 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-slate-400'
+
+/** A set of radio choices, each with a line saying what it means. */
+function Choice<T extends string | number>({
+  legend, name, value, options, onChange,
+}: {
+  legend: string
+  name: string
+  value: T
+  options: ReadonlyArray<readonly [T, string, string]>
+  onChange: (v: T) => void
+}) {
+  return (
+    <fieldset>
+      <legend className="text-sm font-semibold text-slate-900 mb-2">{legend}</legend>
+      <div className="space-y-2">
+        {options.map(([v, title, hint]) => (
+          <label key={String(v)} className="flex items-start gap-3 cursor-pointer">
+            <input type="radio" name={name} checked={value === v} onChange={() => onChange(v)} className="mt-1 h-4 w-4 border-slate-300" />
+            <span>
+              <span className="block text-sm text-slate-900">{title}</span>
+              <span className="block text-xs text-slate-600">{hint}</span>
+            </span>
+          </label>
+        ))}
+      </div>
+    </fieldset>
+  )
 }
 
 interface Status {
@@ -80,7 +117,11 @@ export default function AiSettingsPage() {
       const res = await fetch(`${apiUrl}/api/crm/ai-settings`, {
         method: 'PUT', credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(settings),
+        // Half-filled questions are dropped rather than refused.
+        body: JSON.stringify({
+          ...settings,
+          knowledge: settings.knowledge.filter((k) => k.question.trim() && k.answer.trim()),
+        }),
       })
       if (!res.ok) {
         setError((await res.json().catch(() => null))?.message || 'The settings were not saved.')
@@ -184,9 +225,33 @@ export default function AiSettingsPage() {
             ))}
           </div>
         </fieldset>
+
+        <Choice
+          legend="When nobody has said which country"
+          name="market"
+          value={settings.marketWhenUnknown}
+          onChange={(v) => update({ marketWhenUnknown: v })}
+          options={[
+            ['ask', 'Ask the client first', 'Lebanon or abroad — one short question before it searches anything. Someone from an ad is always taken to mean the ad\'s country.'],
+            ['GEORGIA', 'Assume Georgia', 'Investment property abroad, without asking.'],
+            ['LEBANON', 'Assume Lebanon', 'Homes in Lebanon, without asking.'],
+          ] as const}
+        />
+
+        <Choice
+          legend="Properties in one reply"
+          name="maxListings"
+          value={settings.maxListings}
+          onChange={(v) => update({ maxListings: v })}
+          options={[
+            [1, 'One', 'The single best match. Shortest message.'],
+            [2, 'Up to two', 'A choice without a long message.'],
+            [3, 'Up to three', 'More to choose from.'],
+          ] as const}
+        />
       </section>
 
-      <section className="bg-white border border-slate-200 rounded-xl p-4">
+      <section className="bg-white border border-slate-200 rounded-xl p-4 space-y-4">
         <fieldset>
           <legend className="text-sm font-semibold text-slate-900 mb-2">How it writes</legend>
           <div className="space-y-2">
@@ -209,13 +274,25 @@ export default function AiSettingsPage() {
             ))}
           </div>
         </fieldset>
+
+        <Choice
+          legend="Quality or cost"
+          name="modelTier"
+          value={settings.modelTier}
+          onChange={(v) => update({ modelTier: v })}
+          options={[
+            ['quality', 'Best replies', 'The stronger model first. About one cent per reply.'],
+            ['economy', 'Lowest cost', 'The cheapest model first. About a fifth of the cost; plainer replies.'],
+          ] as const}
+        />
       </section>
 
       <section className="bg-white border border-slate-200 rounded-xl p-4">
-        <h2 className="text-sm font-semibold text-slate-900">Projects to recommend first</h2>
+        <h2 className="text-sm font-semibold text-slate-900">Priority projects</h2>
         <p className="text-sm text-slate-600 mt-1">
-          When a client hasn&apos;t said which project they want, and the ad didn&apos;t name one, the assistant asks their budget and
-          preferred location, then recommends from this list — top of the list first, and only those that fit the budget.
+          What you most want to sell, top first. Whenever one fits what the client asked for — budget, area, size — the assistant
+          recommends it before anything else and says why, using your note. When a client hasn&apos;t named a project, it asks their
+          budget and location and starts from this list. It never pushes one that doesn&apos;t fit.
         </p>
 
         <ol className="mt-3 space-y-2">
@@ -282,15 +359,60 @@ export default function AiSettingsPage() {
         )}
       </section>
 
+      <section className="bg-white border border-slate-200 rounded-xl p-4 space-y-3">
+        <div>
+          <h2 className="text-sm font-semibold text-slate-900">Office</h2>
+          <p className="text-sm text-slate-600 mt-1">Given when a client asks where you are, for the address, or to come by.</p>
+        </div>
+        <input value={settings.office.name} maxLength={120} placeholder="Office name — e.g. PropGroup"
+          onChange={(e) => update({ office: { ...settings.office, name: e.target.value } })} className={field} />
+        <input value={settings.office.address} maxLength={300} placeholder="Address — e.g. Fanar, Lebanon"
+          onChange={(e) => update({ office: { ...settings.office, address: e.target.value } })} className={field} />
+        <input value={settings.office.mapsUrl} maxLength={500} placeholder="Google Maps link — paste it from Maps → Share"
+          onChange={(e) => update({ office: { ...settings.office, mapsUrl: e.target.value } })} className={field} />
+      </section>
+
       <section className="bg-white border border-slate-200 rounded-xl p-4">
-        <h2 className="text-sm font-semibold text-slate-900">Anything else it should know</h2>
+        <h2 className="text-sm font-semibold text-slate-900">Questions and answers</h2>
         <p className="text-sm text-slate-600 mt-1">
-          In your own words — what to mention, what to avoid, when to pass the client to you. It never overrides the fixed rules:
-          no invented prices, nothing about owners or commission, no negotiating.
+          Questions clients ask, answered the way you want. The assistant uses your answer whenever it is asked one of these, in the
+          client&apos;s language. Good for payment plans, residency, fees, how buying abroad works.
+        </p>
+        <ul className="mt-3 space-y-3">
+          {settings.knowledge.map((k, i) => (
+            <li key={i} className="border border-slate-200 rounded-lg p-3 space-y-2">
+              <div className="flex items-start gap-2">
+                <input value={k.question} maxLength={300} placeholder="The question — e.g. Can I get residency if I buy in Batumi?"
+                  onChange={(e) => update({ knowledge: settings.knowledge.map((x, j) => (j === i ? { ...x, question: e.target.value } : x)) })}
+                  className={field} />
+                <button onClick={() => update({ knowledge: settings.knowledge.filter((_, j) => j !== i) })} aria-label="Remove this question"
+                  className="min-h-11 min-w-11 shrink-0 inline-flex items-center justify-center rounded-lg text-slate-500 hover:bg-red-50 hover:text-red-700">
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              </div>
+              <textarea value={k.answer} maxLength={1000} rows={2} placeholder="How to answer it"
+                onChange={(e) => update({ knowledge: settings.knowledge.map((x, j) => (j === i ? { ...x, answer: e.target.value } : x)) })}
+                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-400" />
+            </li>
+          ))}
+        </ul>
+        {settings.knowledge.length < 40 && (
+          <button onClick={() => update({ knowledge: [...settings.knowledge, { question: '', answer: '' }] })}
+            className="mt-3 min-h-11 px-3 rounded-lg border border-slate-300 text-sm font-medium text-slate-800 inline-flex items-center gap-1.5 hover:bg-slate-50">
+            <Plus className="h-4 w-4" /> Add a question
+          </button>
+        )}
+      </section>
+
+      <section className="bg-white border border-slate-200 rounded-xl p-4">
+        <h2 className="text-sm font-semibold text-slate-900">Memory — things to keep in mind</h2>
+        <p className="text-sm text-slate-600 mt-1">
+          Anything it should always remember, in your own words: what to mention, what to avoid, when to pass the client to you.
+          It never overrides the fixed rules — no invented prices, nothing about owners or commission, no negotiating.
         </p>
         <textarea
           value={settings.guidance}
-          maxLength={1500}
+          maxLength={3000}
           onChange={(e) => update({ guidance: e.target.value })}
           rows={5}
           placeholder="e.g. Mention that payment plans are available. If they ask about residency, say a colleague will explain."

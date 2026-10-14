@@ -6,7 +6,7 @@ import {
   TrendingUp, Loader2, Check, Plus, X, ChevronRight, MessagesSquare,
 } from 'lucide-react'
 import {
-  type Deal, type OpportunityStage, DEAL_COLUMNS, dealColumnOf, STAGE_LABELS,
+  type Deal, type OpportunityStage, DEAL_COLUMNS, BOARD_DEAL_COLUMNS, CLIENT_COLUMNS, type PipelineClient, dealColumnOf, STAGE_LABELS,
   dealCommission, dealAlert, isLiveDeal, TYPE_LABELS,
 } from './types'
 import { countryFlag } from '@/lib/market'
@@ -36,7 +36,13 @@ export function DealBoard({
   clientsWithNoDeal,
   onShowClients,
   onOpenChat,
+  clients,
+  onBook,
 }: {
+  /** People at the front of the pipeline, before any viewing or meeting. */
+  clients: PipelineClient[]
+  /** Book a viewing (Lebanon) or an office meeting (abroad) for this client. */
+  onBook: (leadId: string) => void
   /** Jump to this client's conversation in the Inbox. */
   onOpenChat: (leadId: string) => void
   deals: Deal[]
@@ -63,11 +69,20 @@ export function DealBoard({
   // horizontal scroller is a kanban on paper and a swipe-hunt in practice: on a
   // 390px screen you can see one and a half of them and you cannot tell where
   // the pipeline is without scrolling the whole way across.
-  const [mobileColumn, setMobileColumn] = useState<string>(DEAL_COLUMNS[0].key)
+  const [mobileColumn, setMobileColumn] = useState<string>(CLIENT_COLUMNS[0].key)
+
+  const visibleClients = useMemo(() => {
+    const needle = q.trim().toLowerCase()
+    if (!needle) return clients
+    return clients.filter((c) =>
+      [c.name, c.askingFor, c.adLabel, c.chat?.lastPreview].filter(Boolean).some((v) => String(v).toLowerCase().includes(needle))
+    )
+  }, [clients, q])
 
   const filtered = useMemo(() => {
     const needle = q.trim().toLowerCase()
-    let out = deals
+    // Shortlisted properties are counted on the client's card, not shown as deals.
+    let out = deals.filter((d) => BOARD_DEAL_COLUMNS.some((c) => c.stages.includes(d.stage)))
     if (needle) {
       out = out.filter((d) =>
         [d.lead.name, d.lead.phone, d.subject?.title, d.subject?.ref, d.subject?.subtitle]
@@ -136,26 +151,14 @@ export function DealBoard({
         </div>
       </div>
 
-      {/* A board of deals cannot show someone who has none. These are the
-          people who asked something and went quiet, or who nobody has answered
-          yet — the easiest business in the CRM to forget about. */}
-      {clientsWithNoDeal > 0 && (
-        <button
-          onClick={onShowClients}
-          className="w-full text-left rounded-xl border border-dashed border-slate-300 bg-white px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 inline-flex items-center gap-2"
-        >
-          <AlertCircle className="h-4 w-4 text-slate-400" />
-          <strong className="text-slate-900">{clientsWithNoDeal}</strong>
-          client{clientsWithNoDeal === 1 ? ' has' : 's have'} no deal yet — nothing has been shown to them.
-          <ChevronRight className="h-4 w-4 ml-auto text-slate-400" />
-        </button>
-      )}
 
       {/* Phone: pick a column, then read it full width. The chips double as the
           pipeline summary you'd otherwise have to scroll sideways to get. */}
       <div className="lg:hidden pg-scroll-x -mx-1 flex gap-1.5 px-1 pb-1">
-        {DEAL_COLUMNS.map((col) => {
-          const count = filtered.filter((d) => dealColumnOf(d) === col.key).length
+        {[...CLIENT_COLUMNS, ...BOARD_DEAL_COLUMNS].map((col) => {
+          const count = 'stages' in col
+            ? filtered.filter((d) => dealColumnOf(d) === col.key).length
+            : visibleClients.filter((c) => c.bucket === col.key).length
           const active = mobileColumn === col.key
           return (
             <button
@@ -176,7 +179,36 @@ export function DealBoard({
       </div>
 
       <div className="flex gap-2.5 pb-3 max-lg:flex-col lg:pg-scroll-x">
-        {DEAL_COLUMNS.map((col) => {
+        {/* People first: nobody here has a viewing or meeting yet. */}
+        {CLIENT_COLUMNS.map((col) => {
+          const cards = visibleClients.filter((c) => c.bucket === col.key)
+          return (
+            <div
+              key={col.key}
+              className={`rounded-xl border border-slate-200 bg-slate-50/60 lg:pg-snap-start lg:w-[264px] lg:shrink-0 ${
+                mobileColumn === col.key ? 'max-lg:block' : 'max-lg:hidden'
+              }`}
+            >
+              <div className="p-2.5 border-b border-slate-200 max-lg:hidden">
+                <div className="flex items-center gap-1.5">
+                  <span className={`h-2 w-2 rounded-full ${col.accent}`} />
+                  <span className="text-sm font-semibold text-slate-900">{col.label}</span>
+                  <span className="text-xs text-slate-500">{cards.length}</span>
+                </div>
+                <p className="text-[11px] text-slate-500 mt-0.5">{col.hint}</p>
+              </div>
+              <p className="px-2.5 pt-2 text-[11px] text-slate-500 lg:hidden">{col.hint}</p>
+              <div className="p-1.5 space-y-1.5 min-h-[120px]">
+                {cards.map((c) => (
+                  <ClientCard key={c.id} client={c} onOpenClient={onOpenClient} onOpenChat={onOpenChat} onBook={onBook} />
+                ))}
+                {cards.length === 0 && <p className="text-[11px] text-slate-400 text-center py-6">Nobody here</p>}
+              </div>
+            </div>
+          )
+        })}
+
+        {BOARD_DEAL_COLUMNS.map((col) => {
           const cards = filtered.filter((d) => dealColumnOf(d) === col.key)
           const value = cards.reduce((t, d) => t + (dealCommission(d)?.usd ?? 0), 0)
 
@@ -234,21 +266,85 @@ export function DealBoard({
                 ))}
 
                 {cards.length === 0 && (
-                  col.key === 'SUGGESTED' && !q && !onlyAlerts ? (
-                    <button
-                      onClick={onNewDeal}
-                      className="w-full py-6 text-[11px] text-slate-500 hover:text-slate-700 hover:bg-white rounded-lg transition-colors"
-                    >
-                      + Start a deal
-                    </button>
-                  ) : (
-                    <p className="text-[11px] text-slate-400 text-center py-6">Nothing here</p>
-                  )
+                  <p className="text-[11px] text-slate-400 text-center py-6">Nothing here</p>
                 )}
               </div>
             </div>
           )
         })}
+      </div>
+    </div>
+  )
+}
+
+const sinceLabel = (iso: string) => {
+  const mins = Math.round((Date.now() - new Date(iso).getTime()) / 60_000)
+  if (mins < 60) return `${Math.max(1, mins)}m`
+  const hours = Math.round(mins / 60)
+  return hours < 48 ? `${hours}h` : `${Math.round(hours / 24)}d`
+}
+
+/** A person at the front of the pipeline — before any viewing or meeting. */
+function ClientCard({
+  client: c, onOpenClient, onOpenChat, onBook,
+}: {
+  client: PipelineClient
+  onOpenClient: (leadId: string) => void
+  onOpenChat: (leadId: string) => void
+  onBook: (leadId: string) => void
+}) {
+  // Abroad, the next step is a meeting at the office; in Lebanon, a viewing.
+  const meeting = c.market !== 'LEBANON'
+  return (
+    <div
+      onClick={() => onOpenClient(c.id)}
+      className="bg-white border border-slate-200 rounded-lg p-2.5 cursor-pointer hover:border-slate-300 hover:shadow-sm transition-all"
+    >
+      <div className="flex items-start gap-1.5">
+        <span className="text-[11px] shrink-0 mt-0.5">{countryFlag(c.market)}</span>
+        <span className="text-sm font-medium text-slate-900 leading-snug truncate flex-1">{c.name}</span>
+        {c.waitingSince && (
+          <span className="shrink-0 px-1.5 py-0.5 rounded bg-red-50 text-red-700 text-[10px] font-semibold" title="Waiting for a reply">
+            {sinceLabel(c.waitingSince)}
+          </span>
+        )}
+      </div>
+      {(c.askingFor || c.adLabel) && (
+        <p className="text-[11px] text-slate-600 truncate mt-0.5">{c.askingFor ?? `Ad: ${c.adLabel}`}</p>
+      )}
+      {c.chat?.lastPreview && (
+        <p className="text-xs text-slate-500 line-clamp-2 mt-1">{c.chat.lastPreview}</p>
+      )}
+      {c.reason && c.bucket === 'WITH_YOU' && <p className="text-[11px] text-amber-800 mt-1">{c.reason}</p>}
+      <div className="flex items-center gap-1.5 mt-1.5 pt-1.5 border-t border-slate-100 flex-wrap">
+        {c.shortlisted > 0 && (
+          <span className="text-[10px] font-medium text-slate-600 bg-slate-100 rounded px-1.5 py-0.5">
+            {c.shortlisted} {c.shortlisted === 1 ? 'property' : 'properties'} sent
+          </span>
+        )}
+        {c.chat?.detailsToConfirm && (
+          <span className="text-[10px] font-medium text-amber-800 bg-amber-50 rounded px-1.5 py-0.5">Details to confirm</span>
+        )}
+        <span className="flex-1" />
+        {c.chat && (
+          <button
+            onClick={(e) => { e.stopPropagation(); onOpenChat(c.id) }}
+            title={c.chat.unread > 0 ? `${c.chat.unread} unread — open the chat` : 'Open the chat'}
+            className={`min-h-7 px-1.5 rounded-md inline-flex items-center gap-1 text-[11px] font-semibold ${
+              c.chat.unread > 0 ? 'bg-emerald-600 text-white' : 'text-slate-500 hover:bg-slate-100'
+            }`}
+          >
+            <MessagesSquare className="h-3.5 w-3.5" />
+            {c.chat.unread > 0 && c.chat.unread}
+          </button>
+        )}
+        <button
+          onClick={(e) => { e.stopPropagation(); onBook(c.id) }}
+          className="min-h-7 px-1.5 rounded-md text-[11px] font-semibold text-slate-700 hover:bg-slate-100 inline-flex items-center gap-1"
+          title={meeting ? 'Book a meeting at the office' : 'Book a viewing'}
+        >
+          <Calendar className="h-3.5 w-3.5" /> {meeting ? 'Meeting' : 'Viewing'}
+        </button>
       </div>
     </div>
   )

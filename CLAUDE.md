@@ -269,7 +269,19 @@ other:
 distinction is real on the deal, but as columns they split one conversation in
 two and left both looking empty.
 
-Columns are named after the conversation, not the schema: **Enquiry → Details
+**The front of the board is people, not deals** (`routes/pipeline.ts`, since
+2026-10-14): **New** (reached out, nobody answered) → **Assistant** (the chat
+assistant is handling it) → **With you** (handed over, waiting on a reply the
+assistant will not give, or the team is talking). Property deals start at
+**Viewing / meeting** (a viewing in Lebanon, an office meeting for abroad) →
+Viewed / met → Negotiating → Reserved / paying → Closed. Shortlisted properties
+(`SUGGESTED`, `SHARED` — picked or sent, nothing booked) are no longer cards:
+the assistant sending ten projects made ten "Details sent" cards for one person,
+which said nothing true. They are a count on the client's card and stay in the
+drawer. The client directory is its own page, `/admin/clients`
+(`CrmScreen mode="clients"`); `/admin/crm` is the board.
+
+The older column naming, kept for the deal stages: **Enquiry → Details
 sent → Viewing booked → Viewed → Negotiating → Reserved / paying → Closed**.
 "Shortlisted" was replaced because it only described half of what lands there —
 most deals start with a client asking about a property, not with us picking one.

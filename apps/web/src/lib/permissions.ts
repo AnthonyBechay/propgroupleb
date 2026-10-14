@@ -55,6 +55,14 @@ export function canSeeMoney(role: string | null | undefined): boolean {
 }
 
 /**
+ * May this user permanently delete a conversation? Mirrors `requireAdmin` on
+ * DELETE /api/crm/inbox/:id — archiving is open to everyone who uses the inbox.
+ */
+export function canDeleteConversations(role: string | null | undefined): boolean {
+  return role === 'ADMIN' || role === 'SUPER_ADMIN'
+}
+
+/**
  * The admin routes a CRM_MANAGER may open.
  *
  * Deliberately a prefix allow-list rather than a deny-list: a page added next
@@ -62,7 +70,7 @@ export function canSeeMoney(role: string | null | undefined): boolean {
  * which is the failure direction we want. Every other admin endpoint answers
  * 403 to this role anyway, so the pages would render empty at best.
  */
-const CRM_MANAGER_PATHS = ['/admin/crm', '/admin/inbox']
+const CRM_MANAGER_PATHS = ['/admin/crm', '/admin/inbox', '/admin/clients']
 
 /** Where a role lands when it opens the back office. */
 export function adminHomeFor(role: string | null | undefined): string {

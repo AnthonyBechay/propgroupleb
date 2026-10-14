@@ -1,7 +1,6 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
-import { Search, X } from 'lucide-react'
 import { normalizeApiUrl } from '@/lib/utils/api-url'
 import { InboxView } from '../crm/InboxView'
 import { LeadDrawer } from '../crm/LeadDrawer'
@@ -17,7 +16,6 @@ import type { Lead } from '../crm/types'
  */
 export default function InboxPage() {
   const apiUrl = normalizeApiUrl(process.env.NEXT_PUBLIC_API_URL || '')
-  const [search, setSearch] = useState('')
   // The client's card opens over the conversation, so the chat stays where it is.
   const [openLead, setOpenLead] = useState<Lead | null>(null)
   const openClient = useCallback(async (leadId: string) => {
@@ -31,25 +29,9 @@ export default function InboxPage() {
   }, [])
 
   return (
-    <div className="space-y-3">
-      <div className="relative max-w-md">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-        <input
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search conversations by name, number or message"
-          className="w-full min-h-11 pl-9 pr-9 rounded-lg border border-slate-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-slate-400"
-        />
-        {search && (
-          <button onClick={() => setSearch('')} aria-label="Clear search" className="absolute right-1 top-1/2 -translate-y-1/2 min-h-9 min-w-9 inline-flex items-center justify-center text-slate-500">
-            <X className="h-4 w-4" />
-          </button>
-        )}
-      </div>
-
+    <div>
       <InboxView
         fill
-        search={search}
         focusLeadId={focusLeadId}
         onOpenLead={openClient}
         onChanged={() => {}}

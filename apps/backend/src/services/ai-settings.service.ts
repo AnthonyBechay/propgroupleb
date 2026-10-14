@@ -17,16 +17,31 @@ export interface PreferredProject {
   pitch: string;
 }
 
+export interface KnowledgeItem {
+  /** What a client might ask, in the office's words. */
+  question: string;
+  /** How the office wants it answered. */
+  answer: string;
+}
+
 export interface ChatAiSettings {
   /** Day-to-day on/off. The assistant also needs AUTO_REPLY_ENABLED=true. */
   enabled: boolean;
   /** Who it answers: only people from an ad or lead form, or everyone. */
   audience: 'ads' | 'all';
   /**
-   * What to steer an undecided client towards, most wanted first. Used when
-   * the ad or the client has not already named a project.
+   * Which country a client means when no ad says so. "ask" puts the question
+   * to them before anything is searched; otherwise that market is assumed.
+   * (Someone from an ad is always taken to mean the ad's market.)
+   */
+  marketWhenUnknown: 'ask' | 'LEBANON' | 'GEORGIA';
+  /**
+   * The projects the office most wants to sell, most wanted first. They are
+   * recommended first whenever they fit what the client asked for.
    */
   preferred: PreferredProject[];
+  /** Most properties offered in one reply (each one lengthens the message). */
+  maxListings: 1 | 2 | 3;
   /**
    * How it writes to Arabic speakers.
    *   match        — the client's own language and script
@@ -35,7 +50,16 @@ export interface ChatAiSettings {
    *   latin_always — Lebanese in Latin letters to everyone
    */
   replyStyle: 'match' | 'latin' | 'latin_always';
-  /** Anything else it should know or do, in the office's own words. */
+  /**
+   * quality — the stronger model first, about a cent a reply
+   * economy — the cheapest model first, about a fifth of that; plainer replies
+   */
+  modelTier: 'quality' | 'economy';
+  /** Where clients can visit, given when they ask for the address. */
+  office: { name: string; address: string; mapsUrl: string };
+  /** Questions the office has answered in advance. */
+  knowledge: KnowledgeItem[];
+  /** Anything else it should keep in mind, in the office's own words. */
   guidance: string;
 }
 
@@ -43,26 +67,45 @@ export function defaultChatAiSettings(): ChatAiSettings {
   return {
     enabled: true,
     audience: process.env.AUTO_REPLY_AUDIENCE === 'all' ? 'all' : 'ads',
+    marketWhenUnknown: 'ask',
     preferred: [],
+    maxListings: 3,
     replyStyle: 'latin',
+    modelTier: 'quality',
+    office: { name: 'PropGroup', address: 'Fanar, Lebanon', mapsUrl: '' },
+    knowledge: [],
     guidance: '',
   };
 }
 
+const oneOf = <T extends string | number>(value: unknown, allowed: readonly T[], fallback: T): T =>
+  allowed.includes(value as T) ? (value as T) : fallback;
+
 export async function getChatAiSettings(): Promise<ChatAiSettings> {
   const row = await prisma.systemSetting.findUnique({ where: { key: KEY } });
   const saved = (row?.value ?? {}) as Partial<ChatAiSettings>;
-  const defaults = defaultChatAiSettings();
+  const d = defaultChatAiSettings();
+  const office = (saved.office ?? {}) as Partial<ChatAiSettings['office']>;
   return {
-    enabled: typeof saved.enabled === 'boolean' ? saved.enabled : defaults.enabled,
-    audience: saved.audience === 'all' || saved.audience === 'ads' ? saved.audience : defaults.audience,
+    enabled: typeof saved.enabled === 'boolean' ? saved.enabled : d.enabled,
+    audience: oneOf(saved.audience, ['ads', 'all'] as const, d.audience),
+    marketWhenUnknown: oneOf(saved.marketWhenUnknown, ['ask', 'LEBANON', 'GEORGIA'] as const, d.marketWhenUnknown),
     preferred: Array.isArray(saved.preferred)
       ? saved.preferred.filter((p) => p && typeof p.ref === 'string').map((p) => ({ ref: p.ref, pitch: p.pitch ?? '' }))
       : [],
-    replyStyle:
-      saved.replyStyle === 'match' || saved.replyStyle === 'latin' || saved.replyStyle === 'latin_always'
-        ? saved.replyStyle
-        : defaults.replyStyle,
+    maxListings: oneOf(saved.maxListings, [1, 2, 3] as const, d.maxListings),
+    replyStyle: oneOf(saved.replyStyle, ['match', 'latin', 'latin_always'] as const, d.replyStyle),
+    modelTier: oneOf(saved.modelTier, ['quality', 'economy'] as const, d.modelTier),
+    office: {
+      name: typeof office.name === 'string' ? office.name : d.office.name,
+      address: typeof office.address === 'string' ? office.address : d.office.address,
+      mapsUrl: typeof office.mapsUrl === 'string' ? office.mapsUrl : d.office.mapsUrl,
+    },
+    knowledge: Array.isArray(saved.knowledge)
+      ? saved.knowledge
+          .filter((k) => k && typeof k.question === 'string' && typeof k.answer === 'string')
+          .map((k) => ({ question: k.question, answer: k.answer }))
+      : [],
     guidance: typeof saved.guidance === 'string' ? saved.guidance : '',
   };
 }

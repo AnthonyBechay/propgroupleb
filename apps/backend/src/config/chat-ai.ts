@@ -41,6 +41,16 @@ const MODELS = [
 export const CHAT_MODEL_COUNT = MODELS.length;
 
 /**
+ * The order models are tried in. "quality" leads with the stronger model —
+ * about a cent per reply with a voice note. "economy" leads with the cheapest,
+ * about a fifth of that, with plainer replies. Measured on the same voice-note
+ * reply, 2026-10-14.
+ */
+export function chatModelOrder(tier: 'quality' | 'economy'): number[] {
+  return tier === 'economy' ? [2, 1, 0] : [0, 1, 2];
+}
+
+/**
  * The ceiling covers the model's THINKING as well as its answer. These models
  * think for 400–1,000 tokens before a tool call or a two-line reply, so a
  * ceiling sized for the reply alone (it was 800) is spent on thinking and the

@@ -21,7 +21,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import {
   type Lead, type LeadMarket, type LeadType,
-  type Deal, type OpportunityStage,
+  type Deal, type OpportunityStage, type PipelineClient,
   STATUS_META, TYPE_LABELS, MARKET_META, formatLastContact, formatPlanned,
   isWaitingOnUs, hasAwaitingFeedback, SUB_STATUS_META,
 } from './types'
@@ -51,15 +51,22 @@ interface Stats {
 
 type View = 'overview' | 'today' | 'board' | 'list'
 
-export default function CrmPage() {
+/**
+ * The CRM, in one of two shapes: the pipeline board (the main screen) or the
+ * client directory (its own entry in the menu). Both share the same data, the
+ * same client drawer and the same toolbar.
+ */
+export function CrmScreen({ mode }: { mode: 'pipeline' | 'clients' }) {
   const apiUrl = normalizeApiUrl(process.env.NEXT_PUBLIC_API_URL || '')
   const [leads, setLeads] = useState<Lead[]>([])
   // The pipeline is a list of deals, not of people — see DealBoard.
   const [deals, setDeals] = useState<Deal[]>([])
+  // People at the front of the board, before any viewing or meeting.
+  const [pipeline, setPipeline] = useState<PipelineClient[]>([])
   const [movingDeal, setMovingDeal] = useState<string | null>(null)
   const [stats, setStats] = useState<Stats | null>(null)
   const [loading, setLoading] = useState(true)
-  const [view, setView] = useState<View>('today')
+  const [view, setView] = useState<View>(mode === 'clients' ? 'list' : 'board')
   const router = useRouter()
   const [market, setMarket] = useState<'all' | LeadMarket>('all')
   const [search, setSearch] = useState('')
@@ -107,7 +114,7 @@ export default function CrmPage() {
       if (market !== 'all') p.set('market', market)
       if (search.trim()) p.set('search', search.trim())
 
-      const [listRes, statsRes, untappedRes, earnRes, dealsRes] = await Promise.all([
+      const [listRes, statsRes, untappedRes, earnRes, dealsRes, pipelineRes] = await Promise.all([
         fetch(`${apiUrl}/api/crm?${p}`, { credentials: 'include', cache: 'no-store' }),
         fetch(`${apiUrl}/api/crm/stats`, { credentials: 'include', cache: 'no-store' }),
         fetch(`${apiUrl}/api/crm/untapped`, { credentials: 'include', cache: 'no-store' }),
@@ -115,12 +122,14 @@ export default function CrmPage() {
           ? fetch(`${apiUrl}/api/crm/earnings?months=12`, { credentials: 'include', cache: 'no-store' })
           : Promise.resolve(null),
         fetch(`${apiUrl}/api/crm/deals?${p}`, { credentials: 'include', cache: 'no-store' }),
+        fetch(`${apiUrl}/api/crm/pipeline${market !== 'all' ? `?market=${market}` : ''}`, { credentials: 'include', cache: 'no-store' }),
       ])
       if (listRes.ok) setLeads((await listRes.json()).data ?? [])
       if (statsRes.ok) setStats((await statsRes.json()).data ?? null)
       if (untappedRes.ok) setUntapped((await untappedRes.json()).data?.counts ?? {})
       if (earnRes?.ok) setEarnings((await earnRes.json()).data ?? null)
       if (dealsRes.ok) setDeals((await dealsRes.json()).data ?? [])
+      if (pipelineRes.ok) setPipeline((await pipelineRes.json()).data ?? [])
     } finally {
       setLoading(false)
     }
@@ -376,6 +385,8 @@ export default function CrmPage() {
           ))}
         </div>
 
+        {/* The client list is its own page now; it has no board views. */}
+        {mode === 'pipeline' && (
         <div className="flex gap-1 bg-slate-100 rounded-lg p-1">
           <button
             onClick={() => setView('overview')}
@@ -412,20 +423,13 @@ export default function CrmPage() {
           >
             <LayoutGrid className="h-4 w-4" /> <span className="sm:hidden">Board</span>
           </button>
-          <button
-            onClick={() => setView('list')}
-            title="All clients"
-            aria-label="All clients"
-            className={`min-h-10 px-2.5 rounded-md transition-all inline-flex items-center gap-1 text-sm font-medium ${view === 'list' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-900'}`}
-          >
-            <List className="h-4 w-4" /> <span className="sm:hidden">Clients</span>
-          </button>
         </div>
+        )}
       </div>
 
       {/* Content */}
       {view === 'overview' ? (
-        <OverviewView onFocus={(v) => setView(v)} />
+        <OverviewView onFocus={(v) => (v === 'list' ? router.push('/admin/clients') : setView(v))} />
       ) : view === 'today' ? (
         <TodayView market={market} onOpen={setOpenId} />
       ) : loading ? (
@@ -442,8 +446,15 @@ export default function CrmPage() {
           onRemoveDeal={removeDeal}
           search={search}
           clientsWithNoDeal={clientsWithNoDeal}
-          onShowClients={() => setView('list')}
+          onShowClients={() => router.push('/admin/clients')}
           onOpenChat={(leadId) => router.push(`/admin/inbox?lead=${leadId}`)}
+          clients={pipeline}
+          onBook={async (leadId) => {
+            const known = leads.find((l) => l.id === leadId)
+            if (known) { setBookingFor(known); return }
+            const res = await fetch(`${apiUrl}/api/crm/${leadId}`, { credentials: 'include', cache: 'no-store' })
+            if (res.ok) setBookingFor((await res.json()).data)
+          }}
         />
       ) : visible.length === 0 ? (
         <div className="bg-white border rounded-xl p-16 text-center text-slate-400">

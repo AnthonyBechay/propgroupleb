@@ -57,8 +57,20 @@ const settingsSchema = z.object({
   preferred: z
     .array(z.object({ ref: z.string().trim().min(1).max(40), pitch: z.string().trim().max(300).default('') }))
     .max(10),
+  marketWhenUnknown: z.enum(['ask', 'LEBANON', 'GEORGIA']).default('ask'),
+  maxListings: z.union([z.literal(1), z.literal(2), z.literal(3)]).default(3),
   replyStyle: z.enum(['match', 'latin', 'latin_always']).default('latin'),
-  guidance: z.string().trim().max(1500).default(''),
+  modelTier: z.enum(['quality', 'economy']).default('quality'),
+  office: z.object({
+    name: z.string().trim().max(120).default(''),
+    address: z.string().trim().max(300).default(''),
+    mapsUrl: z.union([z.string().trim().url().max(500), z.literal('')]).default(''),
+  }),
+  knowledge: z
+    .array(z.object({ question: z.string().trim().min(1).max(300), answer: z.string().trim().min(1).max(1000) }))
+    .max(40)
+    .default([]),
+  guidance: z.string().trim().max(3000).default(''),
 });
 
 // PUT /api/crm/ai-settings

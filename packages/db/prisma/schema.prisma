@@ -1756,6 +1756,9 @@ model Conversation {
   // assistant keeps answering even though a person has replied on the thread.
   aiResumedAt DateTime?
 
+  // Hidden from the inbox list. Comes back by itself the moment they write again.
+  archivedAt DateTime?
+
   // Click-to-WhatsApp / Instagram ad attribution from the first message.
   adId    String?
   adLabel String?
@@ -1767,6 +1770,7 @@ model Conversation {
   suggestions LeadSuggestion[]
 
   @@unique([channel, externalId])
+  @@index([archivedAt, lastMessageAt])
   @@index([lastMessageAt])
   @@index([leadId])
   @@map("conversations")
