@@ -21,6 +21,7 @@ interface Settings {
   enabled: boolean
   audience: 'ads' | 'all'
   marketWhenUnknown: 'ask' | 'LEBANON' | 'GEORGIA'
+  handover: 'step_aside' | 'return_after_quiet' | 'always'
   preferred: Preferred[]
   maxListings: 1 | 2 | 3
   replyStyle: 'match' | 'latin' | 'latin_always'
@@ -225,6 +226,18 @@ export default function AiSettingsPage() {
             ))}
           </div>
         </fieldset>
+
+        <Choice
+          legend="When someone from the team replies, or the assistant hands over"
+          name="handover"
+          value={settings.handover}
+          onChange={(v) => update({ handover: v })}
+          options={[
+            ['return_after_quiet', 'Step aside, and come back after a quiet day', 'It stays out while you are talking. If the client writes again a full day after anyone from the team last replied, it picks the conversation up again from its summary.'],
+            ['step_aside', 'Step aside until resumed', 'It stays out until someone presses "Resume" on that conversation.'],
+            ['always', 'Always answer', 'It answers every message on every conversation, even while you are talking too — clients may get two replies. Only a pause stops it.'],
+          ] as const}
+        />
 
         <Choice
           legend="When nobody has said which country"

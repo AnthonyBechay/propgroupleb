@@ -30,6 +30,16 @@ export interface ChatAiSettings {
   /** Who it answers: only people from an ad or lead form, or everyone. */
   audience: 'ads' | 'all';
   /**
+   * What happens when a person replies on a thread or the assistant hands over.
+   *   step_aside         — it stays out until someone presses Resume
+   *   return_after_quiet — it stays out, but a client who writes again after a
+   *                        day with nobody from the team in between gets the
+   *                        assistant back, picking up from the summary
+   *   always             — it keeps answering every thread regardless; only a
+   *                        pause from the team stops it
+   */
+  handover: 'step_aside' | 'return_after_quiet' | 'always';
+  /**
    * Which country a client means when no ad says so. "ask" puts the question
    * to them before anything is searched; otherwise that market is assumed.
    * (Someone from an ad is always taken to mean the ad's market.)
@@ -68,6 +78,7 @@ export function defaultChatAiSettings(): ChatAiSettings {
     enabled: true,
     audience: process.env.AUTO_REPLY_AUDIENCE === 'all' ? 'all' : 'ads',
     marketWhenUnknown: 'ask',
+    handover: 'return_after_quiet',
     preferred: [],
     maxListings: 3,
     replyStyle: 'latin',
@@ -90,6 +101,7 @@ export async function getChatAiSettings(): Promise<ChatAiSettings> {
     enabled: typeof saved.enabled === 'boolean' ? saved.enabled : d.enabled,
     audience: oneOf(saved.audience, ['ads', 'all'] as const, d.audience),
     marketWhenUnknown: oneOf(saved.marketWhenUnknown, ['ask', 'LEBANON', 'GEORGIA'] as const, d.marketWhenUnknown),
+    handover: oneOf(saved.handover, ['step_aside', 'return_after_quiet', 'always'] as const, d.handover),
     preferred: Array.isArray(saved.preferred)
       ? saved.preferred.filter((p) => p && typeof p.ref === 'string').map((p) => ({ ref: p.ref, pitch: p.pitch ?? '' }))
       : [],

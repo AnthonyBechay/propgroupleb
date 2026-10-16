@@ -48,7 +48,7 @@ const MEDIA_WAIT_MS = 3_000;
 const MEDIA_WAIT_TRIES = 4;
 const DAY_MS = 24 * 60 * 60 * 1000;
 /** People send three short messages in a row; answer once, after they stop. */
-const DEBOUNCE_MS = 12_000;
+const DEBOUNCE_MS = 8_000;
 /** WhatsApp cuts a photo caption at 1024 characters. */
 const CAPTION_LIMIT = 1000;
 /** Enough history to keep the thread of a conversation; each message is resent on every model call. */
@@ -60,6 +60,10 @@ const MAX_MODEL_TURNS = 6;
 const MAX_LISTINGS = 3;
 
 const pending = new Map<string, NodeJS.Timeout>();
+/** Tools whose result the model does not need to see before it can finish. */
+const FINISHING_TOOLS = new Set([
+  'send_listings', 'save_client_requirements', 'save_voice_transcripts', 'update_conversation_summary', 'hand_off_to_team',
+]);
 /** How many times a failed reply has been retried, per thread, and the waits between. */
 const retries = new Map<string, number>();
 const RETRY_AFTER_MS = [60_000, 3 * 60_000, 10 * 60_000];
@@ -143,6 +147,30 @@ export async function autoReplyStatus(conversationId: string): Promise<AutoReply
   };
 }
 
+/**
+ * The client wrote again a full day after anyone from the team last did
+ * anything on the thread (replied, or paused it). Whatever was being handled
+ * by hand has gone quiet, and a client writing into silence should not wait for
+ * someone to notice.
+ */
+async function cameBackAfterQuiet(conversation: { id: string; aiPausedAt: Date | null }): Promise<boolean> {
+  const [lastIn, lastTeam] = await Promise.all([
+    prisma.chatMessage.findFirst({
+      where: { conversationId: conversation.id, direction: 'IN' },
+      orderBy: { createdAt: 'desc' },
+      select: { createdAt: true },
+    }),
+    prisma.chatMessage.findFirst({
+      where: { conversationId: conversation.id, direction: 'OUT', NOT: { origin: 'AI' } },
+      orderBy: { createdAt: 'desc' },
+      select: { createdAt: true },
+    }),
+  ]);
+  if (!lastIn) return false;
+  const teamAt = Math.max(lastTeam?.createdAt.getTime() ?? 0, conversation.aiPausedAt?.getTime() ?? 0);
+  return teamAt > 0 && lastIn.createdAt.getTime() - teamAt > DAY_MS;
+}
+
 /** "Resume auto-reply" was pressed within the last 24 hours. */
 function resumedRecently(conversation: { aiResumedAt: Date | null }): boolean {
   return Boolean(conversation.aiResumedAt && Date.now() - conversation.aiResumedAt.getTime() < DAY_MS);
@@ -153,8 +181,8 @@ function resumedRecently(conversation: { aiResumedAt: Date | null }): boolean {
  * ones that only exist to keep the assistant out of a person's way.
  */
 async function standingBlock(
-  conversation: { id: string; channel: 'WHATSAPP' | 'INSTAGRAM'; aiPaused: boolean; aiPausedReason: string | null; aiResumedAt: Date | null; adId: string | null; lastInboundAt: Date | null; lead: { adId: string | null; source: string } | null },
-  settings: { enabled: boolean; audience: 'ads' | 'all' },
+  conversation: { id: string; channel: 'WHATSAPP' | 'INSTAGRAM'; aiPaused: boolean; aiPausedReason: string | null; aiPausedAt: Date | null; aiAlways: boolean; aiResumedAt: Date | null; adId: string | null; lastInboundAt: Date | null; lead: { adId: string | null; source: string } | null },
+  settings: { enabled: boolean; audience: 'ads' | 'all'; handover: ChatAiSettings['handover'] },
   manual: boolean
 ): Promise<string | null> {
   if (!chatAiEnabled()) return 'No Gemini key is set on the server (GEMINI_API_KEY).';
@@ -169,7 +197,15 @@ async function standingBlock(
   if (!manual) {
     if (process.env.AUTO_REPLY_ENABLED !== 'true') return 'The master switch is off on the server (AUTO_REPLY_ENABLED is not "true").';
     if (!settings.enabled) return 'Automatic replies are switched off in the Chat assistant settings.';
-    if (conversation.aiPaused) {
+    // Whether the assistant answers through a team reply or a hand-over: on
+    // this thread always, everywhere by setting, or because the client has come
+    // back after a quiet day.
+    const alwaysHere = conversation.aiAlways;
+    const alwaysEverywhere = settings.handover === 'always';
+    const cameBack = settings.handover === 'return_after_quiet' && (await cameBackAfterQuiet(conversation));
+    const pausedByTeam = conversation.aiPausedReason === 'Paused by the team';
+
+    if (conversation.aiPaused && !alwaysHere && !cameBack && !(alwaysEverywhere && !pausedByTeam)) {
       return `Auto-reply is paused on this conversation${conversation.aiPausedReason ? `: ${conversation.aiPausedReason.charAt(0).toLowerCase()}${conversation.aiPausedReason.slice(1)}` : ''}.`;
     }
     if (settings.audience !== 'all') {
@@ -180,7 +216,7 @@ async function standingBlock(
     // A person replied from the phone or the CRM: the thread is theirs now —
     // unless somebody pressed "Resume auto-reply", which hands it back to the
     // assistant for 24 hours whatever the team writes in the meantime.
-    if (!resumedRecently(conversation)) {
+    if (!alwaysHere && !alwaysEverywhere && !cameBack && !resumedRecently(conversation)) {
       const humanReplied = await prisma.chatMessage.count({
         where: {
           conversationId: conversation.id, direction: 'OUT',
@@ -262,6 +298,12 @@ const TOOLS: ChatTool[] = [
     },
   },
   {
+    name: 'update_conversation_summary',
+    description:
+      'Rewrite the running summary of this conversation: two to four sentences in English on who the client is, what they want (country, area, budget, size, timing), what has been offered or agreed, and what is still open. Call it in the same turn as your reply, every time.',
+    parameters: { type: 'object', properties: { summary: { type: 'string' } }, required: ['summary'] },
+  },
+  {
     name: 'hand_off_to_team',
     description:
       'Pass the conversation to a person. Use when the client asks for one, is upset, wants to negotiate or book a viewing, or asks something you cannot answer. Still write a short reply telling them a colleague will message them.',
@@ -292,6 +334,7 @@ What to do:
 - Each reply is one message and costs money to send. Say everything for this turn in that one reply; never plan a follow-up message.
 - As soon as you know the country and either a budget, an area or a project, call search_listings and attach the best matches with send_listings. Two or three well-matched options beat many. If nothing fits, say so plainly and ask what they could flex on.
 - Each time the client tells you a requirement, call save_client_requirements.
+- Be quick: once you have what you need, write your reply in the SAME turn as send_listings, save_client_requirements and update_conversation_summary — do not make a separate turn just for those.
 - Results marked "priority" are the projects the office most wants to sell. When one fits what the client asked for, recommend it first and use its "whyRecommend" to say why it is a good choice. Never push one that does not fit their budget or what they asked for.
 - Photos, floor plans, the location and the full details of every property are on its own page, and send_listings puts the link to that page in your message. So when a client asks for pictures, more details, the location or "more info" about a property, attach it with send_listings and tell them everything is at the link. That is an answer you can give yourself — never hand off, and never promise that a colleague will send photos or details.
 
@@ -436,7 +479,7 @@ async function run(conversationId: string, manual: boolean): Promise<AutoReplyOu
   if (!manual && threadCount >= PER_THREAD_LIMIT) {
     await prisma.conversation.update({
       where: { id: conversationId },
-      data: { aiPaused: true, aiPausedReason: `It had already sent ${PER_THREAD_LIMIT} replies in a day` },
+      data: { aiPaused: true, aiPausedReason: `It had already sent ${PER_THREAD_LIMIT} replies in a day`, aiPausedAt: new Date() },
     });
     return skip(`The assistant has already sent ${PER_THREAD_LIMIT} replies here today, so it has paused for a person to take over.`);
   }
@@ -580,6 +623,9 @@ async function run(conversationId: string, manual: boolean): Promise<AutoReplyOu
       ? `Places we have stock in there: ${names.places.join(', ')}.${names.projects.length ? ` Projects: ${names.projects.join(', ')}.` : ''} A name you hear that sounds like one of these is that one.`
       : null,
     known.length ? `What we already know (do not ask again):\n${known.join('\n')}` : null,
+    conversation.summary
+      ? `Where this conversation stood (your own summary — messages since may include replies from the team):\n${conversation.summary}`
+      : null,
   ]
     .filter(Boolean)
     .join('\n\n');
@@ -672,6 +718,9 @@ async function run(conversationId: string, manual: boolean): Promise<AutoReplyOu
             });
           }
         }
+      } else if (call.name === 'update_conversation_summary') {
+        const summary = typeof args.summary === 'string' ? args.summary.trim().slice(0, 1200) : '';
+        if (summary) await prisma.conversation.update({ where: { id: conversationId }, data: { summary } });
       } else if (call.name === 'hand_off_to_team') {
         handoff = true;
         handoffReason = typeof args.reason === 'string' ? args.reason.trim().slice(0, 200) : '';
@@ -681,6 +730,9 @@ async function run(conversationId: string, manual: boolean): Promise<AutoReplyOu
 
       responses.push({ functionResponse: { name: call.name, response, ...(call.id ? { id: call.id } : {}) } });
     }
+    // The reply is written and everything else it asked for is bookkeeping:
+    // done. Sending those results back would only cost another round trip.
+    if (reply && result.calls.every((c) => FINISHING_TOOLS.has(c.name))) break;
     contents.push({ role: 'user', parts: responses });
   }
 
@@ -738,10 +790,17 @@ async function run(conversationId: string, manual: boolean): Promise<AutoReplyOu
   // A hand-off pauses the assistant so it does not carry on over the person
   // taking the conversation — unless a person asked for this reply themselves,
   // in which case they are already there and the pause would only confuse.
-  if (handoff && !manual) {
+  if (handoff && !manual && !conversation.aiAlways && settings.handover !== 'always') {
     await prisma.conversation.update({
       where: { id: conversationId },
-      data: { aiPaused: true, aiPausedReason: handoffReason || 'It handed the conversation to the team' },
+      data: { aiPaused: true, aiPausedReason: handoffReason || 'It handed the conversation to the team', aiPausedAt: new Date() },
+    });
+  } else if (conversation.aiPaused && !manual) {
+    // It was allowed to answer a paused thread (always-on, or the client came
+    // back after a quiet day) — so the thread is the assistant's again.
+    await prisma.conversation.update({
+      where: { id: conversationId },
+      data: { aiPaused: false, aiPausedReason: null, aiPausedAt: null },
     });
   }
   return { sent: true, reason: `Replied${cards.length ? ` with ${cards.length} propert${cards.length === 1 ? 'y' : 'ies'}` : ''}${handoff ? ' and handed over to the team' : ''}.` };

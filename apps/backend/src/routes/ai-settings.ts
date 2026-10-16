@@ -58,6 +58,7 @@ const settingsSchema = z.object({
     .array(z.object({ ref: z.string().trim().min(1).max(40), pitch: z.string().trim().max(300).default('') }))
     .max(10),
   marketWhenUnknown: z.enum(['ask', 'LEBANON', 'GEORGIA']).default('ask'),
+  handover: z.enum(['step_aside', 'return_after_quiet', 'always']).default('return_after_quiet'),
   maxListings: z.union([z.literal(1), z.literal(2), z.literal(3)]).default(3),
   replyStyle: z.enum(['match', 'latin', 'latin_always']).default('latin'),
   modelTier: z.enum(['quality', 'economy']).default('quality'),

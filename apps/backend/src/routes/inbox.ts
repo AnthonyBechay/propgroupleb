@@ -421,20 +421,29 @@ router.post(
 router.patch(
   '/:id',
   asyncHandler(async (req: Request, res: Response) => {
-    const { aiPaused } = z.object({ aiPaused: z.boolean() }).parse(req.body);
+    const body = z
+      .object({ aiPaused: z.boolean().optional(), aiAlways: z.boolean().optional() })
+      .parse(req.body);
     const { count } = await prisma.conversation.updateMany({
       where: { id: req.params.id },
-      // Resuming hands the thread back to the assistant for 24 hours, even
-      // though a person has been replying on it.
-      data: aiPaused
-        ? { aiPaused: true, aiPausedReason: 'Paused by the team', aiResumedAt: null }
-        : { aiPaused: false, aiPausedReason: null, aiResumedAt: new Date() },
+      data: {
+        // Resuming hands the thread back to the assistant for 24 hours, even
+        // though a person has been replying on it.
+        ...(body.aiPaused === true
+          ? { aiPaused: true, aiPausedReason: 'Paused by the team', aiPausedAt: new Date(), aiResumedAt: null }
+          : body.aiPaused === false
+            ? { aiPaused: false, aiPausedReason: null, aiPausedAt: null, aiResumedAt: new Date() }
+            : {}),
+        // Always-on also lifts any pause: it means "answer, whatever happens".
+        ...(body.aiAlways === true ? { aiAlways: true, aiPaused: false, aiPausedReason: null, aiPausedAt: null } : {}),
+        ...(body.aiAlways === false ? { aiAlways: false } : {}),
+      },
     });
     if (count === 0) {
       sendNotFound(res, 'Conversation');
       return;
     }
-    sendSuccess(res, { aiPaused });
+    sendSuccess(res, body);
   })
 );
 

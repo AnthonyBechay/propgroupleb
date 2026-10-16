@@ -1752,6 +1752,14 @@ model Conversation {
   aiPaused Boolean @default(false)
   // Why, in words — so "paused" on a thread explains itself.
   aiPausedReason String?
+  aiPausedAt     DateTime?
+  // "Keep the assistant on": it answers this thread whatever happens — after
+  // the team replies, after it hands over. Only an explicit pause stops it.
+  aiAlways Boolean @default(false)
+  // A few sentences on where the conversation stands, rewritten by the
+  // assistant after each reply. It is what lets it pick a thread back up days
+  // later, after the team has been talking, without rereading everything.
+  summary String?
   // When somebody last pressed "Resume auto-reply". For 24 hours from then the
   // assistant keeps answering even though a person has replied on the thread.
   aiResumedAt DateTime?

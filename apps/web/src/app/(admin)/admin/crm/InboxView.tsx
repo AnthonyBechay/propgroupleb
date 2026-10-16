@@ -36,6 +36,8 @@ interface Thread {
   lastPreview: string | null
   unreadCount: number
   aiPaused: boolean
+  /** The assistant answers this thread whatever happens. */
+  aiAlways?: boolean
   adLabel: string | null
   adId: string | null
   lead: ThreadLead | null
@@ -326,6 +328,15 @@ export function InboxView({
     }
   }
 
+  const toggleAlways = async () => {
+    if (!detail) return
+    const res = await call(`/${detail.id}`, { method: 'PATCH', body: JSON.stringify({ aiAlways: !detail.aiAlways }) })
+    if (res.ok) {
+      setAiNote(null)
+      loadDetail(detail.id)
+    }
+  }
+
   const toggleAi = async () => {
     if (!detail) return
     // The header button: pause it when it is answering, resume it otherwise.
@@ -474,6 +485,19 @@ export function InboxView({
                 >
                   <Bot className="h-4 w-4" />
                   {detail.aiPaused ? 'Auto-reply paused' : detail.autoReply.sent ? 'Auto-reply on' : 'Auto-reply not active'}
+                </button>
+              )}
+              {detail.autoReplyOn && (
+                // "Keep it on" for this client: it answers even after the team
+                // replies or it hands over. A pause still stops it.
+                <button
+                  onClick={toggleAlways}
+                  title={detail.aiAlways
+                    ? 'The assistant answers this conversation whatever happens. Click to go back to normal.'
+                    : 'Keep the assistant answering this conversation even after the team replies'}
+                  className={`min-h-11 px-3 rounded-lg text-sm font-medium inline-flex items-center gap-1.5 border ${detail.aiAlways ? 'border-emerald-600 bg-emerald-600 text-white' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}
+                >
+                  {detail.aiAlways ? 'Always on' : 'Keep always on'}
                 </button>
               )}
               <button
