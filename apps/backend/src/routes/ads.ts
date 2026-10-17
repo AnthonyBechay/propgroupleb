@@ -136,7 +136,7 @@ router.post(
       return;
     }
     const leads = await prisma.lead.findMany({
-      where: { OR: [{ adId: { not: null } }, { externalLeadId: { not: null } }] },
+      where: { OR: [{ adId: { not: null } }, { externalLeadId: { not: null } }, { ctwaClid: { not: null } }] },
       orderBy: { createdAt: 'desc' },
       select: { id: true },
       take: 300,

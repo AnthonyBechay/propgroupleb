@@ -9,6 +9,7 @@ import { Toaster } from "@/components/ui/toast";
 import { ConditionalScrollToTop } from "@/components/layout/ConditionalScrollToTop";
 import { AnalyticsTracker } from "@/components/analytics/AnalyticsTracker";
 import { ComparatorBar } from "@/components/ComparatorBar";
+import { MetaPixel } from "@/components/analytics/MetaPixel";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -186,6 +187,7 @@ export default function RootLayout({
             <ComparatorBar />
             <Toaster />
             <AnalyticsTracker />
+            <MetaPixel />
           </ComparatorProvider>
         </AuthProvider>
       </body>

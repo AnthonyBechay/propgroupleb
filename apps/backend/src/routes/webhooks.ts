@@ -293,11 +293,17 @@ function whatsAppText(msg: any): string {
 
 function whatsAppReferral(msg: any): AdReferral | null {
   const r = msg.referral;
-  if (!r?.source_id) return null;
+  if (!r?.source_id && !r?.ctwa_clid) return null;
   // Headline AND the ad's main text: a project named in either is enough to
   // know what the client is asking about.
   const label = [r.headline, r.body].filter(Boolean).join(' — ').slice(0, 300);
-  return { adId: String(r.source_id), label: label || null };
+  return {
+    adId: r.source_id ? String(r.source_id) : null,
+    label: label || null,
+    ctwaClid: r.ctwa_clid ?? null,
+    // YCloud puts the account on the message; Meta's own format on the entry.
+    wabaId: msg.wabaId ?? null,
+  };
 }
 
 function seconds(ts: unknown): Date | undefined {

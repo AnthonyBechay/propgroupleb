@@ -92,6 +92,10 @@ function marketFor(source: 'META' | 'WHATSAPP'): 'LEBANON' | 'GEORGIA' {
 export interface AdReferral {
   adId?: string | null;
   label?: string | null;
+  /** Click-to-WhatsApp click id — what Meta needs to credit the ad with a result. */
+  ctwaClid?: string | null;
+  /** The WhatsApp Business Account the chat came in on. */
+  wabaId?: string | null;
 }
 
 export interface ChatEvent {
@@ -200,6 +204,13 @@ export async function recordChatMessage(event: ChatEvent): Promise<string | null
         where: { channel_externalId: { channel: event.channel, externalId } },
       });
     }
+  } else if (!event.history && event.referral?.ctwaClid && conversation.leadId) {
+    // A client we already have tapped an ad again: the newest click is the one
+    // a result should be credited to.
+    await prisma.lead.update({
+      where: { id: conversation.leadId },
+      data: { ctwaClid: event.referral.ctwaClid, wabaId: event.referral.wabaId ?? undefined, adId: event.referral.adId ?? undefined },
+    });
   } else if (!conversation.leadId && !event.history) {
     // The sender may have been added to the CRM by hand since the thread began.
     const lead = await findLeadForSender(event.channel, externalId);
@@ -232,6 +243,13 @@ export async function recordChatMessage(event: ChatEvent): Promise<string | null
     throw err;
   }
 
+  if (event.referral && !event.history) {
+    logger.info('Chat started from an ad', {
+      conversation: conversation.id,
+      ad: event.referral.adId,
+      clickId: event.referral.ctwaClid ? 'yes' : 'no',
+    });
+  }
   logger.info('Chat message stored', {
     channel: event.channel,
     direction: event.direction,
@@ -429,6 +447,8 @@ async function createLeadFromChat(event: ChatEvent, externalId: string): Promise
       igId: isWhatsApp ? null : externalId,
       adId: event.referral?.adId ?? null,
       adLabel: event.referral?.label ?? null,
+      ctwaClid: event.referral?.ctwaClid ?? null,
+      wabaId: event.referral?.wabaId ?? null,
       notes: event.body.slice(0, 4000),
       contactIntervalDays: 3,
     },

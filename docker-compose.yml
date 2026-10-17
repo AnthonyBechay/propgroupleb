@@ -35,6 +35,10 @@ services:
       META_DATASET_ID: ${META_DATASET_ID:-}
       # While set, those reports go to Events Manager's "Test events" tab only.
       META_TEST_EVENT_CODE: ${META_TEST_EVENT_CODE:-}
+      # The WhatsApp Business Account of the CRM's number (YCloud shows it as
+      # "WABA ID"). Needed to credit click-to-WhatsApp ads with results.
+      META_WABA_ID: ${META_WABA_ID:-}
+      META_WHATSAPP_DATASET_ID: ${META_WHATSAPP_DATASET_ID:-}
       INSTAGRAM_APP_SECRET: ${INSTAGRAM_APP_SECRET:-}
       # Instagram account token — for sending replies. Expires after 60 days
       # unless refreshed; replies on Instagram stop when it does.
@@ -153,6 +157,9 @@ services:
         # Requires Image Transformations enabled on the zone fronting
         # NEXT_PUBLIC_R2_PUBLIC_URL. Leave empty to use the built-in optimizer.
         NEXT_PUBLIC_IMAGE_CDN: ${NEXT_PUBLIC_IMAGE_CDN:-}
+        # Meta Pixel — the "propgroup-data" dataset, shared with the CRM so
+        # site visits and chats add up to one picture. Empty turns it off.
+        NEXT_PUBLIC_META_PIXEL_ID: ${NEXT_PUBLIC_META_PIXEL_ID-1650178626844787}
     restart: unless-stopped
     environment:
       NODE_ENV: production

@@ -1,5 +1,6 @@
 'use client'
 
+import { trackPixel } from '@/components/analytics/MetaPixel'
 import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -39,7 +40,7 @@ export function ContactSection() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
       })
-      if (res.ok) { setIsSubmitted(true); form.reset() }
+      if (res.ok) { trackPixel('Lead', { content_name: 'Contact form' }); setIsSubmitted(true); form.reset() }
       else {
         const e = await res.json().catch(() => ({}))
         setSubmitError(e.message || 'Failed to send message. Please try again.')

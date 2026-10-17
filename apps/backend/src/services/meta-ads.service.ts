@@ -203,5 +203,16 @@ export async function checkMetaConnection(): Promise<ConnectionCheck[]> {
     });
   }
 
+  // WhatsApp-ad results go to the dataset linked to the WhatsApp account.
+  const waba = process.env.META_WABA_ID;
+  if (!waba) {
+    add('WhatsApp ad results', false, 'META_WABA_ID is not set — the WhatsApp Business Account id (shown in YCloud next to the number).');
+  } else {
+    await attempt('WhatsApp ad results', async () => {
+      const { whatsappDatasetId } = await import('./meta-conversions.service.js');
+      return `WhatsApp account ${waba} reports to dataset ${await whatsappDatasetId(waba)}.`;
+    });
+  }
+
   return checks;
 }

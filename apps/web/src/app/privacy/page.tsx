@@ -3,7 +3,7 @@ import Link from 'next/link'
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'
 
 const CONTACT_EMAIL = 'propgroupleb@gmail.com'
-const LAST_UPDATED = '12 October 2026'
+const LAST_UPDATED = '17 October 2026'
 
 export const metadata = {
   title: 'Privacy Policy — PropGroup',
@@ -127,7 +127,10 @@ export default function PrivacyPage() {
           <Section id="cookies" title="6. Cookies">
             <p>
               We use a cookie to keep you signed in to your account, and basic analytics to count
-              page views. We do not use advertising cookies on our websites.
+              page views. We also use the Meta Pixel, which tells Meta (Facebook and Instagram) which
+              of our pages you visited and whether you sent us an enquiry, so that we can measure our
+              adverts and show them to people likely to be interested. You can control this in your
+              Facebook and Instagram ad settings.
             </p>
           </Section>
 

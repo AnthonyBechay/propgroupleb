@@ -14,9 +14,20 @@ import { logger } from '../utils/logger.js';
  * theirs reaches a viewing, "Converted" when one closes. Each client is
  * reported at most once per stage, and only ever forwards.
  *
+ * Two kinds of client, reported two ways:
+ *   - From a lead form (or with no ad click to point at): a CRM event —
+ *     "Lead" / "Qualified" / "Converted" — to META_DATASET_ID, matched by the
+ *     lead-form id or hashed phone and email.
+ *   - From a click-to-WhatsApp ad: a business-messaging event —
+ *     "LeadSubmitted" / "QualifiedLead" / "Purchase" — carrying the ad click id,
+ *     sent to the dataset Meta links to the WhatsApp Business Account. Only
+ *     this kind is credited to a WhatsApp ad.
+ *
  * Env:
  *   META_DATASET_ID   — the dataset (pixel) id from Meta Events Manager, set up
  *                       for CRM / conversion leads
+ *   META_WHATSAPP_DATASET_ID — optional; the dataset linked to the WhatsApp
+ *                       Business Account. Looked up automatically when unset.
  *   META_ACCESS_TOKEN — the system-user token
  *   META_TEST_EVENT_CODE — optional; while set, events land in Events
  *                       Manager's "Test events" tab instead of the real data
@@ -31,6 +42,36 @@ type Stage = keyof typeof STAGES;
 const QUALIFIED = ['VIEWING_BOOKED', 'VIEWED', 'INTERESTED', 'OFFER_MADE', 'RESERVED'];
 
 const sha256 = (value: string) => crypto.createHash('sha256').update(value).digest('hex');
+
+/** The same stages, in the names Meta uses for conversations on WhatsApp. */
+const MESSAGING_EVENT: Record<Stage, string> = { Lead: 'LeadSubmitted', Qualified: 'QualifiedLead', Converted: 'Purchase' };
+
+const waDatasetCache = new Map<string, string>();
+
+/**
+ * The dataset Meta links to a WhatsApp Business Account — where WhatsApp-ad
+ * results have to go. Asking creates it if the account has none yet. Needs a
+ * token with whatsapp_business_manage_events on that account.
+ */
+export async function whatsappDatasetId(wabaId: string): Promise<string> {
+  if (process.env.META_WHATSAPP_DATASET_ID) return process.env.META_WHATSAPP_DATASET_ID;
+  const hit = waDatasetCache.get(wabaId);
+  if (hit) return hit;
+  const url = `https://graph.facebook.com/${GRAPH_VERSION}/${encodeURIComponent(wabaId)}/dataset`;
+  const headers = { Authorization: `Bearer ${process.env.META_ACCESS_TOKEN}` };
+  let res = await fetch(url, { headers, signal: AbortSignal.timeout(15_000) });
+  let json: any = await res.json().catch(() => ({})); // eslint-disable-line @typescript-eslint/no-explicit-any
+  let id = json?.id ?? json?.data?.[0]?.dataset_id ?? json?.data?.[0]?.id;
+  if (!id) {
+    // None linked yet: this call creates (or returns) it.
+    res = await fetch(url, { method: 'POST', headers, signal: AbortSignal.timeout(15_000) });
+    json = await res.json().catch(() => ({}));
+    id = json?.id ?? json?.data?.[0]?.dataset_id ?? json?.data?.[0]?.id;
+  }
+  if (!id) throw new Error(json?.error?.message ?? `No dataset for WhatsApp account ${wabaId} (HTTP ${res.status})`);
+  waDatasetCache.set(wabaId, String(id));
+  return String(id);
+}
 
 export function conversionsConfigured(): boolean {
   return Boolean(process.env.META_DATASET_ID && process.env.META_ACCESS_TOKEN);
@@ -49,11 +90,12 @@ export async function reportLeadStage(leadId: string): Promise<ReportOutcome> {
       where: { id: leadId },
       select: {
         id: true, adId: true, externalLeadId: true, phone: true, email: true, metaStage: true,
-        opportunities: { select: { stage: true } },
+        ctwaClid: true, wabaId: true,
+        opportunities: { select: { stage: true, soldPrice: true, soldCurrency: true } },
       },
     });
     // Only people an ad brought in: anyone else tells Meta nothing about its ads.
-    if (!lead || (!lead.adId && !lead.externalLeadId)) return { status: 'skipped', detail: 'not from an ad' };
+    if (!lead || (!lead.adId && !lead.externalLeadId && !lead.ctwaClid)) return { status: 'skipped', detail: 'not from an ad' };
 
     const stages = lead.opportunities.map((o) => o.stage as string);
     const reached: Stage = stages.includes('WON')
@@ -63,6 +105,42 @@ export async function reportLeadStage(leadId: string): Promise<ReportOutcome> {
         : 'Lead';
     if (STAGES[reached] <= (STAGES[lead.metaStage as Stage] ?? 0)) {
       return { status: 'skipped', detail: `"${lead.metaStage}" already reported` };
+    }
+
+    // A click-to-WhatsApp client: report against the ad click itself.
+    const wabaId = lead.wabaId || process.env.META_WABA_ID || null;
+    if (lead.ctwaClid && wabaId) {
+      const won = lead.opportunities.find((o) => o.stage === 'WON' && o.soldPrice);
+      const dataset = await whatsappDatasetId(wabaId);
+      const res = await fetch(`https://graph.facebook.com/${GRAPH_VERSION}/${encodeURIComponent(dataset)}/events`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${process.env.META_ACCESS_TOKEN}` },
+        body: JSON.stringify({
+          data: [
+            {
+              event_name: MESSAGING_EVENT[reached],
+              event_time: Math.floor(Date.now() / 1000),
+              action_source: 'business_messaging',
+              messaging_channel: 'whatsapp',
+              user_data: { whatsapp_business_account_id: wabaId, ctwa_clid: lead.ctwaClid },
+              ...(reached === 'Converted'
+                ? { custom_data: { currency: won?.soldCurrency ?? 'USD', value: won?.soldPrice ?? 0 } }
+                : {}),
+            },
+          ],
+          ...(process.env.META_TEST_EVENT_CODE ? { test_event_code: process.env.META_TEST_EVENT_CODE } : {}),
+        }),
+        signal: AbortSignal.timeout(15_000),
+      });
+      if (!res.ok) {
+        const json: any = await res.json().catch(() => ({})); // eslint-disable-line @typescript-eslint/no-explicit-any
+        const reason = json?.error?.error_user_msg ?? json?.error?.message ?? `HTTP ${res.status}`;
+        logger.error('Meta WhatsApp conversion not accepted', { leadId, status: res.status, reason });
+        return { status: 'failed', detail: reason };
+      }
+      await prisma.lead.update({ where: { id: lead.id }, data: { metaStage: reached } });
+      logger.info('Meta WhatsApp conversion reported', { leadId, event: MESSAGING_EVENT[reached] });
+      return { status: 'sent', detail: MESSAGING_EVENT[reached] };
     }
 
     // Meta matches the event to the person by the lead-form id when there is

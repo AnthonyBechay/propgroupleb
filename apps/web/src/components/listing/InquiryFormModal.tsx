@@ -1,5 +1,6 @@
 'use client'
 
+import { trackPixel } from '@/components/analytics/MetaPixel'
 import { useState } from 'react'
 import {
   Dialog,
@@ -68,6 +69,7 @@ export function InquiryFormModal({ listingId, listingTitle, buildingId }: Inquir
         throw new Error(data?.error ?? `Request failed (${res.status})`)
       }
 
+      trackPixel('Lead', { content_name: 'Listing enquiry' })
       setSuccess(true)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong. Please try again.')

@@ -1597,6 +1597,11 @@ model Lead {
   // The furthest stage already reported back to Meta ("Qualified",
   // "Converted"), so each is sent once and never backwards.
   metaStage String?
+  // Click-to-WhatsApp: the ad click that started their chat, and the WhatsApp
+  // Business Account it came in on. With these Meta can tie a sale back to the
+  // exact ad click — the only way a WhatsApp ad's results are counted.
+  ctwaClid String?
+  wabaId   String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
