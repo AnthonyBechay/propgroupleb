@@ -2,6 +2,7 @@ import { prisma } from '@propgroup/db';
 import { AppError } from '../utils/errors.js';
 import { logger } from '../utils/logger.js';
 import { recordChatMessage } from './messaging-intake.service.js';
+import { instagramToken } from './instagram-token.service.js';
 
 /**
  * Sending a reply on a mirrored thread.
@@ -27,7 +28,7 @@ export type ReplyOrigin = 'CRM' | 'AI';
 export function canSendOn(channel: 'WHATSAPP' | 'INSTAGRAM'): boolean {
   return channel === 'WHATSAPP'
     ? Boolean(process.env.YCLOUD_API_KEY && process.env.YCLOUD_WHATSAPP_FROM)
-    : Boolean(process.env.INSTAGRAM_ACCESS_TOKEN);
+    : Boolean(instagramToken());
 }
 
 export function replyWindowOpen(lastInboundAt: Date | null): boolean {
@@ -73,13 +74,13 @@ async function sendInstagram(to: string, text: string, imageUrl?: string): Promi
   if (imageUrl) {
     await postJson(
       `https://graph.instagram.com/${GRAPH_VERSION}/me/messages`,
-      { Authorization: `Bearer ${process.env.INSTAGRAM_ACCESS_TOKEN}` },
+      { Authorization: `Bearer ${instagramToken()}` },
       { recipient: { id: to }, message: { attachment: { type: 'image', payload: { url: imageUrl } } } }
     ).catch(() => undefined);
   }
   const json = await postJson(
     `https://graph.instagram.com/${GRAPH_VERSION}/me/messages`,
-    { Authorization: `Bearer ${process.env.INSTAGRAM_ACCESS_TOKEN}` },
+    { Authorization: `Bearer ${instagramToken()}` },
     { recipient: { id: to }, message: { text } }
   );
   if (!json.message_id) throw new AppError('The message was sent but Instagram returned no id', 502);

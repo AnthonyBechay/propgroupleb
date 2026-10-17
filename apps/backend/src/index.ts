@@ -13,6 +13,8 @@ import { logger } from './utils/logger.js';
 import { validateEnv } from './utils/validate-env.js';
 import { ensureReferenceCodes } from './utils/reference.js';
 import { normaliseCrmData } from './utils/crm-bootstrap.js';
+import { startInstagramTokenRefresh } from './services/instagram-token.service.js';
+import { startQuietSweep } from './services/auto-reply.service.js';
 
 // Import routes
 import authRoutes from './routes/auth.js';
@@ -415,6 +417,11 @@ async function startServer() {
     } catch (err) {
       logger.error('Could not normalise CRM data', { error: (err as Error).message });
     }
+
+    // Background jobs: keep the Instagram token from expiring, and pick up
+    // clients the team has left waiting.
+    startInstagramTokenRefresh();
+    startQuietSweep();
 
     const server = app.listen(PORT, () => {
       logger.info('Server started', {

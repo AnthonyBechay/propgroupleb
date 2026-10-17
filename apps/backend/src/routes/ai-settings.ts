@@ -9,6 +9,7 @@ import { aiBudget } from '../utils/ai-budget.js';
 import { getChatAiSettings, saveChatAiSettings } from '../services/ai-settings.service.js';
 import { cardsByRef, formatPrice, searchCatalogue } from '../services/catalogue.service.js';
 import { canSendOn } from '../services/messaging-send.service.js';
+import { instagramTokenStatus } from '../services/instagram-token.service.js';
 
 // How the chat assistant behaves — admin only, because it decides what a
 // machine says to clients in the office's name.
@@ -44,6 +45,7 @@ router.get(
         aiKey: chatAiEnabled(),
         whatsappSending: canSendOn('WHATSAPP'),
         instagramSending: canSendOn('INSTAGRAM'),
+        instagramToken: instagramTokenStatus(),
         budget,
       },
       catalogue: [...georgia.map((c) => option(c, 'GEORGIA')), ...lebanon.map((c) => option(c, 'LEBANON'))],
@@ -59,6 +61,7 @@ const settingsSchema = z.object({
     .max(10),
   marketWhenUnknown: z.enum(['ask', 'LEBANON', 'GEORGIA']).default('ask'),
   handover: z.enum(['step_aside', 'return_after_quiet', 'always']).default('return_after_quiet'),
+  quietHours: z.union([z.literal(1), z.literal(3), z.literal(6), z.literal(12), z.literal(20)]).default(6),
   maxListings: z.union([z.literal(1), z.literal(2), z.literal(3)]).default(3),
   replyStyle: z.enum(['match', 'latin', 'latin_always']).default('latin'),
   modelTier: z.enum(['quality', 'economy']).default('quality'),

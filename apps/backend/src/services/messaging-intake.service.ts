@@ -5,6 +5,7 @@ import { processImageBuffer, uploadFileAtKey } from './upload.service.js';
 import { recordAdEnquiry } from './deal-sync.service.js';
 import { describeAd } from './meta-ads.service.js';
 import { reportLeadStage } from './meta-conversions.service.js';
+import { instagramToken } from './instagram-token.service.js';
 
 /**
  * Turning Meta webhook deliveries into inbox threads and CRM clients.
@@ -301,7 +302,7 @@ export async function recordChatMessage(event: ChatEvent): Promise<string | null
  * fallback name in place.
  */
 async function nameInstagramSender(conversationId: string, userId: string): Promise<void> {
-  const token = process.env.INSTAGRAM_ACCESS_TOKEN;
+  const token = instagramToken();
   if (!token) return;
   try {
     const res = await fetch(

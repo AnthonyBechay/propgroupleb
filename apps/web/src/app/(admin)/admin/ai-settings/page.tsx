@@ -22,6 +22,7 @@ interface Settings {
   audience: 'ads' | 'all'
   marketWhenUnknown: 'ask' | 'LEBANON' | 'GEORGIA'
   handover: 'step_aside' | 'return_after_quiet' | 'always'
+  quietHours: 1 | 3 | 6 | 12 | 20
   preferred: Preferred[]
   maxListings: 1 | 2 | 3
   replyStyle: 'match' | 'latin' | 'latin_always'
@@ -66,6 +67,7 @@ interface Status {
   aiKey: boolean
   whatsappSending: boolean
   instagramSending: boolean
+  instagramToken?: { configured: boolean; refreshedAt: string | null; expiresAt: string | null; error: string | null }
   budget: { dailyUsd: number; dailyLimitUsd: number; monthlyUsd: number; monthlyLimitUsd: number; exhausted: boolean }
 }
 
@@ -183,6 +185,15 @@ export default function AiSettingsPage() {
             {blockers.map((b) => <li key={b}>{b}</li>)}
           </ul>
         )}
+        {status.instagramToken?.configured && (
+          <p className={`text-xs mt-2 ${status.instagramToken.error ? 'text-red-700' : 'text-slate-600'}`}>
+            {status.instagramToken.error
+              ? `Instagram token could not be renewed: ${status.instagramToken.error}. Generate a new one in the Meta app and put it in INSTAGRAM_ACCESS_TOKEN.`
+              : status.instagramToken.expiresAt
+                ? `Instagram token renews itself weekly — good until ${new Date(status.instagramToken.expiresAt).toLocaleDateString()}.`
+                : 'Instagram token renews itself weekly; the first renewal happens within a day of the server starting.'}
+          </p>
+        )}
         <p className="text-xs text-slate-600 mt-2">
           Spend: ${status.budget.dailyUsd.toFixed(2)} of ${status.budget.dailyLimitUsd} in the last 24 hours ·
           ${status.budget.monthlyUsd.toFixed(2)} of ${status.budget.monthlyLimitUsd} this month. All AI stops at either limit.
@@ -233,11 +244,27 @@ export default function AiSettingsPage() {
           value={settings.handover}
           onChange={(v) => update({ handover: v })}
           options={[
-            ['return_after_quiet', 'Step aside, and come back after a quiet day', 'It stays out while you are talking. If the client writes again a full day after anyone from the team last replied, it picks the conversation up again from its summary.'],
+            ['return_after_quiet', 'Step aside, and take over if the team goes quiet', 'It stays out while you are talking. If a client is waiting and nobody from the team has replied for the time below, it picks the conversation up again from its summary.'],
             ['step_aside', 'Step aside until resumed', 'It stays out until someone presses "Resume" on that conversation.'],
             ['always', 'Always answer', 'It answers every message on every conversation, even while you are talking too — clients may get two replies. Only a pause stops it.'],
           ] as const}
         />
+
+        {settings.handover === 'return_after_quiet' && (
+          <Choice
+            legend="Take over after the team has been quiet for"
+            name="quietHours"
+            value={settings.quietHours}
+            onChange={(v) => update({ quietHours: v })}
+            options={[
+              [1, '1 hour', 'Clients are never left long.'],
+              [3, '3 hours', ''],
+              [6, '6 hours', ''],
+              [12, '12 hours', ''],
+              [20, '20 hours', 'The longest possible: WhatsApp allows a reply only within 24 hours of the client\'s last message.'],
+            ] as const}
+          />
+        )}
 
         <Choice
           legend="When nobody has said which country"

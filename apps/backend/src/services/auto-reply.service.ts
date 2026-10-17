@@ -48,7 +48,7 @@ const MEDIA_WAIT_MS = 3_000;
 const MEDIA_WAIT_TRIES = 4;
 const DAY_MS = 24 * 60 * 60 * 1000;
 /** People send three short messages in a row; answer once, after they stop. */
-const DEBOUNCE_MS = 8_000;
+const DEBOUNCE_MS = 6_000;
 /** WhatsApp cuts a photo caption at 1024 characters. */
 const CAPTION_LIMIT = 1000;
 /** Enough history to keep the thread of a conversation; each message is resent on every model call. */
@@ -148,27 +148,52 @@ export async function autoReplyStatus(conversationId: string): Promise<AutoReply
 }
 
 /**
- * The client wrote again a full day after anyone from the team last did
- * anything on the thread (replied, or paused it). Whatever was being handled
- * by hand has gone quiet, and a client writing into silence should not wait for
- * someone to notice.
+ * The team has gone quiet: nobody has replied (or paused the thread) for
+ * `quietHours`. A client writing into that silence should not wait for
+ * someone to notice, so the assistant takes the conversation back.
  */
-async function cameBackAfterQuiet(conversation: { id: string; aiPausedAt: Date | null }): Promise<boolean> {
-  const [lastIn, lastTeam] = await Promise.all([
-    prisma.chatMessage.findFirst({
-      where: { conversationId: conversation.id, direction: 'IN' },
-      orderBy: { createdAt: 'desc' },
-      select: { createdAt: true },
-    }),
-    prisma.chatMessage.findFirst({
-      where: { conversationId: conversation.id, direction: 'OUT', NOT: { origin: 'AI' } },
-      orderBy: { createdAt: 'desc' },
-      select: { createdAt: true },
-    }),
-  ]);
-  if (!lastIn) return false;
+async function teamWentQuiet(conversation: { id: string; aiPausedAt: Date | null }, quietHours: number): Promise<boolean> {
+  const lastTeam = await prisma.chatMessage.findFirst({
+    where: { conversationId: conversation.id, direction: 'OUT', NOT: { origin: 'AI' } },
+    orderBy: { createdAt: 'desc' },
+    select: { createdAt: true },
+  });
   const teamAt = Math.max(lastTeam?.createdAt.getTime() ?? 0, conversation.aiPausedAt?.getTime() ?? 0);
-  return teamAt > 0 && lastIn.createdAt.getTime() - teamAt > DAY_MS;
+  return teamAt > 0 && Date.now() - teamAt >= quietHours * 60 * 60 * 1000;
+}
+
+/**
+ * Every few minutes, look for clients who are waiting while the team has gone
+ * quiet. Nothing else would notice them: the assistant otherwise only wakes on
+ * a new message, and a client who wrote once and is waiting sends no other.
+ */
+export function startQuietSweep(): void {
+  const sweep = async () => {
+    if (!autoReplyEnabled()) return;
+    const settings = await getChatAiSettings();
+    if (!settings.enabled || settings.handover !== 'return_after_quiet') return;
+    const now = Date.now();
+    // Still inside WhatsApp's 24-hour window, waiting at least as long as the
+    // quiet period, and the client spoke last.
+    const candidates = await prisma.conversation.findMany({
+      where: {
+        archivedAt: null,
+        lastInboundAt: { gte: new Date(now - DAY_MS + 30 * 60 * 1000), lte: new Date(now - 60_000) },
+      },
+      select: { id: true, lastInboundAt: true, lastMessageAt: true },
+      take: 200,
+    });
+    for (const c of candidates) {
+      if (!c.lastInboundAt || c.lastMessageAt.getTime() - c.lastInboundAt.getTime() > 1000) continue;
+      if (pending.has(c.id) || inFlight.has(c.id)) continue;
+      const outcome = await run(c.id, false).catch((err) => {
+        logger.error('Quiet sweep reply failed', err, { conversationId: c.id });
+        return null;
+      });
+      if (outcome?.sent) logger.info('Auto-reply: picked up a waiting client', { conversationId: c.id, reason: outcome.reason });
+    }
+  };
+  setInterval(() => void sweep().catch((err) => logger.error('Quiet sweep failed', err)), 5 * 60 * 1000).unref();
 }
 
 /** "Resume auto-reply" was pressed within the last 24 hours. */
@@ -182,7 +207,7 @@ function resumedRecently(conversation: { aiResumedAt: Date | null }): boolean {
  */
 async function standingBlock(
   conversation: { id: string; channel: 'WHATSAPP' | 'INSTAGRAM'; aiPaused: boolean; aiPausedReason: string | null; aiPausedAt: Date | null; aiAlways: boolean; aiResumedAt: Date | null; adId: string | null; lastInboundAt: Date | null; lead: { adId: string | null; source: string } | null },
-  settings: { enabled: boolean; audience: 'ads' | 'all'; handover: ChatAiSettings['handover'] },
+  settings: { enabled: boolean; audience: 'ads' | 'all'; handover: ChatAiSettings['handover']; quietHours: number },
   manual: boolean
 ): Promise<string | null> {
   if (!chatAiEnabled()) return 'No Gemini key is set on the server (GEMINI_API_KEY).';
@@ -202,11 +227,17 @@ async function standingBlock(
     // back after a quiet day.
     const alwaysHere = conversation.aiAlways;
     const alwaysEverywhere = settings.handover === 'always';
-    const cameBack = settings.handover === 'return_after_quiet' && (await cameBackAfterQuiet(conversation));
+    const cameBack = settings.handover === 'return_after_quiet' && (await teamWentQuiet(conversation, settings.quietHours));
     const pausedByTeam = conversation.aiPausedReason === 'Paused by the team';
 
     if (conversation.aiPaused && !alwaysHere && !cameBack && !(alwaysEverywhere && !pausedByTeam)) {
-      return `Auto-reply is paused on this conversation${conversation.aiPausedReason ? `: ${conversation.aiPausedReason.charAt(0).toLowerCase()}${conversation.aiPausedReason.slice(1)}` : ''}.`;
+      const why = conversation.aiPausedReason
+        ? `: ${conversation.aiPausedReason.charAt(0).toLowerCase()}${conversation.aiPausedReason.slice(1)}`
+        : '';
+      const comesBack = settings.handover === 'return_after_quiet'
+        ? ` It takes over again once the team has been quiet for ${settings.quietHours} hour${settings.quietHours === 1 ? '' : 's'}.`
+        : '';
+      return `Auto-reply is paused on this conversation${why}.${comesBack}`;
     }
     if (settings.audience !== 'all') {
       const fromAd =
@@ -223,7 +254,11 @@ async function standingBlock(
           sentAt: { gte: new Date(Date.now() - DAY_MS) }, NOT: { origin: 'AI' },
         },
       });
-      if (humanReplied > 0) return 'Someone on the team replied on this conversation in the last 24 hours, so the assistant is staying out of it.';
+      if (humanReplied > 0) {
+        return settings.handover === 'return_after_quiet'
+          ? `Someone on the team replied on this conversation recently, so the assistant is staying out of it — it takes over again if a client message waits ${settings.quietHours} hour${settings.quietHours === 1 ? '' : 's'} with no reply from the team.`
+          : 'Someone on the team replied on this conversation in the last 24 hours, so the assistant is staying out of it.';
+      }
     }
   }
   const budget = await aiBudget();
@@ -410,7 +445,26 @@ async function loadAttachment(mediaUrl: string): Promise<{ data: string; mimeTyp
   }
 }
 
+/**
+ * One reply per thread at a time. The new-message timer, the quiet sweep and
+ * the "reply now" button can all reach the same thread; two runs that both saw
+ * the client waiting would both answer.
+ */
+const inFlight = new Set<string>();
+
 async function run(conversationId: string, manual: boolean): Promise<AutoReplyOutcome> {
+  if (inFlight.has(conversationId)) {
+    return { sent: false, reason: 'The assistant is already answering this conversation.' };
+  }
+  inFlight.add(conversationId);
+  try {
+    return await reply(conversationId, manual);
+  } finally {
+    inFlight.delete(conversationId);
+  }
+}
+
+async function reply(conversationId: string, manual: boolean): Promise<AutoReplyOutcome> {
   const skip = (reason: string): AutoReplyOutcome => ({ sent: false, reason });
   const conversation = await prisma.conversation.findUnique({
     where: { id: conversationId },
@@ -640,7 +694,14 @@ async function run(conversationId: string, manual: boolean): Promise<AutoReplyOu
   let handoff = false;
   let reply = '';
 
-  const order = chatModelOrder(settings.modelTier);
+  // A greeting or a one-liner ("hi", "kifak", "thanks") does not need the
+  // stronger model: the cheap one answers it in a couple of seconds for a
+  // fraction of the cost. Anything with a number, a voice note or real content
+  // goes to the tier chosen in settings.
+  const unansweredText = ordered.filter((m) => unansweredIds.has(m.id)).map((m) => m.body).join(' ').trim();
+  const simple =
+    !hasVoice && unansweredText.length <= 40 && !/\d/.test(unansweredText) && !/\[\w+\]/.test(unansweredText);
+  const order = chatModelOrder(simple ? 'economy' : settings.modelTier);
   for (let step = 0; ; step++) {
     const model = order[step];
     const lastChance = step === order.length - 1;
@@ -655,7 +716,9 @@ async function run(conversationId: string, manual: boolean): Promise<AutoReplyOu
   for (let turn = 0; turn < MAX_MODEL_TURNS; turn++) {
     const result = await session.send(contents);
     contents.push(result.content);
-    if (result.text) reply = result.text;
+    // Text written alongside a search is "let me check" — not the answer. Only
+    // a turn that ends the work (no call, or only bookkeeping calls) is the reply.
+    if (result.text && result.calls.every((c) => FINISHING_TOOLS.has(c.name))) reply = result.text;
     if (result.calls.length === 0) break;
 
     const responses: ChatPart[] = [];
