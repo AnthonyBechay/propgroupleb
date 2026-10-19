@@ -114,6 +114,17 @@ export async function normaliseCrmData(): Promise<void> {
   // Follow-up dates used to be invented from a 7-day cadence, so every imported
   // client showed up overdue on day one and the team stopped reading the badge.
   // Clear the invented ones; from here on a date only exists if someone set it.
+  // The owner asked (2026-10-19) for Arabic letters to be answered in Arabic
+  // letters, and voice notes in Lebanese in Latin letters — which is "match".
+  // The old default answered every Arabic speaker in Latin letters.
+  await once('chat_reply_style_match_v1', async () => {
+    const row = await prisma.systemSetting.findUnique({ where: { key: 'chat_ai_settings' } });
+    const value = (row?.value ?? null) as Record<string, unknown> | null;
+    if (!row || !value || value.replyStyle !== 'latin') return 'nothing to change';
+    await prisma.systemSetting.update({ where: { key: 'chat_ai_settings' }, data: { value: { ...value, replyStyle: 'match' } as never } });
+    return 'chat assistant reply style moved from latin to match';
+  });
+
   await once('crm_clear_derived_followups_v1', async () => {
     const { count } = await prisma.lead.updateMany({
       where: {

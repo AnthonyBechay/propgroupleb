@@ -127,7 +127,7 @@ export async function sendReply(
     // WhatsApp refuses some photos (a format it does not take, a file too
     // large, a link it cannot fetch). The words matter more than the picture,
     // and the link in them leads to every photo anyway — send them without it.
-    logger.warn('Photo not accepted, sending the text alone', { error: (err as Error).message });
+    logger.warn('Photo not accepted, sending the text alone', { conversation: conversationId, image: imageUrl, error: (err as Error).message });
     imageUrl = undefined;
     sent = await deliver();
   }

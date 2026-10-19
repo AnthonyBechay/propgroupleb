@@ -63,7 +63,7 @@ const settingsSchema = z.object({
   handover: z.enum(['step_aside', 'return_after_quiet', 'always']).default('return_after_quiet'),
   quietHours: z.union([z.literal(1), z.literal(3), z.literal(6), z.literal(12), z.literal(20)]).default(6),
   maxListings: z.union([z.literal(1), z.literal(2), z.literal(3)]).default(3),
-  replyStyle: z.enum(['match', 'latin', 'latin_always']).default('latin'),
+  replyStyle: z.enum(['match', 'latin', 'latin_always']).default('match'),
   modelTier: z.enum(['quality', 'economy']).default('quality'),
   office: z.object({
     name: z.string().trim().max(120).default(''),

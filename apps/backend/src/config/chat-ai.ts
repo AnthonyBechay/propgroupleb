@@ -125,6 +125,9 @@ export interface ChatTurnResult {
  * reply again on the next (`modelIndex + 1`).
  */
 export class ChatSession {
+  /** What this session has cost so far, for the one log line each reply gets. */
+  readonly spent = { calls: 0, inputTokens: 0, outputTokens: 0, usd: 0, ms: 0 };
+
   constructor(
     private readonly system: string,
     private readonly tools: ChatTool[],
@@ -145,6 +148,7 @@ export class ChatSession {
     const model = MODELS[this.modelIndex];
     for (let attempt = 0; ; attempt++) {
       let failure: string;
+      const started = Date.now();
       try {
         const res = await fetch(
           `https://generativelanguage.googleapis.com/v1beta/models/${model.id}:generateContent`,
@@ -158,7 +162,7 @@ export class ChatSession {
             body: JSON.stringify({
               systemInstruction: { parts: [{ text: this.system }] },
               contents,
-              tools: [{ functionDeclarations: this.tools }],
+              ...(this.tools.length ? { tools: [{ functionDeclarations: this.tools }] } : {}),
               ...(textOnly ? { toolConfig: { functionCallingConfig: { mode: 'NONE' } } } : {}),
               generationConfig: { maxOutputTokens: MAX_OUTPUT_TOKENS },
             }),
@@ -166,7 +170,7 @@ export class ChatSession {
           }
         );
         const json: any = await res.json().catch(() => ({}));
-        if (res.ok) return this.finish(model, json);
+        if (res.ok) return this.finish(model, json, Date.now() - started);
 
         // Overloaded, rate-limited or a server fault: worth another go. Anything
         // else (bad request, bad key) will not get better by asking again.
@@ -189,13 +193,18 @@ export class ChatSession {
     }
   }
 
-  private finish(model: (typeof MODELS)[number], json: any): ChatTurnResult {
+  private finish(model: (typeof MODELS)[number], json: any, ms: number): ChatTurnResult {
       const u = json.usageMetadata ?? {};
       const inputTokens = u.promptTokenCount ?? 0;
       // Thinking is billed as output.
       const outputTokens = (u.candidatesTokenCount ?? 0) + (u.thoughtsTokenCount ?? 0);
       const costUsd = (inputTokens * model.inputPerM + outputTokens * model.outputPerM) / 1e6;
-      logger.debug('Chat AI call', { model: model.id, in: inputTokens, out: outputTokens, usd: costUsd.toFixed(5) });
+      this.spent.calls += 1;
+      this.spent.inputTokens += inputTokens;
+      this.spent.outputTokens += outputTokens;
+      this.spent.usd += costUsd;
+      this.spent.ms += ms;
+      logger.debug('Chat AI call', { model: model.id, in: inputTokens, out: outputTokens, usd: costUsd.toFixed(5), ms });
       void prisma.aiUsage
         .create({
           data: {

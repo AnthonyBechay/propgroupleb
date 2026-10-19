@@ -61,7 +61,9 @@ export interface ChatAiSettings {
   maxListings: 1 | 2 | 3;
   /**
    * How it writes to Arabic speakers.
-   *   match        — the client's own language and script
+   *   match        — the client's own script: Arabic letters for Arabic
+   *                  letters; Lebanese in Latin letters for Arabizi and for
+   *                  Arabic voice notes; English and French as they are
    *   latin        — Lebanese Arabic in Latin letters ("kifak, shu badak?")
    *                  for anyone writing Arabic; English and French as they are
    *   latin_always — Lebanese in Latin letters to everyone
@@ -89,7 +91,7 @@ export function defaultChatAiSettings(): ChatAiSettings {
     quietHours: 6,
     preferred: [],
     maxListings: 3,
-    replyStyle: 'latin',
+    replyStyle: 'match',
     modelTier: 'quality',
     office: { name: 'PropGroup', address: 'Fanar, Lebanon', mapsUrl: '' },
     knowledge: [],

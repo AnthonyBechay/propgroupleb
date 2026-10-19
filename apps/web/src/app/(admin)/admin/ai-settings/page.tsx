@@ -296,9 +296,9 @@ export default function AiSettingsPage() {
           <legend className="text-sm font-semibold text-slate-900 mb-2">How it writes</legend>
           <div className="space-y-2">
             {([
-              ['latin', 'Lebanese in English letters for Arabic speakers', 'Anyone writing or speaking Arabic gets "Ahla w sahla, shu l budget?" style. English and French speakers get their own language.'],
+              ['match', 'Match the client (recommended)', 'Arabic letters get Arabic letters. Arabic typed in English letters, and Arabic voice notes, get Lebanese in English letters ("Ahla w sahla, 2addeh l budget?"). English and French as they are.'],
+              ['latin', 'Lebanese in English letters for Arabic speakers', 'Anyone writing or speaking Arabic, even in Arabic letters, gets Lebanese in English letters. English and French speakers get their own language.'],
               ['latin_always', 'Lebanese in English letters for everyone', 'Whatever language the client writes in.'],
-              ['match', 'The client\'s own language and script', 'Arabic letters for Arabic letters, English for English.'],
             ] as const).map(([value, title, hint]) => (
               <label key={value} className="flex items-start gap-3 cursor-pointer">
                 <input

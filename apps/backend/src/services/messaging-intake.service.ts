@@ -258,6 +258,10 @@ export async function recordChatMessage(event: ChatEvent): Promise<string | null
     ...(event.origin ? { origin: event.origin } : {}),
     conversation: conversation.id,
     client: conversation.leadId ?? 'none',
+    // What was said, so a shared log can be read as the conversation it was.
+    ...(process.env.LOG_CHAT_TEXT !== 'false' && event.type === 'text' && !event.history
+      ? { text: event.body.replace(/\s+/g, ' ').slice(0, 120) }
+      : {}),
   });
 
   // Not awaited: a slow download must not hold up the thread, and a failed one
@@ -462,11 +466,35 @@ async function createLeadFromChat(event: ChatEvent, externalId: string): Promise
 /** Delivery receipts for messages we sent. Unknown ids are ignored. */
 export async function recordMessageStatus(
   messageIds: Array<string | null | undefined>,
-  status: string
+  status: string,
+  failure?: string | null
 ): Promise<void> {
   const ids = messageIds.filter((id): id is string => Boolean(id));
   if (ids.length === 0) return;
-  await prisma.chatMessage.updateMany({ where: { externalId: { in: ids } }, data: { status } });
+  const { count } = await prisma.chatMessage.updateMany({ where: { externalId: { in: ids } }, data: { status } });
+
+  // "sent" can race the row being written, so only the later receipts are
+  // telling. A receipt for a message we never stored is what a send that
+  // errored but went out anyway looks like — the trail of a duplicate.
+  if (count === 0) {
+    if (status !== 'sent') logger.info('Receipt for a message not in the CRM', { status, id: ids[0] });
+    return;
+  }
+  if (status !== 'read' && status !== 'failed') return;
+  const message = await prisma.chatMessage.findFirst({
+    where: { externalId: { in: ids } },
+    select: { conversationId: true, direction: true, origin: true, type: true, sentAt: true },
+  });
+  if (!message || message.direction !== 'OUT') return;
+  const meta = {
+    conversation: message.conversationId,
+    origin: message.origin ?? 'unknown',
+    type: message.type,
+    afterS: Math.round((Date.now() - message.sentAt.getTime()) / 1000),
+  };
+  if (status === 'failed') logger.warn('Chat message not delivered', { ...meta, reason: failure ?? undefined });
+  // How long a reply sits before the client reads it — the other half of timing.
+  else logger.info('Chat reply read', meta);
 }
 
 /**

@@ -217,6 +217,42 @@ export function InboxView({
     return () => clearInterval(timer)
   }, [loadThreads])
 
+  // A phone suspends the page's timers while it is in the background — and the
+  // home-screen app is in the background most of the day. Catch up the moment
+  // it is opened again, rather than up to a poll later.
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState !== 'visible') return
+      loadThreads()
+      if (openId) loadDetail(openId)
+    }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => document.removeEventListener('visibilitychange', onVisible)
+  }, [loadThreads, loadDetail, openId])
+
+  // On a phone an open conversation is the whole screen, like WhatsApp: sized
+  // to what the keyboard leaves visible (iOS does not shrink 100dvh for it),
+  // and the page behind it held still.
+  const [phoneHeight, setPhoneHeight] = useState<number | null>(null)
+  useEffect(() => {
+    const phone = window.matchMedia('(max-width: 1023px)')
+    if (!openId || !phone.matches) { setPhoneHeight(null); return }
+    const vv = window.visualViewport
+    const fit = () => {
+      setPhoneHeight(vv ? vv.height : window.innerHeight)
+      // iOS scrolls the page to show a focused field; the chat is already in view.
+      window.scrollTo(0, 0)
+    }
+    fit()
+    vv?.addEventListener('resize', fit)
+    const previous = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => {
+      vv?.removeEventListener('resize', fit)
+      document.body.style.overflow = previous
+    }
+  }, [openId])
+
   useEffect(() => {
     setDetail(null)
     setDraft('')
@@ -452,7 +488,10 @@ export function InboxView({
       </div>
 
       {/* Open thread */}
-      <div className={`flex-col min-h-[60vh] lg:min-h-0 ${openId ? 'flex' : 'hidden lg:flex'}`}>
+      <div
+        className={`flex-col lg:min-h-0 ${openId ? 'flex fixed inset-x-0 top-0 z-40 h-[100dvh] bg-white pt-[env(safe-area-inset-top)] lg:static lg:z-auto lg:h-auto lg:pt-0' : 'hidden lg:flex'}`}
+        style={phoneHeight ? { height: phoneHeight } : undefined}
+      >
         {!openId ? (
           <div className="flex-1 flex items-center justify-center text-sm text-slate-400">Select a conversation</div>
         ) : !detail ? (
@@ -484,7 +523,8 @@ export function InboxView({
                   className={`min-h-11 px-3 rounded-lg text-sm font-medium inline-flex items-center gap-1.5 border ${detail.autoReply.sent ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-slate-200 text-slate-600'}`}
                 >
                   <Bot className="h-4 w-4" />
-                  {detail.aiPaused ? 'Auto-reply paused' : detail.autoReply.sent ? 'Auto-reply on' : 'Auto-reply not active'}
+                  {/* "Auto-reply" is the icon on a phone, where the header is one row. */}
+                  <span><span className="hidden sm:inline">Auto-reply </span>{detail.aiPaused ? 'paused' : detail.autoReply.sent ? 'on' : 'not active'}</span>
                 </button>
               )}
               {detail.autoReplyOn && (
@@ -522,19 +562,19 @@ export function InboxView({
                 onClick={() => setShowListings((v) => !v)}
                 className={`min-h-11 px-3 rounded-lg text-sm font-medium inline-flex items-center gap-1.5 border ${showListings ? 'border-slate-900 bg-slate-900 text-white' : 'border-slate-200 text-slate-700 hover:bg-slate-50'}`}
               >
-                <Building2 className="h-4 w-4" /> Properties
+                <Building2 className="h-4 w-4" /> <span className="hidden sm:inline">Properties</span>
               </button>
               {detail.lead ? (
-                <button onClick={() => onOpenLead(detail.lead!.id)} className="min-h-11 px-3 rounded-lg text-sm font-medium inline-flex items-center gap-1.5 border border-slate-200 text-slate-700 hover:bg-slate-50">
-                  <User className="h-4 w-4" /> Open client
+                <button onClick={() => onOpenLead(detail.lead!.id)} aria-label="Open client" className="min-h-11 min-w-11 px-3 rounded-lg text-sm font-medium inline-flex items-center justify-center gap-1.5 border border-slate-200 text-slate-700 hover:bg-slate-50">
+                  <User className="h-4 w-4" /> <span className="hidden sm:inline">Open client</span>
                 </button>
               ) : (
                 <>
                   <button onClick={() => setLinking((v) => !v)} className="min-h-11 px-3 rounded-lg text-sm font-medium inline-flex items-center gap-1.5 border border-slate-200 text-slate-700 hover:bg-slate-50">
-                    <Link2 className="h-4 w-4" /> Link to client
+                    <Link2 className="h-4 w-4" /> <span className="hidden sm:inline">Link to client</span>
                   </button>
                   <button onClick={() => addAsClient()} className="min-h-11 px-3 rounded-lg text-sm font-medium inline-flex items-center gap-1.5 bg-slate-900 text-white hover:bg-slate-800">
-                    <UserPlus className="h-4 w-4" /> Add as client
+                    <UserPlus className="h-4 w-4" /> <span className="hidden sm:inline">Add as client</span>
                   </button>
                 </>
               )}
@@ -626,7 +666,7 @@ export function InboxView({
               />
             )}
 
-            <div ref={scrollRef} className={`flex-1 overflow-y-auto px-3 sm:px-4 py-4 space-y-2 bg-slate-100 lg:max-h-none ${fill ? 'max-h-[calc(100dvh-22rem)]' : 'max-h-[55vh]'}`}>
+            <div ref={scrollRef} className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-3 sm:px-4 py-4 space-y-2 bg-slate-100">
               {detail.hasEarlier && (
                 <p className="text-center">
                   <button
@@ -677,7 +717,8 @@ export function InboxView({
 
             </div>
 
-            <div className="border-t border-slate-200 p-3">
+            {/* Clear of the home bar in the installed app. */}
+            <div className="border-t border-slate-200 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] lg:pb-3 bg-white">
               {error && <p className="text-sm text-red-600 mb-2">{error}</p>}
               {!detail.sendingConfigured ? (
                 <p className="text-sm text-slate-500">

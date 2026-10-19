@@ -54,7 +54,9 @@ function LoginForm() {
         }
 
         if (user.role === 'SUPER_ADMIN' || user.role === 'ADMIN' || user.role === 'CRM_MANAGER') {
-          router.push('/admin')
+          // Back to the admin page they were on — the inbox, when it was
+          // opened from the home-screen app and the session had run out.
+          router.push(next.startsWith('/admin') ? next : '/admin')
         } else {
           router.push(next)
         }

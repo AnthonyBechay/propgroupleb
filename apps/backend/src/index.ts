@@ -108,12 +108,19 @@ app.use(
     },
     {
       skip: (req, res) => {
-        if (req.url === '/health' || req.url === '/api/health') return true;
+        // originalUrl, not url: by the time the response finishes, a mounted
+        // router has stripped its prefix from req.url ("/ycloud", not
+        // "/api/webhooks/ycloud"), which is how every webhook delivery and read
+        // receipt still got a line of its own.
+        const url = req.originalUrl ?? req.url;
+        if (url === '/health' || url === '/api/health') return true;
         if (res.statusCode >= 400) return false;
         if (req.method === 'OPTIONS') return true;
-        if (req.url.startsWith('/api/webhooks/')) return true;
+        if (url.startsWith('/api/webhooks/')) return true;
         // Marking a thread read is the inbox poll's shadow, not a real change.
-        if (/^\/api\/crm\/inbox\/[^/]+\/read/.test(req.url)) return true;
+        if (/^\/api\/crm\/inbox\/[^/]+\/read/.test(url)) return true;
+        // Page-view beacons: one per visitor click, and the analytics screen counts them anyway.
+        if (url.startsWith('/api/analytics/track')) return true;
         if (req.method === 'GET' || req.method === 'HEAD') {
           // Keep only the slow ones; response time is not known here, so let
           // the formatter decide by returning false for nothing else.

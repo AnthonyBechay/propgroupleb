@@ -207,7 +207,9 @@ async function handleYCloud(event: any): Promise<void> {
 
   if (type === 'whatsapp.message.updated') {
     const m = event.whatsappMessage;
-    if (m?.status) await recordMessageStatus([m.wamid, m.id], m.status);
+    if (m?.status) {
+      await recordMessageStatus([m.wamid, m.id], m.status, m.errorMessage ?? m.errorCode ?? m.errors?.[0]?.title ?? null);
+    }
     return;
   }
 
@@ -269,7 +271,16 @@ function whatsAppText(msg: any): string {
   if (msg.type === 'unsupported' || msg.type === 'unknown') {
     const why = msg.errors?.[0];
     const detail = why?.error_data?.details ?? why?.message ?? why?.title;
-    logger.warn('WhatsApp message not passed on', { from: msg.from, code: why?.code, detail });
+    // Everything WhatsApp said about it, and whether it carried an advert — so
+    // the next time this happens the log alone says what kind of message it was.
+    logger.warn('WhatsApp message not passed on', {
+      from: msg.from,
+      code: why?.code,
+      detail,
+      title: why?.title,
+      fromAd: msg.referral ? 'yes' : 'no',
+      keys: Object.keys(msg).filter((k) => !['from', 'to', 'errors'].includes(k)).join(','),
+    });
     return `Not received: WhatsApp did not pass this message on${detail ? ` (${detail})` : ''}. It is visible on the phone.`;
   }
   if (msg.type === 'reaction') return `Reacted ${msg.reaction?.emoji ?? ''}`.trim();
@@ -361,7 +372,7 @@ async function handleWhatsApp(body: any): Promise<void> {
       }
 
       for (const status of value.statuses ?? []) {
-        if (status.id && status.status) await recordMessageStatus([status.id], status.status);
+        if (status.id && status.status) await recordMessageStatus([status.id], status.status, status.errors?.[0]?.title ?? null);
       }
     }
   }

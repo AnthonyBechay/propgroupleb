@@ -85,13 +85,8 @@ export function scheduleAutoReply(conversationId: string, delayMs: number = DEBO
     conversationId,
     setTimeout(() => {
       pending.delete(conversationId);
-      void run(conversationId, false)
-        // Every outcome is logged with its reason: "it did not reply" must
-        // always be answerable from the log without guessing.
-        .then((outcome) => {
-          retries.delete(conversationId);
-          logger.info(`Auto-reply: ${outcome.sent ? 'sent' : 'not sent'}`, { conversationId, reason: outcome.reason });
-        })
+      void run(conversationId, retries.has(conversationId) ? 'retry' : 'message')
+        .then(() => retries.delete(conversationId))
         .catch((err) => {
           // Nobody is watching, so a failure must not be the end of it: the
           // client is still waiting. Try again a few times, further apart.
@@ -115,6 +110,8 @@ export interface AutoReplyOutcome {
   reason: string;
   /** The block is one "Resume auto-reply" lifts (a pause, or the team having replied). */
   canResume?: boolean;
+  /** What happened on the way, for the log line: script, model, tools, cost, timings, text previews. */
+  trace?: Record<string, unknown>;
 }
 
 /**
@@ -125,7 +122,7 @@ export interface AutoReplyOutcome {
  * the send fails, so the cause reaches the screen.
  */
 export function runAutoReplyNow(conversationId: string): Promise<AutoReplyOutcome> {
-  return run(conversationId, true);
+  return run(conversationId, 'manual');
 }
 
 /** Would the assistant answer the next message on this thread, and if not, why? */
@@ -186,11 +183,9 @@ export function startQuietSweep(): void {
     for (const c of candidates) {
       if (!c.lastInboundAt || c.lastMessageAt.getTime() - c.lastInboundAt.getTime() > 1000) continue;
       if (pending.has(c.id) || inFlight.has(c.id)) continue;
-      const outcome = await run(c.id, false).catch((err) => {
+      await run(c.id, 'sweep').catch((err) => {
         logger.error('Quiet sweep reply failed', err, { conversationId: c.id });
-        return null;
       });
-      if (outcome?.sent) logger.info('Auto-reply: picked up a waiting client', { conversationId: c.id, reason: outcome.reason });
     }
   };
   setInterval(() => void sweep().catch((err) => logger.error('Quiet sweep failed', err)), 5 * 60 * 1000).unref();
@@ -346,23 +341,139 @@ const TOOLS: ChatTool[] = [
   },
 ];
 
+/**
+ * How Lebanese people really text in Latin letters. Left to itself the model
+ * wrote "halla9", "3andna", "7elwi" and fus7a like "bodayi3" — Gulf numbers and
+ * Syrian endings that a Lebanese client reads as a foreign bot.
+ */
+const LEBANESE_LATIN = `How Lebanese people text Arabic in Latin letters ("Arabizi") — follow it exactly:
+- Only three numbers stand for letters: 2 (ء, and ق — Lebanese pronounce qaf as a hamza: "halla2", "2addeh", "2ariib"), 3 (ع), 7 (ح). Never use 9, 6 or 8 as letters: 9 for ق or ص is Gulf and reads as foreign. Write ص s, ط t, ض d, ظ z, خ kh, غ gh, ش sh.
+- Lebanese, not Syrian, Gulf or Egyptian. Lebanese endings in "e": "7elwe", "hayde", "risele", "tenye", "mni7a". Lebanese words: "3anna" (not "3andna"), "2addeh" (how much), "shu", "halla2", "kif", "baddak", "fi", "akid", "tab3an", "ya3ne", "hek", "hon", "kamen", "ma fi mechkle".
+- Keep property and money words in English, as Lebanese do: budget, apartment, studio, project, investment, payment plan, down payment, sea view, ROI.
+- Never transliterate formal Arabic (fus7a) — no "bodayi3", "mizeytik", "khyarat". If unsure of a word, use the English one.
+- Sounds right: "Ahla w sahla! 2addeh l budget li 3am tfakker fi?" · "3anna projects ktir 7elwe b Batumi bi hal budget:" · "Akid, kel l souwar w l tafasil 3al link." · "Ma weslitna l risele, fik tb3atha marra tenye ka text?"
+- Sounds wrong: "Shu l budget li 3am tfakkir fi la halla9?" · "3andna khyarat ktir 7elwi" · "Hay l-bodayi3 3am tne2i l-afdal la mizeytik".`;
+
+const LEBANESE_ARABIC = `When writing in Arabic letters: Lebanese dialect the way Lebanese people type it, never formal Arabic. "أهلا وسهلا! قديش الميزانية يلي عم تفكر فيها؟" · "عنا مشاريع كتير حلوة بباتومي بهالميزانية" · "أكيد، كل الصور والتفاصيل عاللينك". Project names, reference codes and words like ROI stay in Latin letters.`;
+
 const LANGUAGE_RULE: Record<ChatAiSettings['replyStyle'], string> = {
-  match:
-    '- Reply in the language the client uses, and the same script. Lebanese Arabic in Arabic letters gets Lebanese Arabic in Arabic letters; Arabic typed in Latin letters and numbers (e.g. "badde shi2a") gets the same style back; English gets English; French gets French. Never ask which language they prefer.',
-  latin:
-    '- If the client writes or speaks Arabic — in Arabic letters, in Latin letters, or in a voice note — reply in Lebanese Arabic written in LATIN letters with the usual chat numbers (2 for ء, 3 for ع, 7 for ح, 5 for خ), the way Lebanese people text: "Ahla w sahla! Shu l budget li 3am tfakkir fi?". Never use Arabic script. If they write English, reply in English; French, in French. Never ask which language they prefer.',
-  latin_always:
-    '- Always reply in Lebanese Arabic written in LATIN letters with the usual chat numbers (2 for ء, 3 for ع, 7 for ح, 5 for خ), the way Lebanese people text: "Ahla w sahla! Shu l budget li 3am tfakkir fi?". Never use Arabic script, whatever language the client writes in.',
+  match: `- Reply in the client's language and script. Arabic typed in Arabic letters gets Lebanese Arabic in Arabic letters. Arabic typed in Latin letters, or SPOKEN in a voice note, gets Lebanese Arabic in Latin letters. English gets English; French gets French. Never ask which language they prefer.
+${LEBANESE_LATIN}
+${LEBANESE_ARABIC}`,
+  latin: `- If the client writes or speaks Arabic — in Arabic letters, in Latin letters, or in a voice note — reply in Lebanese Arabic written in LATIN letters. Never use Arabic script. If they write English, reply in English; French, in French. Never ask which language they prefer.
+${LEBANESE_LATIN}`,
+  latin_always: `- Always reply in Lebanese Arabic written in LATIN letters, whatever language the client writes in. Never use Arabic script.
+${LEBANESE_LATIN}`,
 };
 
-function systemPrompt(context: string, replyStyle: ChatAiSettings['replyStyle']): string {
+type ClientScript = 'arabic' | 'latin' | 'voice';
+const ARABIC_LETTERS = /[؀-ۿݐ-ݿ]/;
+const NOT_RECEIVED = /^Not received:/;
+
+/**
+ * How the client is writing right now: their newest message that has words in
+ * it, looking first at what is unanswered and then further back. A voice note
+ * counts as speech, whatever was said in it.
+ */
+function clientScript(newestFirst: Array<{ direction: string; type: string; body: string }>): ClientScript | null {
+  for (const m of newestFirst) {
+    if (m.direction !== 'IN') continue;
+    if (m.type === 'audio') return 'voice';
+    if (m.type !== 'text' && !m.body.trim()) continue;
+    if (NOT_RECEIVED.test(m.body) || /^\[\w+\]$/.test(m.body)) continue;
+    if (ARABIC_LETTERS.test(m.body)) return 'arabic';
+    if (/[a-z]/i.test(m.body)) return 'latin';
+  }
+  return null;
+}
+
+/**
+ * The one script this reply must be in, decided in code — the model kept
+ * answering Arabic letters with Latin ones when only told the general rule.
+ * `expect` is what the written reply is checked against.
+ */
+function scriptForThisReply(style: ChatAiSettings['replyStyle'], script: ClientScript | null): { rule: string; expect: 'arabic' | 'latin' | null } {
+  if (style === 'latin_always') {
+    return { rule: 'Write this reply in Lebanese Arabic in LATIN letters.', expect: 'latin' };
+  }
+  if (script === 'arabic') {
+    return style === 'match'
+      ? { rule: 'The client is typing in ARABIC letters: write this reply in Lebanese Arabic in Arabic letters.', expect: 'arabic' }
+      : { rule: 'The client is typing in Arabic letters: write this reply in Lebanese Arabic in LATIN letters.', expect: 'latin' };
+  }
+  if (script === 'voice') {
+    return {
+      rule: 'The client\'s latest message is a voice note. If they speak Arabic, write this reply in Lebanese Arabic in LATIN letters; if English or French, in that language. Never Arabic script.',
+      expect: 'latin',
+    };
+  }
+  if (script === 'latin') {
+    return {
+      rule: 'The client is typing in Latin letters: reply in the same language — English, French, or Lebanese Arabic in Latin letters if that is what they type. Never Arabic script.',
+      expect: 'latin',
+    };
+  }
+  return { rule: '', expect: null };
+}
+
+/** What is wrong with the reply's script, or null. Links are ignored — "goo.gl/9xQ" is not Arabizi. */
+function scriptProblem(text: string, expect: 'arabic' | 'latin' | null): string | null {
+  const words = text.replace(/https?:\/\/\S+/g, '');
+  if (expect === 'arabic' && !ARABIC_LETTERS.test(words)) return 'written in Latin letters instead of Arabic';
+  if (expect === 'latin' && ARABIC_LETTERS.test(words)) return 'written in Arabic letters instead of Latin';
+  // "halla9", "3e9ar", "9ar2eb" — but not "9th floor".
+  if (expect === 'latin' && /[a-z]9|\b9(?!th\b)[a-z]/i.test(words)) return 'used 9 as a letter';
+  return null;
+}
+
+/**
+ * Put a reply that came out in the wrong script, or with Gulf numbers, right.
+ * A small text-only call on the cheapest model, made only when the check fails;
+ * if it fails too, the original goes out — a reply in the wrong script beats
+ * silence.
+ */
+async function rewriteScript(
+  text: string,
+  expect: 'arabic' | 'latin',
+  conversationId: string
+): Promise<{ text: string; usd: number }> {
+  const session = new ChatSession(
+    `You correct WhatsApp messages written by a Lebanese real estate agency. Rewrite the message you are given ${
+      expect === 'arabic' ? 'in Lebanese Arabic in ARABIC letters' : 'in LATIN letters — Lebanese Arabizi if it is Arabic, otherwise leave the language as it is'
+    }. Keep its meaning and length, and keep every name, number, price, reference code and link exactly as they are. Output only the rewritten message.
+
+${expect === 'arabic' ? LEBANESE_ARABIC : LEBANESE_LATIN}`,
+    [],
+    { feature: 'chat-reply', conversationId },
+    chatModelOrder('economy')[0]
+  );
+  try {
+    const result = await session.send([{ role: 'user', parts: [{ text }] }], true);
+    return { text: result.text || text, usd: session.spent.usd };
+  } catch (err) {
+    logger.warn('Auto-reply: script fix failed, sending as written', { conversationId, error: (err as Error).message });
+    return { text, usd: session.spent.usd };
+  }
+}
+
+/** Short, single-line text for the log, or nothing when LOG_CHAT_TEXT=false. */
+function preview(text: string | null | undefined, max = 160): string | undefined {
+  if (!text || process.env.LOG_CHAT_TEXT === 'false') return undefined;
+  const flat = text.replace(/\s+/g, ' ').trim();
+  return flat.length > max ? `${flat.slice(0, max)}…` : flat;
+}
+
+const sameText = (a: string, b: string) => a.replace(/\s+/g, ' ').trim().toLowerCase() === b.replace(/\s+/g, ' ').trim().toLowerCase();
+
+function systemPrompt(context: string, replyStyle: ChatAiSettings['replyStyle'], thisReply: string): string {
   return `You are the assistant for PropGroup, a real estate brokerage, replying to a client on WhatsApp or Instagram. PropGroup sells and rents property in Lebanon and sells investment property abroad, mainly in Georgia.
 
 How to write:
-${LANGUAGE_RULE[replyStyle]}
+${LANGUAGE_RULE[replyStyle]}${thisReply ? `\n- ${thisReply}` : ''}
 - Write like a helpful person texting: one to three short sentences, at most one question at a time. No lists, no markdown, no emojis unless the client uses them.
 - If the client sends a voice note, listen to it and answer what it says as if they had typed it.
-- A message that reads "Not received: …" means the client sent something that did not reach us — usually a voice note or photo set to "view once". Do not guess what it said. Ask them, briefly and kindly, to send it again as a normal voice note or as text.
+- A message that reads "Not received: …" in the middle of a conversation means the client sent something that did not reach us — usually a voice note or photo set to "view once". Do not guess what it said. Ask them, briefly and kindly, to send it again as a normal voice note or as text.
+- Never send a message you have already sent in this conversation, word for word or nearly. If you already told them a colleague will be in touch, do not say it again: answer what they asked if you can, or acknowledge it in a few words.
 
 What to do:
 - Work out what they need from what you already know, and ask only for what is genuinely missing, one question at a time. Never ask something the ad they came from, their earlier messages or the notes below already answer.
@@ -452,20 +563,36 @@ async function loadAttachment(mediaUrl: string): Promise<{ data: string; mimeTyp
  */
 const inFlight = new Set<string>();
 
-async function run(conversationId: string, manual: boolean): Promise<AutoReplyOutcome> {
+async function run(conversationId: string, trigger: 'message' | 'sweep' | 'manual' | 'retry'): Promise<AutoReplyOutcome> {
   if (inFlight.has(conversationId)) {
     return { sent: false, reason: 'The assistant is already answering this conversation.' };
   }
   inFlight.add(conversationId);
+  const started = Date.now();
   try {
-    return await reply(conversationId, manual);
+    const outcome = await reply(conversationId, trigger === 'manual');
+    // Every outcome is logged with its reason: "it did not reply" must always
+    // be answerable from the log without guessing. The quiet sweep only logs
+    // what it did, or it would print a line per waiting thread every 5 minutes.
+    if (outcome.sent || trigger !== 'sweep') {
+      logger.info(`Auto-reply: ${outcome.sent ? 'sent' : 'not sent'}`, {
+        conversation: conversationId,
+        trigger,
+        reason: outcome.reason,
+        ...outcome.trace,
+        ms: Date.now() - started,
+      });
+    }
+    return outcome;
   } finally {
     inFlight.delete(conversationId);
   }
 }
 
 async function reply(conversationId: string, manual: boolean): Promise<AutoReplyOutcome> {
-  const skip = (reason: string): AutoReplyOutcome => ({ sent: false, reason });
+  // Everything worth knowing about this reply, logged as one line with its outcome.
+  const trace: Record<string, unknown> = {};
+  const skip = (reason: string): AutoReplyOutcome => ({ sent: false, reason, trace });
   const conversation = await prisma.conversation.findUnique({
     where: { id: conversationId },
     include: {
@@ -501,10 +628,12 @@ async function reply(conversationId: string, manual: boolean): Promise<AutoReply
         m.direction === 'IN' && (m.type === 'audio' || m.type === 'image') && !m.mediaUrl &&
         Date.now() - m.createdAt.getTime() < 60_000
     );
+  const mediaWaitStarted = Date.now();
   for (let i = 0; i < MEDIA_WAIT_TRIES && stillStoring(); i++) {
     await new Promise((resolve) => setTimeout(resolve, MEDIA_WAIT_MS));
     recent = await loadRecent();
   }
+  if (Date.now() - mediaWaitStarted > 500) trace.mediaWaitMs = Date.now() - mediaWaitStarted;
   // Only answer a client who is actually waiting on us. "Waiting" goes by when
   // a message ARRIVED, not when it was sent: a voice note is stamped with the
   // moment the client pressed send, can take many seconds to upload, and so
@@ -516,6 +645,11 @@ async function reply(conversationId: string, manual: boolean): Promise<AutoReply
     recent.filter((m) => m.direction === 'IN' && m.createdAt.getTime() > lastReplyAt).map((m) => m.id)
   );
   if (unansweredIds.size === 0) return skip('The last message is ours — the client is not waiting on a reply.');
+  const unansweredMessages = recent.filter((m) => unansweredIds.has(m.id)).reverse();
+  // From the first unanswered message arriving to our reply going out.
+  const waitingSince = Math.min(...unansweredMessages.map((m) => m.createdAt.getTime()));
+  trace.in = unansweredMessages.map((m) => m.type).join(',');
+  trace.client = preview(unansweredMessages.map((m) => m.transcript ?? m.body).join(' / '));
   const newestArrival = () =>
     prisma.chatMessage.findFirst({ where: { conversationId }, orderBy: { createdAt: 'desc' }, select: { id: true } });
   const latestId = (await newestArrival())?.id;
@@ -572,7 +706,17 @@ async function reply(conversationId: string, manual: boolean): Promise<AutoReply
       }
     }
     if (parts.length === 0 || !/^\[\w+\]$/.test(m.body)) {
-      parts.push({ text: m.transcript && isAudio ? `[voice note] ${m.transcript}` : m.body });
+      // The opening message of a chat started from an advert sometimes reaches
+      // us only as "not available" (WhatsApp code 131060) while the phone shows
+      // the ad's ready-made greeting. Asking that client to "send it again" is
+      // nonsense to them — so the first message of a thread is read as a hello.
+      const openingUnreadable = NOT_RECEIVED.test(m.body) && m.id === ordered[0].id && recent.length < HISTORY_MESSAGES;
+      parts.push({
+        text: openingUnreadable
+          ? '[Not from the client] Their first message could not be read — almost certainly the ready-made greeting from the advert ("Hello! Can I get more info on this?"). Greet them and start the conversation; do not ask them to resend anything.'
+          : m.transcript && isAudio ? `[voice note] ${m.transcript}` : m.body,
+      });
+      if (openingUnreadable) trace.openingUnreadable = true;
     }
 
     const last = contents[contents.length - 1];
@@ -581,6 +725,10 @@ async function reply(conversationId: string, manual: boolean): Promise<AutoReply
   }
   while (contents.length > 0 && contents[0].role !== 'user') contents.shift();
   if (contents.length === 0) return skip('There is nothing from the client to answer.');
+
+  const script = clientScript([...ordered].reverse());
+  const language = scriptForThisReply(settings.replyStyle, script);
+  trace.script = script ?? 'unknown';
 
   // Reference codes the model may attach: search results, the ad's project,
   // and anything already named in this conversation — "send me the pictures of
@@ -702,6 +850,10 @@ async function reply(conversationId: string, manual: boolean): Promise<AutoReply
   const simple =
     !hasVoice && unansweredText.length <= 40 && !/\d/.test(unansweredText) && !/\[\w+\]/.test(unansweredText);
   const order = chatModelOrder(simple ? 'economy' : settings.modelTier);
+  const sessions: ChatSession[] = [];
+  let toolLog: string[] = [];
+  let turns = 0;
+  const aiStarted = Date.now();
   for (let step = 0; ; step++) {
     const model = order[step];
     const lastChance = step === order.length - 1;
@@ -711,10 +863,14 @@ async function reply(conversationId: string, manual: boolean): Promise<AutoReply
     toSend = [];
     handoff = false;
     reply = '';
-    const session = new ChatSession(systemPrompt(context, settings.replyStyle), TOOLS, { feature: 'chat-reply', conversationId }, model);
+    toolLog = [];
+    turns = 0;
+    const session = new ChatSession(systemPrompt(context, settings.replyStyle, language.rule), TOOLS, { feature: 'chat-reply', conversationId }, model);
+    sessions.push(session);
     try {
   for (let turn = 0; turn < MAX_MODEL_TURNS; turn++) {
     const result = await session.send(contents);
+    turns += 1;
     contents.push(result.content);
     // Text written alongside a search is "let me check" — not the answer. Only
     // a turn that ends the work (no call, or only bookkeeping calls) is the reply.
@@ -740,6 +896,7 @@ async function reply(conversationId: string, manual: boolean): Promise<AutoReply
           kind: typeof args.kind === 'string' ? args.kind : null,
         });
         for (const c of cards) offered.add(c.ref.toUpperCase());
+        toolLog.push(`search(${[args.market, args.deal, args.area, args.budgetMax && `<=${args.budgetMax}`, args.minBeds != null && `${args.minBeds}bd`, args.kind].filter(Boolean).join(' ')})=${cards.length}`);
         // The office's priority projects go first whenever they fit.
         const rank = (ref: string) => {
           const i = priorityOrder.indexOf(ref.toUpperCase());
@@ -765,6 +922,7 @@ async function reply(conversationId: string, manual: boolean): Promise<AutoReply
           .filter((r: string) => offered.has(r));
         toSend = [...new Set(refs)].slice(0, settings.maxListings);
         response = { queued: toSend };
+        toolLog.push(`send(${toSend.join(' ') || 'none'})`);
       } else if (call.name === 'save_client_requirements') {
         // Somebody telling us what they want to buy is a client, whether or
         // not anyone is at a screen to say so. The assistant works unattended,
@@ -779,17 +937,20 @@ async function reply(conversationId: string, manual: boolean): Promise<AutoReply
               where: { id: messageId },
               data: { transcript: t.text.trim().slice(0, 4000) },
             });
+            trace.heard = preview([trace.heard, t.text].filter(Boolean).join(' / '));
           }
         }
       } else if (call.name === 'update_conversation_summary') {
         const summary = typeof args.summary === 'string' ? args.summary.trim().slice(0, 1200) : '';
         if (summary) await prisma.conversation.update({ where: { id: conversationId }, data: { summary } });
       } else if (call.name === 'hand_off_to_team') {
+        toolLog.push('handoff');
         handoff = true;
         handoffReason = typeof args.reason === 'string' ? args.reason.trim().slice(0, 200) : '';
       } else {
         response = { error: 'unknown tool' };
       }
+      if (call.name === 'save_client_requirements') toolLog.push('requirements');
 
       responses.push({ functionResponse: { name: call.name, response, ...(call.id ? { id: call.id } : {}) } });
     }
@@ -816,6 +977,7 @@ async function reply(conversationId: string, manual: boolean): Promise<AutoReply
       // outcome, so a plain holding reply is written by Claude instead: it
       // cannot hear voice notes or search stock, but it can answer a person.
       logger.warn('Chat AI: all Gemini models unavailable, using the text fallback', { conversationId });
+      trace.fallback = 'claude';
       toSend = [];
       handoff = false;
       reply = await fallbackReply(ordered, unansweredIds, settings.replyStyle, defaultMarket).catch((fallbackErr) => {
@@ -827,7 +989,42 @@ async function reply(conversationId: string, manual: boolean): Promise<AutoReply
     }
   }
 
-  if (!reply) return skip('The model returned no reply text.');
+  const spent = () => sessions.reduce((sum, x) => sum + x.spent.usd, 0);
+  const lastSession = sessions[sessions.length - 1];
+  Object.assign(trace, {
+    model: lastSession?.modelId ?? 'claude-fallback',
+    ...(sessions.length > 1 ? { modelsTried: sessions.length } : {}),
+    turns,
+    tools: toolLog.join(' ') || undefined,
+    aiMs: Date.now() - aiStarted,
+  });
+  if (!reply) {
+    trace.usd = spent().toFixed(4);
+    return skip('The model returned no reply text.');
+  }
+
+  // Wrong script, or Gulf "9"s in Arabizi: fix it before the client sees it.
+  const problem = scriptProblem(reply, language.expect);
+  if (problem && language.expect) {
+    trace.scriptFix = problem;
+    const fixed = await rewriteScript(reply, language.expect, conversationId);
+    trace.scriptFixed = scriptProblem(fixed.text, language.expect) === null;
+    reply = fixed.text;
+    trace.usd = (spent() + fixed.usd).toFixed(4);
+  } else {
+    trace.usd = spent().toFixed(4);
+  }
+
+  // Never the same words twice. It happened when a hand-off was repeated on a
+  // thread kept "always on", and the client got two identical messages.
+  const alreadySaid = recent.find(
+    (m) => m.direction === 'OUT' && m.createdAt.getTime() > Date.now() - DAY_MS && (sameText(m.body, reply) || sameText(m.body.slice(0, reply.length), reply))
+  );
+  if (alreadySaid) {
+    trace.reply = preview(reply);
+    logger.warn('Auto-reply: held back a repeat of an earlier message', { conversationId, repeatOf: alreadySaid.id });
+    return skip('The assistant wrote the same message it had already sent, so it held it back.');
+  }
 
   // The client may have written again, or a person may have answered, while the
   // model was working. Never talk over either.
@@ -866,7 +1063,18 @@ async function reply(conversationId: string, manual: boolean): Promise<AutoReply
       data: { aiPaused: false, aiPausedReason: null, aiPausedAt: null },
     });
   }
-  return { sent: true, reason: `Replied${cards.length ? ` with ${cards.length} propert${cards.length === 1 ? 'y' : 'ies'}` : ''}${handoff ? ' and handed over to the team' : ''}.` };
+  Object.assign(trace, {
+    waitedS: Math.round((Date.now() - waitingSince) / 1000),
+    listings: cards.map((c) => c.ref).join(' ') || undefined,
+    handoff: handoff ? handoffReason || 'yes' : undefined,
+    chars: message.length,
+    reply: preview(reply),
+  });
+  return {
+    sent: true,
+    reason: `Replied${cards.length ? ` with ${cards.length} propert${cards.length === 1 ? 'y' : 'ies'}` : ''}${handoff ? ' and handed over to the team' : ''}.`,
+    trace,
+  };
 }
 
 /**

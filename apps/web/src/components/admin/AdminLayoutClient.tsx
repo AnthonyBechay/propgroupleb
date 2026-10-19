@@ -32,7 +32,7 @@ export function AdminLayoutClient({ children }: { children: React.ReactNode }) {
     if (loading) return
 
     if (!user) {
-      router.push('/auth/login?next=/admin')
+      router.push(`/auth/login?next=${encodeURIComponent(pathname || '/admin')}`)
       return
     }
     if (!user.isActive || user.bannedAt) {
