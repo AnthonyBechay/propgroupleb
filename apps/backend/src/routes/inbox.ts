@@ -10,7 +10,7 @@ import { parsePagination, buildPaginationResponse } from '../utils/pagination.js
 import type { AuthenticatedRequest } from '../types/index.js';
 import { linkConversationToLead } from '../services/messaging-intake.service.js';
 import { canSendOn, replyWindowOpen, sendReply } from '../services/messaging-send.service.js';
-import { autoReplyEnabled, autoReplyStatus, runAutoReplyNow } from '../services/auto-reply.service.js';
+import { PAUSED_BY_TEAM, autoReplyEnabled, autoReplyStatus, runAutoReplyNow } from '../services/auto-reply.service.js';
 import { cardCaption, cardsByRef, searchCatalogue, type Market } from '../services/catalogue.service.js';
 import { AppError } from '../utils/errors.js';
 import { recordListingsShared } from '../services/deal-sync.service.js';
@@ -422,15 +422,30 @@ router.patch(
   '/:id',
   asyncHandler(async (req: Request, res: Response) => {
     const body = z
-      .object({ aiPaused: z.boolean().optional(), aiAlways: z.boolean().optional() })
+      .object({
+        // The inbox's one Assistant control. The two flags below are kept for
+        // any older screen still open in a tab.
+        mode: z.enum(['off', 'normal', 'always']).optional(),
+        aiPaused: z.boolean().optional(),
+        aiAlways: z.boolean().optional(),
+      })
       .parse(req.body);
+    const now = new Date();
+    const cleared = { aiPaused: false, aiPausedReason: null, aiPausedAt: null };
     const { count } = await prisma.conversation.updateMany({
       where: { id: req.params.id },
-      data: {
+      data: body.mode ? {
+        // Off: never on its own here. Normal: the settings decide, and team
+        // replies before this moment no longer count against it. Always: it
+        // answers even when the team replies; a hand-off still pauses it.
+        off: { aiPaused: true, aiPausedReason: PAUSED_BY_TEAM, aiPausedAt: now, aiAlways: false, aiResumedAt: null },
+        normal: { ...cleared, aiAlways: false, aiResumedAt: now },
+        always: { ...cleared, aiAlways: true, aiResumedAt: now },
+      }[body.mode] : {
         // Resuming hands the thread back to the assistant for 24 hours, even
         // though a person has been replying on it.
         ...(body.aiPaused === true
-          ? { aiPaused: true, aiPausedReason: 'Paused by the team', aiPausedAt: new Date(), aiResumedAt: null }
+          ? { aiPaused: true, aiPausedReason: PAUSED_BY_TEAM, aiPausedAt: new Date(), aiResumedAt: null }
           : body.aiPaused === false
             ? { aiPaused: false, aiPausedReason: null, aiPausedAt: null, aiResumedAt: new Date() }
             : {}),
@@ -439,6 +454,9 @@ router.patch(
         ...(body.aiAlways === false ? { aiAlways: false } : {}),
       },
     });
+    if (count > 0 && body.mode) {
+      await logAdminAction('INBOX_ASSISTANT_MODE', 'Conversation', req.params.id, { mode: body.mode }, req as AuthenticatedRequest);
+    }
     if (count === 0) {
       sendNotFound(res, 'Conversation');
       return;

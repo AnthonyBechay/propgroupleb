@@ -245,12 +245,13 @@ export default function AiSettingsPage() {
           onChange={(v) => update({ handover: v })}
           options={[
             ['return_after_quiet', 'Step aside, and take over if the team goes quiet', 'It stays out while you are talking. If a client is waiting and nobody from the team has replied for the time below, it picks the conversation up again from its summary.'],
-            ['step_aside', 'Step aside until resumed', 'It stays out until someone presses "Resume" on that conversation.'],
-            ['always', 'Always answer', 'It answers every message on every conversation, even while you are talking too — clients may get two replies. Only a pause stops it.'],
+            ['step_aside', 'Step aside until switched back on', 'It stays out until someone picks a mode again from the Assistant button on that conversation.'],
+            ['always', 'Always answer', 'It answers every message on every conversation, even while you are talking too — clients may get two replies. Switching it off on a chat stops it there. When it hands a client to the team, it waits for the quiet period below.'],
           ] as const}
         />
 
-        {settings.handover === 'return_after_quiet' && (
+        {/* Also how long a hand-off holds on an "always on" chat. */}
+        {settings.handover !== 'step_aside' && (
           <Choice
             legend="Take over after the team has been quiet for"
             name="quietHours"

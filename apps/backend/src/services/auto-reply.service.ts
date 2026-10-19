@@ -60,6 +60,8 @@ const MAX_MODEL_TURNS = 6;
 const MAX_LISTINGS = 3;
 
 const pending = new Map<string, NodeJS.Timeout>();
+/** The pause reason that means a person switched it off — see standingBlock. */
+export const PAUSED_BY_TEAM = 'Paused by the team';
 /** Tools whose result the model does not need to see before it can finish. */
 const FINISHING_TOOLS = new Set([
   'send_listings', 'save_client_requirements', 'save_voice_transcripts', 'update_conversation_summary', 'hand_off_to_team',
@@ -138,8 +140,8 @@ export async function autoReplyStatus(conversationId: string): Promise<AutoReply
   }
   return {
     sent: true,
-    reason: resumedRecently(conversation)
-      ? `Resumed by the team — it keeps answering here until ${new Date((conversation.aiResumedAt as Date).getTime() + DAY_MS).toISOString().slice(0, 16).replace('T', ' ')} UTC.`
+    reason: conversation.aiAlways
+      ? 'It answers every message here, even when the team replies.'
       : 'It will answer the next message.',
   };
 }
@@ -164,11 +166,13 @@ async function teamWentQuiet(conversation: { id: string; aiPausedAt: Date | null
  * quiet. Nothing else would notice them: the assistant otherwise only wakes on
  * a new message, and a client who wrote once and is waiting sends no other.
  */
+const swept = new Map<string, number>();
+
 export function startQuietSweep(): void {
   const sweep = async () => {
     if (!autoReplyEnabled()) return;
     const settings = await getChatAiSettings();
-    if (!settings.enabled || settings.handover !== 'return_after_quiet') return;
+    if (!settings.enabled) return;
     const now = Date.now();
     // Still inside WhatsApp's 24-hour window, waiting at least as long as the
     // quiet period, and the client spoke last.
@@ -183,6 +187,11 @@ export function startQuietSweep(): void {
     for (const c of candidates) {
       if (!c.lastInboundAt || c.lastMessageAt.getTime() - c.lastInboundAt.getTime() > 1000) continue;
       if (pending.has(c.id) || inFlight.has(c.id)) continue;
+      // One try per client message. A thread the assistant looked at and
+      // declined (a repeat it held back, no reply text) would otherwise be put
+      // to the model again every five minutes — paid for every time.
+      if (swept.get(c.id) === c.lastInboundAt.getTime()) continue;
+      swept.set(c.id, c.lastInboundAt.getTime());
       await run(c.id, 'sweep').catch((err) => {
         logger.error('Quiet sweep reply failed', err, { conversationId: c.id });
       });
@@ -217,42 +226,54 @@ async function standingBlock(
   if (!manual) {
     if (process.env.AUTO_REPLY_ENABLED !== 'true') return 'The master switch is off on the server (AUTO_REPLY_ENABLED is not "true").';
     if (!settings.enabled) return 'Automatic replies are switched off in the Chat assistant settings.';
-    // Whether the assistant answers through a team reply or a hand-over: on
-    // this thread always, everywhere by setting, or because the client has come
-    // back after a quiet day.
+    // Switched off for this chat by a person: nothing brings it back but a person.
+    if (conversation.aiPaused && conversation.aiPausedReason === PAUSED_BY_TEAM) {
+      return 'Switched off for this chat by the team.';
+    }
     const alwaysHere = conversation.aiAlways;
     const alwaysEverywhere = settings.handover === 'always';
-    const cameBack = settings.handover === 'return_after_quiet' && (await teamWentQuiet(conversation, settings.quietHours));
-    const pausedByTeam = conversation.aiPausedReason === 'Paused by the team';
+    const hours = `${settings.quietHours} hour${settings.quietHours === 1 ? '' : 's'}`;
 
-    if (conversation.aiPaused && !alwaysHere && !cameBack && !(alwaysEverywhere && !pausedByTeam)) {
-      const why = conversation.aiPausedReason
-        ? `: ${conversation.aiPausedReason.charAt(0).toLowerCase()}${conversation.aiPausedReason.slice(1)}`
-        : '';
-      const comesBack = settings.handover === 'return_after_quiet'
-        ? ` It takes over again once the team has been quiet for ${settings.quietHours} hour${settings.quietHours === 1 ? '' : 's'}.`
-        : '';
-      return `Auto-reply is paused on this conversation${why}.${comesBack}`;
-    }
-    if (settings.audience !== 'all') {
-      const fromAd =
-        Boolean(conversation.adId) || Boolean(conversation.lead?.adId) || conversation.lead?.source === 'FACEBOOK_AD';
-      if (!fromAd) return 'This person did not come from an ad or a lead form, and the settings say to answer only those.';
-    }
-    // A person replied from the phone or the CRM: the thread is theirs now —
-    // unless somebody pressed "Resume auto-reply", which hands it back to the
-    // assistant for 24 hours whatever the team writes in the meantime.
-    if (!alwaysHere && !alwaysEverywhere && !cameBack && !resumedRecently(conversation)) {
-      const humanReplied = await prisma.chatMessage.count({
-        where: {
-          conversationId: conversation.id, direction: 'OUT',
-          sentAt: { gte: new Date(Date.now() - DAY_MS) }, NOT: { origin: 'AI' },
-        },
-      });
-      if (humanReplied > 0) {
-        return settings.handover === 'return_after_quiet'
-          ? `Someone on the team replied on this conversation recently, so the assistant is staying out of it — it takes over again if a client message waits ${settings.quietHours} hour${settings.quietHours === 1 ? '' : 's'} with no reply from the team.`
-          : 'Someone on the team replied on this conversation in the last 24 hours, so the assistant is staying out of it.';
+    // It handed the client to a person, or hit its daily cap. A person is
+    // expected — in every mode, "always on" included: an assistant that says
+    // "a colleague will message you" and then carries on answering contradicts
+    // itself (and once said it twice). Unless set to step aside for good, it
+    // comes back when the team leaves the client waiting the quiet period.
+    if (conversation.aiPaused) {
+      const comesBack = alwaysHere || settings.handover !== 'step_aside';
+      if (!comesBack || !(await teamWentQuiet(conversation, settings.quietHours))) {
+        const why = conversation.aiPausedReason
+          ? ` (${conversation.aiPausedReason.charAt(0).toLowerCase()}${conversation.aiPausedReason.slice(1)})`
+          : '';
+        return `Handed over to the team${why}.${comesBack ? ` It answers again if the team leaves the client waiting ${hours}.` : ' Switch it back on to let it answer.'}`;
+      }
+    } else {
+      // A per-chat "always on" is somebody's explicit choice for this client,
+      // so it answers whether or not they came from an ad.
+      if (settings.audience !== 'all' && !alwaysHere) {
+        const fromAd =
+          Boolean(conversation.adId) || Boolean(conversation.lead?.adId) || conversation.lead?.source === 'FACEBOOK_AD';
+        if (!fromAd) return 'This person did not come from an ad or a lead form, and the settings say to answer only those.';
+      }
+      // A person replied from the phone or the CRM: the thread is theirs now.
+      // Only replies since it was last switched on count — switching it on is
+      // how a person says "take it from here".
+      if (!alwaysHere && !alwaysEverywhere) {
+        const since = Math.max(Date.now() - DAY_MS, conversation.aiResumedAt?.getTime() ?? 0);
+        const humanReplied = await prisma.chatMessage.count({
+          where: {
+            conversationId: conversation.id, direction: 'OUT',
+            sentAt: { gte: new Date(since) }, NOT: { origin: 'AI' },
+          },
+        });
+        if (humanReplied > 0) {
+          if (settings.handover !== 'return_after_quiet') {
+            return 'Someone on the team replied here, so the assistant is staying out of it.';
+          }
+          if (!(await teamWentQuiet(conversation, settings.quietHours))) {
+            return `Someone on the team replied here, so the assistant is staying out of it — it answers again if a client message waits ${hours} with no reply from the team.`;
+          }
+        }
       }
     }
   }
@@ -1050,7 +1071,7 @@ async function reply(conversationId: string, manual: boolean): Promise<AutoReply
   // A hand-off pauses the assistant so it does not carry on over the person
   // taking the conversation — unless a person asked for this reply themselves,
   // in which case they are already there and the pause would only confuse.
-  if (handoff && !manual && !conversation.aiAlways && settings.handover !== 'always') {
+  if (handoff && !manual) {
     await prisma.conversation.update({
       where: { id: conversationId },
       data: { aiPaused: true, aiPausedReason: handoffReason || 'It handed the conversation to the team', aiPausedAt: new Date() },

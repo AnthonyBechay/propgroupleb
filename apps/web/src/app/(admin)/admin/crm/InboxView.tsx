@@ -3,8 +3,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   Loader2, MessageCircle, Instagram, Send, ArrowLeft, UserPlus, User,
-  Bot, Megaphone, Inbox, Smartphone, Link2, X, Building2, Search, Archive, ArchiveRestore, Trash2,
+  Bot, Megaphone, Inbox, Smartphone, Link2, X, Building2, Search, Archive, ArchiveRestore, Trash2, MoreVertical,
 } from 'lucide-react'
+import { AssistantControl, type AssistantMode } from './AssistantControl'
 import { normalizeApiUrl, normalizeFileUrl } from '@/lib/utils/api-url'
 import { useAuth } from '@/contexts/AuthContext'
 import { canDeleteConversations } from '@/lib/permissions'
@@ -36,6 +37,8 @@ interface Thread {
   lastPreview: string | null
   unreadCount: number
   aiPaused: boolean
+  /** Why it is paused: "Paused by the team" means switched off by a person. */
+  aiPausedReason?: string | null
   /** The assistant answers this thread whatever happens. */
   aiAlways?: boolean
   adLabel: string | null
@@ -136,6 +139,25 @@ function Attachment({ message }: { message: ChatMessage }) {
   )
 }
 
+function MenuItem({
+  icon: Icon, onClick, children, danger = false, className = '',
+}: {
+  icon: React.ComponentType<{ className?: string }>
+  onClick: () => void
+  children: React.ReactNode
+  danger?: boolean
+  className?: string
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={`w-full min-h-11 px-3 rounded-lg text-left text-sm inline-flex items-center gap-2.5 ${danger ? 'text-red-700 hover:bg-red-50' : 'text-slate-800 hover:bg-slate-50'} ${className}`}
+    >
+      <Icon className="h-4 w-4 shrink-0" /> {children}
+    </button>
+  )
+}
+
 export function InboxView({
   onOpenLead,
   onChanged,
@@ -203,9 +225,15 @@ export function InboxView({
   const [linkQuery, setLinkQuery] = useState('')
   const [linkResults, setLinkResults] = useState<ThreadLead[]>([])
   const [showListings, setShowListings] = useState(false)
-  // Asking the assistant to answer now, and what came of it.
-  const [aiBusy, setAiBusy] = useState(false)
-  const [aiNote, setAiNote] = useState<string | null>(null)
+  // The ⋯ menu in the chat header.
+  const [menuOpen, setMenuOpen] = useState(false)
+  const menuRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (!menuOpen) return
+    const onDown = (e: MouseEvent) => { if (!menuRef.current?.contains(e.target as Node)) setMenuOpen(false) }
+    document.addEventListener('mousedown', onDown)
+    return () => document.removeEventListener('mousedown', onDown)
+  }, [menuOpen])
 
   const call = useCallback(
     (path: string, init?: RequestInit) =>
@@ -289,7 +317,7 @@ export function InboxView({
     setLinking(false)
     setLinkQuery('')
     setShowListings(false)
-    setAiNote(null)
+    setMenuOpen(false)
     setTake(100)
   }, [openId])
 
@@ -371,45 +399,18 @@ export function InboxView({
     }
   }
 
-  const askAi = async () => {
-    if (!detail || aiBusy) return
-    setAiBusy(true)
-    setAiNote(null)
-    try {
-      const res = await call(`/${detail.id}/ai-reply`, { method: 'POST' })
-      const outcome = res.ok ? (await res.json()).data : null
-      setAiNote(outcome ? outcome.reason : 'The assistant could not be reached.')
-      await Promise.all([loadDetail(detail.id), loadThreads()])
-    } finally { setAiBusy(false) }
+  const replyNow = async (): Promise<string> => {
+    if (!detail) return ''
+    const res = await call(`/${detail.id}/ai-reply`, { method: 'POST' })
+    const outcome = res.ok ? (await res.json()).data : null
+    await Promise.all([loadDetail(detail.id), loadThreads()])
+    return outcome ? outcome.reason : 'The assistant could not be reached.'
   }
 
-  // One way back for every thread-level hold — a pause, or the team having replied.
-  const resumeAi = async () => {
+  const setAssistantMode = async (mode: AssistantMode) => {
     if (!detail) return
-    const res = await call(`/${detail.id}`, { method: 'PATCH', body: JSON.stringify({ aiPaused: false }) })
-    if (res.ok) {
-      setAiNote(null)
-      loadDetail(detail.id)
-    }
-  }
-
-  const toggleAlways = async () => {
-    if (!detail) return
-    const res = await call(`/${detail.id}`, { method: 'PATCH', body: JSON.stringify({ aiAlways: !detail.aiAlways }) })
-    if (res.ok) {
-      setAiNote(null)
-      loadDetail(detail.id)
-    }
-  }
-
-  const toggleAi = async () => {
-    if (!detail) return
-    // The header button: pause it when it is answering, resume it otherwise.
-    const res = await call(`/${detail.id}`, { method: 'PATCH', body: JSON.stringify({ aiPaused: detail.autoReply.sent }) })
-    if (res.ok) {
-      setAiNote(null)
-      loadDetail(detail.id)
-    }
+    const res = await call(`/${detail.id}`, { method: 'PATCH', body: JSON.stringify({ mode }) })
+    if (res.ok) await loadDetail(detail.id)
   }
 
   // Arriving from a client's drawer: go straight to their thread.
@@ -527,86 +528,81 @@ export function InboxView({
           <div className="flex-1 flex items-center justify-center text-slate-400"><Loader2 className="h-6 w-6 animate-spin" /></div>
         ) : (
           <>
-            <div className="px-3 sm:px-4 py-2.5 border-b border-slate-200 flex items-center gap-2 flex-wrap">
-              <button onClick={closeThread} aria-label="Back to conversations" className="lg:hidden min-h-11 min-w-11 inline-flex items-center justify-center text-slate-600">
+            {/* One row on every screen: back, who, the assistant, and the rest
+                in a menu. The ad's text truncates instead of pushing the
+                buttons off the edge, as a long one used to. */}
+            <div className="px-2 sm:px-4 py-2 border-b border-slate-200 flex items-center gap-1.5 sm:gap-2">
+              <button onClick={closeThread} aria-label="Back to conversations" className="lg:hidden shrink-0 min-h-11 min-w-11 -ml-1 inline-flex items-center justify-center text-slate-600">
                 <ArrowLeft className="h-5 w-5" />
               </button>
-              <ChannelIcon channel={detail.channel} className="h-5 w-5 shrink-0" />
+              <ChannelIcon channel={detail.channel} className="h-5 w-5 shrink-0 hidden sm:block" />
               <div className="min-w-0 flex-1">
                 <p className="font-semibold text-slate-900 truncate">{threadName(detail)}</p>
                 {detail.channel === 'WHATSAPP' && threadName(detail) !== `+${detail.externalId}` && (
-                  <p className="text-xs text-slate-500">+{detail.externalId}</p>
+                  <p className="text-xs text-slate-500 truncate">+{detail.externalId}</p>
                 )}
                 {detail.adId && (
-                  <p className="text-xs text-slate-500 truncate inline-flex items-center gap-1">
-                    <Megaphone className="h-3 w-3" /> From an ad{detail.adLabel ? `: ${detail.adLabel}` : ''}
+                  <p className="text-xs text-slate-500 truncate" title={detail.adLabel ?? undefined}>
+                    <Megaphone className="h-3 w-3 inline -mt-0.5 mr-1" />From an ad{detail.adLabel ? `: ${detail.adLabel}` : ''}
                   </p>
                 )}
               </div>
+
               {detail.autoReplyOn && (
-                // Green only when the assistant really will answer the next
-                // message here; the reason it won't is on hover and below.
-                <button
-                  onClick={toggleAi}
-                  title={detail.autoReply.reason}
-                  className={`min-h-11 px-3 rounded-lg text-sm font-medium inline-flex items-center gap-1.5 border ${detail.autoReply.sent ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-slate-200 text-slate-600'}`}
-                >
-                  <Bot className="h-4 w-4" />
-                  {/* "Auto-reply" is the icon on a phone, where the header is one row. */}
-                  <span><span className="hidden sm:inline">Auto-reply </span>{detail.aiPaused ? 'paused' : detail.autoReply.sent ? 'on' : 'not active'}</span>
-                </button>
+                <AssistantControl
+                  thread={detail}
+                  status={detail.autoReply}
+                  canReply={detail.canReply}
+                  onMode={setAssistantMode}
+                  onReplyNow={replyNow}
+                />
               )}
-              {detail.autoReplyOn && (
-                // "Keep it on" for this client: it answers even after the team
-                // replies or it hands over. A pause still stops it.
-                <button
-                  onClick={toggleAlways}
-                  title={detail.aiAlways
-                    ? 'The assistant answers this conversation whatever happens. Click to go back to normal.'
-                    : 'Keep the assistant answering this conversation even after the team replies'}
-                  className={`min-h-11 px-3 rounded-lg text-sm font-medium inline-flex items-center gap-1.5 border ${detail.aiAlways ? 'border-emerald-600 bg-emerald-600 text-white' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}
-                >
-                  {detail.aiAlways ? 'Always on' : 'Keep always on'}
-                </button>
-              )}
-              <button
-                onClick={() => archive(filter !== 'archived')}
-                title={filter === 'archived' ? 'Back to the inbox' : 'Archive — hide it until they write again'}
-                aria-label={filter === 'archived' ? 'Unarchive' : 'Archive'}
-                className="min-h-11 min-w-11 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 inline-flex items-center justify-center"
-              >
-                {filter === 'archived' ? <ArchiveRestore className="h-4 w-4" /> : <Archive className="h-4 w-4" />}
-              </button>
-              {canDelete && (
-                <button
-                  onClick={remove}
-                  title="Delete this conversation from the CRM"
-                  aria-label="Delete conversation"
-                  className="min-h-11 min-w-11 rounded-lg border border-slate-200 text-slate-500 hover:bg-red-50 hover:text-red-700 inline-flex items-center justify-center"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </button>
-              )}
+
+              {/* The everyday actions stay visible from sm up. */}
               <button
                 onClick={() => setShowListings((v) => !v)}
-                className={`min-h-11 px-3 rounded-lg text-sm font-medium inline-flex items-center gap-1.5 border ${showListings ? 'border-slate-900 bg-slate-900 text-white' : 'border-slate-200 text-slate-700 hover:bg-slate-50'}`}
+                aria-label="Properties"
+                className={`hidden sm:inline-flex shrink-0 min-h-11 px-3 rounded-lg text-sm font-medium items-center gap-1.5 border ${showListings ? 'border-slate-900 bg-slate-900 text-white' : 'border-slate-200 text-slate-700 hover:bg-slate-50'}`}
               >
-                <Building2 className="h-4 w-4" /> <span className="hidden sm:inline">Properties</span>
+                <Building2 className="h-4 w-4" /> <span className="hidden xl:inline">Properties</span>
               </button>
-              {detail.lead ? (
-                <button onClick={() => onOpenLead(detail.lead!.id)} aria-label="Open client" className="min-h-11 min-w-11 px-3 rounded-lg text-sm font-medium inline-flex items-center justify-center gap-1.5 border border-slate-200 text-slate-700 hover:bg-slate-50">
-                  <User className="h-4 w-4" /> <span className="hidden sm:inline">Open client</span>
+              {detail.lead && (
+                <button onClick={() => onOpenLead(detail.lead!.id)} aria-label="Open client" className="hidden sm:inline-flex shrink-0 min-h-11 px-3 rounded-lg text-sm font-medium items-center gap-1.5 border border-slate-200 text-slate-700 hover:bg-slate-50">
+                  <User className="h-4 w-4" /> <span className="hidden xl:inline">Open client</span>
                 </button>
-              ) : (
-                <>
-                  <button onClick={() => setLinking((v) => !v)} className="min-h-11 px-3 rounded-lg text-sm font-medium inline-flex items-center gap-1.5 border border-slate-200 text-slate-700 hover:bg-slate-50">
-                    <Link2 className="h-4 w-4" /> <span className="hidden sm:inline">Link to client</span>
-                  </button>
-                  <button onClick={() => addAsClient()} className="min-h-11 px-3 rounded-lg text-sm font-medium inline-flex items-center gap-1.5 bg-slate-900 text-white hover:bg-slate-800">
-                    <UserPlus className="h-4 w-4" /> <span className="hidden sm:inline">Add as client</span>
-                  </button>
-                </>
               )}
+
+              <div ref={menuRef} className="relative shrink-0">
+                <button
+                  onClick={() => setMenuOpen((v) => !v)}
+                  aria-label="More actions"
+                  aria-expanded={menuOpen}
+                  className="min-h-11 min-w-11 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 inline-flex items-center justify-center"
+                >
+                  <MoreVertical className="h-4 w-4" />
+                </button>
+                {menuOpen && (
+                  <div className="absolute right-0 top-full mt-1.5 z-[60] w-56 rounded-xl border border-slate-200 bg-white p-1.5 shadow-lg" onClick={() => setMenuOpen(false)}>
+                    <MenuItem className="sm:hidden" icon={Building2} onClick={() => setShowListings((v) => !v)}>
+                      {showListings ? 'Hide properties' : 'Properties'}
+                    </MenuItem>
+                    {detail.lead ? (
+                      <MenuItem className="sm:hidden" icon={User} onClick={() => onOpenLead(detail.lead!.id)}>Open client</MenuItem>
+                    ) : (
+                      <>
+                        <MenuItem icon={UserPlus} onClick={() => addAsClient()}>Add as client</MenuItem>
+                        <MenuItem icon={Link2} onClick={() => setLinking(true)}>Link to a client</MenuItem>
+                      </>
+                    )}
+                    <MenuItem icon={filter === 'archived' ? ArchiveRestore : Archive} onClick={() => archive(filter !== 'archived')}>
+                      {filter === 'archived' ? 'Back to the inbox' : 'Archive'}
+                    </MenuItem>
+                    {canDelete && (
+                      <MenuItem icon={Trash2} danger onClick={remove}>Delete conversation</MenuItem>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
 
             {linking && !detail.lead && (
@@ -637,32 +633,6 @@ export function InboxView({
                 {linkQuery.trim().length >= 2 && linkResults.length === 0 && (
                   <p className="text-sm text-slate-500 mt-2">No client matches.</p>
                 )}
-              </div>
-            )}
-
-            {/* Why the assistant is quiet here, and a way to make it answer once. */}
-            {(aiNote || (detail.autoReplyOn && !detail.autoReply.sent)) && (
-              <div className="px-3 sm:px-4 py-2.5 border-b border-slate-200 bg-slate-50 flex items-center gap-3 flex-wrap">
-                <p className="text-sm text-slate-700 flex-1 min-w-[200px]">
-                  <Bot className="h-4 w-4 inline -mt-0.5 mr-1 text-slate-500" />
-                  {aiNote ?? detail.autoReply.reason}
-                </p>
-                {detail.autoReply.canResume && (
-                  <button
-                    onClick={resumeAi}
-                    title="The assistant answers this conversation for the next 24 hours, even if the team replies too"
-                    className="min-h-11 px-3 rounded-lg bg-slate-900 text-white text-sm font-medium inline-flex items-center gap-1.5"
-                  >
-                    Resume auto-reply for 24h
-                  </button>
-                )}
-                <button
-                  onClick={askAi}
-                  disabled={aiBusy}
-                  className="min-h-11 px-3 rounded-lg border border-slate-300 bg-white text-slate-800 text-sm font-medium inline-flex items-center gap-1.5 disabled:opacity-50"
-                >
-                  {aiBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Bot className="h-4 w-4" />} Reply with the assistant now
-                </button>
               </div>
             )}
 
