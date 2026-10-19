@@ -65,9 +65,16 @@ export function AssistantControl({
   }, [open])
   useEffect(() => { if (!open) setNote(null) }, [open])
 
+  // Past WhatsApp's 24 hours nothing can be sent, whatever the mode — so the
+  // button shows the mode that WILL apply, not a "quiet" that read as if the
+  // choice had not been taken.
+  const closed = !canReply && mode !== 'off'
+  const modeName = mode === 'always' ? 'Always on' : 'Normal'
+
   // [short label for a phone, full label, colour]
   const [short, full, tone] =
     mode === 'off' ? ['Off', 'Assistant off', 'border-slate-200 bg-white text-slate-600']
+    : closed ? [modeName, `${modeName} · waits for client`, 'border-slate-200 bg-white text-slate-700']
     : handedOver ? ['Handed over', 'Handed over to team', 'border-amber-200 bg-amber-50 text-amber-800']
     : status.sent ? (mode === 'always' ? ['Always', 'Assistant always on', 'border-emerald-600 bg-emerald-600 text-white'] : ['On', 'Assistant on', 'border-emerald-200 bg-emerald-50 text-emerald-800'])
     : ['Quiet', 'Assistant quiet', 'border-amber-200 bg-amber-50 text-amber-800']
@@ -109,7 +116,11 @@ export function AssistantControl({
               </button>
             </div>
             {/* What happens next, in words — the reason used to be a hover tooltip, which a phone cannot show. */}
-            <p className={`mt-1 text-sm ${status.sent ? 'text-emerald-800' : 'text-slate-700'}`}>{note ?? status.reason}</p>
+            <p className={`mt-1 text-sm ${status.sent ? 'text-emerald-800' : 'text-slate-700'}`}>
+              {note ?? (closed
+                ? `Your choice is saved. WhatsApp only allows replies within 24 hours of the client's last message, so it answers as soon as they write again. To start the conversation again yourself, send the follow-up message from below the chat.`
+                : status.reason)}
+            </p>
 
             <div className="mt-3 space-y-1.5" role="radiogroup" aria-label="Assistant on this chat">
               {MODES.map(([value, title, hint]) => {

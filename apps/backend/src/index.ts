@@ -15,6 +15,7 @@ import { ensureReferenceCodes } from './utils/reference.js';
 import { normaliseCrmData } from './utils/crm-bootstrap.js';
 import { startInstagramTokenRefresh } from './services/instagram-token.service.js';
 import { startQuietSweep } from './services/auto-reply.service.js';
+import { startFollowUpSweep } from './services/follow-up.service.js';
 
 // Import routes
 import authRoutes from './routes/auth.js';
@@ -429,6 +430,7 @@ async function startServer() {
     // clients the team has left waiting.
     startInstagramTokenRefresh();
     startQuietSweep();
+    startFollowUpSweep();
 
     const server = app.listen(PORT, () => {
       logger.info('Server started', {

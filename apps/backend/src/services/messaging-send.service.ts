@@ -155,3 +155,56 @@ export async function sendReply(
     data: { origin },
   });
 }
+
+/**
+ * Send an approved WhatsApp template — the one kind of message WhatsApp
+ * accepts more than 24 hours after the client last wrote. Billed by Meta per
+ * message, unlike a reply inside the window. `text` is the template's wording
+ * with the values filled in, stored so the thread shows what the client got.
+ */
+export async function sendTemplate(
+  conversationId: string,
+  template: { name: string; language: string; params: string[] },
+  text: string,
+  origin: ReplyOrigin
+): Promise<void> {
+  const conversation = await prisma.conversation.findUnique({ where: { id: conversationId } });
+  if (!conversation) throw new AppError('Conversation not found', 404);
+  if (conversation.channel !== 'WHATSAPP') throw new AppError('Templates are a WhatsApp feature', 400);
+  if (!canSendOn('WHATSAPP')) throw new AppError('WhatsApp sending is not configured yet', 503);
+
+  const json = await postJson(
+    'https://api.ycloud.com/v2/whatsapp/messages/sendDirectly',
+    { 'X-API-Key': process.env.YCLOUD_API_KEY as string },
+    {
+      from: process.env.YCLOUD_WHATSAPP_FROM,
+      to: `+${conversation.externalId}`,
+      type: 'template',
+      template: {
+        name: template.name,
+        language: { code: template.language },
+        ...(template.params.length
+          ? { components: [{ type: 'body', parameters: template.params.map((value) => ({ type: 'text', text: value })) }] }
+          : {}),
+      },
+    }
+  );
+  const id = json.wamid ?? json.id;
+  if (!id) throw new AppError('The template was sent but YCloud returned no id', 502);
+  const altId = json.wamid && json.id ? json.id : undefined;
+
+  await recordChatMessage({
+    channel: 'WHATSAPP',
+    externalId: conversation.externalId,
+    messageId: id,
+    altMessageId: altId,
+    direction: 'OUT',
+    type: 'template',
+    body: text.slice(0, 4000),
+    origin,
+  });
+  await prisma.chatMessage.updateMany({
+    where: { externalId: { in: [id, altId].filter((x): x is string => Boolean(x)) } },
+    data: { origin },
+  });
+}

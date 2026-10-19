@@ -70,6 +70,8 @@ interface ThreadDetail extends Thread {
   hasEarlier: boolean
   sendingConfigured: boolean
   autoReplyOn: boolean
+  /** The paid template that restarts a conversation after 24 hours. */
+  followUp?: { available: boolean; preview: string; lastSentAt: string | null }
 }
 
 /** How often an open inbox asks for new messages. */
@@ -355,6 +357,26 @@ export function InboxView({
     } finally { setSending(false) }
   }
 
+  // The approved template — the one message WhatsApp takes after 24 hours. Paid, so asked first.
+  const sendFollowUp = async () => {
+    if (!openId || !detail?.followUp || sending) return
+    const sure = window.confirm(
+      `Send the follow-up template to ${threadName(detail)}?\n\n"${detail.followUp.preview}"\n\nWhatsApp charges for each template message.`
+    )
+    if (!sure) return
+    setSending(true)
+    setError(null)
+    try {
+      const res = await call(`/${openId}/follow-up`, { method: 'POST' })
+      if (!res.ok) {
+        const body = await res.json().catch(() => null)
+        setError(body?.message || body?.error || 'The follow-up was not sent.')
+        return
+      }
+      await Promise.all([loadDetail(openId), loadThreads()])
+    } finally { setSending(false) }
+  }
+
   const addAsClient = async (leadId?: string) => {
     if (!openId) return
     const res = await call(`/${openId}/lead`, { method: 'POST', body: JSON.stringify(leadId ? { leadId } : {}) })
@@ -439,7 +461,7 @@ export function InboxView({
   const visible = threads
 
   return (
-    <div className={`bg-white border border-slate-200 rounded-xl overflow-hidden lg:grid lg:grid-cols-[360px_1fr] ${fill ? 'lg:h-[calc(100dvh-9rem)]' : 'lg:h-[70vh]'}`}>
+    <div className={`bg-white border border-slate-200 rounded-xl overflow-hidden lg:grid lg:grid-cols-[360px_minmax(0,1fr)] ${fill ? 'lg:h-[calc(100dvh-9rem)]' : 'lg:h-[70vh]'}`}>
       {/* Threads — below lg, one pane at a time */}
       <div className={`lg:border-r lg:border-slate-200 lg:flex lg:flex-col lg:min-h-0 ${openId ? 'hidden lg:flex' : ''}`}>
       <div className="p-2 pb-1.5 border-b border-slate-200 space-y-1.5">
@@ -519,7 +541,7 @@ export function InboxView({
 
       {/* Open thread */}
       <div
-        className={`flex-col lg:min-h-0 ${openId ? 'flex fixed inset-x-0 top-0 z-40 h-[100dvh] bg-white pt-[env(safe-area-inset-top)] lg:static lg:z-auto lg:h-auto lg:pt-0' : 'hidden lg:flex'}`}
+        className={`flex-col min-w-0 lg:min-h-0 ${openId ? 'flex fixed inset-x-0 top-0 z-40 h-[100dvh] bg-white pt-[env(safe-area-inset-top)] lg:static lg:z-auto lg:h-auto lg:pt-0' : 'hidden lg:flex'}`}
         style={phoneHeight ? { height: phoneHeight } : undefined}
       >
         {!openId ? (
@@ -653,7 +675,7 @@ export function InboxView({
             {/* The conversation, with matching properties beside it on a wide
                 screen and in a short strip above it on a narrow one — never
                 in place of it. */}
-            <div className="flex-1 min-h-0 flex flex-col xl:flex-row-reverse">
+            <div className="flex-1 min-h-0 min-w-0 flex flex-col xl:flex-row-reverse">
             {showListings && (
               <ListingPicker
                 // Re-fetch when what they want changes.
@@ -700,7 +722,7 @@ export function InboxView({
                       {m.direction === 'OUT' && m.origin && (
                         <>
                           {m.origin === 'AI' ? <Bot className="h-3 w-3" /> : m.origin === 'PHONE' ? <Smartphone className="h-3 w-3" /> : null}
-                          {ORIGIN_LABEL[m.origin] ?? m.origin} ·
+                          {m.type === 'template' ? 'Follow-up' : ORIGIN_LABEL[m.origin] ?? m.origin} ·
                         </>
                       )}
                       {clockLabel(m.sentAt)}
@@ -728,10 +750,23 @@ export function InboxView({
                 // last message, the API only accepts paid, pre-approved
                 // templates. The WhatsApp Business app on the phone has no such
                 // limit — so the way out is one tap to that chat on the phone.
-                <div className="flex items-center gap-2">
-                  <p className="flex-1 text-sm text-slate-600">
-                    Over 24h since they last wrote — WhatsApp only lets the phone app reply now.
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className="flex-1 min-w-[200px] text-sm text-slate-600">
+                    Over 24h since they last wrote — WhatsApp only allows the phone app, or a paid follow-up template.
+                    {detail.followUp?.lastSentAt && (
+                      <span className="block text-xs text-slate-500">Follow-up sent {dayLabel(detail.followUp.lastSentAt)} at {clockLabel(detail.followUp.lastSentAt)}.</span>
+                    )}
                   </p>
+                  {detail.followUp?.available && (
+                    <button
+                      onClick={sendFollowUp}
+                      disabled={sending}
+                      title={detail.followUp.preview}
+                      className="shrink-0 min-h-11 px-4 rounded-lg border border-slate-300 bg-white text-slate-800 text-sm font-medium inline-flex items-center gap-1.5 disabled:opacity-50"
+                    >
+                      {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />} Send follow-up
+                    </button>
+                  )}
                   {detail.channel === 'WHATSAPP' && (
                     <a
                       href={`https://wa.me/${detail.externalId}`}

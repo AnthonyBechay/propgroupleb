@@ -24,6 +24,32 @@ export interface KnowledgeItem {
   answer: string;
 }
 
+/**
+ * One short, friendly WhatsApp message to a client who has gone quiet.
+ *
+ * Past 24 hours since the client's last message WhatsApp accepts only a
+ * template Meta has approved in advance — free text is refused, from a person
+ * or the assistant alike — and each one is billed. So the wording lives in
+ * Meta (created in YCloud → Templates); here is only its name, and a copy of
+ * its text so the thread can show what was sent.
+ */
+export interface FollowUpSettings {
+  /** Send it automatically. Off until a template has been approved. */
+  enabled: boolean;
+  /** Days of silence on both sides before it goes. */
+  afterDays: 3 | 5 | 7 | 14;
+  /** The template's name exactly as approved, e.g. "propgroup_checkin". */
+  templateName: string;
+  /** Its language code as approved, e.g. "en" or "ar". */
+  language: string;
+  /** Its text, as approved. "{{1}}" stands for the client's first name. */
+  text: string;
+  /** The template has {{1}} for the first name. */
+  useName: boolean;
+  /** At most this many automatic follow-ups in 24 hours — each is a paid message. */
+  dailyLimit: number;
+}
+
 export interface ChatAiSettings {
   /** Day-to-day on/off. The assistant also needs AUTO_REPLY_ENABLED=true. */
   enabled: boolean;
@@ -80,6 +106,7 @@ export interface ChatAiSettings {
   knowledge: KnowledgeItem[];
   /** Anything else it should keep in mind, in the office's own words. */
   guidance: string;
+  followUp: FollowUpSettings;
 }
 
 export function defaultChatAiSettings(): ChatAiSettings {
@@ -96,6 +123,15 @@ export function defaultChatAiSettings(): ChatAiSettings {
     office: { name: 'PropGroup', address: 'Fanar, Lebanon', mapsUrl: '' },
     knowledge: [],
     guidance: '',
+    followUp: {
+      enabled: false,
+      afterDays: 7,
+      templateName: '',
+      language: 'en',
+      text: 'Hi {{1}}, it\'s PropGroup 👋 Just checking in — are you still looking for property? Reply here and we\'ll send you our latest options.',
+      useName: true,
+      dailyLimit: 20,
+    },
   };
 }
 
@@ -107,6 +143,7 @@ export async function getChatAiSettings(): Promise<ChatAiSettings> {
   const saved = (row?.value ?? {}) as Partial<ChatAiSettings>;
   const d = defaultChatAiSettings();
   const office = (saved.office ?? {}) as Partial<ChatAiSettings['office']>;
+  const followUp = (saved.followUp ?? {}) as Partial<FollowUpSettings>;
   return {
     enabled: typeof saved.enabled === 'boolean' ? saved.enabled : d.enabled,
     audience: oneOf(saved.audience, ['ads', 'all'] as const, d.audience),
@@ -130,6 +167,15 @@ export async function getChatAiSettings(): Promise<ChatAiSettings> {
           .map((k) => ({ question: k.question, answer: k.answer }))
       : [],
     guidance: typeof saved.guidance === 'string' ? saved.guidance : '',
+    followUp: {
+      enabled: typeof followUp.enabled === 'boolean' ? followUp.enabled : d.followUp.enabled,
+      afterDays: oneOf(followUp.afterDays, [3, 5, 7, 14] as const, d.followUp.afterDays),
+      templateName: typeof followUp.templateName === 'string' ? followUp.templateName : d.followUp.templateName,
+      language: typeof followUp.language === 'string' && followUp.language ? followUp.language : d.followUp.language,
+      text: typeof followUp.text === 'string' && followUp.text ? followUp.text : d.followUp.text,
+      useName: typeof followUp.useName === 'boolean' ? followUp.useName : d.followUp.useName,
+      dailyLimit: Number.isInteger(followUp.dailyLimit) && (followUp.dailyLimit as number) > 0 ? (followUp.dailyLimit as number) : d.followUp.dailyLimit,
+    },
   };
 }
 

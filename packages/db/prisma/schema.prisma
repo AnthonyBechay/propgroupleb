@@ -1772,6 +1772,10 @@ model Conversation {
   // Hidden from the inbox list. Comes back by itself the moment they write again.
   archivedAt DateTime?
 
+  // When the follow-up template last went out (services/follow-up.service.ts).
+  // One per silence: another only once the client has written since.
+  followUpSentAt DateTime?
+
   // Click-to-WhatsApp / Instagram ad attribution from the first message.
   adId    String?
   adLabel String?

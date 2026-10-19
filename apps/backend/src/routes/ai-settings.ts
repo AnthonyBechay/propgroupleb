@@ -75,6 +75,20 @@ const settingsSchema = z.object({
     .max(40)
     .default([]),
   guidance: z.string().trim().max(3000).default(''),
+  followUp: z
+    .object({
+      enabled: z.boolean().default(false),
+      afterDays: z.union([z.literal(3), z.literal(5), z.literal(7), z.literal(14)]).default(7),
+      // Meta template names: lowercase letters, digits and underscores.
+      templateName: z.union([z.string().trim().regex(/^[a-z0-9_]{1,512}$/, 'Template names are lowercase letters, numbers and _'), z.literal('')]).default(''),
+      language: z.string().trim().regex(/^[a-z]{2,3}(_[A-Z]{2})?$/, 'A language code like en, ar or en_US').default('en'),
+      text: z.string().trim().min(1).max(1024),
+      useName: z.boolean().default(true),
+      dailyLimit: z.number().int().min(1).max(200).default(20),
+    })
+    // Switching it on with no template would only fail every hour.
+    .refine((f) => !f.enabled || f.templateName, { message: 'Add the approved template name before switching follow-ups on', path: ['templateName'] })
+    .optional(),
 });
 
 // PUT /api/crm/ai-settings
@@ -91,7 +105,7 @@ router.put(
       .map((p) => ({ ref: p.ref.toUpperCase(), pitch: p.pitch }))
       .filter((p) => live.has(p.ref));
 
-    const settings = { ...data, preferred };
+    const settings = { ...data, preferred, followUp: data.followUp ?? (await getChatAiSettings()).followUp };
     await saveChatAiSettings(settings, authReq.user?.id);
     await logAdminAction(
       'UPDATE_CHAT_AI_SETTINGS', 'SystemSetting', 'chat_ai_settings',

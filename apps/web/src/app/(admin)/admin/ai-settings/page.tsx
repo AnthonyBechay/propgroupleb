@@ -30,6 +30,17 @@ interface Settings {
   office: { name: string; address: string; mapsUrl: string }
   knowledge: Knowledge[]
   guidance: string
+  followUp: FollowUp
+}
+
+interface FollowUp {
+  enabled: boolean
+  afterDays: 3 | 5 | 7 | 14
+  templateName: string
+  language: string
+  text: string
+  useName: boolean
+  dailyLimit: number
 }
 
 const field = 'w-full min-h-11 rounded-lg border border-slate-300 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-slate-400'
@@ -459,6 +470,95 @@ export default function AiSettingsPage() {
           placeholder="e.g. Mention that payment plans are available. If they ask about residency, say a colleague will explain."
           className="mt-3 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-400"
         />
+      </section>
+
+      <section className="bg-white border border-slate-200 rounded-xl p-4 space-y-4">
+        <div>
+          <h2 className="text-sm font-semibold text-slate-900">Follow-up after silence</h2>
+          <p className="text-sm text-slate-600 mt-1">
+            One short, friendly WhatsApp message to a client who has gone quiet, so they are not lost once nobody can reply.
+            After 24 hours without a message from the client, WhatsApp only accepts a template Meta has approved in advance,
+            and charges for each one. If they answer, the assistant carries on as usual.
+          </p>
+        </div>
+
+        <details className="rounded-lg bg-slate-50 border border-slate-200 p-3 text-sm text-slate-700">
+          <summary className="cursor-pointer font-medium text-slate-900">How to set up the template (once)</summary>
+          <ol className="mt-2 list-decimal pl-5 space-y-1">
+            <li>In YCloud, go to WhatsApp → Templates → Create.</li>
+            <li>Category <b>Marketing</b>, a name like <code>propgroup_checkin</code>, language English (or Arabic).</li>
+            <li>Paste the text below as the body. Keep <code>{'{{1}}'}</code> where the client&apos;s first name goes, with &ldquo;Rami&rdquo; as the sample.</li>
+            <li>Submit. Approval usually takes minutes to a day. Then put the same name and language here and switch it on.</li>
+          </ol>
+        </details>
+
+        <label className="flex items-start gap-3 cursor-pointer">
+          <input type="checkbox" checked={settings.followUp.enabled}
+            onChange={(e) => update({ followUp: { ...settings.followUp, enabled: e.target.checked } })}
+            className="mt-1 h-4 w-4 rounded border-slate-300" />
+          <span>
+            <span className="block text-sm text-slate-900">Send it automatically</span>
+            <span className="block text-xs text-slate-600">
+              Once per silence, to clients only (not suppliers or unknown numbers), between 10:00 and 19:00 Beirut time.
+              Never to closed, lost or parked clients, to chats where the assistant is switched off, or to anyone who asked to stop.
+              The <b>Send follow-up</b> button on a chat works whether or not this is on.
+            </span>
+          </span>
+        </label>
+
+        <Choice
+          legend="After how long without any message"
+          name="afterDays"
+          value={settings.followUp.afterDays}
+          onChange={(v) => update({ followUp: { ...settings.followUp, afterDays: v } })}
+          options={[
+            [3, '3 days', ''],
+            [5, '5 days', ''],
+            [7, '7 days', 'Recommended.'],
+            [14, '14 days', ''],
+          ] as const}
+        />
+
+        <div className="grid gap-3 sm:grid-cols-[1fr_140px]">
+          <label className="block">
+            <span className="block text-sm font-medium text-slate-900 mb-1">Template name, exactly as approved</span>
+            <input value={settings.followUp.templateName} maxLength={512} placeholder="propgroup_checkin"
+              onChange={(e) => update({ followUp: { ...settings.followUp, templateName: e.target.value.trim().toLowerCase() } })}
+              className={field} />
+          </label>
+          <label className="block">
+            <span className="block text-sm font-medium text-slate-900 mb-1">Language code</span>
+            <input value={settings.followUp.language} maxLength={6} placeholder="en"
+              onChange={(e) => update({ followUp: { ...settings.followUp, language: e.target.value.trim() } })}
+              className={field} />
+          </label>
+        </div>
+
+        <label className="block">
+          <span className="block text-sm font-medium text-slate-900 mb-1">The template&apos;s text</span>
+          <span className="block text-xs text-slate-600 mb-1.5">
+            Exactly as approved — this is what the conversation will show was sent. {'{{1}}'} is the client&apos;s first name.
+          </span>
+          <textarea value={settings.followUp.text} maxLength={1024} rows={3}
+            onChange={(e) => update({ followUp: { ...settings.followUp, text: e.target.value } })}
+            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-400" />
+        </label>
+
+        <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input type="checkbox" checked={settings.followUp.useName}
+              onChange={(e) => update({ followUp: { ...settings.followUp, useName: e.target.checked } })}
+              className="h-4 w-4 rounded border-slate-300" />
+            <span className="text-sm text-slate-900">The template has {'{{1}}'} for the first name</span>
+          </label>
+          <label className="flex items-center gap-2">
+            <span className="text-sm text-slate-900">At most</span>
+            <input type="number" min={1} max={200} value={settings.followUp.dailyLimit}
+              onChange={(e) => update({ followUp: { ...settings.followUp, dailyLimit: Math.max(1, Math.min(200, Number(e.target.value) || 1)) } })}
+              className="w-20 min-h-11 rounded-lg border border-slate-300 px-3 text-sm" />
+            <span className="text-sm text-slate-900">a day</span>
+          </label>
+        </div>
       </section>
 
       <div className="flex items-center gap-3">

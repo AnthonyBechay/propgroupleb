@@ -10,6 +10,7 @@ import { parsePagination, buildPaginationResponse } from '../utils/pagination.js
 import type { AuthenticatedRequest } from '../types/index.js';
 import { linkConversationToLead } from '../services/messaging-intake.service.js';
 import { canSendOn, replyWindowOpen, sendReply } from '../services/messaging-send.service.js';
+import { followUpInfo, sendFollowUp } from '../services/follow-up.service.js';
 import { PAUSED_BY_TEAM, autoReplyEnabled, autoReplyStatus, runAutoReplyNow } from '../services/auto-reply.service.js';
 import { cardCaption, cardsByRef, searchCatalogue, type Market } from '../services/catalogue.service.js';
 import { AppError } from '../utils/errors.js';
@@ -113,6 +114,8 @@ router.get(
       // Whether the assistant would answer THIS thread's next message — and
       // when it would not, the reason, so nobody has to guess.
       autoReply: await autoReplyStatus(conversation.id),
+      // The paid way to restart a conversation once the window has closed.
+      followUp: await followUpInfo(conversation),
     });
   })
 );
@@ -394,6 +397,17 @@ router.post(
     }
     await logAdminAction('INBOX_AI_REPLY', 'Conversation', req.params.id, { sent: outcome.sent }, req as AuthenticatedRequest);
     sendSuccess(res, outcome);
+  })
+);
+
+// POST /api/crm/inbox/:id/follow-up — send the approved follow-up template
+// now: the only message WhatsApp accepts after the 24-hour window. Paid.
+router.post(
+  '/:id/follow-up',
+  asyncHandler(async (req: Request, res: Response) => {
+    await sendFollowUp(req.params.id, true);
+    await logAdminAction('INBOX_FOLLOW_UP', 'Conversation', req.params.id, {}, req as AuthenticatedRequest);
+    sendSuccess(res, { sent: true });
   })
 );
 
