@@ -153,6 +153,35 @@ export function InboxView({
   const apiUrl = normalizeApiUrl(process.env.NEXT_PUBLIC_API_URL || '')
   const [threads, setThreads] = useState<Thread[] | null>(null)
   const [openId, setOpenId] = useState<string | null>(null)
+
+  // An open conversation is a step in the browser's history (?c=<id>), so the
+  // phone's Back — the swipe, Android's button, the browser arrow — closes the
+  // chat instead of leaving the inbox, and a reload stays on the same chat.
+  const openThread = useCallback((id: string) => {
+    const url = new URL(window.location.href)
+    url.searchParams.set('c', id)
+    const state = { inboxThread: id }
+    // Switching chats side by side on a desktop replaces; opening one pushes.
+    if (window.history.state?.inboxThread) window.history.replaceState(state, '', url)
+    else window.history.pushState(state, '', url)
+    setOpenId(id)
+  }, [])
+  const closeThread = useCallback(() => {
+    if (window.history.state?.inboxThread) {
+      window.history.back() // popstate below clears it
+      return
+    }
+    const url = new URL(window.location.href)
+    url.searchParams.delete('c')
+    window.history.replaceState(null, '', url)
+    setOpenId(null)
+  }, [])
+  useEffect(() => {
+    const fromUrl = () => setOpenId(new URL(window.location.href).searchParams.get('c'))
+    fromUrl()
+    window.addEventListener('popstate', fromUrl)
+    return () => window.removeEventListener('popstate', fromUrl)
+  }, [])
   const [detail, setDetail] = useState<ThreadDetail | null>(null)
   const [draft, setDraft] = useState('')
   const [sending, setSending] = useState(false)
@@ -324,7 +353,7 @@ export function InboxView({
     if (!detail) return
     const res = await call(`/${detail.id}/archive`, { method: 'POST', body: JSON.stringify({ archived }) })
     if (res.ok) {
-      setOpenId(null)
+      closeThread()
       loadThreads()
     }
   }
@@ -337,7 +366,7 @@ export function InboxView({
     if (!sure) return
     const res = await call(`/${detail.id}`, { method: 'DELETE' })
     if (res.ok) {
-      setOpenId(null)
+      closeThread()
       loadThreads()
     }
   }
@@ -387,7 +416,7 @@ export function InboxView({
   useEffect(() => {
     if (!focusLeadId || !threads) return
     const theirs = threads.find((t) => t.lead?.id === focusLeadId)
-    if (theirs) setOpenId(theirs.id)
+    if (theirs) openThread(theirs.id)
   }, [focusLeadId, threads === null]) // eslint-disable-line react-hooks/exhaustive-deps
 
   if (threads === null) {
@@ -443,7 +472,7 @@ export function InboxView({
         {visible.map((t) => (
           <li key={t.id}>
             <button
-              onClick={() => setOpenId(t.id)}
+              onClick={() => openThread(t.id)}
               className={`w-full min-h-11 text-left px-3 py-2 flex gap-2.5 hover:bg-slate-50 ${openId === t.id ? 'bg-slate-100' : t.unreadCount > 0 ? 'bg-emerald-50/60' : ''}`}
             >
               <ChannelIcon channel={t.channel} className="h-4 w-4 mt-0.5 shrink-0" />
@@ -499,7 +528,7 @@ export function InboxView({
         ) : (
           <>
             <div className="px-3 sm:px-4 py-2.5 border-b border-slate-200 flex items-center gap-2 flex-wrap">
-              <button onClick={() => setOpenId(null)} aria-label="Back to conversations" className="lg:hidden min-h-11 min-w-11 inline-flex items-center justify-center text-slate-600">
+              <button onClick={closeThread} aria-label="Back to conversations" className="lg:hidden min-h-11 min-w-11 inline-flex items-center justify-center text-slate-600">
                 <ArrowLeft className="h-5 w-5" />
               </button>
               <ChannelIcon channel={detail.channel} className="h-5 w-5 shrink-0" />
@@ -725,9 +754,25 @@ export function InboxView({
                   Replying from the CRM isn&apos;t set up for {detail.channel === 'WHATSAPP' ? 'WhatsApp' : 'Instagram'} yet. Reply from the phone app — it will appear here.
                 </p>
               ) : !detail.canReply ? (
-                <p className="text-sm text-slate-500">
-                  More than 24 hours since their last message, so only the phone app can reply. It will appear here.
-                </p>
+                // WhatsApp's rule, not ours: past 24 hours since the client's
+                // last message, the API only accepts paid, pre-approved
+                // templates. The WhatsApp Business app on the phone has no such
+                // limit — so the way out is one tap to that chat on the phone.
+                <div className="flex items-center gap-2">
+                  <p className="flex-1 text-sm text-slate-600">
+                    Over 24h since they last wrote — WhatsApp only lets the phone app reply now.
+                  </p>
+                  {detail.channel === 'WHATSAPP' && (
+                    <a
+                      href={`https://wa.me/${detail.externalId}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="shrink-0 min-h-11 px-4 rounded-lg bg-emerald-600 text-white text-sm font-medium inline-flex items-center gap-1.5"
+                    >
+                      <MessageCircle className="h-4 w-4" /> Reply in WhatsApp
+                    </a>
+                  )}
+                </div>
               ) : (
                 <div className="flex items-end gap-2">
                   <textarea
