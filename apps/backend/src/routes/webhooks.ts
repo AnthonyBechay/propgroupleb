@@ -279,6 +279,9 @@ function whatsAppText(msg: any): string {
       detail,
       title: why?.title,
       fromAd: msg.referral ? 'yes' : 'no',
+      // YCloud sends what it knows of the message here (code 131051 carried
+      // one) — e.g. which type WhatsApp would not hand over.
+      unsupported: msg.unsupported ? JSON.stringify(msg.unsupported).slice(0, 200) : undefined,
       keys: Object.keys(msg).filter((k) => !['from', 'to', 'errors'].includes(k)).join(','),
     });
     return `Not received: WhatsApp did not pass this message on${detail ? ` (${detail})` : ''}. It is visible on the phone.`;

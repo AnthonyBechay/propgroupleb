@@ -48,6 +48,7 @@ import aiSettingsRoutes from './routes/ai-settings.js';
 import pipelineRoutes from './routes/pipeline.js';
 import webhookRoutes from './routes/webhooks.js';
 import { privateFieldGuard } from './middleware/auth.js';
+import { realClientIp } from './utils/client-ip.js';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -55,6 +56,9 @@ const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3000';
 
 // Trust proxy for reverse proxy deployments (Coolify/nginx)
 app.set('trust proxy', 1);
+// …and past Cloudflare to the visitor (utils/client-ip.ts). Before the
+// logger and the rate limits, which both key on req.ip.
+app.use(realClientIp);
 
 // Flat query strings only. The default parser turns `?status[not]=x` into an
 // object, and an object dropped into a Prisma `where` is a filter the caller
@@ -94,11 +98,34 @@ app.use(
 // Webhook deliveries are left to the handlers, which log what the message WAS
 // rather than that a POST arrived.
 const SLOW_MS = 2000;
+// Bots trying /.env, /.git/config, phpinfo.php and the like — hundreds a visit,
+// all 404, and they buried the chat lines in the log. They get one summary
+// line an hour instead of a line each. A 404 under /api that is NOT a probe
+// (a deleted listing's slug) is still logged: that one can be a real bug.
+const PROBE = /\.(env|git|svn|php|aws|ssh|pem|key|ya?ml|tfstate|tfvars|bak|old|swp)\b|proc\/self|\.\.|%2f|wp-|phpinfo|credentials|secrets?\.|service.?account|firebase|docker|terraform|@fs\//i;
+let probes = 0;
+const probeIps = new Map<string, number>();
+setInterval(() => {
+  if (probes === 0) return;
+  const top = [...probeIps.entries()].sort((a, b) => b[1] - a[1]).slice(0, 3).map(([ip, n]) => `${ip}×${n}`).join(' ');
+  logger.info('Scanner probes refused in the last hour', { count: probes, top });
+  probes = 0;
+  probeIps.clear();
+}, 60 * 60 * 1000).unref();
 app.use(
   morgan(
     (tokens, req, res) => {
       const status = Number(tokens.status(req, res));
+      // No status: the client hung up before any answer. The error handler
+      // has already said so; a "status=NaN" line adds nothing.
+      if (!Number.isFinite(status)) return null;
       const ms = Math.round(Number(tokens['response-time'](req, res)) || 0);
+      const url = req.originalUrl ?? req.url;
+      if (status === 404 && (!url.startsWith('/api/') || PROBE.test(url))) {
+        probes += 1;
+        probeIps.set(req.ip ?? '?', (probeIps.get(req.ip ?? '?') ?? 0) + 1);
+        return null;
+      }
       const line = `${tokens.method(req, res)} ${tokens.url(req, res)}`;
       const meta = { status, ms, ...(status >= 400 ? { ip: req.ip } : {}) };
       if (status >= 500) logger.error(line, undefined, meta);

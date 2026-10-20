@@ -92,6 +92,13 @@ export function errorHandler(err: Error, req: Request, res: Response, _next: Nex
     return;
   }
 
+  // The browser gave up mid-upload (closed the tab, lost signal, cancelled).
+  // Nothing failed on our side and nobody can be answered — not an ERROR.
+  if (err.message === 'Request aborted' || (req as any).aborted) {
+    logger.warn('Request abandoned by the client', { method: req.method, path: req.originalUrl });
+    return;
+  }
+
   // Unknown / unexpected errors — always log fully
   logger.requestError('Unhandled error', err, req);
   res.status(500).json({
