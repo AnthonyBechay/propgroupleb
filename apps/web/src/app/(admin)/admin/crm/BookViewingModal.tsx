@@ -31,6 +31,8 @@ interface Candidate {
   /** Present when this pairing already exists as an opportunity. */
   opportunityId?: string
   alreadyBooked?: boolean
+  /** Already sent to the client (by the team or the assistant). */
+  sent?: boolean
 }
 
 /** Local datetime string for <input type="datetime-local">. */
@@ -94,12 +96,13 @@ export function BookViewingModal({
           key: `op-${o.id}`,
           kind: (o.subject?.kind === 'CLIENT' ? 'CLIENT' : o.subject?.kind === 'PROJECT' ? 'PROJECT' : 'LISTING') as Candidate['kind'],
           id: o.listingId ?? o.buildingId ?? o.counterpartLeadId ?? '',
-          title: o.subject?.title ?? 'Shortlisted item',
+          title: o.subject?.title ?? 'Property',
           subtitle: o.subject?.subtitle ?? null,
           ref: o.subject?.ref ?? null,
           score: o.matchScore,
           opportunityId: o.id,
           alreadyBooked: o.stage === 'VIEWING_BOOKED',
+          sent: o.stage === 'SHARED',
         }))
         .filter((c) => c.id),
     [lead.opportunities]
@@ -284,10 +287,18 @@ export function BookViewingModal({
             </p>
           ) : (
             <ul className="space-y-1.5">
-              {candidates.map((c) => {
+              {candidates.map((c, i) => {
                 const on = picked?.key === c.key
+                // What they already have first, under its own heading, so the
+                // top of the list does not read as five unexplained picks.
+                const heading = i === 0 && c.opportunityId
+                  ? 'Already discussed with them'
+                  : !c.opportunityId && (i === 0 || candidates[i - 1].opportunityId)
+                    ? (candidates[0]?.opportunityId ? 'Other properties' : null)
+                    : null
                 return (
                   <li key={c.key}>
+                    {heading && <p className="px-1 pt-2 pb-1 text-[11px] font-semibold uppercase tracking-wide text-slate-500">{heading}</p>}
                     <button
                       type="button"
                       onClick={() => setPicked(c)}
@@ -311,7 +322,7 @@ export function BookViewingModal({
                         {c.subtitle && <span className="text-xs text-slate-500 truncate">{c.subtitle}</span>}
                         {c.opportunityId && (
                           <span className="text-[9.5px] font-semibold text-slate-500 bg-slate-100 px-1.5 py-px rounded">
-                            {c.alreadyBooked ? 'Viewing booked — reschedule' : 'Shortlisted'}
+                            {c.alreadyBooked ? 'Already booked — reschedule' : c.sent ? 'Sent to them' : 'Shortlisted'}
                           </span>
                         )}
                       </div>

@@ -8,7 +8,7 @@ export type LeadSource = 'MANUAL' | 'INQUIRY' | 'FAVORITE' | 'SUBMISSION' | 'REF
 /** Why an open client is still open. Answers "he's Active — waiting on what?". */
 export type LeadSubStatus =
   | 'SEARCHING' | 'AWAITING_REPLY' | 'NEEDS_OPTIONS' | 'BUDGET_MISMATCH'
-  | 'FINANCING' | 'PAUSED' | 'DOCS_PENDING' | 'PRICE_REVIEW'
+  | 'FINANCING' | 'PAUSED' | 'DOCS_PENDING' | 'PRICE_REVIEW' | 'NO_RESPONSE'
 export type ContactChannel = 'CALL' | 'WHATSAPP' | 'EMAIL' | 'MEETING' | 'VIEWING' | 'NOTE'
 
 export interface LeadContact {
@@ -511,6 +511,8 @@ export const SUB_STATUS_META: Record<LeadSubStatus, { label: string; cls: string
   FINANCING:       { label: 'Arranging finance', cls: 'bg-violet-50 text-violet-700 border-violet-200' },
   DOCS_PENDING:    { label: 'Waiting on papers', cls: 'bg-amber-50 text-amber-800 border-amber-200', forSide: 'supply' },
   PRICE_REVIEW:    { label: 'Price needs review',cls: 'bg-orange-50 text-orange-800 border-orange-200', forSide: 'supply' },
+  // Set from the board ("Noise"), never picked in the drawer.
+  NO_RESPONSE:     { label: 'Never replied',     cls: 'bg-slate-100 text-slate-500 border-slate-200' },
 }
 
 /**
@@ -631,7 +633,9 @@ export interface PipelineClient {
   adLabel: string | null
   askingFor: string | null
   budgetMax: number | null
-  bucket: 'NEW' | 'ASSISTANT' | 'WITH_YOU'
+  bucket: 'TO_ANSWER' | 'ASSISTANT' | 'WITH_YOU' | 'QUIET' | 'PING_LATER'
+  /** Ping later: when they come back to "To answer". */
+  pingAt: string | null
   reason: string | null
   /** Who sent the last message on their chat. */
   lastFrom: 'client' | 'assistant' | 'team' | null
@@ -651,9 +655,11 @@ export interface PipelineClient {
 }
 
 export const CLIENT_COLUMNS: Array<{ key: PipelineClient['bucket']; label: string; hint: string; accent: string }> = [
-  { key: 'NEW', label: 'New', hint: 'Reached out — nobody has answered yet', accent: 'bg-sky-500' },
+  { key: 'TO_ANSWER', label: 'To answer', hint: 'A person owes them a message: handed over, waiting, a lead to call, or a ping due', accent: 'bg-red-500' },
   { key: 'ASSISTANT', label: 'Assistant', hint: 'The assistant is talking to them', accent: 'bg-emerald-500' },
-  { key: 'WITH_YOU', label: 'With you', hint: 'Handed over, waiting on you, or you are talking', accent: 'bg-amber-500' },
+  { key: 'WITH_YOU', label: 'With you', hint: 'You are talking to them — the ball is in their court', accent: 'bg-amber-500' },
+  { key: 'QUIET', label: 'Gone quiet', hint: 'We spoke last, no reply for 3+ days. Ping later, or mark as noise', accent: 'bg-slate-400' },
+  { key: 'PING_LATER', label: 'Ping later', hint: 'Snoozed — back in "To answer" on the date', accent: 'bg-sky-500' },
 ]
 
 /** Which column a deal sits in. */
@@ -668,11 +674,25 @@ export const STAGE_LABELS: Record<OpportunityStage, string> = {
   SHARED: 'Details sent',
   VIEWING_BOOKED: 'Viewing booked',
   VIEWED: 'Viewed',
-  INTERESTED: 'Interested',
-  OFFER_MADE: 'Offer made',
+  // Named as the board's columns name them — the column said "Negotiating"
+  // while the card said "Interested".
+  INTERESTED: 'Negotiating',
+  OFFER_MADE: 'Negotiating · offer made',
   RESERVED: 'Reserved / paying',
   WON: 'Closed',
-  REJECTED: 'Ruled out',
+  REJECTED: 'Not this one',
+}
+
+/**
+ * A stage as said for this client's market: abroad the step is a meeting at the
+ * office, in Lebanon a viewing — a Batumi deal labelled "Viewing booked" read
+ * as a trip nobody was taking.
+ */
+export function stageLabel(stage: OpportunityStage, market?: string | null): string {
+  const abroad = market != null && market !== 'LEBANON'
+  if (stage === 'VIEWING_BOOKED') return abroad ? 'Meeting booked' : 'Viewing booked'
+  if (stage === 'VIEWED') return abroad ? 'Met' : 'Viewed'
+  return STAGE_LABELS[stage]
 }
 
 /** A deal still in play. */
@@ -706,7 +726,10 @@ export function dealAlert(d: Deal): { text: string; tone: 'red' | 'amber' } | nu
     if (!d.viewingAt) return { text: 'No date set', tone: 'red' }
     const at = new Date(d.viewingAt).getTime()
     if (at < now) return { text: 'Viewing passed — how did it go?', tone: 'red' }
-    if (at - now < 36e5 * 24) return { text: 'Viewing today', tone: 'amber' }
+    // By calendar day, not "within 24 hours": tomorrow evening is not today.
+    const day = (t: number) => new Date(t).toDateString()
+    if (day(at) === day(now)) return { text: 'Viewing today', tone: 'amber' }
+    if (day(at) === day(now + 864e5)) return { text: 'Viewing tomorrow', tone: 'amber' }
   }
   if (d.stage === 'VIEWED' && !d.feedback) return { text: 'No feedback yet', tone: 'amber' }
   if (d.stage === 'RESERVED' && !d.soldPrice) return { text: 'Agreed price not recorded', tone: 'amber' }

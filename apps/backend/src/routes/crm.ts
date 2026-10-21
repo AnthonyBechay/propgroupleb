@@ -37,7 +37,7 @@ const UNIT_KINDS = ['APARTMENT', 'STUDIO', 'DUPLEX', 'PENTHOUSE', 'VILLA', 'TOWN
 const LEAD_TYPES = ['BUYER', 'SELLER', 'RENTER', 'LANDLORD', 'INVESTOR'] as const;
 const LEAD_STATUSES = ['NEW', 'ACTIVE', 'VIEWING', 'NEGOTIATING', 'WON', 'LOST', 'ARCHIVED'] as const;
 const LEAD_SOURCES = ['MANUAL', 'INQUIRY', 'FAVORITE', 'SUBMISSION', 'REFERRAL', 'WHATSAPP', 'PHONE', 'WALK_IN', 'FACEBOOK_AD'] as const;
-const SUB_STATUSES = ['SEARCHING', 'AWAITING_REPLY', 'NEEDS_OPTIONS', 'BUDGET_MISMATCH', 'FINANCING', 'PAUSED', 'DOCS_PENDING', 'PRICE_REVIEW'] as const;
+const SUB_STATUSES = ['SEARCHING', 'AWAITING_REPLY', 'NEEDS_OPTIONS', 'BUDGET_MISMATCH', 'FINANCING', 'PAUSED', 'DOCS_PENDING', 'PRICE_REVIEW', 'NO_RESPONSE'] as const;
 const MARKETS = ['LEBANON', 'GEORGIA'] as const;
 const CHANNELS = ['CALL', 'WHATSAPP', 'EMAIL', 'MEETING', 'VIEWING', 'NOTE'] as const;
 
@@ -794,6 +794,12 @@ router.get(
           createdAt: { gte: newSince },
           lastContactAt: null,
           status: { notIn: ['WON', 'LOST', 'ARCHIVED'] as never },
+          // Nobody logs a call for a WhatsApp chat, so "no contact logged" listed
+          // every chat client — already talked to, often already in a deal —
+          // as never called. A chat is worked from the board's "To answer";
+          // a deal means somebody has spoken to them.
+          conversations: { none: {} },
+          opportunities: { none: { stage: { notIn: ['SUGGESTED', 'REJECTED'] as never } } },
           ...marketWhere,
         },
         orderBy: { createdAt: 'desc' },
@@ -1342,7 +1348,12 @@ router.put(
     }
 
     const lead = await prisma.lead.update({ where: { id: req.params.id }, data: patch });
-    await logAdminAction('UPDATE_LEAD', 'lead', lead.id, { name: lead.name }, authReq);
+    // The status and the planned contact are what the pipeline history shows.
+    await logAdminAction('UPDATE_LEAD', 'lead', lead.id, {
+      name: lead.name,
+      ...(data.status ? { status: data.status } : {}),
+      ...(data.nextContactAt !== undefined ? { nextContactAt: data.nextContactAt } : {}),
+    }, authReq);
     sendSuccess(res, lead, 'Lead updated');
   })
 );
@@ -1705,6 +1716,50 @@ const opportunitySchema = z.object({
   closedAt: z.string().optional().nullable(),
 });
 
+// GET /:id/history — what happened to this client, newest first: every move on
+// the board, deal, status change and assistant setting, with who did it.
+// Built from the audit log, which already recorded all of it but showed it
+// nowhere — so nobody could answer "who moved Joe to Negotiating, and when?".
+router.get(
+  '/:id/history',
+  authenticateToken,
+  requireCrm,
+  asyncHandler(async (req: Request, res: Response) => {
+    const lead = await prisma.lead.findUnique({
+      where: { id: req.params.id },
+      select: { id: true, createdAt: true, source: true, adId: true, adLabel: true, conversations: { select: { id: true, adId: true } } },
+    });
+    if (!lead) { sendNotFound(res, 'Lead'); return; }
+    const conversationIds = lead.conversations.map((c) => c.id);
+    const entries = await prisma.adminAuditLog.findMany({
+      where: {
+        OR: [
+          { targetType: 'lead', targetId: lead.id },
+          ...(conversationIds.length ? [{ targetType: 'Conversation', targetId: { in: conversationIds } }] : []),
+        ],
+        // Reading a thread is not something that happened to the client.
+        NOT: { action: { in: ['INBOX_MARK_READ'] } },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 100,
+      include: { admin: { select: { firstName: true, lastName: true, email: true } } },
+    });
+    sendSuccess(res, {
+      createdAt: lead.createdAt,
+      source: lead.source,
+      fromAd: Boolean(lead.adId || lead.adLabel || lead.conversations.some((c) => c.adId)),
+      adLabel: lead.adLabel,
+      entries: entries.map((e) => ({
+        id: e.id,
+        at: e.createdAt,
+        action: e.action,
+        details: e.details,
+        by: [e.admin.firstName, e.admin.lastName].filter(Boolean).join(' ') || e.admin.email,
+      })),
+    });
+  })
+);
+
 // POST /:id/opportunities — shortlist a property (or a counterpart client)
 router.post(
   '/:id/opportunities',
@@ -1790,7 +1845,11 @@ router.post(
     });
 
     await syncLeadStatus(lead.id);
-    await logAdminAction('CREATE_OPPORTUNITY', 'lead', lead.id, { opportunityId: opportunity.id }, authReq);
+    const [named] = await hydrateOpportunities([opportunity]);
+    await logAdminAction('CREATE_OPPORTUNITY', 'lead', lead.id, {
+      opportunityId: opportunity.id, title: named?.subject?.title ?? null, stage: opportunity.stage,
+      ...(opportunity.viewingAt ? { viewingAt: opportunity.viewingAt } : {}),
+    }, authReq);
     sendCreated(res, opportunity, 'Added to shortlist');
   })
 );
@@ -1854,7 +1913,14 @@ router.patch(
     }
 
     await syncLeadStatus(existing.leadId);
-    await logAdminAction('UPDATE_OPPORTUNITY', 'lead', existing.leadId, { stage: opportunity.stage }, authReq);
+    // Which deal, from where to where — so the client's history reads as moves,
+    // not as "updated".
+    const [named] = await hydrateOpportunities([opportunity]);
+    await logAdminAction('UPDATE_OPPORTUNITY', 'lead', existing.leadId, {
+      opportunityId: opportunity.id, title: named?.subject?.title ?? null,
+      from: existing.stage, stage: opportunity.stage,
+      ...(data.viewingAt ? { viewingAt: data.viewingAt } : {}),
+    }, authReq);
 
     // Return the refreshed lead so the UI can re-render everything at once.
     const lead = await prisma.lead.findUnique({
@@ -1883,9 +1949,10 @@ router.delete(
     const existing = await prisma.leadOpportunity.findUnique({ where: { id: req.params.oid } });
     if (!existing) { sendNotFound(res, 'Opportunity'); return; }
 
+    const [named] = await hydrateOpportunities([existing]);
     await prisma.leadOpportunity.delete({ where: { id: req.params.oid } });
     await syncLeadStatus(existing.leadId);
-    await logAdminAction('DELETE_OPPORTUNITY', 'lead', existing.leadId, {}, authReq);
+    await logAdminAction('DELETE_OPPORTUNITY', 'lead', existing.leadId, { title: named?.subject?.title ?? null, stage: existing.stage }, authReq);
     sendSuccess(res, { id: req.params.oid }, 'Removed from shortlist');
   })
 );

@@ -1494,6 +1494,7 @@ enum LeadSubStatus {
   PAUSED // asked us to pause (travel, ramadan, waiting on a sale)
   DOCS_PENDING // seller side: waiting on papers, deed, authorisation
   PRICE_REVIEW // seller side: asking price needs revisiting
+  NO_RESPONSE // "noise": never wrote back after our first replies — parked, comes back if they write
 }
 
 enum LeadSource {

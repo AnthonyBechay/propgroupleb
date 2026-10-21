@@ -269,10 +269,18 @@ other:
 distinction is real on the deal, but as columns they split one conversation in
 two and left both looking empty.
 
-**The front of the board is people, not deals** (`routes/pipeline.ts`, since
-2026-10-14): **New** (reached out, nobody answered) → **Assistant** (the chat
-assistant is handling it) → **With you** (handed over, waiting on a reply the
-assistant will not give, or the team is talking). Property deals start at
+**The front of the board is people, not deals** (`routes/pipeline.ts`), sorted
+by who owes the next message (since 2026-10-21): **To answer** (a person owes
+them: handed over / promised a colleague, waiting on a reply the assistant will
+not give, a lead form nobody called, a ping that is due) → **Assistant** →
+**With you** (team talking, ball in their court) → **Gone quiet** (we spoke
+last, 3+ days silent; off the board after 30) → **Ping later** (`nextContactAt`
+in the future). A "New" column existed and was always empty — the assistant
+answers in seconds. Person cards have a **Move to…** menu (start a deal at any
+stage via `BookViewingModal`, ping later, **noise** = `ARCHIVED` +
+`NO_RESPONSE` + chat archived, not interested = `LOST`) via
+`POST /api/crm/pipeline/:id/action`; an inbound message reactivates
+`ARCHIVED`/`LOST` clients (`messaging-intake.service.ts`). Property deals start at
 **Viewing / meeting** (a viewing in Lebanon, an office meeting for abroad) →
 Viewed / met → Negotiating → Reserved / paying → Closed. Shortlisted properties
 (`SUGGESTED`, `SHARED` — picked or sent, nothing booked) are no longer cards:

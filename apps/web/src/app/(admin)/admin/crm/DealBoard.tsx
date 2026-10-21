@@ -1,19 +1,22 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   Phone, MessageCircle, Calendar, AlertCircle, Handshake,
-  TrendingUp, Loader2, Check, Plus, X, ChevronRight, MessagesSquare, Instagram,
+  TrendingUp, Loader2, Check, Plus, X, ChevronRight, ChevronDown, MessagesSquare, Instagram, Clock, VolumeX,
 } from 'lucide-react'
 import {
-  type Deal, type OpportunityStage, DEAL_COLUMNS, BOARD_DEAL_COLUMNS, CLIENT_COLUMNS, type PipelineClient, dealColumnOf, STAGE_LABELS,
+  type Deal, type OpportunityStage, BOARD_DEAL_COLUMNS, CLIENT_COLUMNS, type PipelineClient, dealColumnOf, stageLabel,
   dealCommission, dealAlert, isLiveDeal, TYPE_LABELS,
 } from './types'
 import { countryFlag } from '@/lib/market'
 import type { StartStage } from './BookViewingModal'
 
-/** Where a person card can go: onto a property deal at a stage, or out as not interested. */
-export type ClientMove = StartStage | 'LOST'
+/**
+ * Where a person card can go: onto a property deal at a stage (which asks for
+ * the property), snoozed for some days, or off the board as noise / not interested.
+ */
+export type ClientMove = StartStage | 'NOISE' | 'LOST' | `PING:${number}`
 
 /**
  * The pipeline, as deals.
@@ -159,37 +162,63 @@ export function DealBoard({
       {/* Phone: pick a column, then read it full width. The chips double as the
           pipeline summary you'd otherwise have to scroll sideways to get. */}
       <div className="lg:hidden pg-scroll-x -mx-1 flex gap-1.5 px-1 pb-1">
-        {[...CLIENT_COLUMNS, ...BOARD_DEAL_COLUMNS].map((col) => {
-          const count = 'stages' in col
-            ? filtered.filter((d) => dealColumnOf(d) === col.key).length
-            : visibleClients.filter((c) => c.bucket === col.key).length
-          const active = mobileColumn === col.key
-          return (
-            <button
-              key={col.key}
-              onClick={() => setMobileColumn(col.key)}
-              className={`pg-snap-start inline-flex min-h-10 shrink-0 items-center gap-1.5 rounded-lg border px-3 text-sm font-medium transition-colors ${
-                active
-                  ? 'border-slate-900 bg-slate-900 text-white'
-                  : 'border-slate-200 bg-white text-slate-600'
-              }`}
-            >
-              <span className={`h-2 w-2 rounded-full ${col.accent}`} />
-              {col.label}
-              <span className={active ? 'text-white/70' : 'text-slate-400'}>{count}</span>
-            </button>
-          )
-        })}
+        {([['People', CLIENT_COLUMNS], ['Deals', BOARD_DEAL_COLUMNS]] as const).map(([group, cols]) => (
+          <span key={group} className="contents">
+            <span className="self-center shrink-0 px-1 text-[10px] font-semibold uppercase tracking-wide text-slate-400">{group}</span>
+            {cols.map((col) => {
+              const count = 'stages' in col
+                ? filtered.filter((d) => dealColumnOf(d) === col.key).length
+                : visibleClients.filter((c) => c.bucket === col.key).length
+              const active = mobileColumn === col.key
+              return (
+                <button
+                  key={col.key}
+                  onClick={() => setMobileColumn(col.key)}
+                  className={`pg-snap-start inline-flex min-h-10 shrink-0 items-center gap-1.5 rounded-lg border px-3 text-sm font-medium transition-colors ${
+                    active
+                      ? 'border-slate-900 bg-slate-900 text-white'
+                      : 'border-slate-200 bg-white text-slate-600'
+                  }`}
+                >
+                  <span className={`h-2 w-2 rounded-full ${col.accent}`} />
+                  {col.label}
+                  <span className={active ? 'text-white/70' : 'text-slate-400'}>{count}</span>
+                </button>
+              )
+            })}
+          </span>
+        ))}
       </div>
 
       <div className="flex gap-2.5 pb-3 max-lg:flex-col lg:pg-scroll-x">
-        {/* People first: nobody here has a viewing or meeting yet. */}
+        {/* Two halves, said on screen: people (before any property is in play)
+            and deals (one card per property). They used to run together as one
+            row of ten columns, with nothing saying where one became the other. */}
+        <section className="contents lg:flex lg:flex-col lg:gap-1.5 lg:shrink-0">
+          <p className="max-lg:hidden px-1 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+            People <span className="font-normal normal-case tracking-normal text-slate-400">· who owes the next message</span>
+          </p>
+          <div className="contents lg:flex lg:gap-2.5">
         {CLIENT_COLUMNS.map((col) => {
           const cards = visibleClients.filter((c) => c.bucket === col.key)
           return (
             <div
               key={col.key}
-              className={`rounded-xl border border-slate-200 bg-slate-50/60 lg:pg-snap-start lg:w-[264px] lg:shrink-0 ${
+              // A person dropped on "Ping later" is snoozed for a week.
+              {...(col.key === 'PING_LATER' ? {
+                onDragOver: (e: React.DragEvent) => { e.preventDefault(); setOver(col.key) },
+                onDragLeave: () => setOver((k) => (k === col.key ? null : k)),
+                onDrop: (e: React.DragEvent) => {
+                  e.preventDefault()
+                  setOver(null)
+                  const id = e.dataTransfer.getData('text/plain') || dragging
+                  setDragging(null)
+                  if (id?.startsWith('client:')) onBook(id.slice(7), 'PING:7')
+                },
+              } : {})}
+              className={`rounded-xl border lg:pg-snap-start lg:w-[264px] lg:shrink-0 ${
+                over === col.key ? 'border-slate-900 bg-slate-50' : 'border-slate-200 bg-slate-50/60'
+              } ${
                 mobileColumn === col.key ? 'max-lg:block' : 'max-lg:hidden'
               }`}
             >
@@ -212,6 +241,16 @@ export function DealBoard({
           )
         })}
 
+          </div>
+        </section>
+
+        <div className="max-lg:hidden w-px shrink-0 self-stretch bg-slate-300 my-1" aria-hidden />
+
+        <section className="contents lg:flex lg:flex-col lg:gap-1.5 lg:shrink-0">
+          <p className="max-lg:hidden px-1 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+            Deals <span className="font-normal normal-case tracking-normal text-slate-400">· one card per property</span>
+          </p>
+          <div className="contents lg:flex lg:gap-2.5">
         {BOARD_DEAL_COLUMNS.map((col) => {
           const cards = filtered.filter((d) => dealColumnOf(d) === col.key)
           const value = cards.reduce((t, d) => t + (dealCommission(d)?.usd ?? 0), 0)
@@ -269,8 +308,11 @@ export function DealBoard({
                     onOpenClient={onOpenClient}
                     onOpenChat={onOpenChat}
                     onSetCommission={onSetCommission}
-                    onMove={onMove}
-                    onRemove={onRemoveDeal}
+                    onAction={(deal, action) => {
+                      if (action === 'DELETE') onRemoveDeal(deal)
+                      else if (action === 'CLIENT_LOST') onBook(deal.lead.id, 'LOST')
+                      else onMove(deal.id, action)
+                    }}
                   />
                 ))}
 
@@ -281,6 +323,8 @@ export function DealBoard({
             </div>
           )
         })}
+          </div>
+        </section>
       </div>
     </div>
   )
@@ -341,7 +385,14 @@ function ClientCard({
       ) : (
         <p className="text-[11px] text-slate-500 mt-1">{c.source === 'FACEBOOK_AD' ? 'Lead form — no chat yet' : 'No chat yet'}</p>
       )}
-      {c.reason && c.bucket === 'WITH_YOU' && <p className="text-[11px] text-amber-800 mt-1">{c.reason}</p>}
+      {c.bucket === 'PING_LATER' && c.pingAt && (
+        <p className="text-[11px] text-sky-800 mt-1">
+          Ping {new Date(c.pingAt).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' })}{c.reason ? ` — ${c.reason}` : ''}
+        </p>
+      )}
+      {c.reason && c.bucket !== 'PING_LATER' && (
+        <p className={`text-[11px] mt-1 ${c.bucket === 'TO_ANSWER' ? 'text-red-700 font-medium' : 'text-slate-600'}`}>{c.reason}</p>
+      )}
       <div className="flex items-center gap-1.5 mt-1.5 pt-1.5 border-t border-slate-100 flex-wrap">
         {c.shortlisted > 0 && (
           <span className="text-[10px] font-medium text-slate-600 bg-slate-100 rounded px-1.5 py-0.5">
@@ -364,32 +415,190 @@ function ClientCard({
             {c.chat.unread > 0 && c.chat.unread}
           </button>
         )}
-        {/* Where the conversation actually is. Every step but "not interested"
-            asks which property, because from here on the board follows deals. */}
-        <select
-          value=""
-          onClick={(e) => e.stopPropagation()}
-          onChange={(e) => {
-            const to = e.target.value as ClientMove
-            if (to) onBook(c.id, to)
-          }}
-          aria-label="Move this client"
-          className="min-h-7 max-w-[7.5rem] rounded-md border border-slate-200 bg-white px-1 text-[11px] font-semibold text-slate-700 hover:bg-slate-50"
-        >
-          <option value="">Move to…</option>
-          {!c.supplyOnly && <option value="VIEWING_BOOKED">{meeting ? 'Meeting booked' : 'Viewing booked'}</option>}
-          {!c.supplyOnly && <option value="VIEWED">{meeting ? 'Met / discussed' : 'Viewed'}</option>}
-          {!c.supplyOnly && <option value="INTERESTED">Negotiating</option>}
-          {!c.supplyOnly && <option value="RESERVED">Reserved / paying</option>}
-          <option value="LOST">Not interested</option>
-        </select>
+        <MoveMenu meeting={meeting} supplyOnly={c.supplyOnly} onPick={(to) => onBook(c.id, to)} />
       </div>
     </div>
   )
 }
 
+/**
+ * The shell every card menu shares. It floats over the page (position: fixed)
+ * because the board's columns scroll, and an absolute menu was cut off at their
+ * edge. On a phone it is a sheet from the bottom instead: a tap nudges the
+ * page's scroll, and a floating menu that closes on scroll was gone before a
+ * thumb could reach it.
+ */
+function MenuShell({
+  label, height, children,
+}: {
+  label: React.ReactNode
+  /** Roughly how tall the menu is, to open it upwards when it would not fit below. */
+  height: number
+  children: (close: () => void) => React.ReactNode
+}) {
+  const [at, setAt] = useState<{ top: number; left: number } | 'sheet' | null>(null)
+  const open = at !== null
+  const ref = useRef<HTMLDivElement>(null)
+  const button = useRef<HTMLButtonElement>(null)
+  const close = () => setAt(null)
+  const toggle = () => {
+    if (open) { setAt(null); return }
+    if (window.innerWidth < 640) { setAt('sheet'); return }
+    const r = button.current?.getBoundingClientRect()
+    if (!r) return
+    const width = 256
+    const left = Math.max(8, Math.min(r.right - width, window.innerWidth - width - 8))
+    const top = r.bottom + 4 + height < window.innerHeight ? r.bottom + 4 : Math.max(8, r.top - 4 - height)
+    setAt({ top, left })
+  }
+  useEffect(() => {
+    if (!open) return
+    const outside = (e: MouseEvent) => { if (!ref.current?.contains(e.target as Node)) setAt(null) }
+    document.addEventListener('mousedown', outside)
+    if (at === 'sheet') return () => document.removeEventListener('mousedown', outside)
+    // The floating menu is placed once; if the page moves, it would point at nothing.
+    window.addEventListener('scroll', close, true)
+    window.addEventListener('resize', close)
+    return () => {
+      document.removeEventListener('mousedown', outside)
+      window.removeEventListener('scroll', close, true)
+      window.removeEventListener('resize', close)
+    }
+  }, [open, at])
+
+  return (
+    <div ref={ref} className="relative" onClick={(e) => e.stopPropagation()}>
+      <button
+        ref={button}
+        onClick={toggle}
+        aria-expanded={open}
+        className="min-h-7 px-2 rounded-md border border-slate-200 bg-white text-[11px] font-semibold text-slate-700 hover:bg-slate-50 inline-flex items-center gap-1"
+      >
+        {label} <ChevronDown className="h-3 w-3" />
+      </button>
+      {at === 'sheet' && <div className="fixed inset-0 z-50 bg-black/30" onClick={close} />}
+      {open && (
+        <div
+          style={at !== 'sheet' && at ? at : undefined}
+          className={at === 'sheet'
+            ? 'fixed inset-x-0 bottom-0 z-50 max-h-[85dvh] overflow-y-auto rounded-t-2xl bg-white p-3 pb-[max(1rem,env(safe-area-inset-bottom))] shadow-2xl'
+            : 'fixed z-50 w-64 rounded-xl border border-slate-200 bg-white p-1.5 shadow-lg'}
+        >
+          {children(close)}
+        </div>
+      )}
+    </div>
+  )
+}
+
+const MENU_ITEM = 'w-full min-h-10 px-2.5 rounded-md text-left text-sm hover:bg-slate-50 flex items-start gap-2 disabled:opacity-60 disabled:hover:bg-transparent'
+const MENU_GROUP = 'px-2.5 pt-2 pb-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-400 first:pt-1'
+
+function MenuItem({ icon, title, hint, onClick, disabled, current }: {
+  icon: React.ReactNode; title: string; hint?: string; onClick: () => void; disabled?: boolean; current?: boolean
+}) {
+  return (
+    <button className={MENU_ITEM} onClick={onClick} disabled={disabled}>
+      <span className="mt-0.5 shrink-0">{icon}</span>
+      <span className="flex-1">
+        <span className="block font-medium text-slate-900">{title}{current && <span className="ml-1.5 text-[11px] font-normal text-slate-500">· now</span>}</span>
+        {hint && <span className="block text-[11px] text-slate-500">{hint}</span>}
+      </span>
+    </button>
+  )
+}
+
+/**
+ * What to do next with a person. Three groups, in the order a conversation
+ * goes: it becomes a deal, it waits, or it ends. It replaced a dropdown of
+ * eleven entries that put "Met / discussed" next to "In 2 weeks".
+ */
+function MoveMenu({
+  meeting, supplyOnly, onPick,
+}: {
+  /** Abroad the next step is a meeting at the office; in Lebanon, a viewing. */
+  meeting: boolean
+  supplyOnly: boolean
+  onPick: (to: ClientMove) => void
+}) {
+  return (
+    <MenuShell label="Move" height={supplyOnly ? 230 : 400}>
+      {(close) => {
+        const pick = (to: ClientMove) => { close(); onPick(to) }
+        return (
+          <>
+            {!supplyOnly && (
+              <>
+                <p className={MENU_GROUP}>Next step</p>
+                <MenuItem icon={<Calendar className="h-4 w-4 text-violet-600" />} title={meeting ? 'Book a meeting' : 'Book a viewing'} hint="Pick the property and the date" onClick={() => pick('VIEWING_BOOKED')} />
+                <MenuItem icon={<Handshake className="h-4 w-4 text-amber-600" />} title="Negotiating" hint="They want a property — price or terms open" onClick={() => pick('INTERESTED')} />
+                <MenuItem icon={<Check className="h-4 w-4 text-teal-600" />} title="Reserved / paying" hint="They committed to a property" onClick={() => pick('RESERVED')} />
+              </>
+            )}
+            <p className={MENU_GROUP}>Not now</p>
+            <div className="px-2.5 pb-1">
+              <span className="flex items-center gap-1.5 text-sm font-medium text-slate-900"><Clock className="h-4 w-4 text-sky-600" /> Ping later</span>
+              <div className="mt-1.5 flex gap-1">
+                {([[3, '3 days'], [7, '1 week'], [30, '1 month']] as const).map(([days, label]) => (
+                  <button key={days} onClick={() => pick(`PING:${days}`)} className="flex-1 min-h-8 rounded-md border border-slate-200 text-xs font-medium text-slate-700 hover:bg-sky-50 hover:border-sky-200">
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <p className={MENU_GROUP}>Close</p>
+            <MenuItem icon={<VolumeX className="h-4 w-4 text-slate-500" />} title="Noise" hint="Never replied — hide until they write" onClick={() => pick('NOISE')} />
+            <MenuItem icon={<X className="h-4 w-4 text-red-600" />} title="Not interested" hint="They said no" onClick={() => pick('LOST')} />
+          </>
+        )
+      }}
+    </MenuShell>
+  )
+}
+
+/** What a deal card can do — one menu, the same on a computer and a phone. */
+export type DealAction = OpportunityStage | 'CLIENT_LOST' | 'DELETE'
+
+/**
+ * Moving a deal. It replaced a phone-only dropdown that offered stages the
+ * board has no column for (a deal moved to "Details sent" vanished), and a
+ * tiny ✕ that deleted the deal — and its history — when the usual meaning was
+ * "they did not like this one".
+ */
+function DealMoveMenu({ deal: d, onPick }: { deal: Deal; onPick: (action: DealAction) => void }) {
+  const current = dealColumnOf(d)
+  return (
+    <MenuShell label="Move" height={420}>
+      {(close) => {
+        const pick = (a: DealAction) => { close(); onPick(a) }
+        return (
+          <>
+            <p className={MENU_GROUP}>Move to</p>
+            {BOARD_DEAL_COLUMNS.map((col) => (
+              <MenuItem
+                key={col.key}
+                icon={<span className={`block h-2.5 w-2.5 mt-1 rounded-full ${col.accent}`} />}
+                title={col.key === 'NEGOTIATING' ? 'Negotiating' : stageLabel(col.stage, d.lead.market ?? d.subject?.country)}
+                current={current === col.key}
+                disabled={current === col.key}
+                onClick={() => pick(col.stage)}
+              />
+            ))}
+            <p className={MENU_GROUP}>It did not work out</p>
+            <MenuItem icon={<X className="h-4 w-4 text-amber-600" />} title="Not this property" hint="Kept on record. The client stays — back with the people if it was their only deal" onClick={() => pick('REJECTED')} />
+            <MenuItem icon={<X className="h-4 w-4 text-red-600" />} title="Client not interested" hint="They said no to everything — off the board" onClick={() => pick('CLIENT_LOST')} />
+            <div className="mt-1 border-t border-slate-100 pt-1">
+              <MenuItem icon={<X className="h-4 w-4 text-slate-400" />} title="Delete this deal" hint="Only if it was added by mistake — leaves no record" onClick={() => pick('DELETE')} />
+            </div>
+          </>
+        )
+      }}
+    </MenuShell>
+  )
+}
+
 function DealCard({
-  deal: d, canSeeMoney, busy, onDragStart, onOpenClient, onOpenChat, onSetCommission, onMove, onRemove,
+  deal: d, canSeeMoney, busy, onDragStart, onOpenClient, onOpenChat, onSetCommission, onAction,
 }: {
   onOpenChat: (leadId: string) => void
   deal: Deal
@@ -398,9 +607,8 @@ function DealCard({
   onDragStart: () => void
   onOpenClient: (leadId: string) => void
   onSetCommission: (dealId: string, usd: number) => void
-  /** Touch has no drag-and-drop, so a phone moves deals with this instead. */
-  onMove: (dealId: string, stage: OpportunityStage) => void
-  onRemove: (deal: Deal) => void
+  /** Move it (also how a phone moves deals — touch has no drag-and-drop), drop it, or delete it. */
+  onAction: (deal: Deal, action: DealAction) => void
 }) {
   const [editing, setEditing] = useState(false)
   const alert = dealAlert(d)
@@ -429,18 +637,7 @@ function DealCard({
         <span className="text-sm font-medium text-slate-900 leading-snug line-clamp-2 flex-1">
           {d.subject?.title ?? 'Property'}
         </span>
-        {busy ? (
-          <Loader2 className="h-3 w-3 animate-spin text-slate-400 shrink-0 mt-0.5" />
-        ) : (
-          // Removing THIS deal. The client is never touched from here.
-          <button
-            onClick={(e) => { e.stopPropagation(); onRemove(d) }}
-            className="shrink-0 -mt-0.5 -mr-0.5 p-1 rounded text-slate-300 hover:text-red-600 hover:bg-red-50"
-            title="Remove this deal (keeps the client)"
-          >
-            <X className="h-3 w-3" />
-          </button>
-        )}
+        {busy && <Loader2 className="h-3 w-3 animate-spin text-slate-400 shrink-0 mt-0.5" />}
       </div>
 
       {d.subject?.subtitle && (
@@ -521,30 +718,9 @@ function DealCard({
         </div>
       )}
 
-      {/* Moving a deal on a phone. HTML5 drag-and-drop emits no events on touch,
-          so without this the board is read-only on the device it is most often
-          opened on. Desktop keeps dragging and shows the stage as a label. */}
-      <div className="mt-1.5 lg:hidden" onClick={(e) => e.stopPropagation()}>
-        <label className="flex items-center gap-1.5">
-          <span className="sr-only">Stage for {d.subject?.title ?? 'this deal'}</span>
-          <ChevronRight className="h-3 w-3 shrink-0 text-slate-300" />
-          <select
-            value={d.stage}
-            disabled={busy}
-            onChange={(e) => onMove(d.id, e.target.value as OpportunityStage)}
-            className="min-h-9 w-full rounded-md border border-slate-200 bg-white px-1.5 text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-900/10"
-          >
-            {DEAL_COLUMNS.map((c) => (
-              <option key={c.key} value={c.stage}>{c.label}</option>
-            ))}
-          </select>
-        </label>
-      </div>
-
       {/* Reaching them shouldn't need the drawer */}
       <div className="flex items-center gap-1 mt-1.5" onClick={(e) => e.stopPropagation()}>
-        <span className="text-[10px] text-slate-400 flex-1 max-lg:hidden">{STAGE_LABELS[d.stage]}</span>
-        <span className="flex-1 lg:hidden" />
+        <span className="text-[11px] text-slate-500 flex-1">{stageLabel(d.stage, d.lead.market ?? d.subject?.country)}</span>
         {d.lead.phone && (
           <a
             href={`tel:${d.lead.phone}`}
@@ -564,6 +740,7 @@ function DealCard({
             <MessageCircle className="h-4 w-4 lg:h-3 lg:w-3" />
           </a>
         )}
+        <DealMoveMenu deal={d} onPick={(a) => onAction(d, a)} />
       </div>
     </div>
   )

@@ -65,9 +65,21 @@ const dayLabel = (iso: string | null | undefined) => {
 export function TodayView({
   market,
   onOpen,
+  toAnswer,
+  onBoard,
+  onShowBoard,
 }: {
   market: 'all' | 'LEBANON' | 'GEORGIA'
   onOpen: (id: string) => void
+  /** People in the board's "To answer" column. */
+  toAnswer: number
+  /**
+   * Clients the board's people columns already show. Today lists only what the
+   * board does not — the same uncalled lead or due ping in both places was two
+   * to-do lists for one job.
+   */
+  onBoard: Set<string>
+  onShowBoard: () => void
 }) {
   const apiUrl = normalizeApiUrl(process.env.NEXT_PUBLIC_API_URL || '')
   const [agenda, setAgenda] = useState<Agenda | null>(null)
@@ -89,38 +101,58 @@ export function TodayView({
   }
   if (!agenda) return null
 
+  // Chats and lead forms are worked from the board's "To answer"; what is left
+  // here is everyone the board does not show (clients added by hand, by phone).
+  const notOnBoard = <T extends { id: string }>(rows: T[]) => rows.filter((l) => !onBoard.has(l.id))
+  const freshLeads = notOnBoard(agenda.freshLeads)
+  const dueFollowUps = notOnBoard(agenda.dueFollowUps)
+  const goingCold = notOnBoard(agenda.goingCold)
+
   const viewingsToday = agenda.upcomingViewings.filter(
     (o) => o.viewingAt && new Date(o.viewingAt).toDateString() === new Date().toDateString()
   )
   const viewingsSoon = agenda.upcomingViewings.filter((o) => !viewingsToday.includes(o))
 
   const totalWork =
-    agenda.freshLeads.length + viewingsToday.length + agenda.dueFollowUps.length +
+    freshLeads.length + viewingsToday.length + dueFollowUps.length +
     agenda.awaitingFeedback.length + viewingsSoon.length +
-    agenda.needsNewOptions.length + agenda.goingCold.length
+    agenda.needsNewOptions.length + goingCold.length
+
+  const toAnswerBanner = toAnswer > 0 && (
+    <button
+      onClick={onShowBoard}
+      className="w-full min-h-11 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-left text-sm text-red-800 inline-flex items-center gap-2 hover:bg-red-100"
+    >
+      <Zap className="h-4 w-4 shrink-0" />
+      <span className="flex-1"><strong>{toAnswer}</strong> {toAnswer === 1 ? 'client is' : 'clients are'} waiting for a person on the board — chats, lead forms and pings due.</span>
+      <ArrowRight className="h-4 w-4 shrink-0" />
+    </button>
+  )
 
   if (totalWork === 0) {
-    return (
+    return toAnswer > 0 ? <div className="space-y-3">{toAnswerBanner}</div> : (
       <div className="bg-white border border-slate-200 rounded-xl p-16 text-center">
         <CheckCircle2 className="h-12 w-12 mx-auto text-emerald-400 mb-3" />
         <p className="font-semibold text-slate-800">Nothing needs you right now.</p>
         <p className="text-sm text-slate-500 mt-1">
-          No uncalled leads, no viewings today, no follow-ups due.
+          Nothing waiting on the board, no viewings today, no follow-ups due.
         </p>
       </div>
     )
   }
 
   return (
+    <div className="space-y-3">
+    {toAnswerBanner}
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
       <Section
         title="Never called"
         hint="Came in the last 3 days, nobody has spoken to them"
         icon={<Zap className="h-4 w-4" />}
         tone="red"
-        count={agenda.freshLeads.length}
+        count={freshLeads.length}
       >
-        {agenda.freshLeads.map((l) => (
+        {freshLeads.map((l) => (
           <Row key={l.id} lead={l} onOpen={onOpen}
                meta={`${l.source ? l.source.replace(/_/g, ' ').toLowerCase() : 'new'} · ${dayLabel(l.createdAt)}`}
                detail={l.askingFor} />
@@ -145,9 +177,9 @@ export function TodayView({
         hint="You planned to call them by now"
         icon={<Phone className="h-4 w-4" />}
         tone="sky"
-        count={agenda.dueFollowUps.length}
+        count={dueFollowUps.length}
       >
-        {agenda.dueFollowUps.map((l) => (
+        {dueFollowUps.map((l) => (
           <Row key={l.id} lead={l} onOpen={onOpen}
                meta={dayLabel(l.nextContactAt)} detail={l.nextContactNote} />
         ))}
@@ -182,9 +214,9 @@ export function TodayView({
         hint="No contact in 3 weeks and nothing planned"
         icon={<Snowflake className="h-4 w-4" />}
         tone="slate"
-        count={agenda.goingCold.length}
+        count={goingCold.length}
       >
-        {agenda.goingCold.map((l) => (
+        {goingCold.map((l) => (
           <Row key={l.id} lead={l} onOpen={onOpen}
                meta={`last spoke ${dayLabel(l.lastContactAt)}`} detail={l.askingFor} />
         ))}
@@ -203,6 +235,7 @@ export function TodayView({
           ))}
         </Section>
       )}
+    </div>
     </div>
   )
 }

@@ -18,6 +18,7 @@ import {
 import { OpportunityList } from './OpportunityList'
 import { SellerProperties } from './SellerProperties'
 import { DealPanel } from './DealPanel'
+import { PipelineHistory } from './PipelineHistory'
 import { ShareShortlistModal } from './ShareShortlistModal'
 import { useAuth } from '@/contexts/AuthContext'
 import { canSeeMoney as canSeeMoneyFor } from '@/lib/permissions'
@@ -910,6 +911,9 @@ export function LeadDrawer({
 
           {tab === 'activity' && (
           <>
+          {/* What happened to them on the board, who did it, and when. */}
+          <PipelineHistory leadId={l.id} market={l.market} refreshKey={l.updatedAt} />
+
           {/* The conversation itself, as mirrored from the phone. The latest
               few lines only — the Inbox holds the whole thread. */}
           {chats.map((chat) => (

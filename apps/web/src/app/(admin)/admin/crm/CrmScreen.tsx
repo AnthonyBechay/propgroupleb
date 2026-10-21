@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   UserSearch, Plus, Search, Loader2, Phone, MessageCircle, Mail, Clock,
   CalendarPlus, X, LayoutGrid, List, Download, Upload, MapPin,
@@ -19,10 +19,11 @@ import { OverviewView } from './OverviewView'
 import { ClientDirectory } from './ClientDirectory'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
+import { toast } from '@/components/ui/toast'
 import {
   type Lead, type LeadMarket, type LeadType,
   type Deal, type OpportunityStage, type PipelineClient,
-  STATUS_META, TYPE_LABELS, MARKET_META, formatLastContact, formatPlanned,
+  STATUS_META, TYPE_LABELS, MARKET_META, formatLastContact, formatPlanned, BOARD_DEAL_COLUMNS, stageLabel,
   isWaitingOnUs, hasAwaitingFeedback, SUB_STATUS_META,
 } from './types'
 
@@ -70,6 +71,12 @@ export function CrmScreen({ mode }: { mode: 'pipeline' | 'clients' }) {
   const router = useRouter()
   const [market, setMarket] = useState<'all' | LeadMarket>('all')
   const [search, setSearch] = useState('')
+  // The Clients page opened from the board's Lost / Noise links: only those.
+  const [statusFilter, setStatusFilter] = useState<'LOST' | 'ARCHIVED' | null>(null)
+  useEffect(() => {
+    const s = new URLSearchParams(window.location.search).get('status')
+    if (mode === 'clients' && (s === 'LOST' || s === 'ARCHIVED')) setStatusFilter(s)
+  }, [mode])
   // Conversations with something unread, for the badge on the Inbox tab.
   const [unreadChats, setUnreadChats] = useState(0)
   // Arriving from the Inbox with a client to open: /admin/crm?lead=<id>.
@@ -107,14 +114,23 @@ export function CrmScreen({ mode }: { mode: 'pipeline' | 'clients' }) {
   const [prefillName, setPrefillName] = useState('')
   const [showChannels, setShowChannels] = useState(false)
 
+  // The spinner is for the first load only. Showing it on every search
+  // keystroke or market switch blanked the whole board each time.
+  const loadedOnce = useRef(false)
+  const boardQuery = useCallback(() => {
+    const p = new URLSearchParams({ limit: '500' })
+    if (search.trim()) p.set('search', search.trim())
+    return p.toString()
+  }, [search])
   const load = useCallback(async () => {
-    setLoading(true)
+    if (!loadedOnce.current) setLoading(true)
     try {
       // The board needs every open lead at once, so we always fetch broadly and
       // narrow client-side — keeps drag-and-drop instant.
       const p = new URLSearchParams({ limit: '500' })
       if (market !== 'all') p.set('market', market)
       if (search.trim()) p.set('search', search.trim())
+      if (statusFilter) p.set('status', statusFilter)
 
       const [listRes, statsRes, untappedRes, earnRes, dealsRes, pipelineRes] = await Promise.all([
         fetch(`${apiUrl}/api/crm?${p}`, { credentials: 'include', cache: 'no-store' }),
@@ -123,8 +139,10 @@ export function CrmScreen({ mode }: { mode: 'pipeline' | 'clients' }) {
         canSeeMoney
           ? fetch(`${apiUrl}/api/crm/earnings?months=12`, { credentials: 'include', cache: 'no-store' })
           : Promise.resolve(null),
-        fetch(`${apiUrl}/api/crm/deals?${p}`, { credentials: 'include', cache: 'no-store' }),
-        fetch(`${apiUrl}/api/crm/pipeline${market !== 'all' ? `?market=${market}` : ''}`, { credentials: 'include', cache: 'no-store' }),
+        // Every market, narrowed below: the market buttons count what is on
+        // the board in each one, so the board needs all of it.
+        fetch(`${apiUrl}/api/crm/deals?${boardQuery()}`, { credentials: 'include', cache: 'no-store' }),
+        fetch(`${apiUrl}/api/crm/pipeline`, { credentials: 'include', cache: 'no-store' }),
       ])
       if (listRes.ok) setLeads((await listRes.json()).data ?? [])
       if (statsRes.ok) setStats((await statsRes.json()).data ?? null)
@@ -133,14 +151,31 @@ export function CrmScreen({ mode }: { mode: 'pipeline' | 'clients' }) {
       if (dealsRes.ok) setDeals((await dealsRes.json()).data ?? [])
       if (pipelineRes.ok) setPipeline((await pipelineRes.json()).data ?? [])
     } finally {
+      loadedOnce.current = true
       setLoading(false)
     }
-  }, [apiUrl, market, search, canSeeMoney])
+  }, [apiUrl, market, search, canSeeMoney, boardQuery, statusFilter])
 
   useEffect(() => {
     const t = setTimeout(load, search ? 350 : 0)
     return () => clearTimeout(t)
   }, [load, search])
+
+  // The board without the spinner: new chats and replies land on it while it
+  // is open, and an action's result shows without the whole page blinking.
+  const refreshBoard = useCallback(async () => {
+    const [pipelineRes, dealsRes] = await Promise.all([
+      fetch(`${apiUrl}/api/crm/pipeline`, { credentials: 'include', cache: 'no-store' }),
+      fetch(`${apiUrl}/api/crm/deals?${boardQuery()}`, { credentials: 'include', cache: 'no-store' }),
+    ]).catch(() => [null, null])
+    if (pipelineRes?.ok) setPipeline((await pipelineRes.json()).data ?? [])
+    if (dealsRes?.ok) setDeals((await dealsRes.json()).data ?? [])
+  }, [apiUrl, boardQuery])
+  useEffect(() => {
+    if (view !== 'board') return
+    const timer = setInterval(() => { if (document.visibilityState === 'visible') refreshBoard() }, 60_000)
+    return () => clearInterval(timer)
+  }, [view, refreshBoard])
 
   const visible = useMemo(() => {
     let out = leads
@@ -173,8 +208,9 @@ export function CrmScreen({ mode }: { mode: 'pipeline' | 'clients' }) {
    * Move a deal to another stage. Optimistic, and it rolls back on failure —
    * a board that lies about where a deal is, is worse than a slow one.
    */
-  async function moveDeal(dealId: string, stage: OpportunityStage) {
+  async function moveDeal(dealId: string, stage: OpportunityStage, undoing = false) {
     const before = deals
+    const deal = deals.find((d) => d.id === dealId)
     setMovingDeal(dealId)
     setDeals((prev) => prev.map((d) => (d.id === dealId ? { ...d, stage } : d)))
     try {
@@ -198,6 +234,23 @@ export function CrmScreen({ mode }: { mode: 'pipeline' | 'clients' }) {
       // Closing a deal changes the client's standing, so the other views need
       // the fresh figures.
       if (stage === 'WON') load()
+      // A ruled-out property can leave the client with no deal: back with the people.
+      if (stage === 'REJECTED') refreshBoard()
+      // Say what happened, and offer the way back — a drag can land in the wrong column.
+      if (deal && !undoing) {
+        const market = deal.lead.market ?? deal.subject?.country
+        toast({
+          title: stage === 'REJECTED'
+            ? `${deal.lead.name}: not ${deal.subject?.title ?? 'this property'}`
+            : `${deal.lead.name} → ${stageLabel(stage, market)}`,
+          description: stage === 'REJECTED' ? 'Kept on record in their history.' : deal.subject?.title ?? undefined,
+          action: (
+            <button onClick={() => moveDeal(dealId, deal.stage, true)} className="text-sm font-semibold underline">
+              Undo
+            </button>
+          ),
+        })
+      }
     } catch {
       setDeals(before)
       alert('Could not move that deal — nothing was changed. Try again.')
@@ -278,6 +331,30 @@ export function CrmScreen({ mode }: { mode: 'pipeline' | 'clients' }) {
     }
   }
 
+  // The board as shown: the market and intent picked in the toolbar.
+  const boardClients = useMemo(
+    () => pipeline.filter((p) => (market === 'all' || p.market === market) && (typeFilter === 'all' || p.type === typeFilter)),
+    [pipeline, market, typeFilter]
+  )
+  const boardDeals = useMemo(
+    () => deals.filter((d) => (market === 'all' || d.lead.market === market) && (typeFilter === 'all' || d.lead.type === typeFilter)),
+    [deals, market, typeFilter]
+  )
+  // People on the board per market — what the market buttons count there.
+  // They used to count every open client, which never matched the cards.
+  const boardCounts = useMemo(() => {
+    const onBoard = new Map<string, string | undefined>()
+    for (const p of pipeline) if (typeFilter === 'all' || p.type === typeFilter) onBoard.set(p.id, p.market)
+    for (const d of deals) {
+      if (!BOARD_DEAL_COLUMNS.some((c) => c.stages.includes(d.stage))) continue
+      if (typeFilter === 'all' || d.lead.type === typeFilter) onBoard.set(d.lead.id, d.lead.market)
+    }
+    const markets = [...onBoard.values()]
+    return { all: markets.length, LEBANON: markets.filter((m) => m === 'LEBANON').length, GEORGIA: markets.filter((m) => m === 'GEORGIA').length }
+  }, [pipeline, deals, typeFilter])
+  const toAnswer = boardClients.filter((p) => p.bucket === 'TO_ANSWER').length
+  const onBoardIds = useMemo(() => new Set(pipeline.map((p) => p.id)), [pipeline])
+
   const openLead = leads.find((l) => l.id === openId) ?? null
 
   return (
@@ -285,7 +362,10 @@ export function CrmScreen({ mode }: { mode: 'pipeline' | 'clients' }) {
       {/* One row: what needs attention on the left, actions on the right. The
           page title used to eat a whole row saying what the sidebar says. */}
       <div className="flex items-center justify-between gap-3 flex-wrap">
-        <div className={`flex gap-2 flex-wrap ${['today', 'overview', 'board'].includes(view) ? 'invisible pointer-events-none' : ''}`}>
+        {/* The focus chips filter the client list; elsewhere they are not
+            rendered at all, rather than kept as an invisible empty row. */}
+        {view === 'list' && (
+        <div className="flex gap-2 flex-wrap">
           <FocusChip
             active={focus === 'planned'} count={counts.planned}
             onClick={() => setFocus((f) => (f === 'planned' ? 'none' : 'planned'))}
@@ -320,8 +400,9 @@ export function CrmScreen({ mode }: { mode: 'pipeline' | 'clients' }) {
             </button>
           )}
         </div>
+        )}
 
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2 ml-auto">
           <button
             onClick={exportCsv}
             disabled={exporting}
@@ -382,14 +463,18 @@ export function CrmScreen({ mode }: { mode: 'pipeline' | 'clients' }) {
                 market === m ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-900'
               }`}
             >
-              {m === 'all' ? `All (${stats?.openLeads ?? 0})` : `${MARKET_META[m].label} (${stats?.byMarket?.[m] ?? 0})`}
+              {/* On the pipeline page (board, Today, Overview): people on the board. On the Clients page: open clients. */}
+              {mode === 'pipeline'
+                ? m === 'all' ? `All (${boardCounts.all})` : `${MARKET_META[m].label} (${boardCounts[m]})`
+                : m === 'all' ? `All (${stats?.openLeads ?? 0})` : `${MARKET_META[m].label} (${stats?.byMarket?.[m] ?? 0})`}
             </button>
           ))}
         </div>
 
         {/* The client list is its own page now; it has no board views. */}
         {mode === 'pipeline' && (
-        <div className="flex gap-1 bg-slate-100 rounded-lg p-1">
+        // Scrolls sideways on a narrow phone rather than cutting "Board" off.
+        <div className="flex gap-1 bg-slate-100 rounded-lg p-1 max-w-full overflow-x-auto [&>*]:shrink-0">
           <button
             onClick={() => setView('overview')}
             title="Overview — how the business is doing"
@@ -433,12 +518,12 @@ export function CrmScreen({ mode }: { mode: 'pipeline' | 'clients' }) {
       {view === 'overview' ? (
         <OverviewView onFocus={(v) => (v === 'list' ? router.push('/admin/clients') : setView(v))} />
       ) : view === 'today' ? (
-        <TodayView market={market} onOpen={setOpenId} />
+        <TodayView market={market} onOpen={setOpenId} toAnswer={toAnswer} onBoard={onBoardIds} onShowBoard={() => setView('board')} />
       ) : loading ? (
         <div className="flex items-center justify-center py-20 text-slate-400"><Loader2 className="h-6 w-6 animate-spin" /></div>
       ) : view === 'board' ? (
         <DealBoard
-          deals={deals}
+          deals={boardDeals}
           canSeeMoney={canSeeMoney}
           busyId={movingDeal}
           onMove={moveDeal}
@@ -450,27 +535,64 @@ export function CrmScreen({ mode }: { mode: 'pipeline' | 'clients' }) {
           clientsWithNoDeal={clientsWithNoDeal}
           onShowClients={() => router.push('/admin/clients')}
           onOpenChat={(leadId) => router.push(`/admin/inbox?lead=${leadId}`)}
-          clients={pipeline}
+          clients={boardClients}
           onBook={async (leadId, to) => {
-            if (to === 'LOST') {
+            // Ping later / noise / not interested: no property involved.
+            if (to === 'LOST' || to === 'NOISE' || to.startsWith('PING:')) {
               const name = pipeline.find((p) => p.id === leadId)?.name ?? 'this client'
-              if (!window.confirm(`Mark ${name} as not interested? They leave the board and stay in the client list.`)) return
-              const res = await fetch(`${apiUrl}/api/crm/${leadId}`, {
-                method: 'PUT', credentials: 'include',
+              const sure = to === 'NOISE'
+                ? window.confirm(`Mark ${name} as noise?\n\nThey leave the board and the inbox, and come back by themselves if they ever write again.`)
+                : to === 'LOST'
+                  ? window.confirm(`Mark ${name} as not interested? They leave the board and stay in the client list.`)
+                  : true
+              if (!sure) return
+              const body = to === 'NOISE' ? { action: 'noise' }
+                : to === 'LOST' ? { action: 'not_interested' }
+                : { action: 'ping_later', days: Number(to.slice(5)) }
+              // Off the board at once; the refresh confirms it.
+              setPipeline((prev) => to.startsWith('PING:')
+                ? prev.map((p) => (p.id === leadId ? { ...p, bucket: 'PING_LATER', pingAt: new Date(Date.now() + Number(to.slice(5)) * 86_400_000).toISOString() } : p))
+                : prev.filter((p) => p.id !== leadId))
+              const res = await fetch(`${apiUrl}/api/crm/pipeline/${leadId}/action`, {
+                method: 'POST', credentials: 'include',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ status: 'LOST' }),
+                body: JSON.stringify(body),
               })
-              if (res.ok) load()
+              if (!res.ok) alert('That did not save — nothing was changed. Try again.')
+              else toast({
+                title: to === 'NOISE' ? `${name}: noise` : to === 'LOST' ? `${name}: not interested` : `${name}: ping in ${Number(to.slice(5)) === 30 ? 'a month' : `${to.slice(5)} days`}`,
+                description: to === 'NOISE'
+                  ? 'Off the board and out of the inbox until they write again.'
+                  : to === 'LOST' ? 'Off the board. Find them under Lost on the Clients page.' : 'Back in "To answer" on the day.',
+              })
+              refreshBoard()
               return
             }
-            setBookingStage(to)
-            const known = leads.find((l) => l.id === leadId)
-            if (known) { setBookingFor(known); return }
+            setBookingStage(to as StartStage)
+            // Always the full record: the board's list carries the client's
+            // properties without their names, which showed every one of them
+            // as a blank "Shortlisted item".
             const res = await fetch(`${apiUrl}/api/crm/${leadId}`, { credentials: 'include', cache: 'no-store' })
             if (res.ok) setBookingFor((await res.json()).data)
           }}
         />
-      ) : visible.length === 0 ? (
+      ) : (
+        <>
+        {statusFilter && (
+          <div className="flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700">
+            <span className="flex-1">
+              Showing <strong>{statusFilter === 'LOST' ? 'lost clients' : 'noise and parked clients'}</strong>. Open one and set it back to Active to put it on the board again
+              — or it comes back by itself when they write.
+            </span>
+            <button
+              onClick={() => { setStatusFilter(null); router.replace('/admin/clients') }}
+              className="min-h-9 px-3 rounded-lg border border-slate-200 text-sm font-medium hover:bg-slate-50"
+            >
+              Show open clients
+            </button>
+          </div>
+        )}
+        {visible.length === 0 ? (
         <div className="bg-white border rounded-xl p-16 text-center text-slate-400">
           <UserSearch className="h-10 w-10 mx-auto mb-2 opacity-30" />
           {focus === 'planned' ? 'No follow-ups due — you’re all caught up.'
@@ -481,17 +603,20 @@ export function CrmScreen({ mode }: { mode: 'pipeline' | 'clients' }) {
         </div>
       ) : (
         <ClientDirectory leads={visible} canSeeMoney={canSeeMoney} onOpen={setOpenId} search={search} />
+        )}
+        </>
       )}
 
       {/* Closed deals summary — off-board so the pipeline stays focused */}
       {!loading && view === 'board' && (
         <div className="flex flex-wrap gap-2 text-xs text-slate-500">
-          <span className="px-2.5 py-1 rounded-lg bg-white border border-slate-200">
+          {/* Where people taken off the board went — and the way to bring one back. */}
+          <Link href="/admin/clients?status=LOST" className="px-2.5 py-1 rounded-lg bg-white border border-slate-200 hover:bg-slate-50">
             Lost: <strong className="text-slate-700">{stats?.byStatus?.LOST ?? 0}</strong>
-          </span>
-          <span className="px-2.5 py-1 rounded-lg bg-white border border-slate-200">
-            Archived: <strong className="text-slate-700">{stats?.byStatus?.ARCHIVED ?? 0}</strong>
-          </span>
+          </Link>
+          <Link href="/admin/clients?status=ARCHIVED" className="px-2.5 py-1 rounded-lg bg-white border border-slate-200 hover:bg-slate-50">
+            Noise &amp; parked: <strong className="text-slate-700">{stats?.byStatus?.ARCHIVED ?? 0}</strong>
+          </Link>
           {earnings && earnings.bySource?.some((r) => r.leads > 0) && (
             <button
               onClick={() => setShowChannels((v) => !v)}
@@ -594,7 +719,11 @@ export function CrmScreen({ mode }: { mode: 'pipeline' | 'clients' }) {
           lead={bookingFor}
           stage={bookingStage}
           onClose={() => setBookingFor(null)}
-          onBooked={() => { setBookingFor(null); load() }}
+          onBooked={() => {
+            toast({ title: `${bookingFor.name} → ${stageLabel(bookingStage, bookingFor.market)}`, description: 'On the board as a deal now.' })
+            setBookingFor(null)
+            load()
+          }}
         />
       )}
     </div>

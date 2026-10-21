@@ -243,6 +243,17 @@ export async function recordChatMessage(event: ChatEvent): Promise<string | null
     throw err;
   }
 
+  // A client parked as noise or marked lost who writes again is a live lead
+  // again — otherwise they would be invisible on the board while talking to us.
+  // A reaction ("👍") is not someone coming back.
+  if (inbound && !event.history && conversation.leadId && event.type !== 'reaction') {
+    const { count } = await prisma.lead.updateMany({
+      where: { id: conversation.leadId, status: { in: ['ARCHIVED', 'LOST'] } },
+      data: { status: 'ACTIVE', subStatus: null, closedAt: null },
+    });
+    if (count > 0) logger.info('Client came back — back on the board', { lead: conversation.leadId, conversation: conversation.id });
+  }
+
   if (event.referral && !event.history) {
     logger.info('Chat started from an ad', {
       conversation: conversation.id,
