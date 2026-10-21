@@ -13,7 +13,7 @@ import { LeadDrawer } from './LeadDrawer'
 import { LeadFormModal } from './LeadFormModal'
 import { DealBoard } from './DealBoard'
 import { ImportModal } from './ImportModal'
-import { BookViewingModal } from './BookViewingModal'
+import { BookViewingModal, type StartStage } from './BookViewingModal'
 import { TodayView } from './TodayView'
 import { OverviewView } from './OverviewView'
 import { ClientDirectory } from './ClientDirectory'
@@ -99,6 +99,8 @@ export function CrmScreen({ mode }: { mode: 'pipeline' | 'clients' }) {
   const [creating, setCreating] = useState(false)
   const [importing, setImporting] = useState(false)
   const [bookingFor, setBookingFor] = useState<Lead | null>(null)
+  // Which stage the deal being started lands in — a viewing, or straight to negotiating or reserved.
+  const [bookingStage, setBookingStage] = useState<StartStage>('VIEWING_BOOKED')
   // Starting a deal is "which client, then which property" — the client step.
   const [pickingClient, setPickingClient] = useState(false)
   // Carries the name typed in the picker straight into the new-client form.
@@ -449,7 +451,19 @@ export function CrmScreen({ mode }: { mode: 'pipeline' | 'clients' }) {
           onShowClients={() => router.push('/admin/clients')}
           onOpenChat={(leadId) => router.push(`/admin/inbox?lead=${leadId}`)}
           clients={pipeline}
-          onBook={async (leadId) => {
+          onBook={async (leadId, to) => {
+            if (to === 'LOST') {
+              const name = pipeline.find((p) => p.id === leadId)?.name ?? 'this client'
+              if (!window.confirm(`Mark ${name} as not interested? They leave the board and stay in the client list.`)) return
+              const res = await fetch(`${apiUrl}/api/crm/${leadId}`, {
+                method: 'PUT', credentials: 'include',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ status: 'LOST' }),
+              })
+              if (res.ok) load()
+              return
+            }
+            setBookingStage(to)
             const known = leads.find((l) => l.id === leadId)
             if (known) { setBookingFor(known); return }
             const res = await fetch(`${apiUrl}/api/crm/${leadId}`, { credentials: 'include', cache: 'no-store' })
@@ -570,7 +584,7 @@ export function CrmScreen({ mode }: { mode: 'pipeline' | 'clients' }) {
         <ClientPicker
           leads={leads}
           onClose={() => setPickingClient(false)}
-          onPick={(l) => { setPickingClient(false); setBookingFor(l) }}
+          onPick={(l) => { setPickingClient(false); setBookingStage('VIEWING_BOOKED'); setBookingFor(l) }}
           onCreate={(name) => { setPickingClient(false); setPrefillName(name); setCreating(true) }}
         />
       )}
@@ -578,6 +592,7 @@ export function CrmScreen({ mode }: { mode: 'pipeline' | 'clients' }) {
       {bookingFor && (
         <BookViewingModal
           lead={bookingFor}
+          stage={bookingStage}
           onClose={() => setBookingFor(null)}
           onBooked={() => { setBookingFor(null); load() }}
         />

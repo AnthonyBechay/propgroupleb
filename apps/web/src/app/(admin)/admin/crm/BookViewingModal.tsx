@@ -39,13 +39,31 @@ function toLocalInput(d: Date): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
 }
 
+/**
+ * Where the deal starts. A viewing or meeting has a date; the later stages do
+ * not — a Georgian client often goes from the chat straight to "we want this
+ * one" or to reserving, with no meeting at all, and the board had no way to
+ * say so.
+ */
+export type StartStage = 'VIEWING_BOOKED' | 'VIEWED' | 'INTERESTED' | 'RESERVED'
+
+const STAGE_COPY: Record<StartStage, { title: string; question: (name: string) => string; button: string; error: string }> = {
+  VIEWING_BOOKED: { title: 'Book a viewing / meeting', question: (n) => `What is ${n} going to see?`, button: 'Book', error: 'Could not book the viewing' },
+  VIEWED: { title: 'Viewed / met', question: (n) => `Which property did ${n} see or discuss with us?`, button: 'Move to Viewed / met', error: 'Could not move the deal' },
+  INTERESTED: { title: 'Negotiating', question: (n) => `Which property is ${n} negotiating on?`, button: 'Move to Negotiating', error: 'Could not move the deal' },
+  RESERVED: { title: 'Reserved / paying', question: (n) => `Which property did ${n} reserve?`, button: 'Move to Reserved', error: 'Could not move the deal' },
+}
+
 export function BookViewingModal({
-  lead, onClose, onBooked,
+  lead, onClose, onBooked, stage = 'VIEWING_BOOKED',
 }: {
   lead: Lead
   onClose: () => void
   onBooked: () => void
+  stage?: StartStage
 }) {
+  const copy = STAGE_COPY[stage]
+  const dated = stage === 'VIEWING_BOOKED'
   const apiUrl = normalizeApiUrl(process.env.NEXT_PUBLIC_API_URL || '')
   const [matches, setMatches] = useState<Candidate[]>([])
   const [loading, setLoading] = useState(true)
@@ -175,25 +193,25 @@ export function BookViewingModal({
   }, [shortlisted, matches, found, query, lead.opportunities])
 
   async function book() {
-    if (!picked || !when) return
+    if (!picked || (dated && !when)) return
     setSaving(true)
     setError(null)
     try {
-      const viewingAt = new Date(when).toISOString()
+      const viewingAt = dated ? new Date(when).toISOString() : undefined
       const res = picked.opportunityId
         ? await fetch(`${apiUrl}/api/crm/opportunities/${picked.opportunityId}`, {
             method: 'PATCH',
             credentials: 'include',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ stage: 'VIEWING_BOOKED', viewingAt }),
+            body: JSON.stringify({ stage, ...(viewingAt ? { viewingAt } : {}) }),
           })
         : await fetch(`${apiUrl}/api/crm/${lead.id}/opportunities`, {
             method: 'POST',
             credentials: 'include',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              stage: 'VIEWING_BOOKED',
-              viewingAt,
+              stage,
+              ...(viewingAt ? { viewingAt } : {}),
               matchScore: picked.score ?? null,
               ...(picked.kind === 'LISTING'
                 ? { listingId: picked.id }
@@ -204,7 +222,7 @@ export function BookViewingModal({
           })
       if (!res.ok) {
         const j = await res.json().catch(() => ({}))
-        setError(j.message || j.error || 'Could not book the viewing')
+        setError(j.message || j.error || copy.error)
         return
       }
       onBooked()
@@ -223,12 +241,12 @@ export function BookViewingModal({
         <div className="px-5 py-3.5 border-b border-slate-100 flex items-start justify-between gap-3">
           <div>
             <h2 className="font-semibold text-slate-900 flex items-center gap-2">
-              <CalendarCheck className="h-5 w-5 text-violet-600" /> Book a viewing
+              <CalendarCheck className="h-5 w-5 text-violet-600" /> {copy.title}
             </h2>
             <p className="text-xs text-slate-500 mt-0.5">
               {wantsCounterpart
                 ? <>Which buyer is seeing <strong>{lead.name}</strong>&apos;s property?</>
-                : <>What is <strong>{lead.name}</strong> going to see?</>}
+                : copy.question(lead.name)}
               {liveCount > 0 && ` · ${liveCount} already in play`}
             </p>
           </div>
@@ -309,7 +327,7 @@ export function BookViewingModal({
           {error && (
             <p className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{error}</p>
           )}
-          <label className="block">
+          {dated && <label className="block">
             <span className="text-xs font-medium text-slate-600">When</span>
             <input
               type="datetime-local"
@@ -317,18 +335,18 @@ export function BookViewingModal({
               onChange={(e) => setWhen(e.target.value)}
               className="mt-1 w-full h-9 px-2.5 text-sm rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-slate-900/10"
             />
-          </label>
+          </label>}
           <div className="flex justify-end gap-2">
             <button onClick={onClose} className="px-4 py-2 text-sm font-medium text-slate-600 rounded-lg hover:bg-slate-100">
               Cancel
             </button>
             <button
               onClick={book}
-              disabled={!picked || !when || saving}
+              disabled={!picked || (dated && !when) || saving}
               className="px-5 py-2 text-sm font-semibold text-white bg-violet-600 rounded-lg hover:bg-violet-700 disabled:opacity-50 inline-flex items-center gap-2"
             >
               {saving && <Loader2 className="h-4 w-4 animate-spin" />}
-              Book viewing
+              {copy.button}
             </button>
           </div>
         </div>

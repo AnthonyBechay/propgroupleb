@@ -10,6 +10,10 @@ import {
   dealCommission, dealAlert, isLiveDeal, TYPE_LABELS,
 } from './types'
 import { countryFlag } from '@/lib/market'
+import type { StartStage } from './BookViewingModal'
+
+/** Where a person card can go: onto a property deal at a stage, or out as not interested. */
+export type ClientMove = StartStage | 'LOST'
 
 /**
  * The pipeline, as deals.
@@ -41,8 +45,8 @@ export function DealBoard({
 }: {
   /** People at the front of the pipeline, before any viewing or meeting. */
   clients: PipelineClient[]
-  /** Book a viewing (Lebanon) or an office meeting (abroad) for this client. */
-  onBook: (leadId: string) => void
+  /** Start a deal for this client at a stage (picking the property), or mark them not interested. */
+  onBook: (leadId: string, to: ClientMove) => void
   /** Jump to this client's conversation in the Inbox. */
   onOpenChat: (leadId: string) => void
   deals: Deal[]
@@ -200,7 +204,7 @@ export function DealBoard({
               <p className="px-2.5 pt-2 text-[11px] text-slate-500 lg:hidden">{col.hint}</p>
               <div className="p-1.5 space-y-1.5 min-h-[120px]">
                 {cards.map((c) => (
-                  <ClientCard key={c.id} client={c} onOpenClient={onOpenClient} onOpenChat={onOpenChat} onBook={onBook} />
+                  <ClientCard key={c.id} client={c} onOpenClient={onOpenClient} onOpenChat={onOpenChat} onBook={onBook} onDragStart={() => setDragging(`client:${c.id}`)} />
                 ))}
                 {cards.length === 0 && <p className="text-[11px] text-slate-400 text-center py-6">Nobody here</p>}
               </div>
@@ -223,6 +227,11 @@ export function DealBoard({
                 const id = e.dataTransfer.getData('text/plain') || dragging
                 setDragging(null)
                 if (!id) return
+                // A person dropped on a deal column: which property is it about?
+                if (id.startsWith('client:')) {
+                  if (col.stage !== 'WON') onBook(id.slice(7), col.stage as StartStage)
+                  return
+                }
                 const deal = deals.find((d) => d.id === id)
                 if (!deal || dealColumnOf(deal) === col.key) return
                 onMove(id, col.stage)
@@ -286,12 +295,13 @@ const sinceLabel = (iso: string) => {
 
 /** A person at the front of the pipeline — before any viewing or meeting. */
 function ClientCard({
-  client: c, onOpenClient, onOpenChat, onBook,
+  client: c, onOpenClient, onOpenChat, onBook, onDragStart,
 }: {
   client: PipelineClient
   onOpenClient: (leadId: string) => void
   onOpenChat: (leadId: string) => void
-  onBook: (leadId: string) => void
+  onBook: (leadId: string, to: ClientMove) => void
+  onDragStart: () => void
 }) {
   // Abroad, the next step is a meeting at the office; in Lebanon, a viewing.
   const meeting = c.market !== 'LEBANON'
@@ -301,6 +311,9 @@ function ClientCard({
   return (
     <div
       onClick={() => onOpenClient(c.id)}
+      // On a computer a person can be dragged onto a deal column; on a phone, the Move menu below.
+      draggable
+      onDragStart={(e) => { e.dataTransfer.setData('text/plain', `client:${c.id}`); onDragStart() }}
       className="bg-white border border-slate-200 rounded-lg p-2.5 cursor-pointer hover:border-slate-300 hover:shadow-sm transition-all"
     >
       <div className="flex items-start gap-1.5">
@@ -351,15 +364,25 @@ function ClientCard({
             {c.chat.unread > 0 && c.chat.unread}
           </button>
         )}
-        {!c.supplyOnly && (
-          <button
-            onClick={(e) => { e.stopPropagation(); onBook(c.id) }}
-            className="min-h-7 px-1.5 rounded-md text-[11px] font-semibold text-slate-700 hover:bg-slate-100 inline-flex items-center gap-1"
-            title={meeting ? 'Book a meeting at the office' : 'Book a viewing'}
-          >
-            <Calendar className="h-3.5 w-3.5" /> {meeting ? 'Meeting' : 'Viewing'}
-          </button>
-        )}
+        {/* Where the conversation actually is. Every step but "not interested"
+            asks which property, because from here on the board follows deals. */}
+        <select
+          value=""
+          onClick={(e) => e.stopPropagation()}
+          onChange={(e) => {
+            const to = e.target.value as ClientMove
+            if (to) onBook(c.id, to)
+          }}
+          aria-label="Move this client"
+          className="min-h-7 max-w-[7.5rem] rounded-md border border-slate-200 bg-white px-1 text-[11px] font-semibold text-slate-700 hover:bg-slate-50"
+        >
+          <option value="">Move to…</option>
+          {!c.supplyOnly && <option value="VIEWING_BOOKED">{meeting ? 'Meeting booked' : 'Viewing booked'}</option>}
+          {!c.supplyOnly && <option value="VIEWED">{meeting ? 'Met / discussed' : 'Viewed'}</option>}
+          {!c.supplyOnly && <option value="INTERESTED">Negotiating</option>}
+          {!c.supplyOnly && <option value="RESERVED">Reserved / paying</option>}
+          <option value="LOST">Not interested</option>
+        </select>
       </div>
     </div>
   )
