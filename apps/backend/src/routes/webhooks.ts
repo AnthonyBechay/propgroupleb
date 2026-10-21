@@ -215,8 +215,13 @@ async function handleYCloud(event: any): Promise<void> {
 
   if (type === 'whatsapp.inbound_message.received' || (history && event.whatsappInboundMessage)) {
     const m = event.whatsappInboundMessage;
-    // Group chats are not mirrored — a thread here is one person.
-    if (!m?.from || m.groupId) return;
+    // Group chats are not mirrored — a thread here is one person. Said in the
+    // log, so "I got a message and it is not in the CRM" has an answer.
+    if (m?.groupId) {
+      logger.info('WhatsApp group message not mirrored', { group: m.groupId, type: m.type });
+      return;
+    }
+    if (!m?.from) return;
     const conversationId = await recordChatMessage({
       channel: 'WHATSAPP',
       externalId: m.from,

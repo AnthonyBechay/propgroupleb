@@ -3,7 +3,7 @@ import { ChatModelUnavailableError, ChatSession, chatAiEnabled, chatModelOrder, 
 import { createText, isAiEnabled } from '../config/ai.js';
 import { aiBudget } from '../utils/ai-budget.js';
 import { logger } from '../utils/logger.js';
-import { cardCaption, cardsByRef, formatPrice, marketNames, projectsNamedIn, searchCatalogue, type Market } from './catalogue.service.js';
+import { cardCaption, cardsByRef, formatPrice, marketNames, projectsNamedIn, propertyDetails, searchCatalogue, type Market } from './catalogue.service.js';
 import { recordListingsShared } from './deal-sync.service.js';
 import { getChatAiSettings, type ChatAiSettings } from './ai-settings.service.js';
 import { linkConversationToLead } from './messaging-intake.service.js';
@@ -298,8 +298,19 @@ const TOOLS: ChatTool[] = [
         minBeds: { type: 'integer', description: 'Minimum bedrooms. 0 for a studio.' },
         budgetMax: { type: 'number', description: 'Plain number in USD: the purchase budget, or for RENT the rent per month.' },
         kind: { type: 'string', enum: UNIT_KINDS },
+        readyOnly: { type: 'boolean', description: 'True when the client wants something built and ready now, not off-plan.' },
       },
       required: ['market'],
+    },
+  },
+  {
+    name: 'get_property_details',
+    description:
+      'Everything the public page says about one property: whether it is ready or off-plan and its handover date, payment plans (down payment, monthly instalments, months), ROI and rental yield, amenities, a description, and each available unit with its size, floor, view, finishes and price. Call it whenever the client asks anything specific about a property — ready or not, payment plan, monthly payments, units, sizes, finishing, ROI, delivery — and answer from it.',
+    parameters: {
+      type: 'object',
+      properties: { ref: { type: 'string', description: 'A reference code from search_listings, the advert, or the conversation, e.g. "PG-1059".' } },
+      required: ['ref'],
     },
   },
   {
@@ -387,83 +398,124 @@ ${LEBANESE_LATIN}`,
 ${LEBANESE_LATIN}`,
 };
 
-type ClientScript = 'arabic' | 'latin' | 'voice';
+/**
+ * The language a client is writing in, decided in code rather than left to
+ * the model. "Latin letters" was not enough: an English "Hello! Can I get more
+ * info on this?" got a Lebanese-in-Latin-letters answer, because the
+ * instruction allowed either and the cheap model picked the wrong one.
+ */
+type ClientLanguage = 'arabic' | 'arabizi' | 'english' | 'french' | 'voice';
+/** What the written reply is checked against. `latin` is any language in Latin letters (after a voice note). */
+type ReplyLanguage = 'arabic' | 'arabizi' | 'english' | 'french' | 'latin';
 const ARABIC_LETTERS = /[؀-ۿݐ-ݿ]/;
 const NOT_RECEIVED = /^Not received:/;
+const LEBANESE_WORDS = /\b(kifak|kifik|kifkon|shu|shou|chou|badde|baddi|baddak|baddik|3am|ahla|ahlan|halla2|hala2|hayda|hayde|akid|ma3ak|ma3ik|yalla|tayeb|mni7|ktir|kteer|kamen|fik|fiki|fiye|ana|enta|enti|inta|inte|lesh|la2|mish|msh|bas|hek|hon|ya3ne|yaane|habibi|marhaba|tfaddal|kel|shi|wen|lal|bel|3al|3an|3anna|men|mn)\b/gi;
+/** Lebanese that never belongs in an English or French reply. */
+const LEBANESE_PHRASE = /\b(ahla|ahlan|akid|ma fi|mechkle|mishkle|mushkle|yalla|habibi|tfaddal|tfadal|ya3ne|kifak|kifik|shu|shou|tayeb|yislamo|tislam|marhaba|w sahla)\b/i;
+const FRENCH_WORDS = /\b(bonjour|bonsoir|salut|merci|je|j|vous|est|c|pour|avec|oui|non|plus|sujet|cette|des|les|une|suis|voudrais|svp|s|il|puis|en|savoir|quel|quelle|votre|nous|sont)\b/gi;
+
+/** Words mixing letters with 2, 3 or 7 ("3am", "halla2", "mni7") — but not "2BR", "3rd", "7am", "PG-1074". */
+function arabiziDigitWords(text: string): number {
+  return (text.match(/[a-z0-9']+/gi) ?? []).filter(
+    (w) => /[a-z]/i.test(w) && /[237]/.test(w) && !/^\d+(st|nd|rd|th|br|bd|bed|beds|k|m|m2|sqm|am|pm|x)$/i.test(w)
+  ).length;
+}
+
+function looksArabizi(text: string): boolean {
+  return arabiziDigitWords(text) >= 1 || (text.match(LEBANESE_WORDS) ?? []).length >= 2;
+}
+
+export function languageOf(text: string): ClientLanguage | null {
+  if (ARABIC_LETTERS.test(text)) return 'arabic';
+  if (!/[a-z]/i.test(text)) return null;
+  if (looksArabizi(text)) return 'arabizi';
+  if ((text.match(FRENCH_WORDS) ?? []).length >= 2 || /\b(bonjour|bonsoir|merci)\b/i.test(text)) return 'french';
+  return 'english';
+}
 
 /**
  * How the client is writing right now: their newest message that has words in
  * it, looking first at what is unanswered and then further back. A voice note
  * counts as speech, whatever was said in it.
  */
-function clientScript(newestFirst: Array<{ direction: string; type: string; body: string }>): ClientScript | null {
+function clientLanguage(newestFirst: Array<{ direction: string; type: string; body: string }>): ClientLanguage | null {
   for (const m of newestFirst) {
     if (m.direction !== 'IN') continue;
     if (m.type === 'audio') return 'voice';
     if (m.type !== 'text' && !m.body.trim()) continue;
     if (NOT_RECEIVED.test(m.body) || /^\[\w+\]$/.test(m.body)) continue;
-    if (ARABIC_LETTERS.test(m.body)) return 'arabic';
-    if (/[a-z]/i.test(m.body)) return 'latin';
+    const language = languageOf(m.body);
+    if (language) return language;
   }
   return null;
 }
 
 /**
- * The one script this reply must be in, decided in code — the model kept
- * answering Arabic letters with Latin ones when only told the general rule.
- * `expect` is what the written reply is checked against.
+ * The one language this reply must be in, decided in code — the model kept
+ * drifting when only told the general rule. `expect` is what the written reply
+ * is checked against before it goes.
  */
-function scriptForThisReply(style: ChatAiSettings['replyStyle'], script: ClientScript | null): { rule: string; expect: 'arabic' | 'latin' | null } {
+function languageForThisReply(style: ChatAiSettings['replyStyle'], language: ClientLanguage | null): { rule: string; expect: ReplyLanguage | null } {
   if (style === 'latin_always') {
-    return { rule: 'Write this reply in Lebanese Arabic in LATIN letters.', expect: 'latin' };
+    return { rule: 'Write this reply in Lebanese Arabic in LATIN letters.', expect: 'arabizi' };
   }
-  if (script === 'arabic') {
-    return style === 'match'
-      ? { rule: 'The client is typing in ARABIC letters: write this reply in Lebanese Arabic in Arabic letters.', expect: 'arabic' }
-      : { rule: 'The client is typing in Arabic letters: write this reply in Lebanese Arabic in LATIN letters.', expect: 'latin' };
+  switch (language) {
+    case 'arabic':
+      return style === 'match'
+        ? { rule: 'The client is typing in ARABIC letters: write this reply in Lebanese Arabic in Arabic letters.', expect: 'arabic' }
+        : { rule: 'The client is typing in Arabic letters: write this reply in Lebanese Arabic in LATIN letters.', expect: 'arabizi' };
+    case 'arabizi':
+      return { rule: 'The client is typing Lebanese Arabic in Latin letters: write this reply the same way.', expect: 'arabizi' };
+    case 'english':
+      return { rule: 'The client is writing in ENGLISH: write this reply only in English — no Arabic or Lebanese words at all, not even "ahla" or "ma fi mechkle".', expect: 'english' };
+    case 'french':
+      return { rule: 'The client is writing in FRENCH: write this reply only in French.', expect: 'french' };
+    case 'voice':
+      return {
+        rule: 'The client\'s latest message is a voice note. If they speak Arabic, write this reply in Lebanese Arabic in LATIN letters; if English or French, in that language only. Never Arabic script.',
+        expect: 'latin',
+      };
+    default:
+      return { rule: '', expect: null };
   }
-  if (script === 'voice') {
-    return {
-      rule: 'The client\'s latest message is a voice note. If they speak Arabic, write this reply in Lebanese Arabic in LATIN letters; if English or French, in that language. Never Arabic script.',
-      expect: 'latin',
-    };
-  }
-  if (script === 'latin') {
-    return {
-      rule: 'The client is typing in Latin letters: reply in the same language — English, French, or Lebanese Arabic in Latin letters if that is what they type. Never Arabic script.',
-      expect: 'latin',
-    };
-  }
-  return { rule: '', expect: null };
 }
 
-/** What is wrong with the reply's script, or null. Links are ignored — "goo.gl/9xQ" is not Arabizi. */
-function scriptProblem(text: string, expect: 'arabic' | 'latin' | null): string | null {
+const LANGUAGE_NAME: Record<ReplyLanguage, string> = {
+  arabic: 'Lebanese Arabic in Arabic letters', arabizi: 'Lebanese Arabic in Latin letters',
+  english: 'English', french: 'French', latin: 'Latin letters',
+};
+
+/** What is wrong with the reply's language, or null. Links are ignored — "goo.gl/9xQ" is not Arabizi. */
+export function languageProblem(text: string, expect: ReplyLanguage | null): string | null {
+  if (!expect) return null;
   const words = text.replace(/https?:\/\/\S+/g, '');
-  if (expect === 'arabic' && !ARABIC_LETTERS.test(words)) return 'written in Latin letters instead of Arabic';
-  if (expect === 'latin' && ARABIC_LETTERS.test(words)) return 'written in Arabic letters instead of Latin';
+  if (expect === 'arabic') return ARABIC_LETTERS.test(words) ? null : 'written in Latin letters instead of Arabic';
+  if (ARABIC_LETTERS.test(words)) return 'written in Arabic letters instead of Latin';
+  // In an English or French reply even one Lebanese phrase is wrong ("Ma fi mechkle, Joe…").
+  if ((expect === 'english' || expect === 'french') && (looksArabizi(words) || LEBANESE_PHRASE.test(words))) {
+    return `written in Lebanese instead of ${LANGUAGE_NAME[expect]}`;
+  }
+  if (expect === 'arabizi' && !looksArabizi(words) && words.split(/\s+/).length > 6) return 'written in English instead of Lebanese';
   // "halla9", "3e9ar", "9ar2eb" — but not "9th floor".
-  if (expect === 'latin' && /[a-z]9|\b9(?!th\b)[a-z]/i.test(words)) return 'used 9 as a letter';
+  if ((expect === 'arabizi' || expect === 'latin') && /[a-z]9|\b9(?!th\b)[a-z]/i.test(words)) return 'used 9 as a letter';
   return null;
 }
 
 /**
- * Put a reply that came out in the wrong script, or with Gulf numbers, right.
+ * Put a reply that came out in the wrong language, or with Gulf numbers, right.
  * A small text-only call on the cheapest model, made only when the check fails;
- * if it fails too, the original goes out — a reply in the wrong script beats
+ * if it fails too, the original goes out — a reply in the wrong language beats
  * silence.
  */
-async function rewriteScript(
+async function rewriteLanguage(
   text: string,
-  expect: 'arabic' | 'latin',
+  expect: ReplyLanguage,
   conversationId: string
 ): Promise<{ text: string; usd: number }> {
+  const target = expect === 'latin' ? 'in LATIN letters — Lebanese Arabizi if it is Arabic, otherwise leave the language as it is' : `in ${LANGUAGE_NAME[expect]}${expect === 'english' || expect === 'french' ? ' only, with no Arabic or Lebanese words' : ''}`;
+  const guide = expect === 'arabic' ? LEBANESE_ARABIC : expect === 'arabizi' || expect === 'latin' ? LEBANESE_LATIN : '';
   const session = new ChatSession(
-    `You correct WhatsApp messages written by a Lebanese real estate agency. Rewrite the message you are given ${
-      expect === 'arabic' ? 'in Lebanese Arabic in ARABIC letters' : 'in LATIN letters — Lebanese Arabizi if it is Arabic, otherwise leave the language as it is'
-    }. Keep its meaning and length, and keep every name, number, price, reference code and link exactly as they are. Output only the rewritten message.
-
-${expect === 'arabic' ? LEBANESE_ARABIC : LEBANESE_LATIN}`,
+    `You correct WhatsApp messages written by a Lebanese real estate agency. Rewrite the message you are given ${target}. Keep its meaning and length, and keep every name, number, price, reference code and link exactly as they are. Output only the rewritten message.${guide ? `\n\n${guide}` : ''}`,
     [],
     { feature: 'chat-reply', conversationId },
     chatModelOrder('economy')[0]
@@ -472,7 +524,7 @@ ${expect === 'arabic' ? LEBANESE_ARABIC : LEBANESE_LATIN}`,
     const result = await session.send([{ role: 'user', parts: [{ text }] }], true);
     return { text: result.text || text, usd: session.spent.usd };
   } catch (err) {
-    logger.warn('Auto-reply: script fix failed, sending as written', { conversationId, error: (err as Error).message });
+    logger.warn('Auto-reply: language fix failed, sending as written', { conversationId, error: (err as Error).message });
     return { text, usd: session.spent.usd };
   }
 }
@@ -503,6 +555,7 @@ What to do:
 - Each time the client tells you a requirement, call save_client_requirements.
 - Be quick: once you have what you need, write your reply in the SAME turn as send_listings, save_client_requirements and update_conversation_summary — do not make a separate turn just for those.
 - Results marked "priority" are the projects the office most wants to sell. When one fits what the client asked for, recommend it first and use its "whyRecommend" to say why it is a good choice. Never push one that does not fit their budget or what they asked for.
+- When the client asks anything specific about a property — is it ready, when is handover, is there a payment plan or monthly instalments, how much down, which sizes or floors, which finishes, the ROI — call get_property_details and answer from it, with the real figures, in a sentence or two. If they want something ready, search with readyOnly. Only hand off when the details really do not contain the answer.
 - Photos, floor plans, the location and the full details of every property are on its own page, and send_listings puts the link to that page in your message. So when a client asks for pictures, more details, the location or "more info" about a property, attach it with send_listings and tell them everything is at the link. That is an answer you can give yourself — never hand off, and never promise that a colleague will send photos or details.
 
 How the two markets work:
@@ -510,9 +563,9 @@ How the two markets work:
 - Lebanon is sold property by property, and a property is either for sale or for rent — ask which if it is not clear, and pass it to search_listings.
 
 Hard rules:
-- Describe a property only as search_listings returned it — its name, its location and its price exactly as given. If a result is somewhere other than where the client asked, say so; never relabel it to match their request.
+- Describe a property only as search_listings or get_property_details returned it — its name, its location and its price exactly as given. If a result is somewhere other than where the client asked, say so; never relabel it to match their request.
 - If a place or project name in a voice note is unclear, or is not one we have stock in, ask the client to confirm it before searching.
-- Only state facts about a property that search_listings returned. Never invent or estimate a price, availability, yield, payment plan, delivery date or legal detail.
+- Only state facts about a property that search_listings or get_property_details returned, or that the office's answers below give. Never invent or estimate a price, availability, yield, payment plan, delivery date or legal detail — if it is not there, say a colleague will confirm it.
 - Never mention owners, sellers, developers' terms, commission, fees, discounts or anything about how PropGroup is paid. If asked, say a colleague will go through the details.
 - Never negotiate, never confirm a viewing time, never ask for ID or payment details.
 - Hand off only when it is really needed: the client asks for a person, is upset, wants to negotiate or to book a viewing, or asks something that is neither in the search results nor on the property's page. Then call hand_off_to_team and tell them a member of the team will message them shortly.
@@ -591,7 +644,7 @@ async function run(conversationId: string, trigger: 'message' | 'sweep' | 'manua
   inFlight.add(conversationId);
   const started = Date.now();
   try {
-    const outcome = await reply(conversationId, trigger === 'manual');
+    const outcome = await reply(conversationId, trigger);
     // Every outcome is logged with its reason: "it did not reply" must always
     // be answerable from the log without guessing. The quiet sweep only logs
     // what it did, or it would print a line per waiting thread every 5 minutes.
@@ -610,7 +663,11 @@ async function run(conversationId: string, trigger: 'message' | 'sweep' | 'manua
   }
 }
 
-async function reply(conversationId: string, manual: boolean): Promise<AutoReplyOutcome> {
+/** "ok", "thanks", "merci", "shukran", 👍 — a conversation ending, not a question. */
+const ACKNOWLEDGEMENT = /^\s*(ok(ay)?|k|thanks?( you)?|thank u|thx|merci( beaucoup)?|shukran|tslam|yslamo|ysalmo|great|perfect|noted|👍|🙏|❤️|شكرا|شكراً|تسلم|يسلمو|اوكي|تمام)[\s!.]*$/i;
+
+async function reply(conversationId: string, trigger: 'message' | 'sweep' | 'manual' | 'retry'): Promise<AutoReplyOutcome> {
+  const manual = trigger === 'manual';
   // Everything worth knowing about this reply, logged as one line with its outcome.
   const trace: Record<string, unknown> = {};
   const skip = (reason: string): AutoReplyOutcome => ({ sent: false, reason, trace });
@@ -671,6 +728,12 @@ async function reply(conversationId: string, manual: boolean): Promise<AutoReply
   const waitingSince = Math.min(...unansweredMessages.map((m) => m.createdAt.getTime()));
   trace.in = unansweredMessages.map((m) => m.type).join(',');
   trace.client = preview(unansweredMessages.map((m) => m.transcript ?? m.body).join(' / '));
+  // The sweep picks up clients left waiting — but "Ok / Thank you" left 13
+  // hours is a conversation that ended, and "You're very welcome!" half a day
+  // later reads as a bot. Only something that needs an answer is picked up.
+  if (trigger === 'sweep' && unansweredMessages.every((m) => m.type === 'text' && m.body.split(/\n|\s\/\s/).every((line) => ACKNOWLEDGEMENT.test(line)))) {
+    return skip('Only a thank-you or an "ok" is waiting, which needs no reply.');
+  }
   const newestArrival = () =>
     prisma.chatMessage.findFirst({ where: { conversationId }, orderBy: { createdAt: 'desc' }, select: { id: true } });
   const latestId = (await newestArrival())?.id;
@@ -747,9 +810,9 @@ async function reply(conversationId: string, manual: boolean): Promise<AutoReply
   while (contents.length > 0 && contents[0].role !== 'user') contents.shift();
   if (contents.length === 0) return skip('There is nothing from the client to answer.');
 
-  const script = clientScript([...ordered].reverse());
-  const language = scriptForThisReply(settings.replyStyle, script);
-  trace.script = script ?? 'unknown';
+  const clientLang = clientLanguage([...ordered].reverse());
+  const language = languageForThisReply(settings.replyStyle, clientLang);
+  trace.language = clientLang ?? 'unknown';
 
   // Reference codes the model may attach: search results, the ad's project,
   // and anything already named in this conversation — "send me the pictures of
@@ -915,6 +978,7 @@ async function reply(conversationId: string, manual: boolean): Promise<AutoReply
           minBeds: Number.isFinite(args.minBeds) ? Number(args.minBeds) : null,
           budgetMax: Number.isFinite(args.budgetMax) ? Number(args.budgetMax) : null,
           kind: typeof args.kind === 'string' ? args.kind : null,
+          readyOnly: args.readyOnly === true,
         });
         for (const c of cards) offered.add(c.ref.toUpperCase());
         toolLog.push(`search(${[args.market, args.deal, args.area, args.budgetMax && `<=${args.budgetMax}`, args.minBeds != null && `${args.minBeds}bd`, args.kind].filter(Boolean).join(' ')})=${cards.length}`);
@@ -935,8 +999,14 @@ async function reply(conversationId: string, manual: boolean): Promise<AutoReply
             kind: c.isProject ? 'project with several units' : c.type,
             deal: c.deal === 'RENT' ? 'for rent' : 'for sale',
             bedrooms: c.bedrooms, area: c.areaSqm, price: formatPrice(c),
+            readiness: c.readiness, ...(c.handover ? { handover: c.handover } : {}),
           })),
         };
+      } else if (call.name === 'get_property_details') {
+        const details = typeof args.ref === 'string' ? await propertyDetails(args.ref) : null;
+        if (details) offered.add(String(details.ref).toUpperCase());
+        toolLog.push(`details(${args.ref})${details ? '' : '=none'}`);
+        response = details ?? { error: 'No public, available property has that reference code.' };
       } else if (call.name === 'send_listings') {
         const refs: string[] = (Array.isArray(args.refs) ? args.refs : [])
           .map((r: unknown) => String(r).toUpperCase())
@@ -1025,11 +1095,11 @@ async function reply(conversationId: string, manual: boolean): Promise<AutoReply
   }
 
   // Wrong script, or Gulf "9"s in Arabizi: fix it before the client sees it.
-  const problem = scriptProblem(reply, language.expect);
+  const problem = languageProblem(reply, language.expect);
   if (problem && language.expect) {
     trace.scriptFix = problem;
-    const fixed = await rewriteScript(reply, language.expect, conversationId);
-    trace.scriptFixed = scriptProblem(fixed.text, language.expect) === null;
+    const fixed = await rewriteLanguage(reply, language.expect, conversationId);
+    trace.scriptFixed = languageProblem(fixed.text, language.expect) === null;
     reply = fixed.text;
     trace.usd = (spent() + fixed.usd).toFixed(4);
   } else {

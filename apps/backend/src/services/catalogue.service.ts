@@ -34,6 +34,8 @@ export interface CatalogueQuery {
   budgetMax?: number | null;
   /** APARTMENT, STUDIO, VILLA, … */
   kind?: string | null;
+  /** Only stock that is built and can be handed over now. */
+  readyOnly?: boolean;
   limit?: number;
 }
 
@@ -56,6 +58,10 @@ export interface CatalogueCard {
   rentPeriod: string | null;
   image: string | null;
   url: string;
+  /** Built and handed over now, or still being built. */
+  readiness: 'ready' | 'off-plan';
+  /** Off-plan: when it is due, "2027-06". */
+  handover: string | null;
 }
 
 function siteUrl(market: Market): string {
@@ -108,7 +114,22 @@ function toCard(building: any): CatalogueCard | null {
     rentPeriod: deal === 'RENT' ? cheapest?.rentPeriod ?? 'MONTHLY' : null,
     image: typeof p.images?.[0] === 'string' && /^https:\/\//.test(p.images[0]) ? p.images[0] : null,
     url: `${siteUrl(market)}/property/${p.slug}`,
+    ...readinessOf(p),
   };
+}
+
+const month = (value: unknown): string | null => {
+  const d = value ? new Date(value as string) : null;
+  return d && !Number.isNaN(d.getTime()) ? d.toISOString().slice(0, 7) : null;
+};
+
+/** Off-plan until its handover date has passed; new builds and resales are ready. */
+function readinessOf(p: Record<string, any>): { readiness: 'ready' | 'off-plan'; handover: string | null } {
+  const due = p.investmentData?.handoverDate ?? p.investmentData?.completionDate ?? null;
+  const dueMonth = month(due);
+  if (p.status !== 'OFF_PLAN') return { readiness: 'ready', handover: null };
+  if (due && new Date(due).getTime() < Date.now()) return { readiness: 'ready', handover: null };
+  return { readiness: 'off-plan', handover: dueMonth };
 }
 
 /**
@@ -167,6 +188,7 @@ export async function searchCatalogue(query: CatalogueQuery): Promise<CatalogueC
       if (Number.isFinite(most) && most < query.minBeds) return false;
     }
     if (needle && ![c.title, c.location].join(' ').toLowerCase().includes(needle)) return false;
+    if (query.readyOnly && c.readiness !== 'ready') return false;
     return true;
   });
 
@@ -261,4 +283,109 @@ export function cardCaption(card: CatalogueCard): string {
   ]
     .filter(Boolean)
     .join('\n');
+}
+
+/**
+ * Everything the public page says about one property, for the chat assistant
+ * to answer "is it ready?", "is there a monthly plan?", "what sizes are there?"
+ * — questions the one-line card cannot, which made it hand over clients it
+ * could have answered.
+ *
+ * Built from the same mapped payload the websites render, so it holds nothing
+ * the public page does not: no owner, no internal notes, no sold price, no
+ * commission. Units that are sold, reserved or off the market are left out.
+ * `ref` may be a unit's code ("PG-1059-2"), which finds its building.
+ */
+export async function propertyDetails(ref: string): Promise<Record<string, unknown> | null> {
+  const code = ref.trim().toUpperCase();
+  const buildingRef = code.replace(/^(PG-\d+)-\d+$/, '$1');
+  const building = await prisma.building.findFirst({
+    where: { ref: buildingRef, visibility: 'PUBLIC' },
+    include: FLAT_PROPERTY_INCLUDE,
+  });
+  if (!building) return null;
+  const card = toCard(building);
+  if (!card) return null;
+  const p = mapBuildingToProperty(building, { detail: true }) as Record<string, any>;
+  const inv = (p.investmentData ?? {}) as Record<string, any>;
+  const money = (n: unknown, currency = card.currency) =>
+    typeof n === 'number' && n > 0 ? `${currency === 'USD' ? '$' : `${currency} `}${Math.round(n).toLocaleString('en-US')}` : null;
+  const clip = (text: unknown, max: number) =>
+    typeof text === 'string' && text.trim() ? (text.trim().length > max ? `${text.trim().slice(0, max)}…` : text.trim()) : undefined;
+  const plan = (value: unknown) => (value == null ? undefined : clip(typeof value === 'string' ? value : JSON.stringify(value), 400));
+
+  const hiddenUnit = new Set(['SOLD', 'RESERVED', 'OFF_MARKET', 'RENTED', 'OWNER_OCCUPIED']);
+  const rawUnits = new Map((building as any).units.map((u: any) => [u.id, u]));
+  const units = (p.units as Array<Record<string, any>>)
+    .filter((u) => u.availabilityStatus === 'AVAILABLE' && !hiddenUnit.has((rawUnits.get(u.id) as any)?.lifecycle))
+    .slice(0, 15)
+    .map((u) => {
+      const raw = rawUnits.get(u.id) as any;
+      const listing = (raw?.listings ?? [])[0];
+      return {
+        ref: u.referenceCode ?? undefined,
+        name: u.name,
+        type: u.propertyType ?? undefined,
+        bedrooms: u.bedrooms,
+        bathrooms: u.bathrooms || undefined,
+        area: u.area ? `${u.area} m²` : undefined,
+        floor: u.floor ?? undefined,
+        views: raw?.views?.length ? raw.views.join(', ').toLowerCase() : undefined,
+        features: raw?.features?.length ? raw.features.join(', ').toLowerCase() : undefined,
+        furnishing: u.furnishingStatus ?? undefined,
+        price: listing ? money(Number(listing.price), listing.currency) : undefined,
+        // Abroad a unit is sold in finishes, each with its own price and plan.
+        options: (u.options as Array<Record<string, any>>).map((o) => ({
+          finish: o.name,
+          price: money(o.pricePerSqm * (u.area || 0), o.currency),
+          pricePerSqm: money(o.pricePerSqm, o.currency),
+          firstPayment: money(o.initialPayment, o.currency) ?? undefined,
+          paymentPlan: plan(o.paymentPlanDetails),
+          about: clip(o.description, 200),
+        })),
+      };
+    });
+
+  const amenities = [
+    ['hasPool', 'pool'], ['hasGym', 'gym'], ['hasGarden', 'garden'], ['hasSecurity', 'security'],
+    ['hasElevator', 'elevator'], ['hasCentralAC', 'central AC'],
+  ].filter(([k]) => p[k]).map(([, label]) => label);
+  for (const [k, label] of [['hasConcierge', 'concierge'], ['hasGenerator', 'generator'], ['hasSolarPower', 'solar power'], ['hasRooftop', 'rooftop']] as const) {
+    if ((building as any)[k]) amenities.push(label);
+  }
+
+  return {
+    ref: card.ref,
+    title: card.title,
+    location: card.location,
+    price: formatPrice(card),
+    readiness: card.readiness === 'ready' ? 'ready — built, can be handed over now' : 'off-plan — still being built',
+    handover: month(inv.handoverDate) ?? undefined,
+    completion: month(inv.completionDate) ?? undefined,
+    builtYear: p.builtYear ?? undefined,
+    availableFrom: month(p.availableFrom) ?? undefined,
+    about: clip(p.shortDescription, 300) ?? clip(p.description, 700),
+    highlights: p.highlightedFeatures?.length ? p.highlightedFeatures : undefined,
+    amenities: amenities.length ? amenities : undefined,
+    paymentPlans: Array.isArray((building as any).paymentPlans) && (building as any).paymentPlans.length
+      ? (building as any).paymentPlans.map((pp: any) => ({
+          name: pp.name, kind: pp.kind, downPaymentPercent: pp.downPaymentPct ?? undefined,
+          months: pp.months ?? undefined, about: clip(pp.description, 200),
+        }))
+      : undefined,
+    investment: Object.values(inv).some((v) => v != null && v !== false && !(Array.isArray(v) && v.length === 0)) ? {
+      expectedROI: inv.expectedROI != null ? `${inv.expectedROI}%` : undefined,
+      rentalYield: inv.rentalYield != null ? `${inv.rentalYield}%` : undefined,
+      averageRentPerMonth: money(inv.averageRentPerMonth),
+      minimumInvestment: money(inv.minInvestment),
+      downPayment: inv.downPaymentPercentage != null ? `${inv.downPaymentPercentage}%` : undefined,
+      installmentYears: inv.installmentYears ?? undefined,
+      paymentPlan: plan(inv.paymentPlan),
+      paymentPlanDetails: plan(inv.paymentPlanDetails),
+      goldenVisa: inv.isGoldenVisaEligible ? `eligible${inv.goldenVisaMinAmount ? ` from ${money(inv.goldenVisaMinAmount)}` : ''}` : undefined,
+      rentalIncomeFrom: month(inv.expectedRentalStart) ?? undefined,
+    } : undefined,
+    units: units.length ? units : undefined,
+    page: card.url,
+  };
 }
