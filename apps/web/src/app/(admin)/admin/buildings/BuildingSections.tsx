@@ -11,6 +11,7 @@
  */
 
 import { useState } from 'react'
+import { PropertyDescription } from '@/components/property/PropertyDescription'
 import {
   Building2, CalendarClock, Coins, FileText, Image as ImageIcon, Loader2, MapPin,
   Search, Sparkles,
@@ -83,6 +84,24 @@ export function amenitiesFor(country: string, residential: boolean) {
 }
 
 // ── Basics ────────────────────────────────────────────────────────────────────
+
+/** Exactly what a client will see — the same component both websites render. */
+function DescriptionPreview({ text }: { text: string }) {
+  const [open, setOpen] = useState(false)
+  if (!text.trim()) return null
+  return (
+    <div className="mt-2">
+      <button type="button" onClick={() => setOpen((v) => !v)} className="text-xs font-medium text-slate-600 underline underline-offset-2 hover:text-slate-900">
+        {open ? 'Hide preview' : 'Preview how clients will see it'}
+      </button>
+      {open && (
+        <div className="mt-2 rounded-xl border border-slate-200 bg-white p-5">
+          <PropertyDescription description={text} />
+        </div>
+      )}
+    </div>
+  )
+}
 
 export function BasicsSection({
   f, set, disabled, owner, onOwnerChange, unitCount, errors,
@@ -205,14 +224,19 @@ export function BasicsSection({
           />
         </Field>
 
-        <Field label="Full description" optional hint="The body text on the property page.">
+        <Field
+          label="Full description"
+          optional
+          hint="The body text on the property page, on both websites. Emoji at the start of a line make an aligned list; a line in CAPITALS or ending with “:” after an emoji becomes a heading; • or - makes bullets; an empty line starts a new paragraph."
+        >
           <Textarea
             value={f.description}
             onChange={(e) => set({ description: e.target.value })}
-            rows={6}
-            placeholder="Describe the property, the building and the area…"
+            rows={12}
+            placeholder={'Describe the property, the building and the area…\n\n💰 PAYMENT PLAN:\n• 30% down payment\n🌊 Sea view from every floor'}
             disabled={disabled}
           />
+          <DescriptionPreview text={f.description} />
         </Field>
 
         {/* Two dropdowns that are right by default and almost never touched.

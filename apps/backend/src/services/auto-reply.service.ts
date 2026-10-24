@@ -411,13 +411,22 @@ const ARABIC_LETTERS = /[؀-ۿݐ-ݿ]/;
 const NOT_RECEIVED = /^Not received:/;
 const LEBANESE_WORDS = /\b(kifak|kifik|kifkon|shu|shou|chou|badde|baddi|baddak|baddik|3am|ahla|ahlan|halla2|hala2|hayda|hayde|akid|ma3ak|ma3ik|yalla|tayeb|mni7|ktir|kteer|kamen|fik|fiki|fiye|ana|enta|enti|inta|inte|lesh|la2|mish|msh|bas|hek|hon|ya3ne|yaane|habibi|marhaba|tfaddal|kel|shi|wen|lal|bel|3al|3an|3anna|men|mn)\b/gi;
 /** Lebanese that never belongs in an English or French reply. */
-const LEBANESE_PHRASE = /\b(ahla|ahlan|akid|ma fi|mechkle|mishkle|mushkle|yalla|habibi|tfaddal|tfadal|ya3ne|kifak|kifik|shu|shou|tayeb|yislamo|tislam|marhaba|w sahla)\b/i;
+const LEBANESE_PHRASE = /\b(ahla|ahlan|akid|ma fi|mechkle|mishkle|mushkle|yalla|habibi|habibti|tfaddal|tfadal|ya3ne|kifak|kifik|shu|shou|tayeb|tayyeb|yislamo|tislam|marhaba|w sahla|inshallah|insha'?allah|inchallah|mashallah|wallah|mabrouk|mabrook|shukran|khalas|tamam|3a rasi|ahla w sahla)\b/i;
 const FRENCH_WORDS = /\b(bonjour|bonsoir|salut|merci|je|j|vous|est|c|pour|avec|oui|non|plus|sujet|cette|des|les|une|suis|voudrais|svp|s|il|puis|en|savoir|quel|quelle|votre|nous|sont)\b/gi;
 
-/** Words mixing letters with 2, 3 or 7 ("3am", "halla2", "mni7") — but not "2BR", "3rd", "7am", "PG-1074". */
+/**
+ * Words mixing letters with 2, 3 or 7 ("3am", "halla2", "mni7", "b3d") — but
+ * not "2BR", "3rd", "7am", "PG-1074", nor apartment and block codes: "2A",
+ * "B7", "12C" read as Lebanese and got an English client a Lebanese answer.
+ * Arabizi words carry at least two letters; codes are one letter, or capitals.
+ */
 function arabiziDigitWords(text: string): number {
   return (text.match(/[a-z0-9']+/gi) ?? []).filter(
-    (w) => /[a-z]/i.test(w) && /[237]/.test(w) && !/^\d+(st|nd|rd|th|br|bd|bed|beds|k|m|m2|sqm|am|pm|x)$/i.test(w)
+    (w) =>
+      /[237]/.test(w) &&
+      (w.match(/[a-z]/gi) ?? []).length >= 2 &&
+      !/^[A-Z]+\d+[A-Z]*$|^\d+[A-Z]+$/.test(w) &&
+      !/^\d+(st|nd|rd|th|br|bd|bed|beds|k|m|m2|sqm|am|pm|x|ft|sq)$/i.test(w)
   ).length;
 }
 
@@ -769,6 +778,8 @@ async function reply(conversationId: string, trigger: 'message' | 'sweep' | 'man
     ...bySendTime.filter((m) => unansweredIds.has(m.id)),
   ];
   const voiceNotes: string[] = []; // message ids, by voice-note number
+  /** What the voice notes said, as the model wrote it down — the language a voice-note reply is checked against. */
+  const heard: string[] = [];
   let attached = 0;
 
   const contents: ChatContent[] = [];
@@ -1029,6 +1040,7 @@ async function reply(conversationId: string, trigger: 'message' | 'sweep' | 'man
               data: { transcript: t.text.trim().slice(0, 4000) },
             });
             trace.heard = preview([trace.heard, t.text].filter(Boolean).join(' / '));
+            heard.push(t.text.trim());
           }
         }
       } else if (call.name === 'update_conversation_summary') {
@@ -1092,6 +1104,17 @@ async function reply(conversationId: string, trigger: 'message' | 'sweep' | 'man
   if (!reply) {
     trace.usd = spent().toFixed(4);
     return skip('The model returned no reply text.');
+  }
+
+  // A voice note can be in any language, so the reply was only held to "Latin
+  // letters". Once we know what was said, hold it to that: English speech gets
+  // pure English, not Lebanese in English letters.
+  if (language.expect === 'latin' && heard.length) {
+    const spoken = heard.map(languageOf);
+    if (spoken.every((l) => l === 'english')) language.expect = 'english';
+    else if (spoken.every((l) => l === 'french')) language.expect = 'french';
+    else if (spoken.some((l) => l === 'arabizi' || l === 'arabic')) language.expect = 'arabizi';
+    trace.language = `voice:${language.expect}`;
   }
 
   // Wrong script, or Gulf "9"s in Arabizi: fix it before the client sees it.

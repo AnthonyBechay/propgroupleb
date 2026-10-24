@@ -1,4 +1,5 @@
 import { notFound } from 'next/navigation'
+import { PropertyDescription } from '@/components/property/PropertyDescription'
 import { prettyAttr } from '@/lib/unit-attributes'
 import Link from 'next/link'
 import {
@@ -184,7 +185,10 @@ export default async function ListingDetailPage({ params }: PageProps) {
 
   if (!listing) notFound()
 
-  const { building, unit } = listing
+  // A unit listing carries its building under the unit; read it from there
+  // too, as the metadata above does — or the description and photos vanish.
+  const unit = listing.unit
+  const building = listing.building ?? listing.unit?.building
 
   // Photos live on the property (building) — single source. Unit images are
   // only a fallback for legacy data.
@@ -384,9 +388,8 @@ export default async function ListingDetailPage({ params }: PageProps) {
             {(listing.description || building?.description) && (
               <div className="bg-white rounded-2xl border border-slate-200 p-6">
                 <h2 className="text-lg font-semibold text-slate-900 mb-3">About this property</h2>
-                <p className="text-slate-600 leading-relaxed whitespace-pre-line">
-                  {listing.description ?? building?.description}
-                </p>
+                {/* Laid out as written: emoji lines aligned, headings, lists, even gaps. */}
+                <PropertyDescription description={listing.description ?? building?.description ?? ''} />
               </div>
             )}
 

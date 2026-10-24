@@ -2,227 +2,206 @@
 
 import { useMemo, type ReactNode } from 'react'
 
-interface PropertyDescriptionProps {
-  description: string
+/**
+ * A property description as the admin wrote it — emoji, line breaks and all —
+ * laid out so it reads as nicely as it was typed.
+ *
+ * The team writes in a loose, elegant convention rather than markdown:
+ *   🌊 Sea view from every floor          ← emoji lines: a feature list
+ *   💰 PAYMENT PLAN:                       ← emoji + caps or ":" : a section heading
+ *   • 30% down payment                     ← bullets (•, -, *) and numbers (1. 2))
+ *   (blank line)                           ← a paragraph break
+ *
+ * Emoji lines used to come out as loose separate paragraphs (Georgia) or as
+ * one plain block (Lebanon). Here consecutive emoji lines become an aligned
+ * list — the emoji in its own column, the text lined up beside it — and
+ * blank lines become one even gap however many were typed.
+ *
+ * Plain JSX, no dangerouslySetInnerHTML: nothing an admin pastes can inject
+ * markup. The same file lives in both storefront repos (propgroup and
+ * propgroupleb) so the two sites render a description identically.
+ */
+
+/** A line opening with an emoji: pictographs, flags (🇬🇪), keycaps (1️⃣), ⭐, ✅ … */
+const EMOJI_START = /^(?:\p{Extended_Pictographic}|\p{Regional_Indicator}{2}|[0-9#*]️?⃣)/u
+/** The emoji itself, with its variation selector / skin tone / ZWJ sequence. */
+const EMOJI_TOKEN = /^(?:\p{Regional_Indicator}{2}|[0-9#*]️?⃣|\p{Extended_Pictographic}(?:️|\p{Emoji_Modifier})?(?:‍\p{Extended_Pictographic}(?:️|\p{Emoji_Modifier})?)*)\s*/u
+const BULLET = /^[•▪●◦\-*–]\s+/
+const NUMBERED = /^(\d{1,2})[.)]\s+/
+
+type Block =
+  | { type: 'heading'; emoji: string | null; text: string }
+  | { type: 'paragraph'; text: string }
+  | { type: 'bullets'; items: string[] }
+  | { type: 'numbered'; items: string[] }
+  | { type: 'emoji'; items: Array<{ emoji: string; text: string }> }
+  | { type: 'gap' }
+
+function splitEmoji(line: string): { emoji: string; text: string } | null {
+  const m = line.match(EMOJI_TOKEN)
+  if (!m) return null
+  return { emoji: m[0].trim(), text: line.slice(m[0].length).trim() }
 }
 
-/**
- * Lightweight rich-text renderer for admin-authored property descriptions.
- *
- * The admin team pastes content from external docs that uses a loose
- * convention rather than strict markdown: bullet lines with `•`, section
- * headers prefixed with emoji (💰, 🏢, ✨, 🌍, 📈, 💼, 📍, 📞), money
- * tables, and inline links/emails. The previous parser only handled
- * `- ` bullets and `**bold**`, so the same paste rendered as a wall of
- * text. This version classifies each line and renders proper JSX —
- * safer than dangerouslySetInnerHTML (no XSS surface) and gives better
- * typographic hierarchy.
- *
- * Recognised patterns (line-level, in order):
- *   • / - / *           → bullet list item (groups consecutive into <ul>)
- *   leading emoji + ":" or short uppercase phrase → section header
- *   blank line          → paragraph break
- *   anything else       → paragraph
- *
- * Inline patterns (within a line):
- *   **text**            → bold
- *   http(s)://…         → external link (opens in new tab)
- *   email@example.com   → mailto link
- *
- * If you need true rich text in the future (tables, images, code),
- * graduate to a real markdown lib (`marked` + DOMPurify, or `react-markdown`).
- * Until then this covers what admins actually type.
- */
+function isHeading(line: string, text: string): boolean {
+  if (line.endsWith(':')) return true
+  if (text.length > 80) return false
+  // Opens with a name in capitals: "🌊 PHIROSMANI RESIDENCE – Batumi's New
+  // Seafront Address", "🌍 BATUMI – Georgia's Rising Hotspot".
+  if (/^[A-Z][A-Z0-9'’&-]{3,}(\s|$)/.test(text)) return true
+  // Or is mostly capitals: "💰 PAYMENT PLAN", "📈 ROI 10%".
+  const letters = text.replace(/[^A-Za-z]/g, '')
+  return letters.length >= 3 && (letters.match(/[A-Z]/g)?.length ?? 0) / letters.length > 0.6
+}
 
-// Unicode emoji range — broad on purpose. Matches the leading-emoji
-// patterns admins use for section headers without having to enumerate.
-const EMOJI_PREFIX_RE = /^[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{2700}-\u{27BF}✨\u{1F000}-\u{1F02F}]/u
+export function parseDescription(description: string): Block[] {
+  const blocks: Block[] = []
+  const last = () => blocks[blocks.length - 1]
 
-const BULLET_RE = /^\s*[•\*\-]\s+/
+  for (const raw of description.replace(/\r\n?/g, '\n').split('\n')) {
+    const line = raw.trim()
+    if (!line) {
+      // However many blank lines were typed, one even gap.
+      if (blocks.length && last().type !== 'gap') blocks.push({ type: 'gap' })
+      continue
+    }
+    const bullet = line.match(BULLET)
+    if (bullet) {
+      const text = line.slice(bullet[0].length)
+      const prev = last()
+      if (prev?.type === 'bullets') prev.items.push(text)
+      else blocks.push({ type: 'bullets', items: [text] })
+      continue
+    }
+    const numbered = line.match(NUMBERED)
+    if (numbered) {
+      const text = line.slice(numbered[0].length)
+      const prev = last()
+      if (prev?.type === 'numbered') prev.items.push(text)
+      else blocks.push({ type: 'numbered', items: [text] })
+      continue
+    }
+    if (EMOJI_START.test(line)) {
+      const parts = splitEmoji(line)
+      if (parts && parts.text) {
+        if (isHeading(line, parts.text)) {
+          blocks.push({ type: 'heading', emoji: parts.emoji, text: parts.text.replace(/:$/, '') })
+        } else {
+          const prev = last()
+          if (prev?.type === 'emoji') prev.items.push(parts)
+          else blocks.push({ type: 'emoji', items: [parts] })
+        }
+        continue
+      }
+    }
+    // A short line ending in ":" with no emoji is a heading too ("Amenities:").
+    if (line.endsWith(':') && line.length <= 60) {
+      blocks.push({ type: 'heading', emoji: null, text: line.replace(/:$/, '') })
+      continue
+    }
+    blocks.push({ type: 'paragraph', text: line })
+  }
+  while (last()?.type === 'gap') blocks.pop()
+  return blocks
+}
 
-// URL + email patterns for inline auto-linking.
-// URL is greedy on purpose — admins paste full URLs, terminator is whitespace
-// or specific punctuation followed by space/end.
-const URL_RE = /(https?:\/\/[^\s<>()\[\]"]+)/g
-const EMAIL_RE = /([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/g
+const URL_OR_EMAIL = /(https?:\/\/[^\s<>()[\]"]+|[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/g
 
-/**
- * Render a single line's inline formatting (bold, URLs, emails).
- * Returns an array of React nodes; we walk the string left-to-right and
- * convert recognised tokens into elements.
- */
-function renderInline(text: string, keyPrefix: string): ReactNode[] {
-  // Split on bold markers first to preserve them around link/email scans.
-  // `**foo**` → ['', 'foo', ''] with even indices being plain, odd being bold.
-  const boldParts = text.split(/\*\*(.+?)\*\*/g)
+/** **bold**, links and emails inside a line. */
+function inline(text: string, key: string): ReactNode[] {
   const out: ReactNode[] = []
-
-  boldParts.forEach((part, idx) => {
-    const isBold = idx % 2 === 1
+  text.split(/\*\*(.+?)\*\*/g).forEach((part, i) => {
     if (!part) return
-
-    // Within each part, scan for URLs and emails. Use a single combined
-    // regex so order is preserved.
-    const tokens = part.split(/(https?:\/\/[^\s<>()\[\]"]+|[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/g)
-    tokens.forEach((tok, tIdx) => {
+    part.split(URL_OR_EMAIL).forEach((tok, j) => {
       if (!tok) return
-      const k = `${keyPrefix}-${idx}-${tIdx}`
-      if (URL_RE.test(tok)) {
-        // Reset lastIndex because the global regex .test mutates it
-        URL_RE.lastIndex = 0
-        out.push(
-          <a
-            key={k}
-            href={tok}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-[#1B3A5C] underline underline-offset-2 hover:text-[#24507D]"
-          >
-            {tok}
-          </a>,
-        )
-      } else if (EMAIL_RE.test(tok)) {
-        EMAIL_RE.lastIndex = 0
-        out.push(
-          <a
-            key={k}
-            href={`mailto:${tok}`}
-            className="text-[#1B3A5C] underline underline-offset-2 hover:text-[#24507D]"
-          >
-            {tok}
-          </a>,
-        )
-      } else if (isBold) {
-        out.push(
-          <strong key={k} className="font-semibold text-slate-800">
-            {tok}
-          </strong>,
-        )
+      const k = `${key}-${i}-${j}`
+      if (/^https?:\/\//.test(tok)) {
+        out.push(<a key={k} href={tok} target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 break-all">{tok}</a>)
+      } else if (/^[^\s@]+@[^\s@]+\.[a-zA-Z]{2,}$/.test(tok)) {
+        out.push(<a key={k} href={`mailto:${tok}`} className="underline underline-offset-2">{tok}</a>)
+      } else if (i % 2 === 1) {
+        out.push(<strong key={k} className="font-semibold text-slate-900">{tok}</strong>)
       } else {
         out.push(<span key={k}>{tok}</span>)
       }
     })
   })
-
   return out
 }
 
-type Block =
-  | { type: 'header'; text: string; key: string }
-  | { type: 'paragraph'; text: string; key: string }
-  | { type: 'bullets'; items: string[]; key: string }
-  | { type: 'spacer'; key: string }
-
-/**
- * Classify lines into block-level structures, grouping consecutive
- * bullets into a single list block.
- */
-function parseBlocks(description: string): Block[] {
-  const lines = description.split('\n')
-  const blocks: Block[] = []
-  let bulletBuffer: string[] = []
-  let key = 0
-  const k = () => `b-${key++}`
-
-  const flushBullets = () => {
-    if (bulletBuffer.length) {
-      blocks.push({ type: 'bullets', items: bulletBuffer, key: k() })
-      bulletBuffer = []
-    }
-  }
-
-  for (const raw of lines) {
-    const line = raw.trim()
-
-    if (!line) {
-      flushBullets()
-      blocks.push({ type: 'spacer', key: k() })
-      continue
-    }
-
-    const bulletMatch = line.match(BULLET_RE)
-    if (bulletMatch) {
-      bulletBuffer.push(line.slice(bulletMatch[0].length))
-      continue
-    }
-
-    flushBullets()
-
-    // Section header heuristic: emoji-prefixed AND (ends with ":" OR is
-    // short-and-mostly-uppercase). Catches "💰 UNIT PRICING:" and
-    // "🌍 MARKET OVERVIEW – Key local context".
-    const startsWithEmoji = EMOJI_PREFIX_RE.test(line)
-    const endsWithColon = line.endsWith(':')
-    const isShort = line.length <= 80
-    const upperRatio = (line.match(/[A-Z]/g)?.length ?? 0) / line.length
-    const looksLikeHeader =
-      startsWithEmoji && (endsWithColon || (isShort && upperRatio > 0.15))
-
-    if (looksLikeHeader) {
-      blocks.push({ type: 'header', text: line, key: k() })
-    } else {
-      blocks.push({ type: 'paragraph', text: line, key: k() })
-    }
-  }
-
-  flushBullets()
-  // Trim leading/trailing spacers — they're noise.
-  while (blocks[0]?.type === 'spacer') blocks.shift()
-  while (blocks[blocks.length - 1]?.type === 'spacer') blocks.pop()
-
-  return blocks
-}
-
-export function PropertyDescription({ description }: PropertyDescriptionProps) {
-  const blocks = useMemo(() => parseBlocks(description || ''), [description])
-
+export function PropertyDescription({ description, className = '' }: { description: string; className?: string }) {
+  const blocks = useMemo(() => parseDescription(description || ''), [description])
   if (blocks.length === 0) return null
 
   return (
-    <div className="text-base sm:text-[15px] text-slate-700 leading-relaxed max-w-3xl space-y-3">
-      {blocks.map((block) => {
-        switch (block.type) {
-          case 'header':
+    <div className={`text-[15px] leading-relaxed text-slate-700 max-w-3xl ${className}`}>
+      {blocks.map((b, i) => {
+        const key = `d-${i}`
+        // Spacing between blocks lives here, so a gap is one even pause.
+        const space = i === 0 ? '' : blocks[i - 1].type === 'gap' ? 'mt-4' : b.type === 'heading' ? 'mt-5' : 'mt-2'
+        switch (b.type) {
+          case 'gap':
+            return null
+          case 'heading':
             return (
-              <h3
-                key={block.key}
-                className="font-bold text-slate-900 text-base sm:text-lg pt-3 first:pt-0"
-              >
-                {renderInline(block.text, block.key)}
+              <h3 key={key} className={`${space} flex items-baseline gap-2 text-base font-semibold text-slate-900 sm:text-[17px]`}>
+                {b.emoji && <span aria-hidden className="text-lg leading-none">{b.emoji}</span>}
+                <span>{inline(b.text, key)}</span>
               </h3>
             )
-          case 'bullets':
+          case 'emoji':
             return (
-              <ul key={block.key} className="space-y-1.5 pl-1">
-                {block.items.map((item, i) => (
-                  <li
-                    key={`${block.key}-i-${i}`}
-                    className="flex gap-2.5 items-start"
-                  >
-                    <span className="text-[#C49A2E] mt-[0.4em] shrink-0 leading-none">
-                      •
-                    </span>
-                    <span className="flex-1">
-                      {renderInline(item, `${block.key}-i-${i}`)}
-                    </span>
+              <ul key={key} className={`${space} space-y-1.5`}>
+                {b.items.map((it, j) => (
+                  <li key={j} className="flex items-start gap-3">
+                    <span aria-hidden className="w-6 shrink-0 text-center text-[17px] leading-relaxed">{it.emoji}</span>
+                    <span className="flex-1">{inline(it.text, `${key}-${j}`)}</span>
                   </li>
                 ))}
               </ul>
             )
-          case 'spacer':
-            // Tailwind `space-y-3` on the parent already gives gap; an empty
-            // line in source means a paragraph-level pause, render a slightly
-            // larger gap.
-            return <div key={block.key} className="h-2" aria-hidden />
-          case 'paragraph':
-          default:
+          case 'bullets':
             return (
-              <p key={block.key} className="leading-relaxed">
-                {renderInline(block.text, block.key)}
-              </p>
+              <ul key={key} className={`${space} space-y-1.5`}>
+                {b.items.map((it, j) => (
+                  <li key={j} className="flex items-start gap-3">
+                    <span aria-hidden className="w-6 shrink-0 text-center leading-relaxed text-slate-400">•</span>
+                    <span className="flex-1">{inline(it, `${key}-${j}`)}</span>
+                  </li>
+                ))}
+              </ul>
             )
+          case 'numbered':
+            return (
+              <ol key={key} className={`${space} space-y-1.5`}>
+                {b.items.map((it, j) => (
+                  <li key={j} className="flex items-start gap-3">
+                    <span aria-hidden className="w-6 shrink-0 text-center font-medium tabular-nums text-slate-500">{j + 1}.</span>
+                    <span className="flex-1">{inline(it, `${key}-${j}`)}</span>
+                  </li>
+                ))}
+              </ol>
+            )
+          default:
+            return <p key={key} className={space}>{inline(b.text, key)}</p>
         }
       })}
     </div>
   )
+}
+
+/**
+ * The description cut for a PDF or a preview without breaking a line or a
+ * word: whole lines up to `max` characters, then "…".
+ */
+export function trimDescription(description: string, max: number): string {
+  const text = description.replace(/\r\n?/g, '\n').replace(/\n{3,}/g, '\n\n').trim()
+  if (text.length <= max) return text
+  let out = ''
+  for (const line of text.split('\n')) {
+    if ((out + '\n' + line).length > max) break
+    out = out ? `${out}\n${line}` : line
+  }
+  if (!out) out = text.slice(0, max).replace(/\s+\S*$/, '')
+  return `${out.trimEnd()} …`
 }

@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { trimDescription } from '@/components/property/PropertyDescription'
 import { createPortal } from 'react-dom'
 import { Download, Loader2, Check } from 'lucide-react'
 import { normalizeFileUrl, normalizeApiUrl } from '@/lib/utils/api-url'
@@ -168,7 +169,8 @@ export function ProposalExport({ listing }: { listing: Listing }) {
         {overview && (
           <div style={{ marginBottom: 16, ...noBreak }}>
             {H2('Overview')}
-            <div style={{ fontSize: 11.5, color: INK_SOFT, lineHeight: 1.6 }}>{overview.slice(0, 700)}</div>
+            {/* Line breaks kept, cut at a whole line — it used to run the text together and stop mid-word at 700. */}
+            <div style={{ fontSize: 11.5, color: INK_SOFT, lineHeight: 1.6, whiteSpace: 'pre-line' }}>{trimDescription(overview, 1100)}</div>
           </div>
         )}
 
