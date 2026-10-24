@@ -3,8 +3,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   Loader2, MessageCircle, Instagram, Send, ArrowLeft, UserPlus, User,
-  Bot, Megaphone, Inbox, Smartphone, Link2, X, Building2, Search, Archive, ArchiveRestore, Trash2, MoreVertical,
+  Bot, Megaphone, Inbox, Smartphone, Link2, X, Building2, Search, Archive, ArchiveRestore, Trash2, MoreVertical, LayoutGrid,
 } from 'lucide-react'
+import Link from 'next/link'
 import { AssistantControl, type AssistantMode } from './AssistantControl'
 import { normalizeApiUrl, normalizeFileUrl } from '@/lib/utils/api-url'
 import { useAuth } from '@/contexts/AuthContext'
@@ -589,6 +590,13 @@ export function InboxView({
                 <Building2 className="h-4 w-4" /> <span className="hidden xl:inline">Properties</span>
               </button>
               {detail.lead && (
+                // Straight to their card on the board — where they stand, not just who they are.
+                <Link href={`/admin/crm?focus=${detail.lead.id}`} aria-label="Show in pipeline" title="Show this client on the pipeline board"
+                  className="hidden sm:inline-flex shrink-0 min-h-11 px-3 rounded-lg text-sm font-medium items-center gap-1.5 border border-slate-200 text-slate-700 hover:bg-slate-50">
+                  <LayoutGrid className="h-4 w-4" /> <span className="hidden xl:inline">Pipeline</span>
+                </Link>
+              )}
+              {detail.lead && (
                 <button onClick={() => onOpenLead(detail.lead!.id)} aria-label="Open client" className="hidden sm:inline-flex shrink-0 min-h-11 px-3 rounded-lg text-sm font-medium items-center gap-1.5 border border-slate-200 text-slate-700 hover:bg-slate-50">
                   <User className="h-4 w-4" /> <span className="hidden xl:inline">Open client</span>
                 </button>
@@ -609,7 +617,10 @@ export function InboxView({
                       {showListings ? 'Hide properties' : 'Properties'}
                     </MenuItem>
                     {detail.lead ? (
-                      <MenuItem className="sm:hidden" icon={User} onClick={() => onOpenLead(detail.lead!.id)}>Open client</MenuItem>
+                      <>
+                        <MenuItem className="sm:hidden" icon={User} onClick={() => onOpenLead(detail.lead!.id)}>Open client</MenuItem>
+                        <MenuItem className="sm:hidden" icon={LayoutGrid} onClick={() => { window.location.href = `/admin/crm?focus=${detail.lead!.id}` }}>Show in pipeline</MenuItem>
+                      </>
                     ) : (
                       <>
                         <MenuItem icon={UserPlus} onClick={() => addAsClient()}>Add as client</MenuItem>

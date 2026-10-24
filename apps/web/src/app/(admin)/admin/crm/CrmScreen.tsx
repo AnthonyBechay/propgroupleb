@@ -79,10 +79,15 @@ export function CrmScreen({ mode }: { mode: 'pipeline' | 'clients' }) {
   }, [mode])
   // Conversations with something unread, for the badge on the Inbox tab.
   const [unreadChats, setUnreadChats] = useState(0)
-  // Arriving from the Inbox with a client to open: /admin/crm?lead=<id>.
+  // Arriving with a client: ?lead=<id> opens their record; ?focus=<id> (the
+  // Inbox's "Pipeline" button) shows where they stand on the board.
+  const [focusLeadId, setFocusLeadId] = useState<string | null>(null)
   useEffect(() => {
-    const lead = new URLSearchParams(window.location.search).get('lead')
+    const q = new URLSearchParams(window.location.search)
+    const lead = q.get('lead')
     if (lead) setOpenId(lead)
+    const focus = q.get('focus')
+    if (focus) setFocusLeadId(focus)
   }, [])
   useEffect(() => {
     const check = () =>
@@ -353,6 +358,25 @@ export function CrmScreen({ mode }: { mode: 'pipeline' | 'clients' }) {
     return { all: markets.length, LEBANON: markets.filter((m) => m === 'LEBANON').length, GEORGIA: markets.filter((m) => m === 'GEORGIA').length }
   }, [pipeline, deals, typeFilter])
   const toAnswer = boardClients.filter((p) => p.bucket === 'TO_ANSWER').length
+
+  // Sent here to find someone who is not on the board (lost, closed, or with
+  // no chat): open their record instead, and say why — never an empty board.
+  const focusHandled = useRef(false)
+  useEffect(() => {
+    // Once: the board refreshes every minute, and this must not keep resetting the filters.
+    if (!focusLeadId || loading || focusHandled.current) return
+    focusHandled.current = true
+    const onBoard = pipeline.some((p) => p.id === focusLeadId) ||
+      deals.some((d) => d.lead.id === focusLeadId && BOARD_DEAL_COLUMNS.some((c) => c.stages.includes(d.stage)))
+    if (onBoard) {
+      // A market or intent filter could hide them; clear both so the card shows.
+      setMarket('all'); setTypeFilter('all'); setView('board')
+      return
+    }
+    setOpenId(focusLeadId)
+    setFocusLeadId(null)
+    toast({ title: 'Not on the board', description: 'They are lost, closed, parked, or have nothing in play — here is their record.' })
+  }, [focusLeadId, loading, pipeline, deals])
   const onBoardIds = useMemo(() => new Set(pipeline.map((p) => p.id)), [pipeline])
 
   const openLead = leads.find((l) => l.id === openId) ?? null
@@ -536,6 +560,7 @@ export function CrmScreen({ mode }: { mode: 'pipeline' | 'clients' }) {
           onShowClients={() => router.push('/admin/clients')}
           onOpenChat={(leadId) => router.push(`/admin/inbox?lead=${leadId}`)}
           clients={boardClients}
+          focusLeadId={focusLeadId}
           onBook={async (leadId, to) => {
             // Ping later / noise / not interested: no property involved.
             if (to === 'LOST' || to === 'NOISE' || to.startsWith('PING:')) {

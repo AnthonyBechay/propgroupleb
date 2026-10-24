@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { normalizeApiUrl } from '@/lib/utils/api-url'
 import { InboxView } from '../crm/InboxView'
 import { LeadDrawer } from '../crm/LeadDrawer'
@@ -16,6 +17,7 @@ import type { Lead } from '../crm/types'
  */
 export default function InboxPage() {
   const apiUrl = normalizeApiUrl(process.env.NEXT_PUBLIC_API_URL || '')
+  const router = useRouter()
   // The client's card opens over the conversation, so the chat stays where it is.
   const [openLead, setOpenLead] = useState<Lead | null>(null)
   const openClient = useCallback(async (leadId: string) => {
@@ -42,6 +44,7 @@ export default function InboxPage() {
           lead={openLead}
           onClose={() => setOpenLead(null)}
           onChanged={() => openClient(openLead.id)}
+          onShowInPipeline={(leadId) => router.push(`/admin/crm?focus=${leadId}`)}
         />
       )}
     </div>

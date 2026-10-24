@@ -1576,6 +1576,9 @@ model Lead {
   nextContactAt       DateTime?
   // What the planned contact is for, shown next to the date.
   nextContactNote     String?
+  // When someone pressed "Ping later". A snooze holds until the date even if
+  // the client wrote last — unless they write again AFTER this moment.
+  snoozedAt           DateTime?
 
   notes String?
 

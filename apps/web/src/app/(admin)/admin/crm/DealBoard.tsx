@@ -45,7 +45,10 @@ export function DealBoard({
   onOpenChat,
   clients,
   onBook,
+  focusLeadId,
 }: {
+  /** Highlight and scroll to this client's cards (arriving from the Inbox). */
+  focusLeadId?: string | null
   /** People at the front of the pipeline, before any viewing or meeting. */
   clients: PipelineClient[]
   /** Start a deal for this client at a stage (picking the property), or mark them not interested. */
@@ -77,6 +80,20 @@ export function DealBoard({
   // 390px screen you can see one and a half of them and you cannot tell where
   // the pipeline is without scrolling the whole way across.
   const [mobileColumn, setMobileColumn] = useState<string>(CLIENT_COLUMNS[0].key)
+
+  // Arriving from the Inbox: open the column they are in and bring the card into view.
+  useEffect(() => {
+    if (!focusLeadId) return
+    const person = clients.find((c) => c.id === focusLeadId)
+    const deal = deals.find((d) => d.lead.id === focusLeadId && BOARD_DEAL_COLUMNS.some((c) => c.stages.includes(d.stage)))
+    const column = person?.bucket ?? (deal ? dealColumnOf(deal) : null)
+    if (!column) return
+    setMobileColumn(column)
+    const t = setTimeout(() => {
+      document.querySelector(`[data-lead="${focusLeadId}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' })
+    }, 150)
+    return () => clearTimeout(t)
+  }, [focusLeadId, clients, deals])
 
   const visibleClients = useMemo(() => {
     const needle = q.trim().toLowerCase()
@@ -233,7 +250,7 @@ export function DealBoard({
               <p className="px-2.5 pt-2 text-[11px] text-slate-500 lg:hidden">{col.hint}</p>
               <div className="p-1.5 space-y-1.5 min-h-[120px]">
                 {cards.map((c) => (
-                  <ClientCard key={c.id} client={c} onOpenClient={onOpenClient} onOpenChat={onOpenChat} onBook={onBook} onDragStart={() => setDragging(`client:${c.id}`)} />
+                  <ClientCard key={c.id} client={c} focused={c.id === focusLeadId} onOpenClient={onOpenClient} onOpenChat={onOpenChat} onBook={onBook} onDragStart={() => setDragging(`client:${c.id}`)} />
                 ))}
                 {cards.length === 0 && <p className="text-[11px] text-slate-400 text-center py-6">Nobody here</p>}
               </div>
@@ -302,6 +319,7 @@ export function DealBoard({
                   <DealCard
                     key={d.id}
                     deal={d}
+                    focused={d.lead.id === focusLeadId}
                     canSeeMoney={canSeeMoney}
                     busy={busyId === d.id}
                     onDragStart={() => setDragging(d.id)}
@@ -339,9 +357,10 @@ const sinceLabel = (iso: string) => {
 
 /** A person at the front of the pipeline — before any viewing or meeting. */
 function ClientCard({
-  client: c, onOpenClient, onOpenChat, onBook, onDragStart,
+  client: c, onOpenClient, onOpenChat, onBook, onDragStart, focused = false,
 }: {
   client: PipelineClient
+  focused?: boolean
   onOpenClient: (leadId: string) => void
   onOpenChat: (leadId: string) => void
   onBook: (leadId: string, to: ClientMove) => void
@@ -358,7 +377,8 @@ function ClientCard({
       // On a computer a person can be dragged onto a deal column; on a phone, the Move menu below.
       draggable
       onDragStart={(e) => { e.dataTransfer.setData('text/plain', `client:${c.id}`); onDragStart() }}
-      className="bg-white border border-slate-200 rounded-lg p-2.5 cursor-pointer hover:border-slate-300 hover:shadow-sm transition-all"
+      data-lead={c.id}
+      className={`bg-white border rounded-lg p-2.5 cursor-pointer hover:border-slate-300 hover:shadow-sm transition-all ${focused ? 'border-amber-400 ring-2 ring-amber-300' : 'border-slate-200'}`}
     >
       <div className="flex items-start gap-1.5">
         <span className="text-[11px] shrink-0 mt-0.5">{countryFlag(c.market)}</span>
@@ -368,7 +388,7 @@ function ClientCard({
             ? <Instagram className="h-3.5 w-3.5 text-pink-600 shrink-0 mt-0.5" aria-label="Instagram" />
             : <MessageCircle className="h-3.5 w-3.5 text-emerald-600 shrink-0 mt-0.5" aria-label="WhatsApp" />
         )}
-        {c.waitingSince && (
+        {c.waitingSince && c.bucket !== 'PING_LATER' && (
           <span className="shrink-0 px-1.5 py-0.5 rounded bg-red-50 text-red-700 text-[10px] font-semibold" title="Waiting for a reply">
             {sinceLabel(c.waitingSince)}
           </span>
@@ -598,8 +618,9 @@ function DealMoveMenu({ deal: d, onPick }: { deal: Deal; onPick: (action: DealAc
 }
 
 function DealCard({
-  deal: d, canSeeMoney, busy, onDragStart, onOpenClient, onOpenChat, onSetCommission, onAction,
+  deal: d, canSeeMoney, busy, onDragStart, onOpenClient, onOpenChat, onSetCommission, onAction, focused = false,
 }: {
+  focused?: boolean
   onOpenChat: (leadId: string) => void
   deal: Deal
   canSeeMoney: boolean
@@ -620,7 +641,8 @@ function DealCard({
       draggable={!editing}
       onDragStart={(e) => { e.dataTransfer.setData('text/plain', d.id); onDragStart() }}
       onClick={() => onOpenClient(d.lead.id)}
-      className={`bg-white border border-slate-200 rounded-lg p-2.5 cursor-pointer hover:border-slate-300 hover:shadow-sm transition-all ${
+      data-lead={d.lead.id}
+      className={`bg-white border rounded-lg p-2.5 cursor-pointer hover:border-slate-300 hover:shadow-sm transition-all ${focused ? 'border-amber-400 ring-2 ring-amber-300' : 'border-slate-200'} ${
         busy ? 'opacity-50 pointer-events-none' : ''
       }`}
     >

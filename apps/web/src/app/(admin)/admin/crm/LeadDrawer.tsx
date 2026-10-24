@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { ChatSuggestion, type Suggestion } from './ChatSuggestion'
 import {
-  X, Phone, MessageCircle, Mail, Loader2, Send, Pencil, Trash2, Building2, Clock, CalendarPlus, ExternalLink, History, Handshake, ClipboardCheck, Lightbulb, Sparkles, Plus, StickyNote, Globe, Home, MessagesSquare, Megaphone,
+  X, Phone, MessageCircle, Mail, Loader2, Send, Pencil, Trash2, Building2, Clock, CalendarPlus, ExternalLink, History, Handshake, ClipboardCheck, Lightbulb, Sparkles, Plus, StickyNote, Globe, Home, MessagesSquare, Megaphone, LayoutGrid,
 } from 'lucide-react'
 import { normalizeApiUrl, normalizeFileUrl } from '@/lib/utils/api-url'
 import { regionLabel } from '@/lib/crm-locations'
@@ -105,13 +105,15 @@ const CHANNELS = ['CALL', 'WHATSAPP', 'EMAIL', 'MEETING', 'VIEWING', 'NOTE'] as 
 
 /** Full client view: contact history, quick log, and matching live listings. */
 export function LeadDrawer({
-  lead, onClose, onChanged, onOpenChat,
+  lead, onClose, onChanged, onOpenChat, onShowInPipeline,
 }: {
   lead: Lead
   onClose: () => void
   onChanged: () => void
   /** Jump to this client's mirrored WhatsApp/Instagram thread in the Inbox. */
   onOpenChat?: (leadId: string) => void
+  /** Jump to this client's card on the pipeline board (from the Inbox). */
+  onShowInPipeline?: (leadId: string) => void
 }) {
   const apiUrl = normalizeApiUrl(process.env.NEXT_PUBLIC_API_URL || '')
   const [detail, setDetail] = useState<Lead | null>(null)
@@ -377,7 +379,13 @@ export function LeadDrawer({
             {onOpenChat && (l.waId || l.igId) && (
               <button onClick={() => onOpenChat(l.id)}
                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-sm text-slate-700 hover:bg-slate-100">
-                <MessagesSquare className="h-3.5 w-3.5" /> Chat history
+                <MessagesSquare className="h-3.5 w-3.5" /> Open chat
+              </button>
+            )}
+            {onShowInPipeline && (
+              <button onClick={() => onShowInPipeline(l.id)}
+                 className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-sm text-slate-700 hover:bg-slate-100">
+                <LayoutGrid className="h-3.5 w-3.5" /> Show in pipeline
               </button>
             )}
             {l.email && (

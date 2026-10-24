@@ -83,7 +83,7 @@ router.get(
       select: {
         id: true, name: true, market: true, type: true, intents: true, isInvestor: true, source: true,
         adLabel: true, adId: true, askingFor: true, budgetMax: true, lastContactAt: true, createdAt: true,
-        nextContactAt: true, nextContactNote: true,
+        nextContactAt: true, nextContactNote: true, snoozedAt: true,
         opportunities: { select: { stage: true } },
         conversations: {
           where: { archivedAt: null },
@@ -157,16 +157,29 @@ router.get(
         assistantOn && chat && !chat.aiPaused && (settings.audience === 'all' || fromAd || chat.aiAlways) &&
         (!teamRecently || chat.aiAlways || settings.handover === 'always');
 
+      // A snooze someone chose wins over "they wrote last" — that was exactly the
+      // case being snoozed (Shadi went straight back to To answer). Only a
+      // message that arrives after the snooze wakes it early.
+      const snoozed = Boolean(
+        pingAt && pingAt.getTime() > now &&
+        (!waitingSince || (l.snoozedAt && waitingSince.getTime() <= l.snoozedAt.getTime()))
+      );
+
       let bucket: Bucket;
       let reason: string | null = null;
-      if (waitingSince) {
+      if (snoozed) {
+        bucket = 'PING_LATER';
+        reason = l.nextContactNote;
+      } else if (waitingSince) {
         // They wrote and nobody has answered.
         if (assistantAnswers && waited < WAITING_MS) bucket = 'ASSISTANT';
         else {
           bucket = 'TO_ANSWER';
-          reason = chat?.aiPaused
-            ? `Handed over: ${chat.aiPausedReason ?? 'the assistant passed this to you'}`
-            : teamRecently ? 'They replied to you' : 'Waiting for a reply';
+          reason = pingAt && pingAt.getTime() > now
+            ? 'They wrote while snoozed'
+            : chat?.aiPaused
+              ? `Handed over: ${chat.aiPausedReason ?? 'the assistant passed this to you'}`
+              : teamRecently ? 'They replied to you' : 'Waiting for a reply';
         }
       } else if (pingAt && pingAt.getTime() > now) {
         bucket = 'PING_LATER';
@@ -277,6 +290,7 @@ router.post(
         where: { id: lead.id },
         data: {
           nextContactAt: new Date(Date.now() + days * DAY_MS),
+          snoozedAt: new Date(),
           // Snoozing again keeps what you meant to do ("send new prices").
           ...(body.note ? { nextContactNote: body.note } : {}),
           subStatus: 'AWAITING_REPLY',
