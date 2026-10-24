@@ -46,6 +46,7 @@ import adsRoutes from './routes/ads.js';
 import aiUsageRoutes from './routes/ai-usage.js';
 import aiSettingsRoutes from './routes/ai-settings.js';
 import pipelineRoutes from './routes/pipeline.js';
+import faqRoutes from './routes/faq.js';
 import webhookRoutes from './routes/webhooks.js';
 import { privateFieldGuard } from './middleware/auth.js';
 import { realClientIp } from './utils/client-ip.js';
@@ -384,6 +385,7 @@ app.use('/api/crm/ads', adsRoutes);
 app.use('/api/crm/ai-usage', aiUsageRoutes);
 app.use('/api/crm/ai-settings', aiSettingsRoutes);
 app.use('/api/crm/pipeline', pipelineRoutes);
+app.use('/api/faq', faqRoutes);
 app.use('/api/crm', crmRoutes);
 // Public by design — Meta calls it. Guarded by signature, not by auth.
 app.use('/api/webhooks', webhookRoutes);

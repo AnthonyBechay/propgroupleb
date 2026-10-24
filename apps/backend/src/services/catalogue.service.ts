@@ -113,7 +113,15 @@ function toCard(building: any): CatalogueCard | null {
     priceFrom: isProject && (p.unitCount ?? 0) > 1,
     rentPeriod: deal === 'RENT' ? cheapest?.rentPeriod ?? 'MONTHLY' : null,
     image: typeof p.images?.[0] === 'string' && /^https:\/\//.test(p.images[0]) ? p.images[0] : null,
-    url: `${siteUrl(market)}/property/${p.slug}`,
+    // Lebanon's site shows properties by listing (/listings/<listing slug>);
+    // /property/<building slug> there only redirects to a listing address that
+    // does not exist. Abroad, the Georgia site shows projects by building slug.
+    url:
+      market === 'LEBANON'
+        ? cheapest?.slug
+          ? `${siteUrl(market)}/listings/${cheapest.slug}`
+          : `${siteUrl(market)}/listings`
+        : `${siteUrl(market)}/property/${p.slug}`,
     ...readinessOf(p),
   };
 }

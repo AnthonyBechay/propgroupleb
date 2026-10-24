@@ -42,9 +42,35 @@ function getSessionId(): string {
   }
 }
 
+const LANDED_KEY = 'pg_landed'
+
+/**
+ * Where this visit came from, once per visit: the page that linked here and
+ * any utm tags. Sent only with the visit's first page view — that is the one
+ * that answers "who sent them" (an AI assistant, a search, an ad).
+ */
+function landingInfo(): Record<string, string> | null {
+  try {
+    if (sessionStorage.getItem(LANDED_KEY)) return null
+    sessionStorage.setItem(LANDED_KEY, '1')
+  } catch {
+    return null
+  }
+  const params = new URLSearchParams(window.location.search)
+  const referrer = document.referrer && !document.referrer.startsWith(window.location.origin) ? document.referrer : ''
+  return {
+    referrer: referrer.slice(0, 300),
+    utmSource: (params.get('utm_source') ?? '').slice(0, 100),
+    utmMedium: (params.get('utm_medium') ?? '').slice(0, 100),
+    utmCampaign: (params.get('utm_campaign') ?? '').slice(0, 100),
+  }
+}
+
 export function track(type: AnalyticsEventType, payload: TrackPayload = {}): void {
   if (typeof window === 'undefined') return
   try {
+    const landing = type === 'page_view' ? landingInfo() : null
+    if (landing) payload = { ...payload, meta: { ...(payload.meta ?? {}), landing } }
     const apiBase = normalizeApiUrl(process.env.NEXT_PUBLIC_API_URL || '')
     const body = JSON.stringify({
       type,

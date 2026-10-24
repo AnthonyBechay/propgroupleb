@@ -72,6 +72,89 @@ router.post(
   })
 );
 
+// ── GET /sources — where visitors came from, AI assistants singled out ───────
+//
+// Each visit's first page view carries where it came from (`meta.landing`,
+// sent by the sites): the page that linked to us and any utm_source. The
+// request's own Referer header cannot answer this — it names our own page.
+// Answers "is ChatGPT (or Perplexity, Gemini…) sending us people, and how many".
+
+const AI_SOURCES: Array<[RegExp, string]> = [
+  [/chatgpt\.com|chat\.openai\.com|openai/i, 'ChatGPT'],
+  [/perplexity/i, 'Perplexity'],
+  [/gemini\.google|bard\.google/i, 'Gemini'],
+  [/copilot\.microsoft|bing\.com\/chat/i, 'Copilot'],
+  [/claude\.ai|anthropic/i, 'Claude'],
+  [/deepseek/i, 'DeepSeek'],
+  [/meta\.ai/i, 'Meta AI'],
+  [/grok|x\.ai/i, 'Grok'],
+  [/you\.com|phind|mistral|chat\.qwen|kagi\.com\/assistant/i, 'Other AI'],
+];
+const SEARCH = /google\.|bing\.com|duckduckgo|yahoo\.|yandex|ecosia|baidu/i;
+const SOCIAL = /facebook|fb\.|instagram|l\.instagram|t\.co\b|x\.com|twitter|linkedin|tiktok|youtube|whatsapp|wa\.me|t\.me|telegram/i;
+
+function classify(landing: { referrer?: string; utmSource?: string; utmMedium?: string }): { channel: string; name: string } {
+  const hay = `${landing.utmSource ?? ''} ${landing.referrer ?? ''}`.trim();
+  if (!hay) return { channel: 'Direct', name: 'Direct / unknown' };
+  for (const [re, name] of AI_SOURCES) if (re.test(hay)) return { channel: 'AI assistants', name };
+  if (/(cpc|paid|ads?)$/i.test(landing.utmMedium ?? '') || /fbclid|gclid/i.test(hay)) return { channel: 'Ads', name: landing.utmSource || 'Ads' };
+  if (SOCIAL.test(hay)) return { channel: 'Social', name: (hay.match(SOCIAL)?.[0] ?? 'Social').replace(/\W+$/, '') };
+  if (SEARCH.test(hay)) return { channel: 'Search engines', name: (hay.match(SEARCH)?.[0] ?? 'Search').replace(/\W+$/, '') };
+  let host = hay;
+  try { host = new URL(landing.referrer ?? '').hostname; } catch { /* keep the raw text */ }
+  return { channel: 'Other websites', name: host || 'Other' };
+}
+
+router.get(
+  '/sources',
+  authenticateToken,
+  requireAdmin,
+  asyncHandler(async (req: Request, res: Response) => {
+    const days = Math.min(365, Math.max(1, Number(req.query.days) || 30));
+    const site = req.query.site === 'LEBANON' || req.query.site === 'INTERNATIONAL' ? req.query.site : null;
+    const landings = await prisma.analyticsEvent.findMany({
+      where: {
+        type: 'page_view',
+        createdAt: { gte: new Date(Date.now() - days * 24 * 60 * 60 * 1000) },
+        meta: { path: ['landing'], not: null as never },
+        ...(site ? { site } : {}),
+      },
+      select: { meta: true, site: true, path: true },
+      take: 50000,
+    });
+
+    const channels = new Map<string, number>();
+    const ai = new Map<string, { visits: number; pages: Map<string, number> }>();
+    for (const e of landings) {
+      const landing = ((e.meta as Record<string, unknown> | null)?.landing ?? {}) as Record<string, string>;
+      const { channel, name } = classify(landing);
+      channels.set(channel, (channels.get(channel) ?? 0) + 1);
+      if (channel === 'AI assistants') {
+        const row = ai.get(name) ?? { visits: 0, pages: new Map() };
+        row.visits += 1;
+        const page = e.path ?? '/';
+        row.pages.set(page, (row.pages.get(page) ?? 0) + 1);
+        ai.set(name, row);
+      }
+    }
+
+    sendSuccess(res, {
+      days,
+      site: site ?? 'all',
+      visits: landings.length,
+      channels: [...channels.entries()].map(([channel, visits]) => ({ channel, visits })).sort((a, b) => b.visits - a.visits),
+      aiAssistants: [...ai.entries()]
+        .map(([name, r]) => ({
+          name,
+          visits: r.visits,
+          // Which pages the assistants link to: the ones they trust.
+          topPages: [...r.pages.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5).map(([path, visits]) => ({ path, visits })),
+        }))
+        .sort((a, b) => b.visits - a.visits),
+    });
+  })
+);
+
 // ── GET /dashboard — aggregated behavioural metrics (admin) ───────────────────
 router.get(
   '/dashboard',

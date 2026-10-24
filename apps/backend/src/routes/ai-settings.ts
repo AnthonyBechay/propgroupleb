@@ -71,7 +71,14 @@ const settingsSchema = z.object({
     mapsUrl: z.union([z.string().trim().url().max(500), z.literal('')]).default(''),
   }),
   knowledge: z
-    .array(z.object({ question: z.string().trim().min(1).max(300), answer: z.string().trim().min(1).max(1000) }))
+    .array(
+      z.object({
+        question: z.string().trim().min(1).max(300),
+        answer: z.string().trim().min(1).max(1000),
+        publish: z.boolean().default(false),
+        market: z.enum(['GEORGIA', 'LEBANON', 'ALL']).default('GEORGIA'),
+      })
+    )
     .max(40)
     .default([]),
   guidance: z.string().trim().max(3000).default(''),

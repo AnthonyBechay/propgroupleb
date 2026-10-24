@@ -15,7 +15,13 @@ import { normalizeApiUrl } from '@/lib/utils/api-url'
 
 interface Preferred { ref: string; pitch: string }
 
-interface Knowledge { question: string; answer: string }
+interface Knowledge {
+  question: string
+  answer: string
+  /** Also published on the website, for visitors, search engines and AI assistants. */
+  publish?: boolean
+  market?: 'GEORGIA' | 'LEBANON' | 'ALL'
+}
 
 interface Settings {
   enabled: boolean
@@ -445,11 +451,29 @@ export default function AiSettingsPage() {
               <textarea value={k.answer} maxLength={1000} rows={2} placeholder="How to answer it"
                 onChange={(e) => update({ knowledge: settings.knowledge.map((x, j) => (j === i ? { ...x, answer: e.target.value } : x)) })}
                 className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-400" />
+              {/* The same answer, published: on the site's questions section and
+                  to search engines and AI assistants as the official one. */}
+              <div className="flex items-center gap-3 flex-wrap">
+                <label className="inline-flex items-center gap-2 text-sm text-slate-800 cursor-pointer min-h-11">
+                  <input type="checkbox" checked={Boolean(k.publish)} className="h-4 w-4 rounded border-slate-300"
+                    onChange={(e) => update({ knowledge: settings.knowledge.map((x, j) => (j === i ? { ...x, publish: e.target.checked } : x)) })} />
+                  Show on the website
+                </label>
+                {k.publish && (
+                  <select value={k.market ?? 'GEORGIA'} aria-label="Which website"
+                    onChange={(e) => update({ knowledge: settings.knowledge.map((x, j) => (j === i ? { ...x, market: e.target.value as Knowledge['market'] } : x)) })}
+                    className="min-h-11 rounded-lg border border-slate-300 px-2 text-sm">
+                    <option value="GEORGIA">propgrp.com (abroad)</option>
+                    <option value="LEBANON">propgrouplb.com (Lebanon)</option>
+                    <option value="ALL">Both websites</option>
+                  </select>
+                )}
+              </div>
             </li>
           ))}
         </ul>
         {settings.knowledge.length < 40 && (
-          <button onClick={() => update({ knowledge: [...settings.knowledge, { question: '', answer: '' }] })}
+          <button onClick={() => update({ knowledge: [...settings.knowledge, { question: '', answer: '', publish: false, market: 'GEORGIA' }] })}
             className="mt-3 min-h-11 px-3 rounded-lg border border-slate-300 text-sm font-medium text-slate-800 inline-flex items-center gap-1.5 hover:bg-slate-50">
             <Plus className="h-4 w-4" /> Add a question
           </button>

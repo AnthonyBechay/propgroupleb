@@ -22,6 +22,15 @@ export interface KnowledgeItem {
   question: string;
   /** How the office wants it answered. */
   answer: string;
+  /**
+   * Also shown on the website's questions section — and given to search
+   * engines and AI assistants as the official answer. Off by default: an
+   * answer written for the assistant to paraphrase is not automatically one
+   * to publish word for word.
+   */
+  publish?: boolean;
+  /** Which site it belongs on when published. */
+  market?: 'GEORGIA' | 'LEBANON' | 'ALL';
 }
 
 /**
@@ -164,7 +173,12 @@ export async function getChatAiSettings(): Promise<ChatAiSettings> {
     knowledge: Array.isArray(saved.knowledge)
       ? saved.knowledge
           .filter((k) => k && typeof k.question === 'string' && typeof k.answer === 'string')
-          .map((k) => ({ question: k.question, answer: k.answer }))
+          .map((k) => ({
+            question: k.question,
+            answer: k.answer,
+            publish: k.publish === true,
+            market: k.market === 'LEBANON' || k.market === 'ALL' ? k.market : ('GEORGIA' as const),
+          }))
       : [],
     guidance: typeof saved.guidance === 'string' ? saved.guidance : '',
     followUp: {

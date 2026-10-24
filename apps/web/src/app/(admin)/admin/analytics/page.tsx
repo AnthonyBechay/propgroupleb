@@ -15,6 +15,7 @@ import Link from 'next/link'
 import { normalizeApiUrl } from '@/lib/utils/api-url'
 import { cookies } from 'next/headers'
 import { BehaviorAnalytics } from './BehaviorAnalytics'
+import { AiSourcesPanel } from './AiSourcesPanel'
 
 type Market = 'all' | 'LEBANON' | 'INTERNATIONAL'
 
@@ -242,6 +243,8 @@ export default async function AnalyticsPage({
 
       {/* User behaviour (first-party event tracking) */}
       <BehaviorAnalytics site={market === 'all' ? null : market} />
+
+      <AiSourcesPanel site={market === 'all' ? null : market} />
 
       {/* Key Metrics */}
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
