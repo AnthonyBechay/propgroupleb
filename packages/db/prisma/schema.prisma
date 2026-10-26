@@ -1843,6 +1843,29 @@ model AiUsage {
   @@map("ai_usage")
 }
 
+// A phone or computer that asked to be told about new chats (the installed
+// Inbox app, or a browser). One row per device; a device that is gone — the app
+// deleted, permission withdrawn — is removed the first time a send to it fails.
+model PushSubscription {
+  id       String @id @default(cuid())
+  userId   String
+  endpoint String @unique
+  p256dh   String
+  auth     String
+
+  // all       — every new message from a client
+  // needs_you — only when a person is needed: the assistant handed over, or
+  //             it is not going to answer this one
+  mode String @default("all")
+
+  userAgent  String?
+  createdAt  DateTime @default(now())
+  lastSentAt DateTime?
+
+  @@index([userId])
+  @@map("push_subscriptions")
+}
+
 // Named ChatMessage because `Message` is a reserved model above.
 model ChatMessage {
   id             String        @id @default(cuid())

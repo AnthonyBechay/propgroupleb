@@ -12,6 +12,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { canDeleteConversations } from '@/lib/permissions'
 import { ChatSuggestion, type Suggestion } from './ChatSuggestion'
 import { ListingPicker } from './ListingPicker'
+import { PushToggle, registerInboxWorker } from './PushToggle'
 
 /**
  * WhatsApp and Instagram threads, mirrored from the phone.
@@ -290,6 +291,19 @@ export function InboxView({
     return () => document.removeEventListener('visibilitychange', onVisible)
   }, [loadThreads, loadDetail, openId])
 
+  // A push arriving while the inbox is open: show it now, not at the next poll.
+  useEffect(() => {
+    if (!('serviceWorker' in navigator)) return
+    void registerInboxWorker()
+    const onMessage = (e: MessageEvent) => {
+      if (e.data?.type !== 'inbox-update') return
+      loadThreads()
+      if (openId) loadDetail(openId)
+    }
+    navigator.serviceWorker.addEventListener('message', onMessage)
+    return () => navigator.serviceWorker.removeEventListener('message', onMessage)
+  }, [loadThreads, loadDetail, openId])
+
   // On a phone an open conversation is the whole screen, like WhatsApp: sized
   // to what the keyboard leaves visible (iOS does not shrink 100dvh for it),
   // and the page behind it held still.
@@ -344,17 +358,36 @@ export function InboxView({
 
   const send = async () => {
     if (!openId || !draft.trim() || sending) return
+    const text = draft
+    // Shown at once, the way a chat app does; replaced by the real message
+    // when the server confirms, taken back out if it fails.
+    const pendingId = `pending-${Date.now()}`
+    setDraft('')
     setSending(true)
     setError(null)
+    setDetail((d) => d && d.id === openId
+      ? {
+          ...d,
+          messages: [...d.messages, {
+            id: pendingId, direction: 'OUT', type: 'text', body: text, mediaUrl: null, transcript: null,
+            origin: 'CRM', status: 'sending', sentAt: new Date().toISOString(),
+          } as ChatMessage],
+        }
+      : d)
     try {
-      const res = await call(`/${openId}/reply`, { method: 'POST', body: JSON.stringify({ text: draft }) })
+      const res = await call(`/${openId}/reply`, { method: 'POST', body: JSON.stringify({ text }) })
       if (!res.ok) {
         const body = await res.json().catch(() => null)
         setError(body?.message || body?.error || 'The message was not sent.')
+        setDraft(text)
+        setDetail((d) => d && { ...d, messages: d.messages.filter((m) => m.id !== pendingId) })
         return
       }
-      setDraft('')
       await Promise.all([loadDetail(openId), loadThreads()])
+    } catch {
+      setError('No connection — the message was not sent.')
+      setDraft(text)
+      setDetail((d) => d && { ...d, messages: d.messages.filter((m) => m.id !== pendingId) })
     } finally { setSending(false) }
   }
 
@@ -466,6 +499,7 @@ export function InboxView({
       {/* Threads — below lg, one pane at a time */}
       <div className={`lg:border-r lg:border-slate-200 lg:flex lg:flex-col lg:min-h-0 ${openId ? 'hidden lg:flex' : ''}`}>
       <div className="p-2 pb-1.5 border-b border-slate-200 space-y-1.5">
+      <PushToggle />
       <div className="relative">
         <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
         <input

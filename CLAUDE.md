@@ -642,3 +642,15 @@ npx prisma migrate resolve --applied <timestamp>_baseline
 
 Worth doing when there's a quiet week. Until then, the boot routines above are
 the only reliable way to change data.
+
+## Chat notifications (web push)
+
+The installed Inbox app (`/inbox.webmanifest`, start `/admin/inbox`) gets push
+notifications through `apps/web/public/inbox-sw.js` (scope `/admin/`, caches
+nothing). Subscriptions are per device in `PushSubscription`, mode `all` or
+`needs_you`. Sending: `apps/backend/src/services/push.service.ts`, called from
+`routes/webhooks.ts` on every inbound chat and from `auto-reply.service.ts` on
+hand-off. VAPID keys come from `VAPID_PUBLIC_KEY`/`VAPID_PRIVATE_KEY`, or are
+generated once and kept in SystemSetting `vapid_keys` — changing them
+invalidates every device, which then has to turn notifications on again.
+iPhone receives them only from the Home Screen app (iOS 16.4+).

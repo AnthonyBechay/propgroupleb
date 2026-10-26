@@ -9,6 +9,7 @@ import {
   type AdReferral,
 } from '../services/messaging-intake.service.js';
 import { scheduleAutoReply } from '../services/auto-reply.service.js';
+import { notifyInboundMessage } from '../services/push.service.js';
 
 /**
  * Meta webhooks — WhatsApp, Instagram messaging and Facebook Lead Ads.
@@ -236,7 +237,10 @@ async function handleYCloud(event: any): Promise<void> {
       referral: whatsAppReferral(m),
       history,
     });
-    if (conversationId && !history) scheduleAutoReply(conversationId);
+    if (conversationId && !history) {
+      scheduleAutoReply(conversationId);
+      void notifyInboundMessage(conversationId);
+    }
     return;
   }
 
@@ -361,7 +365,10 @@ async function handleWhatsApp(body: any): Promise<void> {
           sentAt: seconds(msg.timestamp),
           referral: whatsAppReferral(msg),
         });
-        if (conversationId) scheduleAutoReply(conversationId);
+        if (conversationId) {
+          scheduleAutoReply(conversationId);
+          void notifyInboundMessage(conversationId);
+        }
       }
 
       for (const msg of value.message_echoes ?? []) {
@@ -417,7 +424,10 @@ async function handleInstagram(body: any): Promise<void> {
         sentAt: event.timestamp ? new Date(Number(event.timestamp)) : undefined,
         referral: ad?.ad_id ? { adId: String(ad.ad_id), label: ad.ads_context_data?.ad_title ?? null } : null,
       });
-      if (conversationId && !echo) scheduleAutoReply(conversationId);
+      if (conversationId && !echo) {
+        scheduleAutoReply(conversationId);
+        void notifyInboundMessage(conversationId);
+      }
     }
   }
 }

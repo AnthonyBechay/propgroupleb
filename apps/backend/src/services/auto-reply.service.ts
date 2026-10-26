@@ -1169,6 +1169,15 @@ async function reply(conversationId: string, trigger: 'message' | 'sweep' | 'man
       where: { id: conversationId },
       data: { aiPaused: true, aiPausedReason: handoffReason || 'It handed the conversation to the team', aiPausedAt: new Date() },
     });
+    // The one moment a person is needed — say so on their phones.
+    const { notifyTeam } = await import('./push.service.js');
+    void notifyTeam({
+      title: `${lead?.name || conversation.displayName || 'A client'} needs you`,
+      body: handoffReason || 'The assistant handed this conversation to the team.',
+      url: `/admin/inbox?c=${conversationId}`,
+      tag: `chat-${conversationId}`,
+      kind: 'needs_you',
+    });
   } else if (conversation.aiPaused && !manual) {
     // It was allowed to answer a paused thread (always-on, or the client came
     // back after a quiet day) — so the thread is the assistant's again.
