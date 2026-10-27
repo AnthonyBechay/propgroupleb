@@ -678,6 +678,10 @@ model UnitOption {
   currency           Currency @default(USD)
   initialPayment     Decimal?
   paymentPlanDetails Json?
+  // What this finish looks out at: SEA, MOUNTAIN, CITY… — the same choices a
+  // unit's "View" field uses. In a project the view decides the price
+  // ("White frame, sea view"), so it lives on the finish, not the unit.
+  views              String[] @default([])
   description        String?
 
   createdAt DateTime @default(now())

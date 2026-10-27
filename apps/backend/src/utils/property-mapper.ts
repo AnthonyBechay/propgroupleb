@@ -90,6 +90,8 @@ export function mapUnitOption(option: any, unitId: string): Record<string, unkno
     initialPayment: toNumber(pick(option, 'initialPayment', 'downPayment')) ?? null,
     paymentPlanDetails: pick(option, 'paymentPlanDetails', 'paymentPlan') ?? null,
     description: pick<string>(option, 'description', 'notes') ?? null,
+    /** SEA, MOUNTAIN… — what this finish looks out at. */
+    views: toArray<string>(pick(option, 'views')),
     createdAt: pick(option, 'createdAt') ?? null,
     updatedAt: pick(option, 'updatedAt') ?? null,
     referenceCode: pick<string>(option, 'ref', 'referenceCode', 'code') ?? null,

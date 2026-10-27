@@ -125,6 +125,26 @@ export async function normaliseCrmData(): Promise<void> {
     return 'chat assistant reply style moved from latin to match';
   });
 
+  // Finishes used to carry their view as free text ("Sea view"). A finish whose
+  // whole description is just a view becomes that view in the new field;
+  // what follows a leading view ("Sea view, floors 8–15") stays as the note.
+  await once('unit_option_views_from_text_v1', async () => {
+    const VIEW_WORDS: Record<string, string> = { sea: 'SEA', mountain: 'MOUNTAIN', city: 'CITY', garden: 'GARDEN', pool: 'POOL', street: 'STREET', open: 'OPEN' };
+    const options = await prisma.unitOption.findMany({ where: { description: { not: null } }, select: { id: true, description: true, views: true } });
+    let moved = 0;
+    for (const o of options) {
+      if (o.views.length) continue;
+      // "Sea view" → SEA, no note. "Sea view, floors 8–15" → SEA, note "floors 8–15".
+      const text = (o.description ?? '').trim();
+      const m = text.match(/^(sea|mountain|city|garden|pool|street|open)( view)?\s*(?:[,;:–—-]\s*(.+))?\.?$/i);
+      if (!m) continue;
+      const rest = m[3]?.trim() || null;
+      await prisma.unitOption.update({ where: { id: o.id }, data: { views: [VIEW_WORDS[m[1].toLowerCase()]], description: rest } });
+      moved++;
+    }
+    return `${moved} finish descriptions turned into a view`;
+  });
+
   await once('crm_clear_derived_followups_v1', async () => {
     const { count } = await prisma.lead.updateMany({
       where: {

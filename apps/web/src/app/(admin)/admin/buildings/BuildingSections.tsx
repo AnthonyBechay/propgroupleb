@@ -14,7 +14,7 @@ import { useState } from 'react'
 import { PropertyDescription } from '@/components/property/PropertyDescription'
 import {
   Building2, CalendarClock, Coins, FileText, Image as ImageIcon, Loader2, MapPin,
-  Search, Sparkles,
+  Plus, Search, Sparkles, Trash2,
 } from 'lucide-react'
 import { LocationFields } from '@/components/admin/LocationFields'
 import { OwnerPicker, type OwnerRef } from '@/components/admin/OwnerPicker'
@@ -414,17 +414,28 @@ export function LocationSection({ f, set, disabled, errors }: SectionProps & { e
 
 // ── Building specs + amenities ────────────────────────────────────────────────
 
-export function SpecsSection({ f, set, disabled, residential }: SectionProps & { residential: boolean }) {
+/**
+ * Everything that makes the property worth buying, in one place: the building's
+ * facts, its amenities, and the selling points — which used to be two separate
+ * sections far apart, so "pool" was ticked in one and "rooftop pool with sea
+ * view" typed in the other.
+ */
+export function BuildingSellingSection({
+  f, set, disabled, residential, showFacts,
+}: SectionProps & { residential: boolean; showFacts: boolean }) {
   const amenities = amenitiesFor(f.country, residential)
 
   return (
     <FormSection
-      id="specs"
-      title="The building"
-      description="Shared facts about the building every unit in it inherits."
-      icon={<Building2 className="h-4 w-4" />}
+      id="highlights"
+      title="Building & selling points"
+      description="What the building offers and why it is worth buying — printed on the property page and in the PDF proposal."
+      icon={<Sparkles className="h-4 w-4" />}
     >
-      <div className="space-y-5">
+      <div className="space-y-6">
+        {showFacts && (
+        <div>
+        <p className="mb-2.5 text-xs font-semibold uppercase tracking-wider text-slate-500">The building</p>
         <FieldGrid cols={4}>
           <Field label="Built year" optional>
             <NumberInput
@@ -463,9 +474,11 @@ export function SpecsSection({ f, set, disabled, residential }: SectionProps & {
             />
           </Field>
         </FieldGrid>
+        </div>
+        )}
 
         <div>
-          <p className="mb-2.5 text-sm font-medium text-slate-700">Amenities</p>
+          <p className="mb-2.5 text-xs font-semibold uppercase tracking-wider text-slate-500">Amenities</p>
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
             {amenities.map(({ key, label }) => (
               <CheckboxCard
@@ -483,8 +496,62 @@ export function SpecsSection({ f, set, disabled, residential }: SectionProps & {
             </p>
           )}
         </div>
+
+        <SellingPoints value={f.highlightedFeatures} onChange={(v) => set({ highlightedFeatures: v })} disabled={disabled} />
       </div>
     </FormSection>
+  )
+}
+
+/** "Point — detail" is how a selling point with a detail is stored (one string, no schema change). */
+export const POINT_SEPARATOR = ' — '
+const splitPoint = (s: string) => {
+  const i = s.indexOf(POINT_SEPARATOR)
+  return i === -1 ? { point: s, detail: '' } : { point: s.slice(0, i), detail: s.slice(i + POINT_SEPARATOR.length) }
+}
+
+/**
+ * Selling points as rows — the point, and an optional detail that says why it
+ * matters ("Sea view from every floor — every apartment faces the Black Sea").
+ * A bare chip could only hold the headline.
+ */
+function SellingPoints({ value, onChange, disabled }: { value: string[]; onChange: (v: string[]) => void; disabled?: boolean }) {
+  const rows = value.map(splitPoint)
+  const write = (next: Array<{ point: string; detail: string }>) =>
+    onChange(next.map((r) => (r.detail.trim() ? `${r.point}${POINT_SEPARATOR}${r.detail.trim()}` : r.point)))
+  const update = (i: number, patch: Partial<{ point: string; detail: string }>) =>
+    write(rows.map((r, j) => (j === i ? { ...r, ...patch } : r)))
+  const unused = HIGHLIGHT_SUGGESTIONS.filter((s) => !rows.some((r) => r.point.toLowerCase() === s.toLowerCase()))
+
+  return (
+    <div>
+      <p className="mb-1 text-xs font-semibold uppercase tracking-wider text-slate-500">Selling points</p>
+      <p className="mb-2.5 text-xs text-slate-500">The short reasons to buy, as bullets. Add a detail when the point needs one.</p>
+      <ul className="space-y-2">
+        {rows.map((r, i) => (
+          <li key={i} className="grid gap-2 sm:grid-cols-[minmax(0,2fr)_minmax(0,3fr)_auto]">
+            <TextInput value={r.point} onChange={(e) => update(i, { point: e.target.value })} placeholder="Sea view from every floor" disabled={disabled} aria-label="Selling point" />
+            <TextInput value={r.detail} onChange={(e) => update(i, { detail: e.target.value })} placeholder="Detail (optional) — every apartment faces the Black Sea" disabled={disabled} aria-label="Detail" />
+            <button type="button" onClick={() => write(rows.filter((_, j) => j !== i))} disabled={disabled} aria-label="Remove selling point"
+              className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg text-slate-400 hover:bg-red-50 hover:text-red-600">
+              <Trash2 className="h-4 w-4" />
+            </button>
+          </li>
+        ))}
+      </ul>
+      <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
+        <button type="button" onClick={() => write([...rows, { point: '', detail: '' }])} disabled={disabled}
+          className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-dashed border-slate-300 px-3 text-xs font-medium text-slate-600 hover:border-slate-400 hover:bg-slate-50">
+          <Plus className="h-3.5 w-3.5" /> Add selling point
+        </button>
+        {unused.slice(0, 8).map((s) => (
+          <button key={s} type="button" onClick={() => write([...rows, { point: s, detail: '' }])} disabled={disabled}
+            className="min-h-9 rounded-full bg-slate-100 px-3 text-xs text-slate-600 hover:bg-slate-200">
+            + {s}
+          </button>
+        ))}
+      </div>
+    </div>
   )
 }
 
@@ -494,25 +561,6 @@ const HIGHLIGHT_SUGGESTIONS = [
   'Sea view', 'Mountain view', 'City view', 'Private pool', 'Terrace',
   'Corner unit', 'Fully furnished', 'Maid’s room', 'Storage room', 'Open kitchen',
 ]
-
-export function HighlightsSection({ f, set, disabled }: SectionProps) {
-  return (
-    <FormSection
-      id="highlights"
-      title="Selling points"
-      description="The short phrases printed as bullets on the property page and the PDF proposal."
-      icon={<Sparkles className="h-4 w-4" />}
-    >
-      <ChipsInput
-        value={f.highlightedFeatures}
-        onChange={(v) => set({ highlightedFeatures: v })}
-        placeholder="e.g. Sea view, private pool…"
-        suggestions={HIGHLIGHT_SUGGESTIONS}
-        disabled={disabled}
-      />
-    </FormSection>
-  )
-}
 
 // ── Media ─────────────────────────────────────────────────────────────────────
 

@@ -20,6 +20,8 @@ export interface UnitOption {
   currency: 'USD' | 'LBP'
   initialPayment: number | string | null
   description: string | null
+  /** SEA, MOUNTAIN… — the same view choices a unit has. */
+  views?: string[]
 }
 
 const inp = 'w-full px-2 py-1.5 border border-zinc-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-zinc-900/10'

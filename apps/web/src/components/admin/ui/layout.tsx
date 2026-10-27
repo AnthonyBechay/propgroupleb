@@ -217,7 +217,10 @@ export function SectionNav({ sections, className }: { sections: SectionLink[]; c
   }, [sections.map((s) => s.id).join(',')])
 
   return (
-    <nav className={cn('sticky top-24 hidden w-56 shrink-0 lg:block', className)} aria-label="Form sections">
+    // `self-start`: in a flex row the nav stretched to the full height of the
+    // form, so "sticky" had no room to stick and it scrolled away with the page.
+    // Capped to the screen and scrollable itself, in case the list runs long.
+    <nav className={cn('sticky top-24 hidden max-h-[calc(100vh-7rem)] w-56 shrink-0 self-start overflow-y-auto lg:block', className)} aria-label="Form sections">
       <ul className="space-y-0.5 border-l border-slate-200">
         {sections.map((s) => {
           const on = active === s.id

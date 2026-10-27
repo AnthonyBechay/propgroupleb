@@ -114,7 +114,12 @@ export default function RootLayout({
 }>) {
   const imageCdnOrigin = getImageCdnOrigin()
   return (
-    <html lang="en" className={`${inter.variable} ${plusJakarta.variable} overflow-x-hidden`}>
+    // overflow-x-CLIP, not -hidden: "hidden" quietly made <body> a scroll
+    // container, and `position: sticky` sticks inside its nearest scroll
+    // container — one that never scrolls — so no sticky element anywhere
+    // (the admin form's section menu among them) ever stuck. "clip" hides the
+    // sideways overflow just the same without creating one.
+    <html lang="en" className={`${inter.variable} ${plusJakarta.variable} overflow-x-clip`}>
       <head>
         <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png?v=3" />
         <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png?v=3" />
@@ -175,7 +180,7 @@ export default function RootLayout({
           }}
         />
       </head>
-      <body className="font-plus-jakarta antialiased min-h-screen flex flex-col bg-slate-50 overflow-x-hidden">
+      <body className="font-plus-jakarta antialiased min-h-screen flex flex-col bg-slate-50 overflow-x-clip">
         <AuthProvider>
           <ComparatorProvider>
             <ConditionalNavbar />

@@ -345,6 +345,7 @@ export async function propertyDetails(ref: string): Promise<Record<string, unkno
         // Abroad a unit is sold in finishes, each with its own price and plan.
         options: (u.options as Array<Record<string, any>>).map((o) => ({
           finish: o.name,
+          view: Array.isArray(o.views) && o.views.length ? o.views.join(', ').toLowerCase() : undefined,
           price: money(o.pricePerSqm * (u.area || 0), o.currency),
           pricePerSqm: money(o.pricePerSqm, o.currency),
           firstPayment: money(o.initialPayment, o.currency) ?? undefined,

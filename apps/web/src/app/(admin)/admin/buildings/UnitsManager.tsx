@@ -300,6 +300,7 @@ export function UnitsManager({
               body: JSON.stringify({
                 name: o.name, pricePerSqm: Number(o.pricePerSqm) || 0, currency: o.currency ?? 'USD',
                 initialPayment: o.initialPayment != null ? Number(o.initialPayment) : null, description: o.description ?? null,
+                views: o.views ?? [],
               }),
             })
           }

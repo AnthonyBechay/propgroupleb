@@ -10,12 +10,15 @@ import { useMemo, type ReactNode } from 'react'
  *   🌊 Sea view from every floor          ← emoji lines: a feature list
  *   💰 PAYMENT PLAN:                       ← emoji + caps or ":" : a section heading
  *   • 30% down payment                     ← bullets (•, -, *) and numbers (1. 2))
- *   (blank line)                           ← a paragraph break
+ *   (blank line)                           ← a blank line, kept: two give twice the space
  *
  * Emoji lines used to come out as loose separate paragraphs (Georgia) or as
  * one plain block (Lebanon). Here consecutive emoji lines become an aligned
- * list — the emoji in its own column, the text lined up beside it — and
- * blank lines become one even gap however many were typed.
+ * list — the emoji in its own column, the text lined up beside it.
+ *
+ * Every Enter the admin typed is kept. A first version merged any run of
+ * blank lines into one gap, which undid the spacing people lay out on
+ * purpose; now each blank line is one line's worth of space.
  *
  * Plain JSX, no dangerouslySetInnerHTML: nothing an admin pastes can inject
  * markup. The same file lives in both storefront repos (propgroup and
@@ -35,7 +38,7 @@ type Block =
   | { type: 'bullets'; items: string[] }
   | { type: 'numbered'; items: string[] }
   | { type: 'emoji'; items: Array<{ emoji: string; text: string }> }
-  | { type: 'gap' }
+  | { type: 'gap'; lines: number }
 
 function splitEmoji(line: string): { emoji: string; text: string } | null {
   const m = line.match(EMOJI_TOKEN)
@@ -61,8 +64,10 @@ export function parseDescription(description: string): Block[] {
   for (const raw of description.replace(/\r\n?/g, '\n').split('\n')) {
     const line = raw.trim()
     if (!line) {
-      // However many blank lines were typed, one even gap.
-      if (blocks.length && last().type !== 'gap') blocks.push({ type: 'gap' })
+      // Each blank line is kept: one blank line, one line of space.
+      const prev = last()
+      if (prev?.type === 'gap') prev.lines += 1
+      else if (blocks.length) blocks.push({ type: 'gap', lines: 1 })
       continue
     }
     const bullet = line.match(BULLET)
@@ -137,21 +142,25 @@ export function PropertyDescription({ description, className = '' }: { descripti
     <div className={`text-[15px] leading-relaxed text-slate-700 max-w-3xl ${className}`}>
       {blocks.map((b, i) => {
         const key = `d-${i}`
-        // Spacing between blocks lives here, so a gap is one even pause.
-        const space = i === 0 ? '' : blocks[i - 1].type === 'gap' ? 'mt-4' : b.type === 'heading' ? 'mt-5' : 'mt-2'
+        // Spacing between blocks lives here. After blank lines: one line-height
+        // per blank line, as typed. Otherwise lines sit as close as a line
+        // break — a heading gets a little air.
+        const before = i > 0 ? blocks[i - 1] : null
+        const space = !before ? '' : before.type === 'gap' ? '' : b.type === 'heading' ? 'mt-3' : 'mt-1'
+        const style = before?.type === 'gap' ? { marginTop: `${Math.min(before.lines, 6) * 1.65}em` } : undefined
         switch (b.type) {
           case 'gap':
             return null
           case 'heading':
             return (
-              <h3 key={key} className={`${space} flex items-baseline gap-2 text-base font-semibold text-slate-900 sm:text-[17px]`}>
+              <h3 key={key} style={style} className={`${space} flex items-baseline gap-2 text-base font-semibold text-slate-900 sm:text-[17px]`}>
                 {b.emoji && <span aria-hidden className="text-lg leading-none">{b.emoji}</span>}
                 <span>{inline(b.text, key)}</span>
               </h3>
             )
           case 'emoji':
             return (
-              <ul key={key} className={`${space} space-y-1.5`}>
+              <ul key={key} style={style} className={`${space} space-y-1.5`}>
                 {b.items.map((it, j) => (
                   <li key={j} className="flex items-start gap-3">
                     <span aria-hidden className="w-6 shrink-0 text-center text-[17px] leading-relaxed">{it.emoji}</span>
@@ -162,7 +171,7 @@ export function PropertyDescription({ description, className = '' }: { descripti
             )
           case 'bullets':
             return (
-              <ul key={key} className={`${space} space-y-1.5`}>
+              <ul key={key} style={style} className={`${space} space-y-1.5`}>
                 {b.items.map((it, j) => (
                   <li key={j} className="flex items-start gap-3">
                     <span aria-hidden className="w-6 shrink-0 text-center leading-relaxed text-slate-400">•</span>
@@ -173,7 +182,7 @@ export function PropertyDescription({ description, className = '' }: { descripti
             )
           case 'numbered':
             return (
-              <ol key={key} className={`${space} space-y-1.5`}>
+              <ol key={key} style={style} className={`${space} space-y-1.5`}>
                 {b.items.map((it, j) => (
                   <li key={j} className="flex items-start gap-3">
                     <span aria-hidden className="w-6 shrink-0 text-center font-medium tabular-nums text-slate-500">{j + 1}.</span>
@@ -183,7 +192,7 @@ export function PropertyDescription({ description, className = '' }: { descripti
               </ol>
             )
           default:
-            return <p key={key} className={space}>{inline(b.text, key)}</p>
+            return <p key={key} style={style} className={space}>{inline(b.text, key)}</p>
         }
       })}
     </div>

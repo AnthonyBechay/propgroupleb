@@ -470,6 +470,8 @@ const optionSchema = z.object({
   currency: z.enum(['USD', 'LBP']).default('USD'),
   initialPayment: z.number().min(0).max(100).optional().nullable(),
   description: z.string().max(2000).optional().nullable(),
+  // No default: an update that leaves it out must not wipe it.
+  views: z.array(z.enum(['SEA', 'MOUNTAIN', 'CITY', 'GARDEN', 'POOL', 'STREET', 'OPEN'])).max(7).optional(),
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   paymentPlanDetails: z.any().optional().nullable(),
 });

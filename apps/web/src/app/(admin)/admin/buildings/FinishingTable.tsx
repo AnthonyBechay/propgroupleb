@@ -4,13 +4,20 @@ import { useState } from 'react'
 import { Check, Loader2, Pencil, Plus, Trash2, X } from 'lucide-react'
 import { normalizeApiUrl } from '@/lib/utils/api-url'
 import type { UnitOption } from './UnitOptions'
+import { VIEW_OPTIONS } from '@/lib/unit-attributes'
+
+const viewLabel = (v: string) => VIEW_OPTIONS.find((o) => o.value === v)?.label ?? v
 
 /**
  * A project unit type's finishes, as the table a buyer actually chooses from:
  *
- *   Finishing        Details          Price / m²   Studio · 30 m²   First payment
- *   Black frame      Mountain view    $1,500       $45,000          30%
- *   White frame      Sea view         $1,800       $54,000          30%
+ *   Finishing        View        Price / m²   Studio · 30 m²   First payment
+ *   Black frame      Mountain    $1,500       $45,000          30%
+ *   White frame      Sea         $1,800       $54,000          30%
+ *
+ * The view is the same field a unit has (Sea, Mountain, City…), picked, not
+ * typed — "sea view", "Sea View" and "seaview" were three spellings of one
+ * thing. A free note stays for what a view cannot say ("floors 8–15").
  *
  * It replaced a short list hidden inside the unit's Edit panel, under fields
  * about owners and rent that a project type never has — so the thing that
@@ -73,7 +80,7 @@ export function FinishingTable({
         <thead>
           <tr className="border-b border-slate-200 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500">
             <th className="py-2 pr-3 font-semibold">Finishing</th>
-            <th className="py-2 pr-3 font-semibold">Details</th>
+            <th className="py-2 pr-3 font-semibold">View</th>
             <th className="py-2 pr-3 text-right font-semibold">Price / m²</th>
             <th className="py-2 pr-3 text-right font-semibold">{area ? `Price · ${area} m²` : 'Price'}</th>
             <th className="py-2 pr-3 text-right font-semibold">First payment</th>
@@ -87,8 +94,15 @@ export function FinishingTable({
               <FinishingRow key={o.id} initial={o} area={area} busy={busy} onCancel={() => setEditing(null)} onSave={(b) => save(b, o.id)} />
             ) : (
               <tr key={o.id} className="group">
-                <td className="py-2.5 pr-3 font-medium text-slate-900">{o.name}</td>
-                <td className="py-2.5 pr-3 text-slate-600">{o.description || <span className="text-slate-300">—</span>}</td>
+                <td className="py-2.5 pr-3">
+                  <span className="font-medium text-slate-900">{o.name}</span>
+                  {o.description && <span className="block text-xs text-slate-500">{o.description}</span>}
+                </td>
+                <td className="py-2.5 pr-3">
+                  {o.views?.length
+                    ? <span className="inline-flex flex-wrap gap-1">{o.views.map((v) => <span key={v} className="rounded-full bg-sky-50 px-2 py-0.5 text-xs font-medium text-sky-800 ring-1 ring-sky-200">{viewLabel(v)}</span>)}</span>
+                    : <span className="text-slate-300">—</span>}
+                </td>
                 <td className="py-2.5 pr-3 text-right tabular-nums text-slate-700">{money(Number(o.pricePerSqm), o.currency)}</td>
                 <td className="py-2.5 pr-3 text-right font-semibold tabular-nums text-slate-900">
                   {area && Number(o.pricePerSqm) > 0 ? money(Number(o.pricePerSqm) * area, o.currency) : <span className="font-normal text-slate-300">set the size</span>}
@@ -144,15 +158,18 @@ function FinishingRow({
   const [f, setF] = useState({
     name: initial?.name ?? '',
     description: initial?.description ?? '',
+    views: initial?.views ?? [] as string[],
     pricePerSqm: initial?.pricePerSqm != null ? String(Number(initial.pricePerSqm)) : '',
     currency: initial?.currency ?? 'USD',
     initialPayment: initial?.initialPayment != null ? String(Number(initial.initialPayment)) : '',
   })
-  const set = (k: keyof typeof f, v: string) => setF((p) => ({ ...p, [k]: v }))
+  const set = (k: Exclude<keyof typeof f, 'views'>, v: string) => setF((p) => ({ ...p, [k]: v }))
+  const toggleView = (v: string) => setF((p) => ({ ...p, views: p.views.includes(v) ? p.views.filter((x) => x !== v) : [...p.views, v] }))
   const total = area && Number(f.pricePerSqm) > 0 ? Number(f.pricePerSqm) * area : null
   const submit = () => onSave({
     name: f.name.trim(),
     description: f.description.trim() || null,
+    views: f.views,
     pricePerSqm: Number(f.pricePerSqm) || 0,
     currency: f.currency,
     initialPayment: f.initialPayment !== '' ? Number(f.initialPayment) : null,
@@ -162,10 +179,23 @@ function FinishingRow({
     <tr className="bg-slate-50 align-top">
       <td className="py-2 pr-2">
         <input autoFocus value={f.name} onChange={(e) => set('name', e.target.value)} placeholder="White frame" className={cell} aria-label="Finishing" />
+        <input value={f.description} onChange={(e) => set('description', e.target.value)} placeholder="Note (optional) — e.g. floors 8–15" aria-label="Note"
+          className="mt-1.5 w-full min-h-9 rounded-lg border border-slate-200 bg-white px-2.5 text-xs focus:outline-none focus:ring-2 focus:ring-slate-900/10"
+          onKeyDown={(e) => { if (e.key === 'Enter' && f.name.trim()) submit() }} />
       </td>
       <td className="py-2 pr-2">
-        <input value={f.description} onChange={(e) => set('description', e.target.value)} placeholder="Sea view, floors 8–15" className={cell} aria-label="Details"
-          onKeyDown={(e) => { if (e.key === 'Enter' && f.name.trim()) submit() }} />
+        {/* The unit's own view choices, tapped rather than typed. */}
+        <div className="flex max-w-[15rem] flex-wrap gap-1" role="group" aria-label="View">
+          {VIEW_OPTIONS.map((o) => {
+            const on = f.views.includes(o.value)
+            return (
+              <button key={o.value} type="button" onClick={() => toggleView(o.value)} aria-pressed={on}
+                className={`min-h-8 rounded-full px-2.5 text-xs font-medium ring-1 transition-colors ${on ? 'bg-sky-600 text-white ring-sky-600' : 'bg-white text-slate-600 ring-slate-200 hover:bg-slate-50'}`}>
+                {o.label}
+              </button>
+            )
+          })}
+        </div>
       </td>
       <td className="py-2 pr-2">
         <div className="flex gap-1">

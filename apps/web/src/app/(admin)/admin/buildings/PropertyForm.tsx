@@ -18,8 +18,8 @@ import { countryFlag, siteFor } from '@/lib/market'
 import { isKnownLocation } from '@/lib/lebanon-locations'
 import { isResidential, showsBuildingSpecs } from '@/lib/property-types'
 import {
-  BasicsSection, DocumentsSection, HighlightsSection, InvestmentSection,
-  LocationSection, MediaSection, PaymentPlansSection, SeoSection, SpecsSection,
+  BasicsSection, BuildingSellingSection, DocumentsSection, InvestmentSection,
+  LocationSection, MediaSection, PaymentPlansSection, SeoSection,
 } from './BuildingSections'
 import {
   EMPTY_FIRST_LISTING, EMPTY_FIRST_UNIT, FirstUnitSection, listingTotal,
@@ -106,10 +106,9 @@ export function PropertyForm({ initialData, buildingId }: Props) {
   const sections: SectionLink[] = [
     { id: 'basics', label: 'The basics', icon: Building2 },
     { id: 'location', label: 'Where it is', icon: MapPin },
-    { id: 'unit', label: isEdit ? 'Units & pricing' : 'Unit & price', icon: isEdit ? LayoutList : Home },
-    ...(showBuildingSpecs ? [{ id: 'specs', label: 'The building', icon: Building2 }] : []),
+    { id: 'unit', label: isEdit ? (form.country !== 'LEBANON' ? 'Unit types & finishes' : 'Units & pricing') : 'Unit & price', icon: isEdit ? LayoutList : Home },
+    { id: 'highlights', label: 'Building & selling points', icon: Sparkles },
     { id: 'media', label: 'Photos & video', icon: ImageIcon },
-    { id: 'highlights', label: 'Selling points', icon: Sparkles },
     { id: 'investment', label: 'Investment', icon: Coins },
     { id: 'payment', label: 'Payment plans', icon: Coins },
     ...(isEdit ? [{ id: 'documents', label: 'Documents', icon: FileText }] : []),
@@ -460,11 +459,9 @@ export function PropertyForm({ initialData, buildingId }: Props) {
             />
           )}
 
-          {showBuildingSpecs && <SpecsSection f={form} set={set} residential={residential} disabled={saving} />}
+          <BuildingSellingSection f={form} set={set} residential={residential} showFacts={showBuildingSpecs} disabled={saving} />
 
           <MediaSection f={form} set={set} buildingId={buildingId} disabled={saving} />
-
-          <HighlightsSection f={form} set={set} disabled={saving} />
 
           <InvestmentSection f={form} set={set} disabled={saving} />
 

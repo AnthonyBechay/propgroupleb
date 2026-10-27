@@ -14,6 +14,7 @@
  */
 
 import { normalizeFileUrl } from '@/lib/utils/api-url'
+import { splitSellingPoint } from '@/components/property/SellingPoints'
 import {
   formatMoney, formatProposalDate, instalmentSchedule,
   type Proposal, type ProposalUnit,
@@ -469,7 +470,9 @@ function Description({ p }: { p: Proposal }) {
           {p.highlights.map((h) => (
             <li key={h} style={{ fontSize: 10.5, color: BODY, paddingLeft: 12, position: 'relative' }}>
               <span style={{ position: 'absolute', left: 0, color: INK, fontWeight: 700 }}>·</span>
-              {h}
+              {/* "Point — detail": the point in bold, its detail after it. */}
+              <strong style={{ color: INK, fontWeight: 600 }}>{splitSellingPoint(h).point}</strong>
+              {splitSellingPoint(h).detail && <> — {splitSellingPoint(h).detail}</>}
             </li>
           ))}
         </ul>
