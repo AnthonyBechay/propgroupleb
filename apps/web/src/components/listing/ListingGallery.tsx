@@ -21,6 +21,11 @@ import { normalizeFileUrl } from '@/lib/utils/api-url'
  *    stacked and invisible, and changing photo is a 150 ms fade between images
  *    that are already there. Hovering a thumbnail starts loading its photo too.
  *
+ *    The neighbours wait their turn: they start loading only once the first
+ *    photo has finished, or the moment the visitor touches the gallery. Loading
+ *    them alongside it slowed the first photo — the one Google times — and
+ *    cost data for visitors who never browse.
+ *
  * The same file lives in both storefront repos (propgroup and propgroupleb).
  */
 
@@ -61,7 +66,8 @@ export function MediaGallery({ images: rawImages, title, videoUrl, videoUrls }: 
 
   const [index, setIndex] = useState(0)
   // Photos kept in the page: the current one, its neighbours, and any seen.
-  const [mounted, setMounted] = useState<Set<number>>(() => new Set([0, 1, total - 1].filter((i) => i >= 0 && i < total)))
+  // Only the first at the start — see the note above.
+  const [mounted, setMounted] = useState<Set<number>>(() => new Set(total ? [0] : []))
   const [playing, setPlaying] = useState<number | null>(null)
 
   const keep = useCallback((...ids: number[]) => {
@@ -74,6 +80,9 @@ export function MediaGallery({ images: rawImages, title, videoUrl, videoUrls }: 
     })
   }, [total])
 
+  /** Bring in the photos either side of the first — after it, never with it. */
+  const warmNeighbours = useCallback(() => keep(1, total - 1), [keep, total])
+
   const go = useCallback((i: number) => {
     if (!total) return
     const n = (i + total) % total
@@ -82,6 +91,19 @@ export function MediaGallery({ images: rawImages, title, videoUrl, videoUrls }: 
   }, [total, keep])
 
   const touchX = useRef<number | null>(null)
+  const frameRef = useRef<HTMLDivElement>(null)
+
+  // The first photo is usually in before the page is interactive — server
+  // rendered and preloaded — so its load event fires before anyone listens and
+  // the neighbours never came. Check once the page is live, and as a last
+  // resort warm them shortly after anyway.
+  useEffect(() => {
+    if (total < 2) return
+    const first = frameRef.current?.querySelector('img')
+    if (first?.complete) { warmNeighbours(); return }
+    const t = setTimeout(warmNeighbours, 2500)
+    return () => clearTimeout(t)
+  }, [total, warmNeighbours])
 
   // The player: Esc closes it, and the page behind it holds still.
   useEffect(() => {
@@ -109,13 +131,14 @@ export function MediaGallery({ images: rawImages, title, videoUrl, videoUrls }: 
   return (
     <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
       <div
+        ref={frameRef}
         className="group relative w-full aspect-[16/9] bg-slate-100 select-none outline-none"
         tabIndex={0}
         onKeyDown={(e) => {
           if (e.key === 'ArrowRight') { e.preventDefault(); go(index + 1) }
           else if (e.key === 'ArrowLeft') { e.preventDefault(); go(index - 1) }
         }}
-        onTouchStart={(e) => { touchX.current = e.touches[0].clientX }}
+        onTouchStart={(e) => { touchX.current = e.touches[0].clientX; warmNeighbours() }}
         onTouchEnd={(e) => {
           if (touchX.current == null) return
           const dx = e.changedTouches[0].clientX - touchX.current
@@ -123,6 +146,9 @@ export function MediaGallery({ images: rawImages, title, videoUrl, videoUrls }: 
           touchX.current = null
         }}
         aria-roledescription="carousel"
+        // About to browse: get the neighbours now, even if the first is still loading.
+        onPointerEnter={warmNeighbours}
+        onFocus={warmNeighbours}
       >
         {total === 0 ? (
           <div className="absolute inset-0 flex items-center justify-center">
@@ -139,8 +165,12 @@ export function MediaGallery({ images: rawImages, title, videoUrl, videoUrls }: 
                 sizes="(max-width: 1024px) 100vw, 66vw"
                 quality={75}
                 priority={i === 0}
-                // Neighbours load now, not when they become visible.
+                // Once mounted, a neighbour loads straight away rather than
+                // waiting to become visible (it never is, until clicked).
                 loading={i === 0 ? undefined : 'eager'}
+                // The first photo is in: now fetch the next and previous.
+                onLoad={i === 0 ? warmNeighbours : undefined}
+                onError={i === 0 ? warmNeighbours : undefined}
                 className={`object-cover transition-opacity duration-150 ${i === index ? 'opacity-100' : 'opacity-0'}`}
                 aria-hidden={i !== index}
               />
