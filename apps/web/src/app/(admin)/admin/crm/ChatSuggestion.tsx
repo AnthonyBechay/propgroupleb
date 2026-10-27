@@ -17,6 +17,8 @@ export interface Suggestion {
   patch: {
     intent?: string; market?: string; area?: string; minBeds?: number
     budgetMax?: number; kind?: string; isInvestor?: boolean
+    /** The full name they gave in the chat. */
+    fullName?: string
   }
 }
 
@@ -41,6 +43,7 @@ export function ChatSuggestion({
   const p = suggestion.patch ?? {}
 
   const facts = [
+    p.fullName ? `Name: ${p.fullName}` : null,
     p.intent ? INTENT_LABEL[p.intent] ?? p.intent : null,
     p.market ? titleCase(p.market) : null,
     p.area ?? null,

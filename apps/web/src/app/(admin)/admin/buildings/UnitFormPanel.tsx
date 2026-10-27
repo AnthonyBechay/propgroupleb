@@ -153,8 +153,15 @@ const money = (v: string): number | null => (v.trim() === '' ? null : Number(v))
  */
 export function UnitFormPanel({
   initial, buildingId, unitId, ownerAssigned, onSave, onCancel, saving,
-  hideNumbering, saveLabel,
+  hideNumbering, saveLabel, project = false,
 }: {
+  /**
+   * A unit type in a project we resell abroad ("Studio, 30 m²"). It is priced
+   * by its finishes, not owned by anyone: the ownership record, portal owner,
+   * freehold/leasehold, unit number and owner-occupied statuses belong to a
+   * Lebanese apartment and only confused a Batumi project.
+   */
+  project?: boolean
   initial: UnitFormState
   buildingId: string
   unitId?: string
@@ -197,7 +204,7 @@ export function UnitFormPanel({
               disabled={saving}
             />
           </Field>
-          {!hideNumbering && (
+          {!hideNumbering && !project && (
             <Field label="Unit no." optional>
               <TextInput
                 value={f.unitNumber}
@@ -271,21 +278,26 @@ export function UnitFormPanel({
               {FURNISHING_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
             </SelectInput>
           </Field>
-          <Field label="Ownership" optional hint="Freehold or leasehold title.">
-            <SelectInput value={f.ownership} onChange={(e) => set({ ownership: e.target.value })} disabled={saving}>
-              {OWNERSHIP_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-            </SelectInput>
-          </Field>
+          {!project && (
+            <Field label="Ownership" optional hint="Freehold or leasehold title.">
+              <SelectInput value={f.ownership} onChange={(e) => set({ ownership: e.target.value })} disabled={saving}>
+                {OWNERSHIP_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+              </SelectInput>
+            </Field>
+          )}
         </FieldGrid>
 
-        <Field label="View" optional hint="Printed in the PDF proposal as “sea / city view”.">
-          <PillSelect
-            value={f.views}
-            onChange={(views) => set({ views })}
-            options={VIEW_OPTIONS}
-            disabled={saving}
-          />
-        </Field>
+        {/* In a project the view belongs to the finishing ("White frame — sea view"). */}
+        {!project && (
+          <Field label="View" optional hint="Printed in the PDF proposal as “sea / city view”.">
+            <PillSelect
+              value={f.views}
+              onChange={(views) => set({ views })}
+              options={VIEW_OPTIONS}
+              disabled={saving}
+            />
+          </Field>
+        )}
 
         <Field label="Features" optional hint="Listed as bullets on the public property page.">
           <ChipsInput
@@ -307,7 +319,10 @@ export function UnitFormPanel({
             hint="Changing this can close or update its listings to match."
           >
             <SelectInput value={f.lifecycle} onChange={(e) => set({ lifecycle: e.target.value })} disabled={saving}>
-              {LIFECYCLE_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+              {LIFECYCLE_OPTIONS
+                // A project type is on sale, being prepared, or withdrawn — never rented or owner-occupied.
+                .filter((o) => !project || ['DRAFT', 'FOR_SALE', 'OFF_MARKET'].includes(o.value) || o.value === f.lifecycle)
+                .map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
             </SelectInput>
           </Field>
         </FieldGrid>
@@ -315,7 +330,7 @@ export function UnitFormPanel({
         {/* A development we resell offers "1 bedroom" as a template many clients
             buy. We're the broker, not the developer, so there's no stock count —
             just a flag that it repeats. */}
-        <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+        {!project && <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
           <Toggle
             checked={f.isUnitType}
             onChange={(v) => set({ isUnitType: v })}
@@ -323,7 +338,7 @@ export function UnitFormPanel({
             hint="For developments where the same “1 bedroom” is sold to many clients. It stays available to everyone, and which apartment each client got is recorded on their deal."
             disabled={saving}
           />
-        </div>
+        </div>}
       </div>
 
       {/* Photos */}
@@ -339,8 +354,9 @@ export function UnitFormPanel({
         />
       </div>
 
-      {/* What it's worth, on the unit — see the note on the state type. */}
-      <div className="border-t border-slate-100 pt-5">
+      {/* What it's worth, on the unit — see the note on the state type. Not for
+          a project type: its price is its finishes, and nobody owns a type. */}
+      {!project && <div className="border-t border-slate-100 pt-5">
         <Disclosure
           label="Ownership record"
           hint="Asking price · what it sold for · rent — for the client portal"
@@ -441,7 +457,7 @@ export function UnitFormPanel({
             </Field>
           </FieldGrid>
         </Disclosure>
-      </div>
+      </div>}
 
       {/* Internal note */}
       <div className="border-t border-slate-100 pt-5">
@@ -454,14 +470,14 @@ export function UnitFormPanel({
             value={f.notes}
             onChange={(e) => set({ notes: e.target.value })}
             rows={2}
-            placeholder="e.g. Owner wants viewings after 4pm"
+            placeholder={project ? 'e.g. Only floors 5–12 left' : 'e.g. Owner wants viewings after 4pm'}
             disabled={saving}
           />
         </Field>
       </div>
 
       {/* Assign to a portal user — existing units only */}
-      {unitId && <AssignOwner apiUrl={apiUrl} unitId={unitId} alreadyAssigned={!!ownerAssigned} />}
+      {unitId && !project && <AssignOwner apiUrl={apiUrl} unitId={unitId} alreadyAssigned={!!ownerAssigned} />}
 
       <div className="flex items-center justify-end gap-2 border-t border-slate-100 pt-4">
         <button

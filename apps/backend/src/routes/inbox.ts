@@ -193,6 +193,11 @@ router.post(
       data.unitKinds = [...(lead.unitKinds ?? []), patch.kind];
       note('Property type', null, patch.kind);
     }
+    // The full name the client gave in the chat (the assistant asks for it first).
+    if (typeof patch.fullName === 'string' && patch.fullName.trim() && patch.fullName.trim() !== lead.name) {
+      data.name = patch.fullName.trim();
+      note('Name', lead.name, data.name);
+    }
     if (typeof patch.isInvestor === 'boolean' && patch.isInvestor !== lead.isInvestor) {
       data.isInvestor = patch.isInvestor;
       note('Investor', lead.isInvestor ? 'yes' : 'no', patch.isInvestor ? 'yes' : 'no');

@@ -337,6 +337,7 @@ const TOOLS: ChatTool[] = [
         kind: { type: 'string', enum: UNIT_KINDS },
         isInvestor: { type: 'boolean', description: 'True if they are buying for return rather than to live in.' },
         summary: { type: 'string', description: 'One line in English: what they want and how soon.' },
+        fullName: { type: 'string', description: 'The client\'s full name, exactly as they wrote it, once they have told you.' },
       },
       required: ['summary'],
     },
@@ -844,7 +845,7 @@ async function reply(conversationId: string, trigger: 'message' | 'sweep' | 'man
     where: { conversationId, status: 'PENDING' },
     select: { patch: true },
   });
-  const said = (pendingSuggestion?.patch ?? {}) as { market?: string };
+  const said = (pendingSuggestion?.patch ?? {}) as { market?: string; fullName?: string };
   const adMarket: Market = (process.env.LEAD_MARKET_META ?? 'GEORGIA').toUpperCase() === 'LEBANON' ? 'LEBANON' : 'GEORGIA';
   const knownMarket: Market | null =
     said.market === 'LEBANON' || said.market === 'GEORGIA'
@@ -902,7 +903,19 @@ async function reply(conversationId: string, trigger: 'message' | 'sweep' | 'man
   const names = hasVoice && knownMarket ? await marketNames(knownMarket) : { places: [] as string[], projects: [] as string[] };
   const office = settings.office;
 
+  // The first reply asks who they are. Their full name is the one thing the
+  // CRM cannot get from WhatsApp (the profile name is a nickname as often as
+  // not), and asked first it reads as courtesy; asked later, as a form.
+  const weSpokeBefore = recent.some((m) => m.direction === 'OUT');
+  const nameRule = said.fullName
+    ? `The client's name is ${said.fullName} — use their first name naturally, and do not ask for it again.`
+    : !weSpokeBefore
+      ? 'This is your FIRST reply to this client. Greet them warmly (thank them for reaching out) and ask for their full name — that is the whole message: no properties, no other questions yet. Do not call search_listings or send_listings in this reply.'
+      : 'If the client has just told you their name, record it with save_client_requirements (fullName) and continue straight away with what they came for — the details of the property or project from the advert, or the next useful question. If they did not give it, do not ask again; just help them.';
+  trace.nameStep = said.fullName ? 'known' : weSpokeBefore ? 'continue' : 'ask';
+
   const context = [
+    nameRule,
     ad,
     preferred,
     settings.guidance ? `Keep in mind (from the office):\n${settings.guidance}` : null,
@@ -1149,6 +1162,12 @@ async function reply(conversationId: string, trigger: 'message' | 'sweep' | 'man
 
   // One message: the reply, then the properties under it. The first one's
   // photo heads the message when the whole thing fits in a caption.
+  // The first reply is the greeting and the name question, nothing more —
+  // the advert's "send it straight away" must not win over that.
+  if (trace.nameStep === 'ask' && toSend.length) {
+    trace.heldBackListings = toSend.join(' ');
+    toSend = [];
+  }
   const cards = await cardsByRef(toSend);
   const message = [reply, ...cards.map(cardCaption)].join('\n\n');
   const photo = cards.find((c) => c.image)?.image ?? undefined;
@@ -1213,6 +1232,11 @@ async function saveSuggestion(conversationId: string, leadId: string | null, arg
   if (Number.isFinite(args.budgetMax) && args.budgetMax > 0) patch.budgetMax = Number(args.budgetMax);
   if (UNIT_KINDS.includes(args.kind)) patch.kind = args.kind;
   if (typeof args.isInvestor === 'boolean') patch.isInvestor = args.isInvestor;
+  // A name, not a sentence: letters, spaces, apostrophes and hyphens, 2–80 characters.
+  if (typeof args.fullName === 'string') {
+    const name = args.fullName.trim().replace(/\s+/g, ' ');
+    if (name.length >= 2 && name.length <= 80 && /^[\p{L}\p{M}' .-]+$/u.test(name)) patch.fullName = name;
+  }
   const summary = typeof args.summary === 'string' ? args.summary.trim().slice(0, 300) : '';
   if (!summary && Object.keys(patch).length === 0) return;
 

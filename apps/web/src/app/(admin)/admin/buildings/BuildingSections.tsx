@@ -124,7 +124,9 @@ export function BasicsSection({
       icon={<Building2 className="h-4 w-4" />}
     >
       <div className="space-y-5">
-        <OwnerPicker value={owner} onChange={onOwnerChange} />
+        {/* A project abroad is resold, not listed by an owner. Shown there only
+            when an owner is attached already (old data), so it can be removed. */}
+        {(f.country === 'LEBANON' || owner) && <OwnerPicker value={owner} onChange={onOwnerChange} />}
 
         <Field
           label="Title"

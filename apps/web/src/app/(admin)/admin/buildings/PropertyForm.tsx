@@ -417,9 +417,10 @@ export function PropertyForm({ initialData, buildingId }: Props) {
       />
 
       <div className="flex gap-10">
-        {/* `max-w-3xl`: the shell's container runs to 1600px and a text field
-            stretched across all of it is unreadable. */}
-        <form onSubmit={handleSubmit} className="min-w-0 max-w-3xl flex-1 space-y-6">
+        {/* Wide enough for the finishes table and two-column fields; still
+            capped, because a text field stretched across 1600px is unreadable.
+            It was max-w-3xl, which left half the screen empty either side. */}
+        <form onSubmit={handleSubmit} className="min-w-0 max-w-6xl flex-1 space-y-6">
           {error && <InlineNote tone="error">{error}</InlineNote>}
 
           <BasicsSection
@@ -438,6 +439,8 @@ export function PropertyForm({ initialData, buildingId }: Props) {
               because units can't exist without a property to hang off. */}
           {isEdit ? (
             <UnitsManager
+              // Abroad we resell projects priced by finish — see UnitsManager.
+              project={form.country !== 'LEBANON'}
               buildingId={buildingId!}
               buildingImages={form.images}
               buildingTitle={form.title}

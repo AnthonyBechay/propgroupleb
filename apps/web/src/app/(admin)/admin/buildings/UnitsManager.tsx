@@ -16,6 +16,7 @@ import { ALL_PROPERTY_KINDS, typeDef, typeLabel } from '@/lib/property-types'
 import { buildingRefOf, unitRef } from '@/lib/reference'
 import { cn } from '@/lib/utils'
 import { UnitOptions } from './UnitOptions'
+import { FinishingTable } from './FinishingTable'
 import { UnitFormPanel, buildUnitPayload, emptyUnit, unitFormFrom, type UnitFormState } from './UnitFormPanel'
 import { ListingEditPanel, ListingQuickForm } from './ListingPanels'
 
@@ -91,8 +92,15 @@ type PanelMode = 'unit-edit' | 'listing-create' | 'listing-edit'
  * worth of units in one go, and duplicating one that is already right.
  */
 export function UnitsManager({
-  buildingId, buildingImages = [], buildingTitle, buildingListings = [],
+  buildingId, buildingImages = [], buildingTitle, buildingListings = [], project = false,
 }: {
+  /**
+   * A project we resell abroad. Shown at the FINISHING level — unit type
+   * ("Studio · 30 m²") with its finishes as a priced table — instead of the
+   * apartment-by-apartment view built for Lebanon, whose listings, owners and
+   * numbering mean nothing for a Batumi development.
+   */
+  project?: boolean
   buildingId: string
   buildingImages?: string[]
   buildingTitle?: string
@@ -271,12 +279,35 @@ export function UnitsManager({
         body: JSON.stringify({
           ...payload,
           unitNumber: payload.unitNumber ? `${payload.unitNumber} copy` : null,
-          // A copy never inherits a live market state — it has no listing yet.
-          lifecycle: 'DRAFT',
+          // A project type is copied to make the next type ("Studio" → "1 bedroom"):
+          // name it as a copy and keep it on sale. An apartment copy never
+          // inherits a live market state — it has no listing yet.
+          ...(project
+            ? { name: `${unit.name || typeLabel(unit.kind)} (copy)`, lifecycle: unit.lifecycle ?? 'FOR_SALE' }
+            : { lifecycle: 'DRAFT' }),
         }),
       })
       if (!res.ok) { setError('Could not duplicate the unit.'); return }
-      toast({ title: 'Unit duplicated', description: 'It starts as a draft — give it a number.' })
+      // In a project the finishes are the price; a copy without them has none.
+      if (project && unit.options?.length) {
+        const created = (await res.json().catch(() => null))?.data
+        if (created?.id) {
+          for (const o of unit.options) {
+            await fetch(`${apiUrl}/api/buildings/${buildingId}/units/${created.id}/options`, {
+              method: 'POST',
+              credentials: 'include',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                name: o.name, pricePerSqm: Number(o.pricePerSqm) || 0, currency: o.currency ?? 'USD',
+                initialPayment: o.initialPayment != null ? Number(o.initialPayment) : null, description: o.description ?? null,
+              }),
+            })
+          }
+        }
+      }
+      toast(project
+        ? { title: 'Unit type duplicated', description: 'With its finishes — rename it and adjust the size.' }
+        : { title: 'Unit duplicated', description: 'It starts as a draft — give it a number.' })
       await fetchUnits()
     } finally {
       setSaving(false)
@@ -302,7 +333,7 @@ export function UnitsManager({
 
   if (loading) {
     return (
-      <FormSection id="unit" title="Units & pricing" icon={<LayoutList className="h-4 w-4" />}>
+      <FormSection id="unit" title={project ? 'Unit types & finishes' : 'Units & pricing'} icon={<LayoutList className="h-4 w-4" />}>
         <div className="flex items-center justify-center gap-2 py-10 text-slate-400">
           <Loader2 className="h-5 w-5 animate-spin" />
           <span className="text-sm">Loading units…</span>
@@ -314,9 +345,13 @@ export function UnitsManager({
   return (
     <FormSection
       id="unit"
-      title="Units & pricing"
+      title={project ? 'Unit types & finishes' : 'Units & pricing'}
       description={
-        units.length === 0
+        project
+          ? units.length === 0
+            ? 'Add each unit type (studio, 1 bedroom…), then its finishes — the finishes carry the price.'
+            : `${units.length} unit type${units.length === 1 ? '' : 's'} · ${units.reduce((n: number, u: { options?: unknown[] }) => n + (u.options?.length ?? 0), 0)} finishes`
+          : units.length === 0
           ? 'A property needs at least one unit — the unit is what carries the price.'
           : `${units.length} unit${units.length === 1 ? '' : 's'}${
               stats.total > 0 ? ` · ${stats.active} of ${stats.total} listing${stats.total === 1 ? '' : 's'} live` : ''
@@ -342,19 +377,19 @@ export function UnitsManager({
               expresses better: a unit of kind WHOLE_BUILDING. Two ways to say
               one thing meant price could come from either, and a property could
               carry both at once. Existing ones still work and still edit. */}
-          <button
+          {!project && <button
             type="button"
             onClick={() => { setAdding((a) => (a === 'many' ? null : 'many')); setExpanded(null) }}
             className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-slate-200 px-3 text-xs font-medium text-slate-600 transition-colors hover:bg-slate-50"
           >
             <Layers className="h-3.5 w-3.5" /> Add several
-          </button>
+          </button>}
           <button
             type="button"
             onClick={() => { setAdding((a) => (a === 'one' ? null : 'one')); setExpanded(null) }}
             className="inline-flex min-h-9 items-center gap-1.5 rounded-lg bg-slate-800 px-3 text-xs font-medium text-white transition-colors hover:bg-slate-700"
           >
-            <Plus className="h-3.5 w-3.5" /> Add unit
+            <Plus className="h-3.5 w-3.5" /> {project ? 'Add unit type' : 'Add unit'}
           </button>
         </div>
       }
@@ -395,7 +430,9 @@ export function UnitsManager({
 
         {adding === 'one' && (
           <UnitFormPanel
-            initial={emptyUnit()}
+            // A project's unit is a type sold to many clients, and it is for sale.
+            initial={project ? { ...emptyUnit(), isUnitType: true, lifecycle: 'FOR_SALE' } : emptyUnit()}
+            project={project}
             buildingId={buildingId}
             onSave={createUnit}
             onCancel={() => setAdding(null)}
@@ -428,7 +465,79 @@ export function UnitsManager({
           />
         )}
 
-        {units.length > 0 && (
+        {project && units.length > 0 && (
+          <ul className="space-y-4">
+            {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+            {units.map((unit: any) => {
+              const editOpen = expanded?.id === unit.id && expanded?.mode === 'unit-edit'
+              const def = typeDef(unit.kind)
+              const label = unit.name || typeLabel(unit.kind)
+              const ref = unitRef(unit, units.length, unit.ref ? buildingRefOf(unit.ref) : null)
+              return (
+                <li key={unit.id} className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-slate-100 bg-slate-50/70 px-4 py-3 sm:px-5">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        {ref && <span className="rounded border border-slate-200 bg-white px-1.5 py-0.5 font-mono text-[10px] font-semibold text-slate-500">{ref}</span>}
+                        <span className="text-base font-semibold text-slate-900">{label}</span>
+                        {/* The type only when the name doesn't already say it ("Studio Studio"). */}
+                        {unit.name && unit.name.trim().toLowerCase() !== typeLabel(unit.kind).toLowerCase() && (
+                          <span className="rounded-full bg-white px-2 py-0.5 text-xs text-slate-500 ring-1 ring-slate-200">{typeLabel(unit.kind)}</span>
+                        )}
+                        {unit.lifecycle && unit.lifecycle !== 'FOR_SALE' && (
+                          <span className={cn('rounded-full px-2 py-0.5 text-xs font-medium', LIFECYCLE_COLORS[unit.lifecycle] ?? 'bg-slate-100 text-slate-500')}>
+                            {LIFECYCLE_OPTIONS.find((o) => o.value === unit.lifecycle)?.label ?? unit.lifecycle}
+                          </span>
+                        )}
+                      </div>
+                      <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-slate-500">
+                        {unit.areaSqm != null && <span className="flex items-center gap-1"><Square className="h-3 w-3" /> {unit.areaSqm} m²</span>}
+                        {def.beds && unit.bedrooms != null && <span className="flex items-center gap-1"><Bed className="h-3 w-3" /> {unit.bedrooms === 0 ? 'Studio' : `${unit.bedrooms} bed`}</span>}
+                        {unit.floor != null && <span className="flex items-center gap-1"><Layers className="h-3 w-3" /> Floor {unit.floor}</span>}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-0.5">
+                      <RowAction label={editOpen ? 'Close' : 'Edit unit type'} active={editOpen} onClick={() => openPanel(unit.id, 'unit-edit')}>
+                        <Pencil className="h-3.5 w-3.5" />
+                      </RowAction>
+                      <RowAction label="Duplicate" onClick={() => duplicateUnit(unit)} disabled={saving}>
+                        <Copy className="h-3.5 w-3.5" />
+                      </RowAction>
+                      <RowAction label="Delete unit type" danger onClick={() => setDeleteTarget(unit)}>
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </RowAction>
+                    </div>
+                  </div>
+                  {editOpen && (
+                    <div className="border-b border-slate-100 px-4 py-4 sm:px-5">
+                      <UnitFormPanel
+                        initial={unitFormFrom(unit)}
+                        project
+                        buildingId={buildingId}
+                        unitId={unit.id}
+                        onSave={(f) => updateUnit(unit.id, f)}
+                        onCancel={() => setExpanded(null)}
+                        saving={saving}
+                      />
+                    </div>
+                  )}
+                  <div className="px-4 py-3 sm:px-5">
+                    <FinishingTable
+                      buildingId={buildingId}
+                      unitId={unit.id}
+                      options={unit.options ?? []}
+                      areaSqm={unit.areaSqm != null ? Number(unit.areaSqm) : null}
+                      unitLabel={label}
+                      onChanged={fetchUnits}
+                    />
+                  </div>
+                </li>
+              )
+            })}
+          </ul>
+        )}
+
+        {!project && units.length > 0 && (
           <ul className="space-y-2.5">
             {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
             {units.map((unit: any) => {
