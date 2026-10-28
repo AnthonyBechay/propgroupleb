@@ -18,7 +18,7 @@ import {
   ListFilter,
   ClipboardList,
   UserSearch,
-  X, Bot, MessagesSquare,
+  X, MessagesSquare, Bot, Bell, Gauge,
 } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { canAccessAdminPath, isSuperAdmin, ROLE_LABELS, type Role } from '@/lib/permissions'
@@ -55,17 +55,7 @@ interface NavGroup {
  */
 const GROUPS: NavGroup[] = [
   {
-    id: 'inventory',
-    label: 'Inventory',
-    items: [
-      { name: 'Properties', href: '/admin/buildings', icon: Building2 },
-      { name: 'Listings', href: '/admin/listings', icon: ListFilter },
-      { name: 'Owner submissions', href: '/admin/submissions', icon: ClipboardList },
-      { name: 'Location guides', href: '/admin/location-guides', icon: MapPin },
-      { name: 'Documents', href: '/admin/documents', icon: FileText },
-    ],
-  },
-  {
+    // First, because it is where the day's work arrives.
     id: 'clients',
     label: 'Clients',
     items: [
@@ -77,13 +67,24 @@ const GROUPS: NavGroup[] = [
     ],
   },
   {
+    id: 'inventory',
+    label: 'Inventory',
+    items: [
+      { name: 'Properties', href: '/admin/buildings', icon: Building2 },
+      { name: 'Listings', href: '/admin/listings', icon: ListFilter },
+      { name: 'Owner submissions', href: '/admin/submissions', icon: ClipboardList },
+      { name: 'Location guides', href: '/admin/location-guides', icon: MapPin },
+      { name: 'Documents', href: '/admin/documents', icon: FileText },
+    ],
+  },
+  {
     id: 'system',
-    label: 'System',
+    label: 'Insights and setup',
     items: [
       { name: 'Analytics', href: '/admin/analytics', icon: BarChart3 },
-      { name: 'Users', href: '/admin/users', icon: Users },
-      { name: 'Chat assistant', href: '/admin/ai-settings', icon: Bot },
-      { name: 'Settings', href: '/admin/settings', icon: Settings },
+      // Users, site content and the old chat-assistant address are reached
+      // from the Settings cards, and keep Settings lit while open.
+      { name: 'Settings', href: '/admin/settings', icon: Settings, match: ['/admin/users', '/admin/content', '/admin/ai-settings'] },
     ],
   },
 ]
@@ -92,6 +93,12 @@ const GROUPS: NavGroup[] = [
 export const ADMIN_NAV_ITEMS = [
   { name: 'Dashboard', href: '/admin', icon: Home },
   ...GROUPS.flatMap((g) => g.items),
+  // Not in the rail any more, but still a place you can search for.
+  { name: 'Users and roles', href: '/admin/users', icon: Users },
+  { name: 'Chat assistant', href: '/admin/settings/assistant', icon: Bot },
+  { name: 'Notifications', href: '/admin/settings/notifications', icon: Bell },
+  { name: 'AI usage and budget', href: '/admin/settings/ai-usage', icon: Gauge },
+  { name: 'Website content', href: '/admin/content', icon: FileText },
 ]
 
 /**

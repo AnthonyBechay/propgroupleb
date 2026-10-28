@@ -3,8 +3,8 @@
 import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import {
-  Building2, Clock, Eye, FileText, Globe, Heart, Inbox, Layers, ListChecks,
-  MapPin, MessageSquare, Users,
+  Bot, Building2, CalendarClock, Clock, Eye, FileText, Globe, Hand, Heart, Inbox, Layers, ListChecks,
+  MapPin, MessageSquare, MessagesSquare, UserPlus, Users,
 } from 'lucide-react'
 import { normalizeApiUrl } from '@/lib/utils/api-url'
 import { EmptyState, FormSection, PageHeader, StatCard } from '@/components/admin/ui/layout'
@@ -24,8 +24,20 @@ interface MarketRow {
   views: number
 }
 
+interface WorkSnapshot {
+  waiting: number
+  handedOver: number
+  followUpsDue: number
+  newLeadsThisWeek: number
+  openLeads: number
+  leadsByStatus: Array<{ status: string; count: number }>
+  ai: { todayUsd: number; dailyLimitUsd: number; monthUsd: number; monthlyLimitUsd: number; exhausted: boolean }
+}
+
 interface DashboardData {
   market: string
+  /** Absent on an API older than the dashboard — the row is then not drawn. */
+  work?: WorkSnapshot
   overview: {
     totalUsers: number
     totalBuildings: number
@@ -167,6 +179,8 @@ export function AdminDashboardClient() {
 
       {data && (
         <div className={cn('space-y-6 transition-opacity', loading && 'opacity-50')}>
+          {data.work && <WorkRow work={data.work} />}
+
           {/* Headline numbers — everything here respects the market switch */}
           <div className="grid grid-cols-2 gap-2.5 lg:grid-cols-6">
             <StatCard
@@ -524,4 +538,49 @@ function FeedRow({
   )
   const cls = 'block px-5 py-3.5 transition-colors hover:bg-slate-50'
   return href ? <Link href={href} className={cls}>{body}</Link> : <div className={cls}>{body}</div>
+}
+
+/**
+ * What is waiting on the team, first thing on the page.
+ *
+ * The dashboard used to open on catalogue totals — how many buildings exist —
+ * which change weekly and ask nothing of anyone. The work now arrives as chats
+ * and follow-ups, so those lead, and each tile opens the place to act on it.
+ */
+function WorkRow({ work }: { work: WorkSnapshot }) {
+  const pct = work.ai.dailyLimitUsd > 0 ? Math.min(100, (work.ai.todayUsd / work.ai.dailyLimitUsd) * 100) : 0
+  const tile = (urgent: boolean) =>
+    cn(
+      'block rounded-xl border p-3 transition-colors',
+      urgent ? 'border-amber-300 bg-amber-50 hover:bg-amber-100/70' : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50',
+    )
+  const items = [
+    { href: '/admin/inbox', icon: MessagesSquare, label: 'Chats waiting', value: work.waiting, hint: 'Unread WhatsApp and Instagram', urgent: work.waiting > 0 },
+    { href: '/admin/inbox', icon: Hand, label: 'Handed to the team', value: work.handedOver, hint: 'The assistant stepped aside', urgent: work.handedOver > 0 },
+    { href: '/admin/crm', icon: CalendarClock, label: 'Follow-ups due', value: work.followUpsDue, hint: `${work.openLeads} open clients`, urgent: work.followUpsDue > 0 },
+    { href: '/admin/crm', icon: UserPlus, label: 'New clients', value: work.newLeadsThisWeek, hint: 'Last 7 days', urgent: false },
+  ]
+  return (
+    <div className="grid grid-cols-2 gap-2.5 lg:grid-cols-5">
+      {items.map((i) => (
+        <Link key={i.label} href={i.href} className={tile(i.urgent)}>
+          <div className={cn('flex items-center gap-1.5 text-xs font-medium', i.urgent ? 'text-amber-800' : 'text-slate-500')}>
+            <i.icon className="h-4 w-4" />{i.label}
+          </div>
+          <div className={cn('mt-0.5 text-2xl font-bold tabular-nums', i.urgent ? 'text-amber-900' : 'text-slate-900')}>{i.value}</div>
+          <div className="mt-0.5 text-xs text-slate-500">{i.hint}</div>
+        </Link>
+      ))}
+      <Link href="/admin/settings/assistant" className={cn(tile(work.ai.exhausted), 'col-span-2 lg:col-span-1')}>
+        <div className="flex items-center gap-1.5 text-xs font-medium text-slate-500"><Bot className="h-4 w-4" />AI spend, 24 h</div>
+        <div className="mt-0.5 text-2xl font-bold tabular-nums text-slate-900">${work.ai.todayUsd.toFixed(2)}</div>
+        <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-slate-100">
+          <div className={cn('h-full rounded-full', work.ai.exhausted ? 'bg-red-500' : 'bg-slate-700')} style={{ width: `${pct}%` }} />
+        </div>
+        <div className="mt-1 text-xs text-slate-500">
+          {work.ai.exhausted ? 'Budget used up — AI paused' : `of $${work.ai.dailyLimitUsd} a day · $${work.ai.monthUsd.toFixed(2)} this month`}
+        </div>
+      </Link>
+    </div>
+  )
 }

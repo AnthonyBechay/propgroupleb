@@ -6,6 +6,57 @@ import { asyncHandler } from '../utils/errors.js';
 import { sendSuccess, sendCreated, sendPaginated } from '../utils/response.js';
 import { parsePagination, buildPaginationResponse } from '../utils/pagination.js';
 import type { AuthenticatedRequest } from '../types/index.js';
+import { aiBudget } from '../utils/ai-budget.js';
+
+type MarketScope = 'LEBANON' | 'INTERNATIONAL' | null;
+
+const OPEN_LEAD_STATUSES = ['NEW', 'ACTIVE', 'VIEWING', 'NEGOTIATING'] as const;
+
+/** A lead's market is GEORGIA where a building's is "not Lebanon". */
+const leadMarketWhere = (market: MarketScope) =>
+  market === 'LEBANON' ? { market: 'LEBANON' as const }
+  : market === 'INTERNATIONAL' ? { market: 'GEORGIA' as const }
+  : {};
+
+/** A listing hangs off a building directly, or through one of its units. */
+const listingMarketWhere = (market: MarketScope) => {
+  if (!market) return {};
+  const country = market === 'LEBANON' ? { country: 'LEBANON' as const } : { country: { not: 'LEBANON' as const } };
+  return { OR: [{ building: { is: country } }, { unit: { is: { building: { is: country } } } }] };
+};
+
+/**
+ * What needs doing now: the chats and clients waiting on the team.
+ *
+ * Conversations are not narrowed by market — a WhatsApp thread has no country
+ * until someone links it to a client, and an unanswered one must never vanish
+ * from the dashboard because of a filter.
+ */
+async function workSnapshot(market: MarketScope) {
+  const now = new Date();
+  const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+  const leadScope = leadMarketWhere(market);
+  const [waiting, handedOver, followUpsDue, newLeads, openLeads, leadsByStatus, budget] = await Promise.all([
+    prisma.conversation.count({ where: { archivedAt: null, unreadCount: { gt: 0 } } }),
+    prisma.conversation.count({ where: { archivedAt: null, aiPaused: true, unreadCount: { gt: 0 } } }),
+    prisma.lead.count({
+      where: { ...leadScope, status: { in: [...OPEN_LEAD_STATUSES] }, nextContactAt: { lte: now } },
+    }),
+    prisma.lead.count({ where: { ...leadScope, createdAt: { gte: weekAgo } } }),
+    prisma.lead.count({ where: { ...leadScope, status: { in: [...OPEN_LEAD_STATUSES] } } }),
+    prisma.lead.groupBy({ by: ['status'], where: leadScope, _count: { _all: true } }),
+    aiBudget(),
+  ]);
+  return {
+    waiting,
+    handedOver,
+    followUpsDue,
+    newLeadsThisWeek: newLeads,
+    openLeads,
+    leadsByStatus: leadsByStatus.map((r) => ({ status: r.status, count: r._count._all })),
+    ai: { todayUsd: budget.dailyUsd, dailyLimitUsd: budget.dailyLimitUsd, monthUsd: budget.monthlyUsd, monthlyLimitUsd: budget.monthlyLimitUsd, exhausted: budget.exhausted },
+  };
+}
 
 const router: Router = express.Router();
 
@@ -88,6 +139,7 @@ router.get(
       listingsByCountryRaw,
       inquiriesByCountryRaw,
       viewsByCountryRaw,
+      work,
     ] = await Promise.all([
       prisma.user.count(),
       prisma.building.count({ where: countryWhere }),
@@ -163,6 +215,7 @@ router.get(
       prisma.listing.groupBy({ by: ['buildingId'], where: { status: 'ACTIVE' }, _count: { _all: true } }),
       prisma.propertyInquiry.groupBy({ by: ['buildingId'], _count: { _all: true } }),
       prisma.building.groupBy({ by: ['country'], _count: { _all: true }, _sum: { views: true } }),
+      workSnapshot(market),
     ]);
 
     // ── Per-market rollup ─────────────────────────────────────────────────────
@@ -198,6 +251,7 @@ router.get(
 
     sendSuccess(res, {
       market: market ?? 'all',
+      work,
       overview: {
         totalUsers,
         totalBuildings,
@@ -234,6 +288,115 @@ router.get(
         buildingsByCountry: buildingsByCountry.map((r) => ({
           country: r.country, count: r._count._all,
         })),
+      },
+    });
+  })
+);
+
+/**
+ * GET /api/admin/analytics — the trends behind the dashboard, counted in SQL.
+ *
+ * The analytics page used to build these by downloading lists with
+ * `?limit=500` — which the API caps at 100 — so every total quietly stopped at
+ * 100, and it fetched from the Next server, where the login cookie (set on
+ * api.propgrouplb.com) is not present. Now one authenticated call, counted
+ * where the data is.
+ */
+router.get(
+  '/analytics',
+  authenticateToken,
+  requireAdmin,
+  asyncHandler(async (req: Request, res: Response) => {
+    const asked = String(req.query.market ?? '').toUpperCase();
+    const market: MarketScope = asked === 'LEBANON' || asked === 'INTERNATIONAL' ? asked : null;
+    const days = Math.min(365, Math.max(7, Number(req.query.days) || 30));
+    const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+    const now = new Date();
+    const sixMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 5, 1);
+
+    const countryWhere =
+      market === 'LEBANON' ? { country: 'LEBANON' as const }
+      : market === 'INTERNATIONAL' ? { country: { not: 'LEBANON' as const } }
+      : {};
+    const leadScope = leadMarketWhere(market);
+    const listingScope = listingMarketWhere(market);
+    const inquiryScope = market ? { building: { is: countryWhere } } : {};
+
+    const [
+      leadsBySource, leadsByStatus, leadsPeriod, wonPeriod,
+      convByChannel, inboundPeriod, outboundByOrigin,
+      leadRows, inquiryRows,
+      listingsByStatus, listingsByIntent, priceAgg,
+      buildings,
+    ] = await Promise.all([
+      prisma.lead.groupBy({ by: ['source'], where: { ...leadScope, createdAt: { gte: since } }, _count: { _all: true } }),
+      prisma.lead.groupBy({ by: ['status'], where: leadScope, _count: { _all: true } }),
+      prisma.lead.count({ where: { ...leadScope, createdAt: { gte: since } } }),
+      prisma.lead.count({ where: { ...leadScope, status: 'WON', closedAt: { gte: since } } }),
+      prisma.conversation.groupBy({ by: ['channel'], where: { createdAt: { gte: since } }, _count: { _all: true } }),
+      prisma.chatMessage.count({ where: { direction: 'IN', createdAt: { gte: since } } }),
+      prisma.chatMessage.groupBy({ by: ['origin'], where: { direction: 'OUT', createdAt: { gte: since } }, _count: { _all: true } }),
+      prisma.lead.findMany({ where: { ...leadScope, createdAt: { gte: sixMonthsAgo } }, select: { createdAt: true } }),
+      prisma.propertyInquiry.findMany({ where: { ...inquiryScope, createdAt: { gte: sixMonthsAgo } }, select: { createdAt: true } }),
+      prisma.listing.groupBy({ by: ['status'], where: listingScope, _count: { _all: true } }),
+      prisma.listing.groupBy({ by: ['intent'], where: { ...listingScope, status: 'ACTIVE' }, _count: { _all: true } }),
+      prisma.listing.aggregate({
+        where: { ...listingScope, status: 'ACTIVE', currency: 'USD', intent: 'FOR_SALE', price: { gt: 0 } },
+        _min: { price: true }, _max: { price: true }, _avg: { price: true },
+      }),
+      prisma.building.findMany({ where: countryWhere, select: { country: true, city: true, mohafazat: true } }),
+    ]);
+
+    // Six calendar months, oldest first, so a quiet month shows as zero.
+    const months: Array<{ key: string; label: string; leads: number; inquiries: number }> = [];
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      months.push({
+        key: `${d.getFullYear()}-${d.getMonth()}`,
+        label: d.toLocaleString('en', { month: 'short', year: '2-digit' }),
+        leads: 0,
+        inquiries: 0,
+      });
+    }
+    const slot = (d: Date) => months.find((m) => m.key === `${d.getFullYear()}-${d.getMonth()}`);
+    for (const r of leadRows) { const m = slot(r.createdAt); if (m) m.leads += 1; }
+    for (const r of inquiryRows) { const m = slot(r.createdAt); if (m) m.inquiries += 1; }
+
+    // Lebanon by governorate, everywhere else by city — see the dashboard.
+    const regions = new Map<string, number>();
+    for (const b of buildings) {
+      const key = b.country === 'LEBANON'
+        ? String(b.mohafazat || b.city || 'Unspecified').replace(/_/g, ' ')
+        : (b.city || String(b.country) || 'Unspecified');
+      regions.set(key, (regions.get(key) ?? 0) + 1);
+    }
+
+    const replies = Object.fromEntries(outboundByOrigin.map((r) => [r.origin ?? 'unknown', r._count._all]));
+
+    sendSuccess(res, {
+      market: market ?? 'all',
+      days,
+      leads: {
+        newInPeriod: leadsPeriod,
+        wonInPeriod: wonPeriod,
+        bySource: leadsBySource.map((r) => ({ source: r.source, count: r._count._all })).sort((a, b) => b.count - a.count),
+        byStatus: leadsByStatus.map((r) => ({ status: r.status, count: r._count._all })),
+      },
+      chats: {
+        newConversations: convByChannel.map((r) => ({ channel: r.channel, count: r._count._all })),
+        inboundMessages: inboundPeriod,
+        replies,
+      },
+      monthly: months.map(({ label, leads, inquiries }) => ({ label, leads, inquiries })),
+      catalogue: {
+        listingsByStatus: listingsByStatus.map((r) => ({ status: r.status, count: r._count._all })),
+        activeByIntent: listingsByIntent.map((r) => ({ intent: r.intent, count: r._count._all })),
+        salePriceUsd: {
+          min: Number(priceAgg._min.price ?? 0),
+          max: Number(priceAgg._max.price ?? 0),
+          avg: Math.round(Number(priceAgg._avg.price ?? 0)),
+        },
+        regions: [...regions.entries()].map(([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count).slice(0, 10),
       },
     });
   })

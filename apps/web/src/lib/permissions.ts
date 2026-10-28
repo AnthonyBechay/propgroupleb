@@ -72,6 +72,9 @@ export function canDeleteConversations(role: string | null | undefined): boolean
  */
 const CRM_MANAGER_PATHS = ['/admin/crm', '/admin/inbox', '/admin/clients']
 
+/** Single pages (not prefixes) a CRM_MANAGER may also open: their own settings. */
+const CRM_MANAGER_PAGES = ['/admin/settings', '/admin/settings/profile', '/admin/settings/security', '/admin/settings/notifications']
+
 /** Where a role lands when it opens the back office. */
 export function adminHomeFor(role: string | null | undefined): string {
   return role === 'CRM_MANAGER' ? '/admin/crm' : '/admin'
@@ -80,5 +83,6 @@ export function adminHomeFor(role: string | null | undefined): string {
 export function canAccessAdminPath(role: string | null | undefined, pathname: string): boolean {
   if (!canAccessAdmin(role)) return false
   if (role !== 'CRM_MANAGER') return true
+  if (CRM_MANAGER_PAGES.includes(pathname)) return true
   return CRM_MANAGER_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`))
 }
