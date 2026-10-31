@@ -85,6 +85,8 @@ export interface ReportOutcome {
 /** Report this client's furthest stage to Meta, if it is news. Never throws. */
 export async function reportLeadStage(leadId: string): Promise<ReportOutcome> {
   if (!conversionsConfigured()) return { status: 'skipped', detail: 'META_DATASET_ID is not set' };
+  // Hands the claimed stage back when Meta never got it, so the next change retries.
+  let release: () => Promise<unknown> = async () => {};
   try {
     const lead = await prisma.lead.findUnique({
       where: { id: leadId },
@@ -106,6 +108,16 @@ export async function reportLeadStage(leadId: string): Promise<ReportOutcome> {
     if (STAGES[reached] <= (STAGES[lead.metaStage as Stage] ?? 0)) {
       return { status: 'skipped', detail: `"${lead.metaStage}" already reported` };
     }
+    // Claim the stage before telling Meta. An ad that names a project creates
+    // the client and opens its deal at once, both report, and both used to read
+    // "nothing reported yet" — so every such lead reached Meta twice.
+    const below = (Object.keys(STAGES) as Stage[]).filter((s) => STAGES[s] < STAGES[reached]);
+    const claimed = await prisma.lead.updateMany({
+      where: { id: lead.id, OR: [{ metaStage: null }, { metaStage: { in: below } }] },
+      data: { metaStage: reached },
+    });
+    if (claimed.count === 0) return { status: 'skipped', detail: `"${reached}" already being reported` };
+    release = () => prisma.lead.update({ where: { id: lead.id }, data: { metaStage: lead.metaStage } }).catch(() => {});
 
     // A click-to-WhatsApp client: report against the ad click itself.
     const wabaId = lead.wabaId || process.env.META_WABA_ID || null;
@@ -136,9 +148,9 @@ export async function reportLeadStage(leadId: string): Promise<ReportOutcome> {
         const json: any = await res.json().catch(() => ({})); // eslint-disable-line @typescript-eslint/no-explicit-any
         const reason = json?.error?.error_user_msg ?? json?.error?.message ?? `HTTP ${res.status}`;
         logger.error('Meta WhatsApp conversion not accepted', { leadId, status: res.status, reason });
+        await release();
         return { status: 'failed', detail: reason };
       }
-      await prisma.lead.update({ where: { id: lead.id }, data: { metaStage: reached } });
       logger.info('Meta WhatsApp conversion reported', { leadId, event: MESSAGING_EVENT[reached] });
       return { status: 'sent', detail: MESSAGING_EVENT[reached] };
     }
@@ -152,7 +164,10 @@ export async function reportLeadStage(leadId: string): Promise<ReportOutcome> {
       ...(digits ? { ph: [sha256(digits)] } : {}),
       ...(lead.email ? { em: [sha256(lead.email.trim().toLowerCase())] } : {}),
     };
-    if (Object.keys(userData).length === 0) return { status: 'skipped', detail: 'no lead id, phone or email to match on' };
+    if (Object.keys(userData).length === 0) {
+      await release();
+      return { status: 'skipped', detail: 'no lead id, phone or email to match on' };
+    }
 
     const res = await fetch(
       `https://graph.facebook.com/${GRAPH_VERSION}/${encodeURIComponent(process.env.META_DATASET_ID as string)}/events`,
@@ -184,13 +199,14 @@ export async function reportLeadStage(leadId: string): Promise<ReportOutcome> {
       const json: any = await res.json().catch(() => ({})); // eslint-disable-line @typescript-eslint/no-explicit-any
       const reason = json?.error?.error_user_msg ?? json?.error?.message ?? `HTTP ${res.status}`;
       logger.error('Meta conversion not accepted', { leadId, status: res.status, reason });
+      await release();
       return { status: 'failed', detail: reason };
     }
-    await prisma.lead.update({ where: { id: lead.id }, data: { metaStage: reached } });
     logger.info('Meta conversion reported', { leadId, stage: reached });
     return { status: 'sent', detail: reached };
   } catch (err) {
     logger.error('Meta conversion failed', { leadId, error: (err as Error).message });
+    await release();
     return { status: 'failed', detail: (err as Error).message };
   }
 }

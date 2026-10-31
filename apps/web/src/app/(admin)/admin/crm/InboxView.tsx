@@ -265,12 +265,15 @@ export function InboxView({
 
   const loadDetail = useCallback(async (id: string) => {
     const res = await call(`/${id}?take=${take}`)
+    // Deleted — usually on another phone. Close it, or this screen asks for it
+    // every few seconds for as long as it stays open.
+    if (res.status === 404) { closeThread(); return }
     if (!res.ok) return
     const data: ThreadDetail | null = (await res.json()).data ?? null
     setDetail(data)
     // A message that arrives while the thread is on screen has been read.
     if (data && data.unreadCount > 0) call(`/${id}/read`, { method: 'POST' })
-  }, [call, take])
+  }, [call, take, closeThread])
 
   useEffect(() => {
     loadThreads()

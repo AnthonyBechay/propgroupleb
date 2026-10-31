@@ -496,9 +496,15 @@ const LANGUAGE_NAME: Record<ReplyLanguage, string> = {
 };
 
 /** What is wrong with the reply's language, or null. Links are ignored — "goo.gl/9xQ" is not Arabizi. */
-export function languageProblem(text: string, expect: ReplyLanguage | null): string | null {
+export function languageProblem(text: string, expect: ReplyLanguage | null, names: Array<string | null | undefined> = []): string | null {
   if (!expect) return null;
-  const words = text.replace(/https?:\/\/\S+/g, '');
+  let words = text.replace(/https?:\/\/\S+/g, '');
+  // The client's own name is not a language: "Hello rimoncharro7" read as Arabizi.
+  for (const name of names) {
+    for (const part of name?.split(/\s+/) ?? []) {
+      if (part.length >= 2) words = words.split(part).join(' ');
+    }
+  }
   if (expect === 'arabic') return ARABIC_LETTERS.test(words) ? null : 'written in Latin letters instead of Arabic';
   if (ARABIC_LETTERS.test(words)) return 'written in Arabic letters instead of Latin';
   // In an English or French reply even one Lebanese phrase is wrong ("Ma fi mechkle, Joe…").
@@ -556,6 +562,7 @@ ${LANGUAGE_RULE[replyStyle]}${thisReply ? `\n- ${thisReply}` : ''}
 - Write like a helpful person texting: one to three short sentences, at most one question at a time. No lists, no markdown, no emojis unless the client uses them.
 - If the client sends a voice note, listen to it and answer what it says as if they had typed it.
 - A message that reads "Not received: …" in the middle of a conversation means the client sent something that did not reach us — usually a voice note or photo set to "view once". Do not guess what it said. Ask them, briefly and kindly, to send it again as a normal voice note or as text.
+- Never mention what you record for the team ("I have updated your file", "I saved your details"). Just carry on with the conversation.
 - Never send a message you have already sent in this conversation, word for word or nearly. If you already told them a colleague will be in touch, do not say it again: answer what they asked if you can, or acknowledge it in a few words.
 
 What to do:
@@ -745,7 +752,13 @@ async function reply(conversationId: string, trigger: 'message' | 'sweep' | 'man
     return skip('Only a thank-you or an "ok" is waiting, which needs no reply.');
   }
   const newestArrival = () =>
-    prisma.chatMessage.findFirst({ where: { conversationId }, orderBy: { createdAt: 'desc' }, select: { id: true } });
+    // A deleted message or a reaction is not something to answer, and must not
+    // make the assistant hold back a reply that is already written.
+    prisma.chatMessage.findFirst({
+      where: { conversationId, type: { notIn: ['revoke', 'reaction'] } },
+      orderBy: { createdAt: 'desc' },
+      select: { id: true },
+    });
   const latestId = (await newestArrival())?.id;
 
   const [threadCount, globalCount] = await Promise.all([
@@ -857,8 +870,21 @@ async function reply(conversationId: string, trigger: 'message' | 'sweep' | 'man
           : settings.marketWhenUnknown;
   // For the ad's project and the preferred list when nothing is known yet.
   const defaultMarket: Market = knownMarket ?? 'GEORGIA';
+
+  // A client an ad created is named after their WhatsApp profile — "Bilal",
+  // "rimoncharro7" — and listing that as their name, "do not ask again", is
+  // why the first reply stopped asking for the full name on every ad lead.
+  // Only a name somebody typed in, or accepted from the chat, is confirmed.
+  const profileName = conversation.displayName?.trim() || null;
+  const leadNameConfirmed = Boolean(lead?.name && !(profileName && sameText(lead.name, profileName)));
+  const fullName = said.fullName ?? (leadNameConfirmed ? lead?.name ?? null : null);
+  const weSpokeBefore = recent.some((m) => m.direction === 'OUT');
+  const firstReply = !fullName && !weSpokeBefore;
+  const shownName = lead?.name || profileName;
+  const realFirstName = shownName && /^[\p{L}\p{M}' .-]{2,40}$/u.test(shownName) ? shownName : null;
+
   const known = [
-    lead?.name ? `Client name: ${lead.name}` : null,
+    lead?.name && leadNameConfirmed ? `Client name: ${lead.name}` : null,
     lead?.askingFor ? `Already on file: ${lead.askingFor}` : null,
     lead?.budgetMax ? `Budget on file: up to ${lead.budgetMax} USD` : null,
     lead?.minBeds ? `Bedrooms on file: at least ${lead.minBeds}` : null,
@@ -876,7 +902,7 @@ async function reply(conversationId: string, trigger: 'message' | 'sweep' | 'man
         adProjects.length
           ? `It is for ${adProjects
               .map((p) => `${p.title} (${p.ref}) in ${p.location || 'the area'}, ${formatPrice(p)}`)
-              .join('; ')}. Treat that as what they are asking about: you may attach it with send_listings straight away, and should not ask which project or country.`
+              .join('; ')}. Treat that as what they are asking about${firstReply ? '' : ': you may attach it with send_listings straight away,'} and should not ask which project or country.`
           : 'Treat its subject as what they are asking about.',
       ].join(' ')
     : null;
@@ -906,13 +932,20 @@ async function reply(conversationId: string, trigger: 'message' | 'sweep' | 'man
   // The first reply asks who they are. Their full name is the one thing the
   // CRM cannot get from WhatsApp (the profile name is a nickname as often as
   // not), and asked first it reads as courtesy; asked later, as a form.
-  const weSpokeBefore = recent.some((m) => m.direction === 'OUT');
-  const nameRule = said.fullName
-    ? `The client's name is ${said.fullName} — use their first name naturally, and do not ask for it again.`
-    : !weSpokeBefore
-      ? 'This is your FIRST reply to this client. Greet them warmly (thank them for reaching out) and ask for their full name — that is the whole message: no properties, no other questions yet. Do not call search_listings or send_listings in this reply.'
+  const nameRule = fullName
+    ? `The client's name is ${fullName} — use their first name naturally, and do not ask for it again.`
+    : firstReply
+      ? [
+          'This is your FIRST reply to this client. Greet them warmly (thank them for reaching out) and ask for their full name — that is the whole message: no properties, no prices, no other questions yet.',
+          realFirstName
+            ? `Their WhatsApp profile says "${realFirstName}". You may greet them with that, but it is not their confirmed full name: still ask for it.`
+            : profileName
+              ? `Their WhatsApp profile name ("${profileName}") is a handle, not a name — do not greet them with it.`
+              : null,
+          'If they asked about a project or the advert, say in a few words that you will send them its details right after. Do not mention links, attachments or anything "below".',
+        ].filter(Boolean).join(' ')
       : 'If the client has just told you their name, record it with save_client_requirements (fullName) and continue straight away with what they came for — the details of the property or project from the advert, or the next useful question. If they did not give it, do not ask again; just help them.';
-  trace.nameStep = said.fullName ? 'known' : weSpokeBefore ? 'continue' : 'ask';
+  trace.nameStep = fullName ? 'known' : firstReply ? 'ask' : 'continue';
 
   const context = [
     nameRule,
@@ -957,7 +990,11 @@ async function reply(conversationId: string, trigger: 'message' | 'sweep' | 'man
   const unansweredText = ordered.filter((m) => unansweredIds.has(m.id)).map((m) => m.body).join(' ').trim();
   const simple =
     !hasVoice && unansweredText.length <= 40 && !/\d/.test(unansweredText) && !/\[\w+\]/.test(unansweredText);
-  const order = chatModelOrder(simple ? 'economy' : settings.modelTier);
+  // The first reply only greets and asks the name, so it needs neither the
+  // stronger model nor the catalogue: an advert's opening line used to take
+  // 17 s on the strong model, searching for listings that were then held back.
+  const order = chatModelOrder(simple || firstReply ? 'economy' : settings.modelTier);
+  const tools = firstReply ? TOOLS.filter((t) => t.name === 'save_client_requirements') : TOOLS;
   const sessions: ChatSession[] = [];
   let toolLog: string[] = [];
   let turns = 0;
@@ -973,7 +1010,7 @@ async function reply(conversationId: string, trigger: 'message' | 'sweep' | 'man
     reply = '';
     toolLog = [];
     turns = 0;
-    const session = new ChatSession(systemPrompt(context, settings.replyStyle, language.rule), TOOLS, { feature: 'chat-reply', conversationId }, model);
+    const session = new ChatSession(systemPrompt(context, settings.replyStyle, language.rule), tools, { feature: 'chat-reply', conversationId }, model);
     sessions.push(session);
     try {
   for (let turn = 0; turn < MAX_MODEL_TURNS; turn++) {
@@ -1043,6 +1080,11 @@ async function reply(conversationId: string, trigger: 'message' | 'sweep' | 'man
         // not anyone is at a screen to say so. The assistant works unattended,
         // so it files them itself; the details still wait as a suggestion.
         if (!leadId) leadId = (await linkConversationToLead(conversationId, {}))?.id ?? null;
+        // Only a name the client wrote or said. The model would otherwise
+        // "record" the WhatsApp profile name, and the next reply took it as known.
+        if (typeof args.fullName === 'string' && !nameWasGiven(args.fullName, [...recent.filter((m) => m.direction === 'IN').map((m) => m.body), ...heard])) {
+          delete args.fullName;
+        }
         await saveSuggestion(conversationId, leadId, args);
       } else if (call.name === 'save_voice_transcripts') {
         for (const t of Array.isArray(args.transcripts) ? args.transcripts : []) {
@@ -1131,7 +1173,7 @@ async function reply(conversationId: string, trigger: 'message' | 'sweep' | 'man
   }
 
   // Wrong script, or Gulf "9"s in Arabizi: fix it before the client sees it.
-  const problem = languageProblem(reply, language.expect);
+  const problem = languageProblem(reply, language.expect, [lead?.name, profileName, fullName]);
   if (problem && language.expect) {
     trace.scriptFix = problem;
     const fixed = await rewriteLanguage(reply, language.expect, conversationId);
@@ -1217,6 +1259,13 @@ async function reply(conversationId: string, trigger: 'message' | 'sweep' | 'man
     reason: `Replied${cards.length ? ` with ${cards.length} propert${cards.length === 1 ? 'y' : 'ies'}` : ''}${handoff ? ' and handed over to the team' : ''}.`,
     trace,
   };
+}
+
+/** Whether every word of the name appears in what the client wrote or said. */
+function nameWasGiven(name: string, said: string[]): boolean {
+  const text = said.join(' ').toLowerCase();
+  const parts = name.toLowerCase().split(/\s+/).filter((w) => w.length >= 2);
+  return parts.length > 0 && parts.every((w) => text.includes(w));
 }
 
 /**
