@@ -7,6 +7,7 @@ import { cardCaption, cardsByRef, formatPrice, marketNames, projectsNamedIn, pro
 import { recordListingsShared } from './deal-sync.service.js';
 import { getChatAiSettings, type ChatAiSettings } from './ai-settings.service.js';
 import { linkConversationToLead } from './messaging-intake.service.js';
+import { applyToLead, OFFER_KINDS, savePropertyOffer } from './chat-client-update.service.js';
 import { canSendOn, replyWindowOpen, sendReply } from './messaging-send.service.js';
 import { extractKeyFromUrl, getFileStream } from './upload.service.js';
 
@@ -64,7 +65,7 @@ const pending = new Map<string, NodeJS.Timeout>();
 export const PAUSED_BY_TEAM = 'Paused by the team';
 /** Tools whose result the model does not need to see before it can finish. */
 const FINISHING_TOOLS = new Set([
-  'send_listings', 'save_client_requirements', 'save_voice_transcripts', 'update_conversation_summary', 'hand_off_to_team',
+  'send_listings', 'save_client_requirements', 'save_property_offer', 'save_voice_transcripts', 'update_conversation_summary', 'hand_off_to_team',
 ]);
 /** How many times a failed reply has been retried, per thread, and the waits between. */
 const retries = new Map<string, number>();
@@ -340,6 +341,26 @@ const TOOLS: ChatTool[] = [
         fullName: { type: 'string', description: 'The client\'s full name, exactly as they wrote it, once they have told you.' },
       },
       required: ['summary'],
+    },
+  },
+  {
+    name: 'save_property_offer',
+    description:
+      'When the client is SELLING or RENTING OUT a property — an owner, or a broker offering one to us — record what they are offering, so the team can list it. Call whenever they give or change a detail; include only what they said. Also call save_client_requirements with intent SELLER or LANDLORD.',
+    parameters: {
+      type: 'object',
+      properties: {
+        deal: { type: 'string', enum: ['SALE', 'RENT'] },
+        kind: { type: 'string', enum: OFFER_KINDS },
+        location: { type: 'string', description: 'Area or city, in English, e.g. "Raouche".' },
+        areaSqm: { type: 'number', description: 'Size in square metres.' },
+        price: { type: 'number', description: 'Total asking price in USD (or monthly rent for RENT).' },
+        pricePerSqm: { type: 'number', description: 'Asking price per square metre in USD, when they quote it that way.' },
+        bedrooms: { type: 'integer' },
+        floor: { type: 'integer' },
+        details: { type: 'string', description: 'One or two lines in English: anything else they said about it.' },
+      },
+      required: ['deal'],
     },
   },
   {
@@ -854,11 +875,15 @@ async function reply(conversationId: string, trigger: 'message' | 'sweep' | 'man
   // it would look in Lebanon.
   const fromAd =
     Boolean(conversation.adId) || Boolean(lead?.adId) || lead?.source === 'FACEBOOK_AD';
-  const pendingSuggestion = await prisma.leadSuggestion.findFirst({
-    where: { conversationId, status: 'PENDING' },
+  // Everything this chat has taught, applied or still waiting. Only the
+  // pending card used to count, so once somebody accepted it the assistant
+  // forgot the client had chosen Georgia and asked again.
+  const learned = await prisma.leadSuggestion.findMany({
+    where: { conversationId, status: { in: ['PENDING', 'ACCEPTED'] } },
+    orderBy: { createdAt: 'asc' },
     select: { patch: true },
   });
-  const said = (pendingSuggestion?.patch ?? {}) as { market?: string; fullName?: string };
+  const said = Object.assign({}, ...learned.map((x) => x.patch ?? {})) as { market?: string; fullName?: string };
   const adMarket: Market = (process.env.LEAD_MARKET_META ?? 'GEORGIA').toUpperCase() === 'LEBANON' ? 'LEBANON' : 'GEORGIA';
   const knownMarket: Market | null =
     said.market === 'LEBANON' || said.market === 'GEORGIA'
@@ -994,7 +1019,7 @@ async function reply(conversationId: string, trigger: 'message' | 'sweep' | 'man
   // stronger model nor the catalogue: an advert's opening line used to take
   // 17 s on the strong model, searching for listings that were then held back.
   const order = chatModelOrder(simple || firstReply ? 'economy' : settings.modelTier);
-  const tools = firstReply ? TOOLS.filter((t) => t.name === 'save_client_requirements') : TOOLS;
+  const tools = firstReply ? TOOLS.filter((t) => t.name === 'save_client_requirements' || t.name === 'save_property_offer') : TOOLS;
   const sessions: ChatSession[] = [];
   let toolLog: string[] = [];
   let turns = 0;
@@ -1086,6 +1111,16 @@ async function reply(conversationId: string, trigger: 'message' | 'sweep' | 'man
           delete args.fullName;
         }
         await saveSuggestion(conversationId, leadId, args);
+      } else if (call.name === 'save_property_offer') {
+        // A seller is a client too, and their property belongs with the owner
+        // submissions — not only in a hand-off line nobody files.
+        if (!leadId) leadId = (await linkConversationToLead(conversationId, {}))?.id ?? null;
+        const filed = await savePropertyOffer(conversationId, leadId, args).catch((err) => {
+          logger.error('Auto-reply: could not file the property offer', err, { conversationId });
+          return null;
+        });
+        response = { ok: Boolean(filed) };
+        toolLog.push('offer');
       } else if (call.name === 'save_voice_transcripts') {
         for (const t of Array.isArray(args.transcripts) ? args.transcripts : []) {
           const messageId = voiceNotes[Number(t?.note) - 1];
@@ -1288,6 +1323,14 @@ async function saveSuggestion(conversationId: string, leadId: string | null, arg
   }
   const summary = typeof args.summary === 'string' ? args.summary.trim().slice(0, 300) : '';
   if (!summary && Object.keys(patch).length === 0) return;
+
+  // Empty fields are filled in straight away; only what would replace a value
+  // already on file waits for a person.
+  if (leadId) {
+    const left = await applyToLead(leadId, conversationId, patch, summary);
+    for (const key of Object.keys(patch)) if (!(key in left)) delete patch[key];
+    if (Object.keys(patch).length === 0) return;
+  }
 
   const open = await prisma.leadSuggestion.findFirst({ where: { conversationId, status: 'PENDING' } });
   if (open) {

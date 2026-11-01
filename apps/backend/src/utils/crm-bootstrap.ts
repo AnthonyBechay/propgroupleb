@@ -155,4 +155,30 @@ export async function normaliseCrmData(): Promise<void> {
     });
     return `${count} auto-generated follow-up dates cleared`;
   });
+
+  // Sellers who offered a property in a chat before the assistant could file
+  // it: give each an owner submission, so they are listed with the others.
+  await once('chat_sellers_to_submissions_v1', async () => {
+    const { savePropertyOffer } = await import('../services/chat-client-update.service.js');
+    const since = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
+    const sellers = await prisma.lead.findMany({
+      where: {
+        OR: [{ type: { in: ['SELLER', 'LANDLORD'] as never } }, { intents: { hasSome: ['SELLER', 'LANDLORD'] as never } }],
+        conversations: { some: { lastMessageAt: { gte: since } } },
+      },
+      select: { id: true, type: true, askingFor: true, conversations: { orderBy: { lastMessageAt: 'desc' }, take: 1, select: { id: true } } },
+    });
+    let filed = 0;
+    for (const lead of sellers) {
+      const conversationId = lead.conversations[0]?.id;
+      if (!conversationId) continue;
+      if (await prisma.propertySubmission.findUnique({ where: { conversationId } })) continue;
+      const done = await savePropertyOffer(conversationId, lead.id, {
+        deal: lead.type === 'LANDLORD' ? 'RENT' : 'SALE',
+        details: lead.askingFor ?? undefined,
+      }).catch(() => null);
+      if (done) filed++;
+    }
+    return `${filed} chat sellers filed as owner submissions`;
+  });
 }

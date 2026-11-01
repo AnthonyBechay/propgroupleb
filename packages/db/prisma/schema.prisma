@@ -1451,6 +1451,12 @@ model PropertySubmission {
   reviewedAt   DateTime?
   buildingId   String?   @unique // set when approved → the created property
 
+  // WEBSITE (the "list your property" form) or CHAT — an owner or broker who
+  // offered a property on WhatsApp/Instagram and was filed by the assistant.
+  source         String  @default("WEBSITE")
+  conversationId String? @unique // the chat it came from; one offer per chat
+  leadId         String? // the client record of whoever offered it
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

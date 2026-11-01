@@ -38,6 +38,9 @@ interface Submission {
   images: string[]
   videos: string[]
   wantsPhotoVisit: boolean
+  /** WEBSITE (the form) or CHAT (offered on WhatsApp/Instagram, filed by the assistant). */
+  source?: string
+  conversationId?: string | null
   visited: boolean
   dataCollected: boolean
   adminNotes: string | null
@@ -223,6 +226,7 @@ export default function AdminSubmissionsPage() {
                         <span className="font-semibold text-slate-900 truncate">{s.title}</span>
                         <span className={`px-2 py-0.5 rounded text-xs font-medium ${meta.cls}`}>{meta.label}</span>
                         <span className="text-xs text-slate-500">{typeLabel(s.unitKind)} · {s.intent === 'FOR_RENT' ? 'Rent' : 'Sale'}</span>
+                        {s.source === 'CHAT' && <span className="px-2 py-0.5 rounded text-xs font-medium bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200">From chat</span>}
                       </div>
                       <div className="flex items-center gap-3 mt-1 text-sm text-slate-500 flex-wrap">
                         <span className="inline-flex items-center gap-1"><MapPin className="h-3.5 w-3.5" />{location}</span>
@@ -252,6 +256,11 @@ export default function AdminSubmissionsPage() {
                       {s.sellerEmail && (
                         <a href={`mailto:${s.sellerEmail}`} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-sm text-slate-700 hover:bg-slate-100">
                           <Mail className="h-3.5 w-3.5" /> {s.sellerEmail}
+                        </a>
+                      )}
+                      {s.conversationId && (
+                        <a href={`/admin/inbox?c=${s.conversationId}`} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-900 text-sm text-white hover:bg-slate-800">
+                          <MessageCircle className="h-3.5 w-3.5" /> Open chat
                         </a>
                       )}
                       {s.preferredContact && <span className="text-xs text-slate-500">prefers {s.preferredContact}</span>}
