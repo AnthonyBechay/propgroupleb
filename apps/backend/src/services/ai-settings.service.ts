@@ -62,6 +62,12 @@ export interface FollowUpSettings {
 export interface ChatAiSettings {
   /** Day-to-day on/off. The assistant also needs AUTO_REPLY_ENABLED=true. */
   enabled: boolean;
+  /**
+   * When it was last allowed to answer again: `enabled` switched on, or
+   * `handover` moved off step_aside. Set by the server. What arrived before this
+   * was left unanswered on purpose, so it is never picked up afterwards.
+   */
+  switchedOnAt?: string | null;
   /** Who it answers: only people from an ad or lead form, or everyone. */
   audience: 'ads' | 'all';
   /**
@@ -155,6 +161,7 @@ export async function getChatAiSettings(): Promise<ChatAiSettings> {
   const followUp = (saved.followUp ?? {}) as Partial<FollowUpSettings>;
   return {
     enabled: typeof saved.enabled === 'boolean' ? saved.enabled : d.enabled,
+    switchedOnAt: typeof saved.switchedOnAt === 'string' ? saved.switchedOnAt : null,
     audience: oneOf(saved.audience, ['ads', 'all'] as const, d.audience),
     marketWhenUnknown: oneOf(saved.marketWhenUnknown, ['ask', 'LEBANON', 'GEORGIA'] as const, d.marketWhenUnknown),
     handover: oneOf(saved.handover, ['step_aside', 'return_after_quiet', 'always'] as const, d.handover),

@@ -87,8 +87,9 @@ function beirutHour(): number {
 }
 
 async function sweep(): Promise<void> {
-  const { followUp } = await getChatAiSettings();
-  if (!followUp.enabled || !followUp.templateName || !canSendOn('WHATSAPP')) return;
+  // "Answer clients automatically" off means nothing goes out on its own, this included.
+  const { enabled, followUp } = await getChatAiSettings();
+  if (!enabled || !followUp.enabled || !followUp.templateName || !canSendOn('WHATSAPP')) return;
   const hour = beirutHour();
   if (hour < 10 || hour >= 19) return;
 

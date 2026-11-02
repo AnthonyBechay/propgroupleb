@@ -22,6 +22,9 @@ import { logger } from '../utils/logger.js';
 
 const sameText = (a: string, b: string) => a.replace(/\s+/g, ' ').trim().toLowerCase() === b.replace(/\s+/g, ' ').trim().toLowerCase();
 
+/** What a client is called before anyone knows: "Instagram contact", "WhatsApp +961…". */
+export const isPlaceholderName = (name: string) => !name.trim() || /^(instagram contact|whatsapp \+\d+)$/i.test(name.trim());
+
 export interface ClientPatch {
   intent?: string;
   market?: string;
@@ -63,7 +66,7 @@ export async function applyToLead(
   // The name: a client created from a chat is named after their profile
   // ("Bilal", "rimoncharro7"); the name they type replaces that, not one a person entered.
   if (patch.fullName && !sameText(patch.fullName, lead.name)) {
-    const placeholder = !lead.name.trim() || (conversation?.displayName && sameText(lead.name, conversation.displayName));
+    const placeholder = isPlaceholderName(lead.name) || (conversation?.displayName && sameText(lead.name, conversation.displayName));
     if (placeholder) { data.name = patch.fullName; changes.push(`Name: ${lead.name || '—'} → ${patch.fullName}`); }
     else left.fullName = patch.fullName;
   }

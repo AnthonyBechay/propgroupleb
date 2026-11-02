@@ -112,7 +112,14 @@ router.put(
       .map((p) => ({ ref: p.ref.toUpperCase(), pitch: p.pitch }))
       .filter((p) => live.has(p.ref));
 
-    const settings = { ...data, preferred, followUp: data.followUp ?? (await getChatAiSettings()).followUp };
+    const before = await getChatAiSettings();
+    const switchedOn = (!before.enabled && data.enabled) || (before.handover === 'step_aside' && data.handover !== 'step_aside');
+    const settings = {
+      ...data,
+      preferred,
+      followUp: data.followUp ?? before.followUp,
+      switchedOnAt: switchedOn ? new Date().toISOString() : before.switchedOnAt,
+    };
     await saveChatAiSettings(settings, authReq.user?.id);
     await logAdminAction(
       'UPDATE_CHAT_AI_SETTINGS', 'SystemSetting', 'chat_ai_settings',

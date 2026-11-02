@@ -7,7 +7,7 @@ import { cardCaption, cardsByRef, formatPrice, marketNames, projectsNamedIn, pro
 import { recordListingsShared } from './deal-sync.service.js';
 import { getChatAiSettings, type ChatAiSettings } from './ai-settings.service.js';
 import { linkConversationToLead } from './messaging-intake.service.js';
-import { applyToLead, OFFER_KINDS, savePropertyOffer } from './chat-client-update.service.js';
+import { applyToLead, isPlaceholderName, OFFER_KINDS, savePropertyOffer } from './chat-client-update.service.js';
 import { canSendOn, replyWindowOpen, sendReply } from './messaging-send.service.js';
 import { extractKeyFromUrl, getFileStream } from './upload.service.js';
 
@@ -63,6 +63,8 @@ const MAX_LISTINGS = 3;
 const pending = new Map<string, NodeJS.Timeout>();
 /** The pause reason that means a person switched it off — see standingBlock. */
 export const PAUSED_BY_TEAM = 'Paused by the team';
+/** The assistant's own pause bookkeeping must never undo a person switching it off. */
+const NOT_SWITCHED_OFF = { OR: [{ aiPausedReason: null }, { aiPausedReason: { not: PAUSED_BY_TEAM } }] };
 /** Tools whose result the model does not need to see before it can finish. */
 const FINISHING_TOOLS = new Set([
   'send_listings', 'save_client_requirements', 'save_property_offer', 'save_voice_transcripts', 'update_conversation_summary', 'hand_off_to_team',
@@ -169,36 +171,39 @@ async function teamWentQuiet(conversation: { id: string; aiPausedAt: Date | null
  */
 const swept = new Map<string, number>();
 
-export function startQuietSweep(): void {
-  const sweep = async () => {
-    if (!autoReplyEnabled()) return;
-    const settings = await getChatAiSettings();
-    if (!settings.enabled) return;
-    const now = Date.now();
-    // Still inside WhatsApp's 24-hour window, waiting at least as long as the
-    // quiet period, and the client spoke last.
-    const candidates = await prisma.conversation.findMany({
-      where: {
-        archivedAt: null,
-        lastInboundAt: { gte: new Date(now - DAY_MS + 30 * 60 * 1000), lte: new Date(now - 60_000) },
-      },
-      select: { id: true, lastInboundAt: true, lastMessageAt: true },
-      take: 200,
+export async function quietSweep(): Promise<void> {
+  if (!autoReplyEnabled()) return;
+  const settings = await getChatAiSettings();
+  if (!settings.enabled) return;
+  const now = Date.now();
+  // Still inside WhatsApp's 24-hour window, waiting at least as long as the
+  // quiet period, and the client spoke last.
+  const candidates = await prisma.conversation.findMany({
+    where: {
+      archivedAt: null,
+      lastInboundAt: { gte: new Date(now - DAY_MS + 30 * 60 * 1000), lte: new Date(now - 60_000) },
+    },
+    select: { id: true, lastInboundAt: true, lastMessageAt: true, aiAlways: true },
+    take: 200,
+  });
+  for (const c of candidates) {
+    if (!c.lastInboundAt || c.lastMessageAt.getTime() - c.lastInboundAt.getTime() > 1000) continue;
+    // "Step aside" means no late replies at all: it answers a new message when it arrives, or not.
+    if (settings.handover === 'step_aside' && !c.aiAlways) continue;
+    if (pending.has(c.id) || inFlight.has(c.id)) continue;
+    // One try per client message. A thread the assistant looked at and
+    // declined (a repeat it held back, no reply text) would otherwise be put
+    // to the model again every five minutes — paid for every time.
+    if (swept.get(c.id) === c.lastInboundAt.getTime()) continue;
+    swept.set(c.id, c.lastInboundAt.getTime());
+    await run(c.id, 'sweep').catch((err) => {
+      logger.error('Quiet sweep reply failed', err, { conversationId: c.id });
     });
-    for (const c of candidates) {
-      if (!c.lastInboundAt || c.lastMessageAt.getTime() - c.lastInboundAt.getTime() > 1000) continue;
-      if (pending.has(c.id) || inFlight.has(c.id)) continue;
-      // One try per client message. A thread the assistant looked at and
-      // declined (a repeat it held back, no reply text) would otherwise be put
-      // to the model again every five minutes — paid for every time.
-      if (swept.get(c.id) === c.lastInboundAt.getTime()) continue;
-      swept.set(c.id, c.lastInboundAt.getTime());
-      await run(c.id, 'sweep').catch((err) => {
-        logger.error('Quiet sweep reply failed', err, { conversationId: c.id });
-      });
-    }
-  };
-  setInterval(() => void sweep().catch((err) => logger.error('Quiet sweep failed', err)), 5 * 60 * 1000).unref();
+  }
+}
+
+export function startQuietSweep(): void {
+  setInterval(() => void quietSweep().catch((err) => logger.error('Quiet sweep failed', err)), 5 * 60 * 1000).unref();
 }
 
 /** "Resume auto-reply" was pressed within the last 24 hours. */
@@ -260,7 +265,9 @@ async function standingBlock(
       // Only replies since it was last switched on count — switching it on is
       // how a person says "take it from here".
       if (!alwaysHere && !alwaysEverywhere) {
-        const since = Math.max(Date.now() - DAY_MS, conversation.aiResumedAt?.getTime() ?? 0);
+        // Stepping aside lasts until someone switches it back on, not for a day.
+        const resumedAt = conversation.aiResumedAt?.getTime() ?? 0;
+        const since = settings.handover === 'step_aside' ? resumedAt : Math.max(Date.now() - DAY_MS, resumedAt);
         const humanReplied = await prisma.chatMessage.count({
           where: {
             conversationId: conversation.id, direction: 'OUT',
@@ -431,7 +438,19 @@ type ClientLanguage = 'arabic' | 'arabizi' | 'english' | 'french' | 'voice';
 type ReplyLanguage = 'arabic' | 'arabizi' | 'english' | 'french' | 'latin';
 const ARABIC_LETTERS = /[؀-ۿݐ-ݿ]/;
 const NOT_RECEIVED = /^Not received:/;
-const LEBANESE_WORDS = /\b(kifak|kifik|kifkon|shu|shou|chou|badde|baddi|baddak|baddik|3am|ahla|ahlan|halla2|hala2|hayda|hayde|akid|ma3ak|ma3ik|yalla|tayeb|mni7|ktir|kteer|kamen|fik|fiki|fiye|ana|enta|enti|inta|inte|lesh|la2|mish|msh|bas|hek|hon|ya3ne|yaane|habibi|marhaba|tfaddal|kel|shi|wen|lal|bel|3al|3an|3anna|men|mn)\b/gi;
+const LEBANESE_WORDS = /\b(kifak|kifik|kifkon|shu|shou|chou|badde|baddi|baddak|baddik|3am|ahla|ahlan|halla2|hala2|hayda|hayde|akid|ma3ak|ma3ik|yalla|tayeb|mni7|ktir|kteer|kamen|fik|fiki|fiye|ana|enta|enti|inta|inte|lesh|la2|mish|msh|bas|hek|hon|ya3ne|yaane|habibi|marhaba|tfaddal|kel|shi|wen|lal|bel|3al|3an|3anna|men|mn|hal|hala|fi|ade|kam|bi|bass|ento|lezem|lezim|kaman|mnih)\b/gi;
+/**
+ * Lebanese no English or French sentence contains, so one is enough. "Hi sho hal
+ * stdio 39k", "Plz fi majel tefsir aktar", "Hkine plz" and "Ok tmm" all read as
+ * English, and the reply check then rewrote a correct Lebanese answer into English.
+ */
+const LEBANESE_SURE = /\b(sho|shu|shou|chou|kif|kifak|kifik|kifkon|baddi|badde|baddak|baddik|baddkon|bade|bdi|bde|hkine|hkini|ehkine|ehkini|tmm|tamam|mni7|ktir|kteer|aktar|majel|majal|mumkin|mmkn|momken|adesh|addesh|addeh|adde|lesh|hayda|hayde|heyda|halla|ya3ne|yaane|yani|tayeb|yalla|khalas|marhaba|ahla|ahlan|andak|andkon|ande|fiyi|fiye|fik|fiki|estesmar|istithmar)\b/i;
+/**
+ * Words that show a message really is English. Without one it is no evidence of
+ * anything: a name ("Eliane azar"), "ok", "Hi" or "studio 39k" says nothing
+ * about the language, and must not switch a Lebanese chat to English.
+ */
+const ENGLISH_WORDS = /\b(i|i'm|im|you|your|we|our|my|me|the|is|are|am|was|in|to|of|for|and|or|with|at|on|this|that|these|those|it|can|could|would|should|will|do|does|did|have|has|how|what|when|where|why|which|who|want|need|looking|send|get|give|know|more|much|many|please|about|around|any|some|there|not|from|if|but)\b/i;
 /** Lebanese that never belongs in an English or French reply. */
 const LEBANESE_PHRASE = /\b(ahla|ahlan|akid|ma fi|mechkle|mishkle|mushkle|yalla|habibi|habibti|tfaddal|tfadal|ya3ne|kifak|kifik|shu|shou|tayeb|tayyeb|yislamo|tislam|marhaba|w sahla|inshallah|insha'?allah|inchallah|mashallah|wallah|mabrouk|mabrook|shukran|khalas|tamam|3a rasi|ahla w sahla)\b/i;
 const FRENCH_WORDS = /\b(bonjour|bonsoir|salut|merci|je|j|vous|est|c|pour|avec|oui|non|plus|sujet|cette|des|les|une|suis|voudrais|svp|s|il|puis|en|savoir|quel|quelle|votre|nous|sont)\b/gi;
@@ -453,7 +472,8 @@ function arabiziDigitWords(text: string): number {
 }
 
 function looksArabizi(text: string): boolean {
-  return arabiziDigitWords(text) >= 1 || (text.match(LEBANESE_WORDS) ?? []).length >= 2;
+  // "3am dawwer" is Lebanese; "at 3am tomorrow" is a time.
+  return arabiziDigitWords(text) >= 1 || LEBANESE_SURE.test(text) || /(?<!\bat\s)\b3am\s+[a-z]/i.test(text) || (text.match(LEBANESE_WORDS) ?? []).length >= 2;
 }
 
 export function languageOf(text: string): ClientLanguage | null {
@@ -467,18 +487,21 @@ export function languageOf(text: string): ClientLanguage | null {
 /**
  * How the client is writing right now: their newest message that has words in
  * it, looking first at what is unanswered and then further back. A voice note
- * counts as speech, whatever was said in it.
+ * counts as speech, whatever was said in it. A message with no sign of any
+ * language (a name, "ok") does not count; English is only the last resort.
  */
-function clientLanguage(newestFirst: Array<{ direction: string; type: string; body: string }>): ClientLanguage | null {
+export function clientLanguage(newestFirst: Array<{ direction: string; type: string; body: string }>): ClientLanguage | null {
+  let unclear: ClientLanguage | null = null;
   for (const m of newestFirst) {
-    if (m.direction !== 'IN') continue;
+    if (m.direction !== 'IN' || m.type === 'reaction' || m.type === 'revoke') continue;
     if (m.type === 'audio') return 'voice';
     if (m.type !== 'text' && !m.body.trim()) continue;
     if (NOT_RECEIVED.test(m.body) || /^\[\w+\]$/.test(m.body)) continue;
     const language = languageOf(m.body);
-    if (language) return language;
+    if (language === 'english' && !ENGLISH_WORDS.test(m.body)) unclear ??= language;
+    else if (language) return language;
   }
-  return null;
+  return unclear;
 }
 
 /**
@@ -507,7 +530,10 @@ function languageForThisReply(style: ChatAiSettings['replyStyle'], language: Cli
         expect: 'latin',
       };
     default:
-      return { rule: '', expect: null };
+      // Nothing readable yet (the opening reached us as "not available"). Left
+      // open, the model wrote Arabic script to a +33 number and "Thank you… 3am
+      // baddna nsa3dak" to a Lebanese one. Their next message sets the language.
+      return { rule: 'The client has not written anything readable yet: write this reply only in English.', expect: 'english' };
   }
 }
 
@@ -702,7 +728,7 @@ async function run(conversationId: string, trigger: 'message' | 'sweep' | 'manua
 }
 
 /** "ok", "thanks", "merci", "shukran", 👍 — a conversation ending, not a question. */
-const ACKNOWLEDGEMENT = /^\s*(ok(ay)?|k|thanks?( you)?|thank u|thx|merci( beaucoup)?|shukran|tslam|yslamo|ysalmo|great|perfect|noted|👍|🙏|❤️|شكرا|شكراً|تسلم|يسلمو|اوكي|تمام)[\s!.]*$/i;
+const ACKNOWLEDGEMENT = /^\s*(ok(ay)?|k|thanks?( you)?|thank u|thx|merci( beaucoup)?|shukran|tslam|yslamo|ysalmo|great|perfect|noted|ok tmm|tmm|tamam|habibi|7abibi|👍|🙏|❤️|شكرا|شكراً|تسلم|يسلمو|اوكي|تمام|حبيبي|حبيب القلب)[\s!.]*$/i;
 
 async function reply(conversationId: string, trigger: 'message' | 'sweep' | 'manual' | 'retry'): Promise<AutoReplyOutcome> {
   const manual = trigger === 'manual';
@@ -766,6 +792,20 @@ async function reply(conversationId: string, trigger: 'message' | 'sweep' | 'man
   const waitingSince = Math.min(...unansweredMessages.map((m) => m.createdAt.getTime()));
   trace.in = unansweredMessages.map((m) => m.type).join(',');
   trace.client = preview(unansweredMessages.map((m) => m.transcript ?? m.body).join(' / '));
+  // A 👍 is not a question. Left for the sweep, one got "I will call you at 4:15
+  // PM today" 20 hours later, about a call that had already happened.
+  if (!manual && unansweredMessages.every((m) => m.type === 'reaction' || m.type === 'revoke')) {
+    return skip('Only a reaction or a deleted message is waiting, which needs no reply.');
+  }
+  // What came in while it was off stays with the team. Switching back on means
+  // "answer from now on", not "answer everything you missed in the last day" —
+  // "Reply now" is there for that.
+  if (!manual) {
+    const onSince = Math.max(settings.switchedOnAt ? Date.parse(settings.switchedOnAt) : 0, conversation.aiResumedAt?.getTime() ?? 0);
+    if (Math.max(...unansweredMessages.map((m) => m.createdAt.getTime())) <= onSince) {
+      return skip('This message arrived while the assistant was off, so it was left for the team.');
+    }
+  }
   // The sweep picks up clients left waiting — but "Ok / Thank you" left 13
   // hours is a conversation that ended, and "You're very welcome!" half a day
   // later reads as a bot. Only something that needs an answer is picked up.
@@ -793,8 +833,8 @@ async function reply(conversationId: string, trigger: 'message' | 'sweep' | 'man
     prisma.chatMessage.count({ where: { origin: 'AI', sentAt: { gte: since } } }),
   ]);
   if (!manual && threadCount >= PER_THREAD_LIMIT) {
-    await prisma.conversation.update({
-      where: { id: conversationId },
+    await prisma.conversation.updateMany({
+      where: { id: conversationId, ...NOT_SWITCHED_OFF },
       data: { aiPaused: true, aiPausedReason: `It had already sent ${PER_THREAD_LIMIT} replies in a day`, aiPausedAt: new Date() },
     });
     return skip(`The assistant has already sent ${PER_THREAD_LIMIT} replies here today, so it has paused for a person to take over.`);
@@ -901,11 +941,11 @@ async function reply(conversationId: string, trigger: 'message' | 'sweep' | 'man
   // why the first reply stopped asking for the full name on every ad lead.
   // Only a name somebody typed in, or accepted from the chat, is confirmed.
   const profileName = conversation.displayName?.trim() || null;
-  const leadNameConfirmed = Boolean(lead?.name && !(profileName && sameText(lead.name, profileName)));
+  const leadNameConfirmed = Boolean(lead?.name && !isPlaceholderName(lead.name) && !(profileName && sameText(lead.name, profileName)));
   const fullName = said.fullName ?? (leadNameConfirmed ? lead?.name ?? null : null);
   const weSpokeBefore = recent.some((m) => m.direction === 'OUT');
   const firstReply = !fullName && !weSpokeBefore;
-  const shownName = lead?.name || profileName;
+  const shownName = (lead?.name && !isPlaceholderName(lead.name) ? lead.name : null) || profileName;
   const realFirstName = shownName && /^[\p{L}\p{M}' .-]{2,40}$/u.test(shownName) ? shownName : null;
 
   const known = [
@@ -1237,6 +1277,16 @@ async function reply(conversationId: string, trigger: 'message' | 'sweep' | 'man
     return skip('A new message arrived while the assistant was working, so it held back rather than talk over it.');
   }
 
+  // It can take 15 seconds to write a reply. If it was switched off meanwhile, off wins.
+  if (!manual) {
+    const [current, currentSettings] = await Promise.all([
+      prisma.conversation.findUnique({ where: { id: conversationId }, include: { lead: { select: { adId: true, source: true } } } }),
+      getChatAiSettings(),
+    ]);
+    const stopped = current ? await standingBlock(current, currentSettings, false) : 'Conversation not found.';
+    if (stopped) return skip(`Held back a written reply: ${stopped}`);
+  }
+
   // One message: the reply, then the properties under it. The first one's
   // photo heads the message when the whole thing fits in a caption.
   // The first reply is the greeting and the name question, nothing more —
@@ -1261,8 +1311,8 @@ async function reply(conversationId: string, trigger: 'message' | 'sweep' | 'man
   // taking the conversation — unless a person asked for this reply themselves,
   // in which case they are already there and the pause would only confuse.
   if (handoff && !manual) {
-    await prisma.conversation.update({
-      where: { id: conversationId },
+    await prisma.conversation.updateMany({
+      where: { id: conversationId, ...NOT_SWITCHED_OFF },
       data: { aiPaused: true, aiPausedReason: handoffReason || 'It handed the conversation to the team', aiPausedAt: new Date() },
     });
     // The one moment a person is needed — say so on their phones.
@@ -1277,8 +1327,8 @@ async function reply(conversationId: string, trigger: 'message' | 'sweep' | 'man
   } else if (conversation.aiPaused && !manual) {
     // It was allowed to answer a paused thread (always-on, or the client came
     // back after a quiet day) — so the thread is the assistant's again.
-    await prisma.conversation.update({
-      where: { id: conversationId },
+    await prisma.conversation.updateMany({
+      where: { id: conversationId, ...NOT_SWITCHED_OFF },
       data: { aiPaused: false, aiPausedReason: null, aiPausedAt: null },
     });
   }

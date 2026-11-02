@@ -229,6 +229,7 @@ export default function AiSettingsPage() {
             <span className="block text-sm font-semibold text-slate-900">Answer clients automatically</span>
             <span className="block text-sm text-slate-600">
               It stops on a conversation as soon as you reply from your phone or the CRM, or when the client asks for a person.
+              Off means nothing goes out on its own, follow-ups included, and messages that arrive while it is off are not answered when you switch it back on.
             </span>
           </span>
         </label>
@@ -262,7 +263,7 @@ export default function AiSettingsPage() {
           onChange={(v) => update({ handover: v })}
           options={[
             ['return_after_quiet', 'Step aside, and take over if the team goes quiet', 'It stays out while you are talking. If a client is waiting and nobody from the team has replied for the time below, it picks the conversation up again from its summary.'],
-            ['step_aside', 'Step aside until switched back on', 'It stays out until someone picks a mode again from the Assistant button on that conversation.'],
+            ['step_aside', 'Step aside until switched back on', 'No late replies. Once you have replied on a conversation it stays out, however long ago that was, until someone picks a mode again from the Assistant button there. A client it did not answer when they wrote is not picked up later.'],
             ['always', 'Always answer', 'It answers every message on every conversation, even while you are talking too — clients may get two replies. Switching it off on a chat stops it there. When it hands a client to the team, it waits for the quiet period below.'],
           ] as const}
         />
