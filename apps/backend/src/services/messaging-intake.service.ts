@@ -213,7 +213,10 @@ export async function recordChatMessage(event: ChatEvent): Promise<string | null
     });
   } else if (!conversation.leadId && !event.history) {
     // The sender may have been added to the CRM by hand since the thread began.
-    const lead = await findLeadForSender(event.channel, externalId);
+    let lead = await findLeadForSender(event.channel, externalId);
+    // Someone we have chatted with but never filed tapped an ad and asked about
+    // a project. That is a lead, whether or not the assistant is on for this chat.
+    if (!lead && inbound && event.referral?.adId) lead = await createLeadFromChat(event, externalId);
     if (lead) {
       conversation = await prisma.conversation.update({
         where: { id: conversation.id },

@@ -25,6 +25,20 @@ const sameText = (a: string, b: string) => a.replace(/\s+/g, ' ').trim().toLower
 /** What a client is called before anyone knows: "Instagram contact", "WhatsApp +961…". */
 export const isPlaceholderName = (name: string) => !name.trim() || /^(instagram contact|whatsapp \+\d+)$/i.test(name.trim());
 
+/** "Madame Rania" is Rania: a title is how they spoke, not part of the name on the card. */
+const TITLE = /^(madame|mme|mrs?|ms|miss|mister|monsieur|mlle|dr|doctor|sir|ustaz|ustez|ostaz|sayyed|sheikh|مدام|أستاذ|استاذ|دكتور|السيد|السيدة)\.?\s+/iu;
+export function cleanFullName(name: string): string {
+  let clean = name.replace(/\s+/g, ' ').trim();
+  while (TITLE.test(clean)) clean = clean.replace(TITLE, '');
+  return clean;
+}
+
+/** "Rania Karam" says more than "Rania" and contradicts nothing, so it can replace it. */
+const addsToName = (next: string, current: string) => {
+  const words = next.toLowerCase().split(' ');
+  return cleanFullName(current).toLowerCase().split(' ').every((w) => words.includes(w));
+};
+
 export interface ClientPatch {
   intent?: string;
   market?: string;
@@ -65,8 +79,9 @@ export async function applyToLead(
 
   // The name: a client created from a chat is named after their profile
   // ("Bilal", "rimoncharro7"); the name they type replaces that, not one a person entered.
+  if (patch.fullName) patch = { ...patch, fullName: cleanFullName(patch.fullName) };
   if (patch.fullName && !sameText(patch.fullName, lead.name)) {
-    const placeholder = isPlaceholderName(lead.name) || (conversation?.displayName && sameText(lead.name, conversation.displayName));
+    const placeholder = isPlaceholderName(lead.name) || addsToName(patch.fullName, lead.name) || (conversation?.displayName && sameText(lead.name, conversation.displayName));
     if (placeholder) { data.name = patch.fullName; changes.push(`Name: ${lead.name || '—'} → ${patch.fullName}`); }
     else left.fullName = patch.fullName;
   }
@@ -141,6 +156,30 @@ export async function applyToLead(
     }
   }
   return left;
+}
+
+const NAME_SHAPE = /^[\p{L}\p{M}'.-]+( [\p{L}\p{M}'.-]+){1,3}$/u;
+const NOT_A_NAME = /\b(yes|no|ok|okay|not|now|later|thanks|thank|hello|hi|please|plz|why|what|sorry|sure|good|morning|evening|bonjour|bonsoir|merci|oui|non|tmm|tamam|yalla|bas|mish|la2|shu|ahla|marhaba)\b/i;
+
+/**
+ * The client answered "what is your full name?" while the assistant was staying
+ * out. Nothing was listening, so "Rania Karam" stayed in the chat and never
+ * reached their card. Needs no AI: it is the answer to a question somebody just asked.
+ */
+export async function noteNameFromReply(conversationId: string): Promise<void> {
+  const conversation = await prisma.conversation.findUnique({ where: { id: conversationId }, select: { leadId: true } });
+  if (!conversation?.leadId) return;
+  const [answer, question] = await prisma.chatMessage.findMany({
+    where: { conversationId, type: 'text' },
+    orderBy: { createdAt: 'desc' },
+    take: 2,
+    select: { direction: true, body: true },
+  });
+  if (answer?.direction !== 'IN' || question?.direction !== 'OUT') return;
+  if (!/full name|your name|nom complet|votre nom|esmak|esmik|اسمك|الاسم/i.test(question.body)) return;
+  const name = cleanFullName(answer.body);
+  if (name.length > 50 || !NAME_SHAPE.test(name) || NOT_A_NAME.test(name)) return;
+  await applyToLead(conversation.leadId, conversationId, { fullName: name }, '');
 }
 
 const KIND_LABEL: Record<string, string> = {

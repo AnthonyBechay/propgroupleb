@@ -7,7 +7,7 @@ import { cardCaption, cardsByRef, formatPrice, marketNames, projectsNamedIn, pro
 import { recordListingsShared } from './deal-sync.service.js';
 import { getChatAiSettings, type ChatAiSettings } from './ai-settings.service.js';
 import { linkConversationToLead } from './messaging-intake.service.js';
-import { applyToLead, isPlaceholderName, OFFER_KINDS, savePropertyOffer } from './chat-client-update.service.js';
+import { applyToLead, isPlaceholderName, noteNameFromReply, OFFER_KINDS, savePropertyOffer } from './chat-client-update.service.js';
 import { canSendOn, replyWindowOpen, sendReply } from './messaging-send.service.js';
 import { extractKeyFromUrl, getFileStream } from './upload.service.js';
 
@@ -750,7 +750,12 @@ async function reply(conversationId: string, trigger: 'message' | 'sweep' | 'man
 
   const settings = await getChatAiSettings();
   const blocked = await standingBlock(conversation, settings, manual);
-  if (blocked) return skip(blocked);
+  if (blocked) {
+    if (trigger === 'message') {
+      await noteNameFromReply(conversationId).catch((err) => logger.error('Could not note the name from a reply', err, { conversationId }));
+    }
+    return skip(blocked);
+  }
 
   const since = new Date(Date.now() - DAY_MS);
   const loadRecent = () =>
@@ -928,11 +933,14 @@ async function reply(conversationId: string, trigger: 'message' | 'sweep' | 'man
   const knownMarket: Market | null =
     said.market === 'LEBANON' || said.market === 'GEORGIA'
       ? said.market
-      : fromAd
+      // An opening WhatsApp hid is almost always the advert's greeting (see openingUnreadable).
+      : fromAd || trace.openingUnreadable
         ? adMarket
         : settings.marketWhenUnknown === 'ask'
           ? null
           : settings.marketWhenUnknown;
+  // A client asked this once and answered something else was asked twice more.
+  const askedMarket = recent.some((m) => m.origin === 'AI' && /georgia|جورجيا/i.test(m.body) && /lebanon|lebnen|لبنان/i.test(m.body));
   // For the ad's project and the preferred list when nothing is known yet.
   const defaultMarket: Market = knownMarket ?? 'GEORGIA';
 
@@ -1019,6 +1027,8 @@ async function reply(conversationId: string, trigger: 'message' | 'sweep' | 'man
     settings.guidance ? `Keep in mind (from the office):\n${settings.guidance}` : null,
     knownMarket
       ? `This is about ${knownMarket === 'LEBANON' ? 'Lebanon' : 'Georgia'} — do not ask which country unless they bring up another.`
+      : askedMarket
+        ? 'You already asked whether they want Lebanon or Georgia. Do not ask again. Unless they named one, take it as open to both ("both", "I don\'t mind", or answering something else): search Georgia, and Lebanon too if it fits what they said, and show them what you have.'
       : 'You do not know yet whether they want property in Lebanon or an investment abroad. Before searching or suggesting anything, ask exactly that, in one short question — in substance: "Are you looking for an investment abroad in Georgia, or for a property in Lebanon?" (in the client\'s language style). Do not ask which area of Lebanon until they have chosen Lebanon.',
     `Offer at most ${settings.maxListings} propert${settings.maxListings === 1 ? 'y' : 'ies'} in one reply.`,
     office.address

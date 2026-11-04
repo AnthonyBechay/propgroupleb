@@ -388,6 +388,26 @@ router.delete(
   })
 );
 
+// POST /api/crm/inbox/client-problem — what broke on somebody's phone. The
+// installed app has no console, so this log line is the only way to see it.
+router.post(
+  '/client-problem',
+  asyncHandler(async (req: Request, res: Response) => {
+    const body = z
+      .object({
+        kind: z.string().max(20),
+        message: z.string().max(300),
+        stack: z.string().max(600).optional(),
+        path: z.string().max(120).optional(),
+        installed: z.boolean().optional(),
+        userAgent: z.string().max(200).optional(),
+      })
+      .parse(req.body);
+    logger.warn('Inbox app problem', body);
+    res.status(204).end();
+  })
+);
+
 // POST /api/crm/inbox/:id/ai-reply — have the assistant answer now. Also the
 // way to find out why it is not answering: the outcome comes back in words.
 router.post(

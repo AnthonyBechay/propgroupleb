@@ -3,6 +3,7 @@
 import { useEffect } from 'react'
 import { AlertTriangle, RotateCcw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { reloadIfBuildChanged, reportProblem } from '@/lib/utils/client-problems'
 
 export default function GlobalError({
   error,
@@ -13,6 +14,7 @@ export default function GlobalError({
 }) {
   useEffect(() => {
     console.error('Application error:', error)
+    if (!reloadIfBuildChanged(error)) reportProblem('crash', error.message, error.stack)
   }, [error])
 
   return (
@@ -31,6 +33,10 @@ export default function GlobalError({
         >
           <RotateCcw className="w-4 h-4 mr-2" />
           Try Again
+        </Button>
+        {/* The installed app has no reload button of its own. */}
+        <Button onClick={() => window.location.reload()} variant="outline" className="ml-2">
+          Reload
         </Button>
       </div>
     </div>

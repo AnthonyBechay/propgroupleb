@@ -123,7 +123,11 @@ app.use(
       if (!Number.isFinite(status)) return null;
       const ms = Math.round(Number(tokens['response-time'](req, res)) || 0);
       const url = req.originalUrl ?? req.url;
-      if (status === 404 && (!url.startsWith('/api/') || PROBE.test(url))) {
+      // No route at all under /api ("/api/shop/getKF") is a scanner too. A route
+      // answering 404 (a deleted listing) is not. The logo lookup is on every
+      // listing page and 404 only means "use the bundled logo".
+      if (url.includes('/api/content/media/branding.logoUrl') && status === 404) return null;
+      if (status === 404 && (!url.startsWith('/api/') || res.locals.noRoute || PROBE.test(url))) {
         probes += 1;
         probeIps.set(req.ip ?? '?', (probeIps.get(req.ip ?? '?') ?? 0) + 1);
         return null;
@@ -402,6 +406,7 @@ app.use(errorHandler);
 
 // 404 handler
 app.use('*', (_req, res) => {
+  res.locals.noRoute = true;
   res.status(404).json({
     error: 'Not Found',
     message: `Route ${_req.originalUrl} not found`,

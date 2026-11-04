@@ -13,6 +13,7 @@ import { canDeleteConversations } from '@/lib/permissions'
 import { ChatSuggestion, type Suggestion } from './ChatSuggestion'
 import { ListingPicker } from './ListingPicker'
 import { PushToggle, registerInboxWorker } from './PushToggle'
+import { watchForProblems } from '@/lib/utils/client-problems'
 
 /**
  * WhatsApp and Instagram threads, mirrored from the phone.
@@ -130,12 +131,14 @@ function Attachment({ message }: { message: ChatMessage }) {
     return (
       <a href={url} target="_blank" rel="noopener noreferrer">
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={url} alt="Attachment" className="rounded-lg max-h-64 mb-1" />
+        <img src={url} alt="Attachment" loading="lazy" decoding="async" className="rounded-lg max-h-64 mb-1" />
       </a>
     )
   }
-  if (message.type === 'audio') return <audio controls src={url} className="max-w-full mb-1" />
-  if (message.type === 'video') return <video controls src={url} className="rounded-lg max-h-64 mb-1" />
+  // Nothing downloads until it is played: a long chat holds dozens of these, and
+  // iOS restarts a page that runs out of memory — a white screen, to whoever is using it.
+  if (message.type === 'audio') return <audio controls preload="none" src={url} className="max-w-full mb-1" />
+  if (message.type === 'video') return <video controls preload="none" src={url} className="rounded-lg max-h-64 mb-1" />
   return (
     <a href={url} target="_blank" rel="noopener noreferrer" className="underline block mb-1">
       Open attachment
@@ -179,6 +182,10 @@ export function InboxView({
   const apiUrl = normalizeApiUrl(process.env.NEXT_PUBLIC_API_URL || '')
   const [threads, setThreads] = useState<Thread[] | null>(null)
   const [openId, setOpenId] = useState<string | null>(null)
+  // Which chat is open right now, for an answer that arrives after it was left.
+  const openRef = useRef<string | null>(null)
+  openRef.current = openId
+  const backTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // An open conversation is a step in the browser's history (?c=<id>), so the
   // phone's Back — the swipe, Android's button, the browser arrow — closes the
@@ -193,22 +200,38 @@ export function InboxView({
     setOpenId(id)
   }, [])
   const closeThread = useCallback(() => {
+    if (backTimer.current) return // already on its way back; a second Back would leave the inbox
+    // The keyboard going away with the chat can leave iOS's page shifted, showing blank space.
+    if (document.activeElement instanceof HTMLElement) document.activeElement.blur()
+    const leaveChat = () => {
+      backTimer.current = null
+      const url = new URL(window.location.href)
+      url.searchParams.delete('c')
+      window.history.replaceState(null, '', url)
+      setOpenId(null)
+    }
     if (window.history.state?.inboxThread) {
       window.history.back() // popstate below clears it
+      // An app reopened by iOS can keep this step but not the one before it, and
+      // Back then goes nowhere. The chat still has to close.
+      backTimer.current = setTimeout(leaveChat, 500)
       return
     }
-    const url = new URL(window.location.href)
-    url.searchParams.delete('c')
-    window.history.replaceState(null, '', url)
-    setOpenId(null)
+    leaveChat()
   }, [])
   useEffect(() => {
-    const fromUrl = () => setOpenId(new URL(window.location.href).searchParams.get('c'))
+    const fromUrl = () => {
+      if (backTimer.current) { clearTimeout(backTimer.current); backTimer.current = null }
+      setOpenId(new URL(window.location.href).searchParams.get('c'))
+    }
     fromUrl()
     window.addEventListener('popstate', fromUrl)
     return () => window.removeEventListener('popstate', fromUrl)
   }, [])
+  useEffect(() => watchForProblems(), [])
   const [detail, setDetail] = useState<ThreadDetail | null>(null)
+  // The open chat could not be loaded, as opposed to still being on its way.
+  const [detailFailed, setDetailFailed] = useState(false)
   const [draft, setDraft] = useState('')
   const [sending, setSending] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -250,6 +273,18 @@ export function InboxView({
     [apiUrl]
   )
 
+  // The session ran out. These calls are not the ones the sign-in check watches,
+  // so nothing else would notice: reloading lets that check send them to log in.
+  const signedOut = useCallback(() => {
+    try {
+      if (Date.now() - Number(sessionStorage.getItem('inboxSignedOutAt') ?? 0) < 60_000) return
+      sessionStorage.setItem('inboxSignedOutAt', String(Date.now()))
+    } catch {
+      return
+    }
+    window.location.reload()
+  }, [])
+
   // The server searches every thread; the list itself only holds the newest 100.
   const needle = search.trim()
   const loadThreads = useCallback(async () => {
@@ -258,22 +293,40 @@ export function InboxView({
     if (filter === 'unread') p.set('unread', 'true')
     else if (filter === 'archived') p.set('archived', 'true')
     else if (filter !== 'all') p.set('channel', filter)
-    const res = await call(`?${p}`)
-    if (res.ok) setThreads((await res.json()).data ?? [])
-    else setThreads((t) => t ?? [])
-  }, [call, needle, filter])
+    try {
+      const res = await call(`?${p}`)
+      if (res.status === 401) signedOut()
+      if (res.ok) setThreads((await res.json()).data ?? [])
+      else setThreads((t) => t ?? [])
+    } catch {
+      // No signal, or the phone has only just woken the app. The next poll tries again.
+      setThreads((t) => t ?? [])
+    }
+  }, [call, needle, filter, signedOut])
 
   const loadDetail = useCallback(async (id: string) => {
-    const res = await call(`/${id}?take=${take}`)
-    // Deleted — usually on another phone. Close it, or this screen asks for it
-    // every few seconds for as long as it stays open.
-    if (res.status === 404) { closeThread(); return }
-    if (!res.ok) return
-    const data: ThreadDetail | null = (await res.json()).data ?? null
+    let data: ThreadDetail | null
+    try {
+      const res = await call(`/${id}?take=${take}`)
+      // Left while this was on its way: it must not reappear, or close the wrong chat.
+      if (openRef.current !== id) return
+      // Deleted — usually on another phone. Close it, or this screen asks for it
+      // every few seconds for as long as it stays open.
+      if (res.status === 404) { closeThread(); return }
+      if (res.status === 401) { signedOut(); return }
+      if (!res.ok) { setDetailFailed(true); return }
+      data = (await res.json()).data ?? null
+      if (openRef.current !== id) return
+    } catch {
+      // No signal. What is on screen stays; an empty chat says so instead of spinning.
+      if (openRef.current === id) setDetailFailed(true)
+      return
+    }
     setDetail(data)
+    setDetailFailed(false)
     // A message that arrives while the thread is on screen has been read.
     if (data && data.unreadCount > 0) call(`/${id}/read`, { method: 'POST' })
-  }, [call, take, closeThread])
+  }, [call, take, closeThread, signedOut])
 
   useEffect(() => {
     loadThreads()
@@ -291,7 +344,12 @@ export function InboxView({
       if (openId) loadDetail(openId)
     }
     document.addEventListener('visibilitychange', onVisible)
-    return () => document.removeEventListener('visibilitychange', onVisible)
+    // Coming back to a page iOS kept frozen fires this, not visibilitychange.
+    window.addEventListener('pageshow', onVisible)
+    return () => {
+      document.removeEventListener('visibilitychange', onVisible)
+      window.removeEventListener('pageshow', onVisible)
+    }
   }, [loadThreads, loadDetail, openId])
 
   // A push arriving while the inbox is open: show it now, not at the next poll.
@@ -327,11 +385,13 @@ export function InboxView({
     return () => {
       vv?.removeEventListener('resize', fit)
       document.body.style.overflow = previous
+      window.scrollTo(0, 0)
     }
   }, [openId])
 
   useEffect(() => {
     setDetail(null)
+    setDetailFailed(false)
     setDraft('')
     setError(null)
     setLinking(false)
@@ -496,6 +556,7 @@ export function InboxView({
   }
 
   const visible = threads
+  const openThreadRow = threads.find((t) => t.id === openId)
 
   return (
     <div className={`bg-white border border-slate-200 rounded-xl overflow-hidden lg:grid lg:grid-cols-[360px_minmax(0,1fr)] ${fill ? 'lg:h-[calc(100dvh-9rem)]' : 'lg:h-[70vh]'}`}>
@@ -585,7 +646,26 @@ export function InboxView({
         {!openId ? (
           <div className="flex-1 flex items-center justify-center text-sm text-slate-400">Select a conversation</div>
         ) : !detail ? (
-          <div className="flex-1 flex items-center justify-center text-slate-400"><Loader2 className="h-6 w-6 animate-spin" /></div>
+          // Full screen on a phone, so never without a way out: a chat that is
+          // slow or fails to load used to be a white page with no Back.
+          <>
+            <div className="lg:hidden px-2 py-2 border-b border-slate-200 flex items-center gap-1.5">
+              <button onClick={closeThread} aria-label="Back to conversations" className="shrink-0 min-h-11 min-w-11 -ml-1 inline-flex items-center justify-center text-slate-600">
+                <ArrowLeft className="h-5 w-5" />
+              </button>
+              <p className="font-semibold text-slate-900 truncate">{openThreadRow ? threadName(openThreadRow) : 'Conversation'}</p>
+            </div>
+            <div className="flex-1 flex flex-col items-center justify-center gap-3 px-6 text-center text-slate-500">
+              {detailFailed ? (
+                <>
+                  <p className="text-sm">This conversation didn&apos;t load. Check your connection.</p>
+                  <button onClick={() => loadDetail(openId)} className="min-h-11 px-4 rounded-lg bg-slate-900 text-white text-sm font-semibold">Try again</button>
+                </>
+              ) : (
+                <Loader2 className="h-6 w-6 animate-spin text-slate-400" />
+              )}
+            </div>
+          </>
         ) : (
           <>
             {/* One row on every screen: back, who, the assistant, and the rest
