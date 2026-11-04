@@ -22,6 +22,14 @@ export const VIEW_OPTIONS = [
   { value: 'OPEN', label: 'Open' },
 ]
 
+/** What a project's finish looks out at: one per finish, each with its own price per m². */
+export const FINISH_VIEW_OPTIONS = [
+  { value: 'SEA', label: 'Sea view' },
+  { value: 'MOUNTAIN', label: 'Mountain view' },
+  { value: 'ROAD', label: 'Road view' },
+  { value: 'PRIME', label: 'Prime view' },
+]
+
 /** Offered as one-tap chips so the same feature isn't typed three ways. */
 export const FEATURE_SUGGESTIONS = [
   'Balcony', 'Terrace', 'Maid’s room', 'Storage room', 'Private entrance',

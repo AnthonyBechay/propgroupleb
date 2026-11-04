@@ -40,6 +40,7 @@ export function ChatSuggestion({
 }) {
   const apiUrl = normalizeApiUrl(process.env.NEXT_PUBLIC_API_URL || '')
   const [busy, setBusy] = useState<'accept' | 'dismiss' | null>(null)
+  const [done, setDone] = useState<'accept' | 'dismiss' | null>(null)
   const p = suggestion.patch ?? {}
 
   const facts = [
@@ -59,7 +60,12 @@ export function ChatSuggestion({
       const res = await fetch(`${apiUrl}/api/crm/inbox/suggestions/${suggestion.id}/${action}`, {
         method: 'POST', credentials: 'include',
       })
-      if (res.ok) onResolved(action === 'accept')
+      if (res.ok) {
+        // Stay in place a moment. The card closing moves everything below it up,
+        // and a second tap would land on whatever is now under the finger.
+        setDone(action)
+        setTimeout(() => onResolved(action === 'accept'), 1200)
+      }
     } finally { setBusy(null) }
   }
 
@@ -76,8 +82,15 @@ export function ChatSuggestion({
           ))}
         </div>
       )}
+      {done ? (
+      <p className="min-h-11 mt-3 flex items-center gap-1.5 text-sm font-medium text-slate-800">
+        <Check className="h-4 w-4" /> {done === 'accept' ? 'Saved on the client card' : 'Dismissed'}
+      </p>
+      ) : (
+      <>
       <div className="flex gap-2 mt-3">
         <button
+          type="button"
           onClick={() => resolve('accept')}
           disabled={busy !== null}
           className="min-h-11 px-3 rounded-lg bg-slate-900 text-white text-sm font-medium inline-flex items-center gap-1.5 disabled:opacity-50"
@@ -86,6 +99,7 @@ export function ChatSuggestion({
           {hasClient ? 'Update client' : 'Add as client with this'}
         </button>
         <button
+          type="button"
           onClick={() => resolve('dismiss')}
           disabled={busy !== null}
           className="min-h-11 px-3 rounded-lg border border-slate-200 bg-white text-slate-700 text-sm font-medium inline-flex items-center gap-1.5 disabled:opacity-50"
@@ -93,6 +107,9 @@ export function ChatSuggestion({
           <X className="h-4 w-4" /> Dismiss
         </button>
       </div>
+      <p className="text-xs text-slate-500 mt-2">Only the client card changes. Nothing is sent to the client.</p>
+      </>
+      )}
     </div>
   )
 }

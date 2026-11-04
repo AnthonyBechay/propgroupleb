@@ -8,6 +8,7 @@ import {
   CreditCard, TrendingUp, Check, Minus, Download,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { initialPaymentLabel } from '@/lib/initial-payment'
 import type { ComparatorItem, PaymentPlanDetails } from '@/lib/types/api'
 
 function fmt(value: number, currency: string) {
@@ -39,6 +40,8 @@ function Row({ label, values, highlight, isCurrency, currency }: RowProps) {
         <td key={i} className="px-4 py-3 text-sm text-slate-800 text-center border-r border-slate-100 last:border-r-0">
           {v == null ? (
             <Minus className="w-4 h-4 text-slate-300 mx-auto" />
+          ) : isCurrency && typeof v === 'string' ? (
+            <span className="font-semibold text-[#1B3A5C]">{v}</span>
           ) : isCurrency && typeof v === 'number' ? (
             <span className="font-semibold text-[#1B3A5C]">{fmt(v, currency!)}</span>
           ) : (
@@ -210,7 +213,7 @@ export default function ComparePage() {
                 <Row
                   label="Initial Payment"
                   highlight
-                  values={colItems.map(i => i?.initialPayment ?? null)}
+                  values={colItems.map(i => i ? initialPaymentLabel(i.initialPayment, i.totalPrice, v => fmt(v, i.currency)) : null)}
                   isCurrency
                   currency={colItems.find(i => i)?.currency ?? 'USD'}
                 />

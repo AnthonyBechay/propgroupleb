@@ -83,6 +83,7 @@ function buildingFacts(b: Record<string, unknown>): string {
     b.status && `Status: ${String(b.status).replace(/_/g, ' ').toLowerCase()}`,
     b.totalFloors && `Floors: ${b.totalFloors}`,
     b.builtYear && `Built: ${b.builtYear}`,
+    b.distanceToSea != null && `Distance to the sea: ${b.distanceToSea} m`,
     amenities.length && `Amenities: ${amenities.join(', ')}`,
     Array.isArray(b.highlightedFeatures) && b.highlightedFeatures.length &&
       `Highlights: ${(b.highlightedFeatures as string[]).join(', ')}`,

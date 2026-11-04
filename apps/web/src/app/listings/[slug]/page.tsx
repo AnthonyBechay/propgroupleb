@@ -421,6 +421,7 @@ export default async function ListingDetailPage({ params }: PageProps) {
               <div className="bg-white rounded-2xl border border-slate-200 p-6">
                 <h2 className="text-lg font-semibold text-slate-900 mb-4">Building Amenities</h2>
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                  {building.distanceToSea != null && <AmenityChip icon={<Waves className="w-4 h-4" />} label={`${building.distanceToSea.toLocaleString('en-US')} m to the sea`} />}
                   {building.hasPool && <AmenityChip icon={<Waves className="w-4 h-4" />} label="Pool" />}
                   {building.hasGym && <AmenityChip icon={<Dumbbell className="w-4 h-4" />} label="Gym" />}
                   {building.hasGenerator && <AmenityChip icon={<Zap className="w-4 h-4" />} label="Generator" />}

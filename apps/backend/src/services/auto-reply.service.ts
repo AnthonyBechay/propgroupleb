@@ -601,6 +601,75 @@ function preview(text: string | null | undefined, max = 160): string | undefined
 
 const sameText = (a: string, b: string) => a.replace(/\s+/g, ' ').trim().toLowerCase() === b.replace(/\s+/g, ' ').trim().toLowerCase();
 
+const NOTE_WORDS = new RegExp(
+  [
+    "\\b(the|this) (client|customer|lead)\\b",
+    "(?<!(your|my|our|a) )\\bclient('s)? (is|was|wants?|asked|needs?|has|details|record|card|file|profile|status)\\b",
+    "\\b(status update|update status|updated from chat)\\b",
+    "^\\s*(status|update|updated|summary|internal)\\b\\s*[:\\-–]",
+    "\\b(looking to|budget up to|bedrooms from|asking for|property type|already on file|budget on file)\\s*:",
+    "\\bcrm\\b",
+    "\\b(save_client_requirements|update_conversation_summary|hand_off_to_team|search_listings|get_property_details|send_listings)\\b",
+    "\\[not from the client\\]",
+    "\\b(el|l) client\\b",
+    "العميل|الزبون",
+  ].join('|'),
+  'iu'
+);
+
+const TOOL_TEXT = /(?:print\(\s*)?(?:default_api\.)?\b(save_client_requirements|update_conversation_summary|hand_off_to_team|search_listings|get_property_details|send_listings|save_property_offer|save_voice_transcripts)\s*\(/;
+
+/**
+ * The model sometimes types a tool call out as text instead of making it:
+ * `update_conversation_summary(summary="…")` under a good reply, which reached
+ * clients. Cut out only the call, so the reply itself still goes, and hand back
+ * the summary it was trying to save.
+ */
+export function stripToolText(text: string): { text: string; summary: string | null } {
+  let rest = text;
+  let summary: string | null = null;
+  for (let found = TOOL_TEXT.exec(rest); found; found = TOOL_TEXT.exec(rest)) {
+    // To the bracket that closes it, ignoring brackets inside quotes. One never closed runs to the end.
+    let depth = 0;
+    let quote = '';
+    let end = rest.length;
+    for (let i = found.index; i < rest.length; i++) {
+      const ch = rest[i];
+      if (quote) {
+        if (ch === '\\') i++;
+        else if (ch === quote) quote = '';
+      } else if (ch === '"' || ch === "'") quote = ch;
+      else if (ch === '(') depth++;
+      else if (ch === ')' && --depth === 0) { end = i + 1; break; }
+    }
+    const call = rest.slice(found.index, end);
+    if (found[1] === 'update_conversation_summary') {
+      const said = /summary\s*=\s*(["'])((?:\\.|(?!\1)[\s\S])*)\1/.exec(call);
+      if (said) summary = said[2].replace(/\\(["'])/g, '$1');
+    }
+    rest = rest.slice(0, found.index) + rest.slice(end);
+  }
+  if (rest === text) return { text, summary };
+  // What wrapped the call: a code fence and its label.
+  return { text: rest.replace(/```(?:tool_code|python|tool_call)?/g, '').replace(/\n{3,}/g, '\n\n').trim(), summary };
+}
+
+/**
+ * A note for the team, written where the reply to the client belongs. The model
+ * keeps a running summary about "the client" beside every reply, and any text it
+ * writes in that turn was sent as the reply. A client must never read that.
+ * `written` is what it recorded this reply; words copied from there are a note too.
+ */
+export function internalNote(text: string, written: string[] = []): boolean {
+  if (NOTE_WORDS.test(text)) return true;
+  const plain = (s: string) => s.replace(/\s+/g, ' ').trim().toLowerCase();
+  const reply = plain(text);
+  return written.some((w) => {
+    const note = plain(w);
+    return note.length >= 20 && (reply.includes(note.slice(0, 40)) || note.includes(reply));
+  });
+}
+
 function systemPrompt(context: string, replyStyle: ChatAiSettings['replyStyle'], thisReply: string): string {
   return `You are the assistant for PropGroup, a real estate brokerage, replying to a client on WhatsApp or Instagram. PropGroup sells and rents property in Lebanon and sells investment property abroad, mainly in Georgia.
 
@@ -610,6 +679,7 @@ ${LANGUAGE_RULE[replyStyle]}${thisReply ? `\n- ${thisReply}` : ''}
 - If the client sends a voice note, listen to it and answer what it says as if they had typed it.
 - A message that reads "Not received: …" in the middle of a conversation means the client sent something that did not reach us — usually a voice note or photo set to "view once". Do not guess what it said. Ask them, briefly and kindly, to send it again as a normal voice note or as text.
 - Never mention what you record for the team ("I have updated your file", "I saved your details"). Just carry on with the conversation.
+- Every word you write goes to the client. Tools are only ever used by calling them, never by typing their name or arguments into your message. Speak to them as "you". Never describe them as "the client", and never write a status, a summary or a note as text: those belong only in the tools.
 - Never send a message you have already sent in this conversation, word for word or nearly. If you already told them a colleague will be in touch, do not say it again: answer what they asked if you can, or acknowledge it in a few words.
 
 What to do:
@@ -625,11 +695,13 @@ What to do:
 How the two markets work:
 - Abroad (Georgia) PropGroup sells PROJECTS: developments with several unit types and a "from" price. It is always a purchase, usually for investment. Never ask a Georgia client whether they want to buy or rent, never offer rentals, and do not bring up Lebanon unless they do. Useful questions there are budget, unit size, and when they want to buy.
 - Lebanon is sold property by property, and a property is either for sale or for rent — ask which if it is not clear, and pass it to search_listings.
+- A project's "from" price is one unit in its cheapest finish, not the project. When a client names a price or asks what it includes (is it furnished, which view), call get_property_details and say exactly what that price gets them, from its priceNote: the unit, the finish and the view. If they want something it does not include, give the finish that has it and that finish's price. Never answer yes from the project's general description.
+- Furnishing goes by the finish, shown as "furnished" on each option: Black Frame and White Frame are not furnished, Turnkey is.
 
 Hard rules:
 - Describe a property only as search_listings or get_property_details returned it — its name, its location and its price exactly as given. If a result is somewhere other than where the client asked, say so; never relabel it to match their request.
 - If a place or project name in a voice note is unclear, or is not one we have stock in, ask the client to confirm it before searching.
-- Only state facts about a property that search_listings or get_property_details returned, or that the office's answers below give. Never invent or estimate a price, availability, yield, payment plan, delivery date or legal detail — if it is not there, say a colleague will confirm it.
+- Only state facts about a property that search_listings or get_property_details returned, that the office's answers below give, or that a colleague has already told this client. Never invent or estimate a price, availability, yield, payment plan, delivery date, distance (to the sea or anything else: only distanceToSea from get_property_details) or legal detail — if it is not there, say a colleague will confirm it.
 - Never mention owners, sellers, developers' terms, commission, fees, discounts or anything about how PropGroup is paid. If asked, say a colleague will go through the details.
 - Never negotiate, never confirm a viewing time, never ask for ID or payment details.
 - Hand off only when it is really needed: the client asks for a person, is upset, wants to negotiate or to book a viewing, or asks something that is neither in the search results nor on the property's page. Then call hand_off_to_team and tell them a member of the team will message them shortly.
@@ -865,6 +937,9 @@ async function reply(conversationId: string, trigger: 'message' | 'sweep' | 'man
   const contents: ChatContent[] = [];
   for (const m of ordered) {
     const role = m.direction === 'IN' ? 'user' : 'model';
+    // Earlier replies that leaked a tool call must not be shown as how replies look.
+    const body = m.direction === 'OUT' ? stripToolText(m.body).text : m.body;
+    if (!body) continue;
     const parts: ChatPart[] = [];
     const unanswered = unansweredIds.has(m.id);
     const isAudio = m.type === 'audio';
@@ -889,7 +964,7 @@ async function reply(conversationId: string, trigger: 'message' | 'sweep' | 'man
       parts.push({
         text: openingUnreadable
           ? '[Not from the client] Their first message could not be read — almost certainly the ready-made greeting from the advert ("Hello! Can I get more info on this?"). Greet them and start the conversation; do not ask them to resend anything.'
-          : m.transcript && isAudio ? `[voice note] ${m.transcript}` : m.body,
+          : m.transcript && isAudio ? `[voice note] ${m.transcript}` : body,
       });
       if (openingUnreadable) trace.openingUnreadable = true;
     }
@@ -1020,10 +1095,22 @@ async function reply(conversationId: string, trigger: 'message' | 'sweep' | 'man
       : 'If the client has just told you their name, record it with save_client_requirements (fullName) and continue straight away with what they came for — the details of the property or project from the advert, or the next useful question. If they did not give it, do not ask again; just help them.';
   trace.nameStep = fullName ? 'known' : firstReply ? 'ask' : 'continue';
 
+  // A colleague's answer is the office's answer. Without saying so, the rule
+  // "only facts from the catalogue" had the assistant contradicting one.
+  const teamSaid = await prisma.chatMessage.findMany({
+    where: { conversationId, direction: 'OUT', type: 'text', OR: [{ origin: null }, { origin: { not: 'AI' } }] },
+    orderBy: { sentAt: 'desc' },
+    take: 8,
+    select: { body: true },
+  });
+
   const context = [
     nameRule,
     ad,
     preferred,
+    teamSaid.length
+      ? `What a colleague has already told this client, newest first. This is the office's word: treat it as fact, it wins over the catalogue where they differ, and if the client asks the same thing again give the same answer in your own words. Never contradict it:\n${teamSaid.map((m) => `- ${m.body.replace(/\s+/g, ' ').slice(0, 300)}`).join('\n')}`
+      : null,
     settings.guidance ? `Keep in mind (from the office):\n${settings.guidance}` : null,
     knownMarket
       ? `This is about ${knownMarket === 'LEBANON' ? 'Lebanon' : 'Georgia'} — do not ask which country unless they bring up another.`
@@ -1073,6 +1160,19 @@ async function reply(conversationId: string, trigger: 'message' | 'sweep' | 'man
   const sessions: ChatSession[] = [];
   let toolLog: string[] = [];
   let turns = 0;
+  /** What it wrote down for the team during this reply, so none of it goes out as the reply. */
+  const notes: string[] = [];
+  const cleanReply = async (text: string): Promise<string> => {
+    const clean = stripToolText(text);
+    if (clean.text === text) return text;
+    trace.toolTextRemoved = true;
+    logger.warn('Auto-reply: removed a tool call typed into the reply', { conversationId });
+    if (clean.summary) {
+      notes.push(clean.summary);
+      await prisma.conversation.update({ where: { id: conversationId }, data: { summary: clean.summary.slice(0, 1200) } });
+    }
+    return clean.text;
+  };
   const aiStarted = Date.now();
   for (let step = 0; ; step++) {
     const model = order[step];
@@ -1092,9 +1192,14 @@ async function reply(conversationId: string, trigger: 'message' | 'sweep' | 'man
     const result = await session.send(contents);
     turns += 1;
     contents.push(result.content);
+    result.text = await cleanReply(result.text);
     // Text written alongside a search is "let me check" — not the answer. Only
     // a turn that ends the work (no call, or only bookkeeping calls) is the reply.
-    if (result.text && result.calls.every((c) => FINISHING_TOOLS.has(c.name))) reply = result.text;
+    for (const c of result.calls) for (const v of [c.args?.summary, c.args?.reason]) if (typeof v === 'string') notes.push(v);
+    if (result.text && result.calls.every((c) => FINISHING_TOOLS.has(c.name))) {
+      if (internalNote(result.text, notes)) trace.heldNote = preview(result.text);
+      else reply = result.text;
+    }
     if (result.calls.length === 0) break;
 
     const responses: ChatPart[] = [];
@@ -1206,8 +1311,8 @@ async function reply(conversationId: string, trigger: 'message' | 'sweep' | 'man
       // It used its tools (wrote down the voice note, searched) and stopped
       // without saying anything. The client is still waiting: ask for the reply.
       if (!reply) {
-        contents.push({ role: 'user', parts: [{ text: '[Not from the client] You have not replied to the client yet. Write your reply to them now, following the language rule you were given.' }] });
-        reply = (await session.send(contents, true)).text;
+        contents.push({ role: 'user', parts: [{ text: '[Not from the client] You have not replied to the client yet. Write your reply to them now, following the language rule you were given. Speak to them directly as "you": no notes, no summary, no status.' }] });
+        reply = await cleanReply((await session.send(contents, true)).text);
       }
       break;
     } catch (err) {
@@ -1267,6 +1372,22 @@ async function reply(conversationId: string, trigger: 'message' | 'sweep' | 'man
     trace.usd = (spent() + fixed.usd).toFixed(4);
   } else {
     trace.usd = spent().toFixed(4);
+  }
+
+  // The last gate. Holding back leaves the client waiting, so somebody is told;
+  // a note about them landing on their phone cannot be taken back.
+  if (internalNote(reply, notes)) {
+    trace.heldNote = preview(reply);
+    logger.warn('Auto-reply: held back a note written as a reply', { conversationId, text: preview(reply) });
+    const { notifyTeam } = await import('./push.service.js');
+    void notifyTeam({
+      title: `${lead?.name || conversation.displayName || 'A client'} needs you`,
+      body: 'The assistant could not write a proper reply, so nothing was sent.',
+      url: `/admin/inbox?c=${conversationId}`,
+      tag: `chat-${conversationId}`,
+      kind: 'needs_you',
+    });
+    return skip('The assistant wrote a note for the team instead of a reply, so it was not sent.');
   }
 
   // Never the same words twice. It happened when a hand-off was repeated on a

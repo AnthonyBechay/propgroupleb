@@ -227,6 +227,8 @@ router.post(
       }),
     ]);
     await logAdminAction('ACCEPT_CHAT_SUGGESTION', 'lead', lead.id, { changes }, authReq);
+    // This sends nothing. On the timeline, so a message beside it can be told apart.
+    logger.info('Client updated from the chat card', { conversation: suggestion.conversationId, client: lead.id, changes: changes.join('; ').slice(0, 200) });
     sendSuccess(res, { leadId: lead.id, changes });
   })
 );

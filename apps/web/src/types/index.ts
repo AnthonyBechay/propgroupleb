@@ -289,6 +289,7 @@ export interface Building {
   city?: string | null;
   neighborhood?: string | null;
   address?: string | null;
+  distanceToSea?: number | null;
   latitude?: number | null;
   longitude?: number | null;
   images: string[];

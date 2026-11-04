@@ -57,7 +57,9 @@ export function ListingPicker({
   }, [apiUrl, conversationId])
   useEffect(() => { load() }, [load])
 
-  const send = async (ref: string) => {
+  const send = async (ref: string, title: string) => {
+    // This one goes straight to the client's phone, so a stray tap must not send it.
+    if (!window.confirm(`Send ${title} to this client?`)) return
     setSending(ref)
     setError(null)
     try {
@@ -126,7 +128,7 @@ export function ListingPicker({
                 <p className="text-sm font-semibold text-slate-900 mt-1">{money(c)}</p>
                 <div className="flex gap-1.5 mt-2">
                   <button
-                    onClick={() => send(c.ref)}
+                    onClick={() => send(c.ref, c.title)}
                     disabled={!canSend || sending !== null || sent.includes(c.ref)}
                     className="flex-1 min-h-11 rounded-lg bg-slate-900 text-white text-sm font-medium inline-flex items-center justify-center gap-1.5 disabled:opacity-50"
                   >

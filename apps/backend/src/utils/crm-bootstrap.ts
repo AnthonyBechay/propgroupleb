@@ -145,6 +145,28 @@ export async function normaliseCrmData(): Promise<void> {
     return `${moved} finish descriptions turned into a view`;
   });
 
+  // A finish now has one view from a short list, with its own price per m².
+  // Multi-view rows take the view that sets the price, and a note that only named
+  // a view ("Side Sea View") becomes that view. Any other note is left alone, and
+  // a view the list dropped stays readable as a note rather than disappearing.
+  await once('unit_option_one_view_v1', async () => {
+    const options = await prisma.unitOption.findMany({ select: { id: true, description: true, views: true } });
+    let changed = 0;
+    for (const o of options) {
+      const text = (o.description ?? '').trim();
+      const onlyAView = text.length <= 40 && /views?\.?$/i.test(text);
+      const said = [...o.views, ...(onlyAView || !o.views.length ? [text] : [])].join(' ');
+      const view = /\bsea\b/i.test(said) ? 'SEA' : /\bmountains?\b/i.test(said) ? 'MOUNTAIN' : /\bprime\b/i.test(said) ? 'PRIME' : /\b(street|road)\b/i.test(said) ? 'ROAD' : null;
+      const views = view ? [view] : [];
+      const dropped = !view && o.views.length ? o.views.map((v) => v.charAt(0) + v.slice(1).toLowerCase()).join(' & ') + ' view' : null;
+      const description = onlyAView && view ? null : text || dropped;
+      if (o.views.join() === views.join() && (o.description ?? null) === (description || null)) continue;
+      await prisma.unitOption.update({ where: { id: o.id }, data: { views, description: description || null } });
+      changed++;
+    }
+    return `${changed} of ${options.length} finishes moved to one view`;
+  });
+
   await once('crm_clear_derived_followups_v1', async () => {
     const { count } = await prisma.lead.updateMany({
       where: {

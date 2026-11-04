@@ -118,6 +118,7 @@ const buildingSchema = z.object({
   latitude: z.number().optional().nullable(),
   longitude: z.number().optional().nullable(),
   locationUrl: z.string().optional().nullable(),
+  distanceToSea: z.number().int().min(0).max(1_000_000).optional().nullable(),
   builtYear: z.number().int().optional().nullable(),
   totalFloors: z.number().int().optional().nullable(),
   parkingSpaces: z.number().int().optional().nullable(),
@@ -471,7 +472,7 @@ const optionSchema = z.object({
   initialPayment: z.number().min(0).max(100).optional().nullable(),
   description: z.string().max(2000).optional().nullable(),
   // No default: an update that leaves it out must not wipe it.
-  views: z.array(z.enum(['SEA', 'MOUNTAIN', 'CITY', 'GARDEN', 'POOL', 'STREET', 'OPEN'])).max(7).optional(),
+  views: z.array(z.enum(['SEA', 'MOUNTAIN', 'ROAD', 'PRIME'])).max(1).optional(),
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   paymentPlanDetails: z.any().optional().nullable(),
 });

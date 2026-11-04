@@ -313,6 +313,7 @@ export function mapBuildingToProperty(
     district: pick<string>(building, 'neighborhood', 'neighbourhood', 'district') ?? null,
     address: pick<string>(building, 'address') ?? null,
     zipCode: pick<string>(building, 'zipCode') ?? null,
+    distanceToSea: toNumber(pick(building, 'distanceToSea')) ?? null,
     latitude: toNumber(pick(building, 'latitude', 'lat')) ?? null,
     longitude: toNumber(pick(building, 'longitude', 'lng')) ?? null,
     locationUrl: pick<string>(building, 'locationUrl', 'mapUrl') ?? null,

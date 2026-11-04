@@ -340,6 +340,17 @@ export function LocationSection({ f, set, disabled, errors }: SectionProps & { e
           />
         </Field>
 
+        <Field label="Distance to the sea (meters)" optional>
+          <NumberInput
+            min="0"
+            step="1"
+            value={f.distanceToSea}
+            onChange={(e) => set({ distanceToSea: e.target.value })}
+            placeholder="150"
+            disabled={disabled}
+          />
+        </Field>
+
         <Field
           label="Google Maps link"
           optional

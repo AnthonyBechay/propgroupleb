@@ -78,6 +78,7 @@ export const buildingSchema = z.object({
   address: z.string().optional().nullable(),
   zipCode: z.string().optional().nullable(),
   latitude: z.number().optional().nullable(),
+  distanceToSea: z.number().int().min(0).optional().nullable(),
   longitude: z.number().optional().nullable(),
   locationUrl: z.string().optional().nullable(),
 

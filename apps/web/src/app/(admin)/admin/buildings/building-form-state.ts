@@ -77,6 +77,7 @@ export interface BuildingFormState {
   neighborhood: string
   address: string
   zipCode: string
+  distanceToSea: string
   latitude: string
   longitude: string
   locationUrl: string
@@ -156,6 +157,7 @@ export function emptyBuildingForm(initial?: any): BuildingFormState {
     neighborhood: initial?.neighborhood ?? '',
     address: initial?.address ?? '',
     zipCode: initial?.zipCode ?? '',
+    distanceToSea: str(initial?.distanceToSea),
     latitude: str(initial?.latitude),
     longitude: str(initial?.longitude),
     locationUrl: initial?.locationUrl ?? '',
@@ -254,6 +256,7 @@ export function buildingPayload(
     neighborhood: f.neighborhood || null,
     address: f.address || null,
     zipCode: f.zipCode || null,
+    distanceToSea: int(f.distanceToSea),
     latitude: num(f.latitude),
     longitude: num(f.longitude),
     locationUrl: f.locationUrl || null,

@@ -5,6 +5,7 @@ import { trimDescription } from '@/components/property/PropertyDescription'
 import { createPortal } from 'react-dom'
 import { Download, Loader2, Check } from 'lucide-react'
 import { normalizeFileUrl, normalizeApiUrl } from '@/lib/utils/api-url'
+import { initialPaymentAmount, initialPaymentLabel } from '@/lib/initial-payment'
 import type { Listing } from '@/types'
 
 const MOHAFAZAT_LABELS: Record<string, string> = {
@@ -31,7 +32,7 @@ function money(amount: number, currency = 'USD'): string {
 
 interface OptionPlan {
   name: string; total: number; currency: string
-  down: number; downPct: number; months: number; installmentsTotal: number; monthly: number
+  downLabel: string; months: number; installmentsTotal: number; monthly: number
   idealFor?: string | null
 }
 
@@ -76,17 +77,19 @@ export function ProposalExport({ listing }: { listing: Listing }) {
   const rawOptions = unit?.options && unit.options.length > 0 ? unit.options : null
   const optionSource = (rawOptions ?? [{ name: 'Purchase' }]) as unknown as Record<string, unknown>[]
   const options: OptionPlan[] = optionSource.map((o) => {
-    const ppsm = typeof o.pricePerSqm === 'number' ? o.pricePerSqm : null
-    const total = ppsm != null && area ? ppsm * area : typeof o.askingPrice === 'number' ? o.askingPrice : listing.price
+    // Decimals arrive as strings, so a typeof check here would skip every real option.
+    const ppsm = Number(o.pricePerSqm) || null
+    const total = ppsm && area ? ppsm * area : Number(o.askingPrice) || Number(listing.price)
     const currency = (o.currency as string) || (o.askingCurrency as string) || listing.currency || 'USD'
-    const down = typeof o.initialPayment === 'number' ? o.initialPayment : Math.round((total * downPct) / 100)
+    const down = initialPaymentAmount(o.initialPayment, total) ?? Math.round((total * downPct) / 100)
     const plan = (o.paymentPlanDetails ?? {}) as Record<string, unknown>
     const months = typeof plan.months === 'number' ? plan.months : (inv?.installmentYears ? inv.installmentYears * 12 : 30)
     const installmentsTotal = Math.max(total - down, 0)
     const monthly = typeof plan.monthly === 'number' ? plan.monthly : (months > 0 ? installmentsTotal / months : 0)
     return {
       name: (o.name as string) || 'Purchase', total, currency,
-      down, downPct: total > 0 ? Math.round((down / total) * 100) : downPct,
+      downLabel: initialPaymentLabel(o.initialPayment, total, (v) => money(v, currency))
+        ?? `${total > 0 ? Math.round((down / total) * 100) : downPct}% · ${money(down, currency)}`,
       months, installmentsTotal, monthly, idealFor: (o.description as string) ?? null,
     }
   })
@@ -196,7 +199,7 @@ export function ProposalExport({ listing }: { listing: Listing }) {
                         <div style={{ fontSize: 10.5, fontWeight: 700, color: INK, marginBottom: 5, letterSpacing: 0.5 }}>PAYMENT PLAN</div>
                         <ol style={{ margin: 0, paddingLeft: 15, fontSize: 10.5, color: '#334155', lineHeight: 1.7 }}>
                           <li>Sales agreement on signing</li>
-                          <li><strong>Down payment:</strong> {money(o.down, o.currency)} ({o.downPct}%)</li>
+                          <li><strong>Down payment:</strong> {o.downLabel}</li>
                           <li><strong>Installments:</strong> {money(o.installmentsTotal, o.currency)} (~{money(o.monthly, o.currency)}/mo over {o.months} months, interest-free)</li>
                           <li>Full ownership transfer on completion</li>
                         </ol>

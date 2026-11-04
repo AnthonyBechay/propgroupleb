@@ -3,21 +3,18 @@
 import { useState } from 'react'
 import { Check, Loader2, Pencil, Plus, Trash2, X } from 'lucide-react'
 import { normalizeApiUrl } from '@/lib/utils/api-url'
-import type { UnitOption } from './UnitOptions'
-import { VIEW_OPTIONS } from '@/lib/unit-attributes'
-
-const viewLabel = (v: string) => VIEW_OPTIONS.find((o) => o.value === v)?.label ?? v
+import { FinishViewPicker, finishClash, finishViewLabel as viewLabel, firstPaymentField, firstPaymentText, type UnitOption } from './UnitOptions'
 
 /**
  * A project unit type's finishes, as the table a buyer actually chooses from:
  *
  *   Finishing        View        Price / m²   Studio · 30 m²   First payment
  *   Black frame      Mountain    $1,500       $45,000          30%
+ *   Black frame      Sea         $1,600       $48,000          30%
  *   White frame      Sea         $1,800       $54,000          30%
  *
- * The view is the same field a unit has (Sea, Mountain, City…), picked, not
- * typed — "sea view", "Sea View" and "seaview" were three spellings of one
- * thing. A free note stays for what a view cannot say ("floors 8–15").
+ * The view is picked from a short list, not typed, and a row has one: the view
+ * sets the price, so each finish-and-view is its own row with its own price per m².
  *
  * It replaced a short list hidden inside the unit's Edit panel, under fields
  * about owners and rent that a project type never has — so the thing that
@@ -42,6 +39,8 @@ export function FinishingTable({
   const [error, setError] = useState<string | null>(null)
 
   async function save(body: Record<string, unknown>, id?: string) {
+    const clash = finishClash(options, body, id)
+    if (clash) { setError(clash); return }
     setBusy(true); setError(null)
     try {
       const res = await fetch(id ? `${base}/${id}` : base, {
@@ -108,7 +107,7 @@ export function FinishingTable({
                   {area && Number(o.pricePerSqm) > 0 ? money(Number(o.pricePerSqm) * area, o.currency) : <span className="font-normal text-slate-300">set the size</span>}
                 </td>
                 <td className="py-2.5 pr-3 text-right tabular-nums text-slate-700">
-                  {o.initialPayment != null ? `${Number(o.initialPayment)}%` : <span className="text-slate-300">—</span>}
+                  {o.initialPayment != null ? firstPaymentText(o.initialPayment, o.currency) : <span className="text-slate-300">—</span>}
                 </td>
                 <td className="py-1.5 text-right">
                   <button type="button" onClick={() => setEditing(o.id)} aria-label={`Edit ${o.name}`} title="Edit"
@@ -158,13 +157,12 @@ function FinishingRow({
   const [f, setF] = useState({
     name: initial?.name ?? '',
     description: initial?.description ?? '',
-    views: initial?.views ?? [] as string[],
+    views: initial?.views?.slice(0, 1) ?? [] as string[],
     pricePerSqm: initial?.pricePerSqm != null ? String(Number(initial.pricePerSqm)) : '',
     currency: initial?.currency ?? 'USD',
-    initialPayment: initial?.initialPayment != null ? String(Number(initial.initialPayment)) : '',
+    initialPayment: firstPaymentField(initial?.initialPayment, Number(initial?.pricePerSqm) * area),
   })
   const set = (k: Exclude<keyof typeof f, 'views'>, v: string) => setF((p) => ({ ...p, [k]: v }))
-  const toggleView = (v: string) => setF((p) => ({ ...p, views: p.views.includes(v) ? p.views.filter((x) => x !== v) : [...p.views, v] }))
   const total = area && Number(f.pricePerSqm) > 0 ? Number(f.pricePerSqm) * area : null
   const submit = () => onSave({
     name: f.name.trim(),
@@ -179,22 +177,16 @@ function FinishingRow({
     <tr className="bg-slate-50 align-top">
       <td className="py-2 pr-2">
         <input autoFocus value={f.name} onChange={(e) => set('name', e.target.value)} placeholder="White frame" className={cell} aria-label="Finishing" />
-        <input value={f.description} onChange={(e) => set('description', e.target.value)} placeholder="Note (optional) — e.g. floors 8–15" aria-label="Note"
-          className="mt-1.5 w-full min-h-9 rounded-lg border border-slate-200 bg-white px-2.5 text-xs focus:outline-none focus:ring-2 focus:ring-slate-900/10"
-          onKeyDown={(e) => { if (e.key === 'Enter' && f.name.trim()) submit() }} />
+        {f.description && (
+          <p className="mt-1.5 flex items-center gap-1 text-xs text-slate-500">
+            Old note: {f.description}
+            <button type="button" onClick={() => set('description', '')} aria-label="Remove the note" className="p-0.5 rounded text-slate-400 hover:text-slate-800"><X className="h-3 w-3" /></button>
+          </p>
+        )}
       </td>
       <td className="py-2 pr-2">
-        {/* The unit's own view choices, tapped rather than typed. */}
-        <div className="flex max-w-[15rem] flex-wrap gap-1" role="group" aria-label="View">
-          {VIEW_OPTIONS.map((o) => {
-            const on = f.views.includes(o.value)
-            return (
-              <button key={o.value} type="button" onClick={() => toggleView(o.value)} aria-pressed={on}
-                className={`min-h-8 rounded-full px-2.5 text-xs font-medium ring-1 transition-colors ${on ? 'bg-sky-600 text-white ring-sky-600' : 'bg-white text-slate-600 ring-slate-200 hover:bg-slate-50'}`}>
-                {o.label}
-              </button>
-            )
-          })}
+        <div className="max-w-[15rem]">
+          <FinishViewPicker value={f.views} onChange={(views) => setF((p) => ({ ...p, views }))} />
         </div>
       </td>
       <td className="py-2 pr-2">

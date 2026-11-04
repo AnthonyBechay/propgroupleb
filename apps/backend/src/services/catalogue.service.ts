@@ -304,6 +304,10 @@ export function cardCaption(card: CatalogueCard): string {
  * commission. Units that are sold, reserved or off the market are left out.
  * `ref` may be a unit's code ("PG-1059-2"), which finds its building.
  */
+/** Whether a finish comes furnished, for the names the office uses. Unknown names stay unknown. */
+const finishIsFurnished = (name: unknown): boolean | undefined =>
+  typeof name !== 'string' ? undefined : /turn.?key/i.test(name) ? true : /(black|white).?frame/i.test(name) ? false : undefined;
+
 export async function propertyDetails(ref: string): Promise<Record<string, unknown> | null> {
   const code = ref.trim().toUpperCase();
   const buildingRef = code.replace(/^(PG-\d+)-\d+$/, '$1');
@@ -340,20 +344,35 @@ export async function propertyDetails(ref: string): Promise<Record<string, unkno
         floor: u.floor ?? undefined,
         views: raw?.views?.length ? raw.views.join(', ').toLowerCase() : undefined,
         features: raw?.features?.length ? raw.features.join(', ').toLowerCase() : undefined,
-        furnishing: u.furnishingStatus ?? undefined,
+        // In a project the finish decides this, so a unit-level value would contradict it.
+        furnishing: (u.options as unknown[]).length ? undefined : u.furnishingStatus ?? undefined,
         price: listing ? money(Number(listing.price), listing.currency) : undefined,
         // Abroad a unit is sold in finishes, each with its own price and plan.
-        options: (u.options as Array<Record<string, any>>).map((o) => ({
+        options: [...(u.options as Array<Record<string, any>>)].sort((a, b) => a.pricePerSqm - b.pricePerSqm).map((o) => ({
           finish: o.name,
+          furnished: finishIsFurnished(o.name),
           view: Array.isArray(o.views) && o.views.length ? o.views.join(', ').toLowerCase() : undefined,
           price: money(o.pricePerSqm * (u.area || 0), o.currency),
           pricePerSqm: money(o.pricePerSqm, o.currency),
-          firstPayment: money(o.initialPayment, o.currency) ?? undefined,
+          // Up to 100 is a percentage of the price. Above that, the old Georgian
+          // catalogue's amount in money (see lib/initial-payment.ts on the web).
+          firstPayment: Number(o.initialPayment) > 100 ? money(Number(o.initialPayment), o.currency) ?? undefined : Number(o.initialPayment) > 0 ? `${Number(o.initialPayment)}% of the price` : undefined,
           paymentPlan: plan(o.paymentPlanDetails),
           about: clip(o.description, 200),
         })),
       };
     });
+
+  // "From $39,520" reads as the price of the project. It is one unit in one
+  // finish, and a client asking "is the 39,500 furnished?" needs to hear which.
+  const cheapest = (p.units as Array<Record<string, any>>)
+    .filter((u) => u.availabilityStatus === 'AVAILABLE' && !hiddenUnit.has((rawUnits.get(u.id) as any)?.lifecycle))
+    .flatMap((u) => (u.options as Array<Record<string, any>>).map((o) => ({ u, o, amount: o.pricePerSqm * (u.area || 0) })))
+    .filter((x) => x.amount > 0)
+    .sort((a, b) => a.amount - b.amount)[0];
+  const priceNote = cheapest && Math.round(cheapest.amount) === Math.round(card.price)
+    ? `${formatPrice(card).replace(/^from /, '')} is only ${cheapest.u.name} in ${cheapest.o.name}${cheapest.o.views?.length ? `, ${cheapest.o.views.join(' and ').toLowerCase()} view` : ''}${finishIsFurnished(cheapest.o.name) === false ? ', not furnished' : ''}. Other finishes, views and sizes cost more: see units.`
+    : undefined;
 
   const amenities = [
     ['hasPool', 'pool'], ['hasGym', 'gym'], ['hasGarden', 'garden'], ['hasSecurity', 'security'],
@@ -367,7 +386,9 @@ export async function propertyDetails(ref: string): Promise<Record<string, unkno
     ref: card.ref,
     title: card.title,
     location: card.location,
+    distanceToSea: typeof p.distanceToSea === 'number' ? `${p.distanceToSea.toLocaleString('en-US')} m` : undefined,
     price: formatPrice(card),
+    priceNote,
     readiness: card.readiness === 'ready' ? 'ready — built, can be handed over now' : 'off-plan — still being built',
     handover: month(inv.handoverDate) ?? undefined,
     completion: month(inv.completionDate) ?? undefined,

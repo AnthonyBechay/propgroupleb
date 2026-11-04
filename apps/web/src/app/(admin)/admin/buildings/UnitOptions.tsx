@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { Plus, Trash2, Loader2, Check, X, Pencil, Layers3 } from 'lucide-react'
 import { normalizeApiUrl } from '@/lib/utils/api-url'
+import { FINISH_VIEW_OPTIONS } from '@/lib/unit-attributes'
 
 /**
  * Finish / payment options on a unit — "white frame" vs "turnkey", each with
@@ -20,9 +21,47 @@ export interface UnitOption {
   currency: 'USD' | 'LBP'
   initialPayment: number | string | null
   description: string | null
-  /** SEA, MOUNTAIN… — the same view choices a unit has. */
+  /** One of FINISH_VIEW_OPTIONS. Each finish-and-view is its own row with its own price. */
   views?: string[]
 }
+
+export const finishViewLabel = (v: string) => FINISH_VIEW_OPTIONS.find((o) => o.value === v)?.label ?? v
+
+/** Tap to choose, tap again for none. A row has one view, because the view sets its price. */
+export function FinishViewPicker({ value, onChange }: { value: string[]; onChange: (views: string[]) => void }) {
+  return (
+    <div className="flex flex-wrap gap-1" role="group" aria-label="View">
+      {FINISH_VIEW_OPTIONS.map((o) => {
+        const on = value[0] === o.value
+        return (
+          <button key={o.value} type="button" onClick={() => onChange(on ? [] : [o.value])} aria-pressed={on}
+            className={`min-h-8 rounded-full px-2.5 text-xs font-medium ring-1 transition-colors ${on ? 'bg-sky-600 text-white ring-sky-600' : 'bg-white text-slate-600 ring-slate-200 hover:bg-slate-50'}`}>
+            {o.label}
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
+/** The same finish and view twice on one unit: two prices for one thing a buyer can choose. */
+export function finishClash(options: UnitOption[], body: Record<string, unknown>, id?: string): string | null {
+  const name = String(body.name ?? '').trim().toLowerCase()
+  const view = (body.views as string[] | undefined)?.[0] ?? ''
+  const twin = options.find((o) => o.id !== id && o.name.trim().toLowerCase() === name && (o.views?.[0] ?? '') === view)
+  return twin ? `This unit already has ${twin.name}${view ? `, ${finishViewLabel(view).toLowerCase()}` : ''}. Choose another view, or edit that row.` : null
+}
+
+/** What the first-payment field shows. An old catalogue amount (above 100) is offered as its percentage. */
+export function firstPaymentField(stored: number | string | null | undefined, total: number): string {
+  if (stored == null) return ''
+  const value = Number(stored)
+  if (value <= 100) return String(value)
+  return total > 0 ? String(Math.round((value / total) * 100)) : ''
+}
+
+export const firstPaymentText = (stored: number | string, currency: string) =>
+  Number(stored) > 100 ? `${currency === 'USD' ? '$' : `${currency} `}${Math.round(Number(stored)).toLocaleString('en-US')}` : `${Number(stored)}%`
 
 const inp = 'w-full px-2 py-1.5 border border-zinc-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-zinc-900/10'
 
@@ -48,6 +87,8 @@ export function UnitOptions({
   const base = `${apiUrl}/api/buildings/${buildingId}/units/${unitId}/options`
 
   async function save(body: Record<string, unknown>, id?: string) {
+    const clash = finishClash(options, body, id)
+    if (clash) { setError(clash); return }
     setBusy(true); setError(null)
     try {
       const res = await fetch(id ? `${base}/${id}` : base, {
@@ -97,7 +138,7 @@ export function UnitOptions({
       {error && <p className="text-xs text-red-600 mb-2">{error}</p>}
 
       {editing === 'new' && (
-        <OptionForm busy={busy} onCancel={() => setEditing(null)} onSave={(b) => save(b)} />
+        <OptionForm areaSqm={areaSqm} busy={busy} onCancel={() => setEditing(null)} onSave={(b) => save(b)} />
       )}
 
       {options.length === 0 && editing !== 'new' ? (
@@ -112,6 +153,7 @@ export function UnitOptions({
               <li key={o.id}>
                 <OptionForm
                   initial={o}
+                  areaSqm={areaSqm}
                   busy={busy}
                   onCancel={() => setEditing(null)}
                   onSave={(b) => save(b, o.id)}
@@ -125,6 +167,9 @@ export function UnitOptions({
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="text-sm font-medium text-zinc-900">{o.name}</span>
+                    {o.views?.[0] && (
+                      <span className="rounded-full bg-sky-50 px-2 py-0.5 text-xs font-medium text-sky-800 ring-1 ring-sky-200">{finishViewLabel(o.views[0])}</span>
+                    )}
                     <span className="text-xs text-zinc-500">
                       {o.currency} {Number(o.pricePerSqm).toLocaleString()}/m²
                     </span>
@@ -135,7 +180,7 @@ export function UnitOptions({
                     )}
                     {o.initialPayment != null && (
                       <span className="text-[10px] text-zinc-500 bg-zinc-100 px-1.5 py-px rounded">
-                        {Number(o.initialPayment)}% down
+                        {firstPaymentText(o.initialPayment, o.currency)} down
                       </span>
                     )}
                   </div>
@@ -166,9 +211,10 @@ export function UnitOptions({
 }
 
 function OptionForm({
-  initial, busy, onCancel, onSave,
+  initial, areaSqm, busy, onCancel, onSave,
 }: {
   initial?: UnitOption
+  areaSqm?: number | null
   busy: boolean
   onCancel: () => void
   onSave: (body: Record<string, unknown>) => void
@@ -177,9 +223,10 @@ function OptionForm({
     name: initial?.name ?? '',
     pricePerSqm: initial?.pricePerSqm != null ? String(Number(initial.pricePerSqm)) : '',
     currency: initial?.currency ?? 'USD',
-    initialPayment: initial?.initialPayment != null ? String(Number(initial.initialPayment)) : '',
+    initialPayment: firstPaymentField(initial?.initialPayment, Number(initial?.pricePerSqm) * (Number(areaSqm) || 0)),
     description: initial?.description ?? '',
   })
+  const [views, setViews] = useState<string[]>(initial?.views?.slice(0, 1) ?? [])
   const set = (k: keyof typeof f, v: string) => setF((p) => ({ ...p, [k]: v }))
 
   return (
@@ -203,13 +250,19 @@ function OptionForm({
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-4 gap-2">
         <label className="block">
-          <span className="text-[11px] text-zinc-500">Down payment %</span>
+          <span className="text-[11px] text-zinc-500">First payment %</span>
           <input type="number" min="0" max="100" value={f.initialPayment} onChange={(e) => set('initialPayment', e.target.value)} className={inp} />
         </label>
-        <label className="block sm:col-span-3">
-          <span className="text-[11px] text-zinc-500">Description</span>
-          <input value={f.description} onChange={(e) => set('description', e.target.value)} placeholder="Fully finished, appliances included" className={inp} />
-        </label>
+        <div className="block sm:col-span-3">
+          <span className="text-[11px] text-zinc-500">View</span>
+          <FinishViewPicker value={views} onChange={setViews} />
+          {f.description && (
+            <p className="mt-1.5 flex items-center gap-1 text-xs text-zinc-500">
+              Old note: {f.description}
+              <button type="button" onClick={() => set('description', '')} aria-label="Remove the note" className="p-0.5 rounded text-zinc-400 hover:text-zinc-800"><X className="h-3 w-3" /></button>
+            </p>
+          )}
+        </div>
       </div>
       <div className="flex justify-end gap-2">
         <button type="button" onClick={onCancel} className="px-2.5 py-1 text-xs text-zinc-600 rounded hover:bg-zinc-200">
@@ -224,6 +277,7 @@ function OptionForm({
               currency: f.currency,
               initialPayment: f.initialPayment !== '' ? Number(f.initialPayment) : null,
               description: f.description.trim() || null,
+              views,
             })
           }
           disabled={busy || !f.name.trim()}

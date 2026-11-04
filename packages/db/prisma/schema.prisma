@@ -411,6 +411,8 @@ model Building {
   address      String?
   zipCode      String?
   latitude     Float?
+  /// Metres from the sea, as a buyer asks it. The chat assistant quotes only this.
+  distanceToSea Int?
   longitude    Float?
   locationUrl  String? // Google Maps embed URL
 
@@ -678,9 +680,9 @@ model UnitOption {
   currency           Currency @default(USD)
   initialPayment     Decimal?
   paymentPlanDetails Json?
-  // What this finish looks out at: SEA, MOUNTAIN, CITY… — the same choices a
-  // unit's "View" field uses. In a project the view decides the price
-  // ("White frame, sea view"), so it lives on the finish, not the unit.
+  // What this finish looks out at: one of SEA, MOUNTAIN, ROAD, PRIME. The view
+  // decides the price, so each finish-and-view is its own row with its own price
+  // per m² ("Black frame, sea view"). An array for the storefronts' sake.
   views              String[] @default([])
   description        String?
 
