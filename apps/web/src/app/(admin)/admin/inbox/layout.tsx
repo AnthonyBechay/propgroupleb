@@ -18,6 +18,8 @@ export const viewport: Viewport = {
   // Lets the page reach the screen's edges in the installed app; the chat pads
   // itself clear of the notch and the home bar with env(safe-area-inset-*).
   viewportFit: 'cover',
+  // iOS still allows pinching with this; what it stops is the zoom on focusing a field.
+  maximumScale: 1,
 }
 
 export default function InboxLayout({ children }: { children: React.ReactNode }) {

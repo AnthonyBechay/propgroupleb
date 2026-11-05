@@ -383,8 +383,9 @@ Bedrooms aren't scored for investors or international stock.
 
 - **Inputs must render at ≥16px below `md`.** iOS Safari zooms the whole page in
   when it focuses a smaller control and never zooms back out. `globals.css`
-  applies `font-size: max(16px, 1em)` under 768px, so a `text-sm` field is safe;
-  don't undo it with an inline `font-size`.
+  applies `font-size: max(16px, 1em) !important` under 768px and on touch screens,
+  so a `text-sm` field is safe. The `!important` is required: `@layer base` loses
+  to Tailwind's utilities, and without it the rule did nothing.
 - **Tap targets ≥44px** (`min-h-11`) on anything a thumb has to find. Icon-only
   buttons at `p-1.5` are 28px and get mis-tapped.
 - **One navigation, two presentations.** `Sidebar` renders the desktop rail and
@@ -589,7 +590,7 @@ When generating new share links, always go through the `ShareToken` table. Don't
 - **Every word the assistant writes goes to the client.** `internalNote()` in `auto-reply.service.ts` and `stripToolText()` keep its notes off their phone. The model sometimes types a tool call as text (`update_conversation_summary(summary="…")`); only that part is cut and the reply still goes. Otherwise: text about "the client", a status or summary, or words copied from what it just recorded is not a reply. It is asked again once, then held back and the team is told. **A colleague's words win:** what the team told this client is passed in as fact over the catalogue. A project's "from" price is one unit in one finish (`priceNote` in `propertyDetails`), and furnishing goes by the finish. Accepting a chat suggestion ("Update client") sends nothing.
 - **Meta ad spend** is read (never written) by `services/meta-ads.service.ts` for the Overview's ads panel; needs `META_AD_ACCOUNT_ID`. Ad leads that reach a viewing or close are reported back by `services/meta-conversions.service.ts` (needs `META_DATASET_ID`; untested against a real dataset), once per stage, tracked in `Lead.metaStage`.
 - **Follow-up after silence** (`services/follow-up.service.ts`): past 24h since the client's last message WhatsApp accepts only Meta-approved templates, each billed. One template, named in Chat assistant settings (off by default), goes hourly in Beirut business hours to WhatsApp *clients* silent `afterDays`–`afterDays+7` days, once per silence (`Conversation.followUpSentAt`), capped per day; never to WON/LOST/ARCHIVED, chats switched off by the team, or "stop". The window bound is what stops switching it on from pinging six months of imported history — keep it. Stored with origin `AI` so the assistant, not "a team reply", picks up the answer. The inbox's "Send follow-up" button sends it by hand.
-- **Chat assistant settings** live at `/admin/ai-settings` (admin only), stored in `SystemSetting` under `chat_ai_settings`: on/off, who it answers, an ordered list of preferred projects with a pitch each, and free-text guidance. `AUTO_REPLY_ENABLED` stays the server-side master switch above it. The fixed rules (no invented prices, nothing about owners or commission, no negotiating) are in the prompt, not in settings — keep it that way.
+- **Chat assistant settings** live at `/admin/settings/assistant` (admin only; `/admin/ai-settings` redirects there), stored in `SystemSetting` under `chat_ai_settings`: on/off, who it answers, an ordered list of preferred projects with a pitch each, and free-text guidance. `AUTO_REPLY_ENABLED` stays the server-side master switch above it. The fixed rules (no invented prices, nothing about owners or commission, no negotiating) are in the prompt, not in settings — keep it that way.
 
 ---
 
@@ -657,3 +658,17 @@ hand-off. VAPID keys come from `VAPID_PUBLIC_KEY`/`VAPID_PRIVATE_KEY`, or are
 generated once and kept in SystemSetting `vapid_keys` — changing them
 invalidates every device, which then has to turn notifications on again.
 iPhone receives them only from the Home Screen app (iOS 16.4+).
+
+## The Inbox on a phone (`crm/InboxView.tsx`)
+
+- **The page itself never scrolls.** The list and the chat each scroll inside
+  themselves; a scrollable page is what iOS leaves shifted when the keyboard goes.
+- **The open chat lies over the list**, not in place of it, so the list keeps its
+  place and is there the moment a swipe back begins.
+- **An open chat, and a client card over it, are history steps** (`?c=`), so the
+  phone's Back closes one step at a time. A chat opened directly gets the list put
+  behind it on load.
+- **The chat follows `visualViewport`** (height and top): iOS does not shrink
+  100dvh for the keyboard.
+- **Messages being sent live in `pending`, apart from the thread**, so a poll cannot
+  wipe them. A failed one stays on screen with Try again.

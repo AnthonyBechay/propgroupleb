@@ -43,13 +43,15 @@ self.addEventListener('notificationclick', (event) => {
   event.waitUntil(
     (async () => {
       const windows = await self.clients.matchAll({ type: 'window', includeUncontrolled: true })
-      // Reuse the open app, on the conversation tapped.
+      // Reuse the open app, on the conversation tapped. An open inbox switches chat
+      // itself: reloading it would wipe a half-written reply, and navigate() is
+      // unreliable on an iOS app that has just been woken.
       for (const w of windows) {
-        if (w.url.includes('/admin/')) {
-          await w.focus()
-          if ('navigate' in w) return w.navigate(url)
-          return
-        }
+        if (!w.url.includes('/admin/')) continue
+        await w.focus()
+        if (w.url.includes('/admin/inbox')) return w.postMessage({ type: 'open-thread', url })
+        if ('navigate' in w) return w.navigate(url)
+        return
       }
       return self.clients.openWindow(url)
     })()

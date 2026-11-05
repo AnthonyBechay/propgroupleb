@@ -139,12 +139,17 @@
      inputs are `text-sm` (14px), so every admin form, every filter box and the
      login page jumped and then had to be pinched back. `max(16px, …)` raises
      only the ones that would trigger it and leaves anything already larger
-     alone. Above 768px the original sizes apply untouched. */
-  @media (max-width: 767px) {
+     alone. Above 768px the original sizes apply untouched.
+
+     !important is what makes this work at all: this file's @layer base loses to
+     Tailwind's utilities layer whatever the specificity, so without it `text-sm`
+     kept the chat box at 14px and iOS zoomed in every time the keyboard opened.
+     Touch screens wider than 767px (a phone on its side) zoom just the same. */
+  @media (max-width: 767px), (pointer: coarse) {
     input:not([type='checkbox']):not([type='radio']),
     select,
     textarea {
-      font-size: max(16px, 1em);
+      font-size: max(16px, 1em) !important;
     }
   }
 

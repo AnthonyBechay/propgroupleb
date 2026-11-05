@@ -38,7 +38,7 @@ export async function registerInboxWorker(): Promise<ServiceWorkerRegistration |
   }
 }
 
-export function PushToggle() {
+export function PushToggle({ compact = false }: { compact?: boolean }) {
   const apiUrl = normalizeApiUrl(process.env.NEXT_PUBLIC_API_URL || '')
   const [state, setState] = useState<State>('loading')
   const [mode, setMode] = useState<Mode>('all')
@@ -132,6 +132,8 @@ export function PushToggle() {
 
   if (state === 'loading') return null
 
+  if (compact && (state === 'unsupported' || state === 'blocked')) return null
+
   if (state === 'install-first' || state === 'unsupported' || state === 'blocked') {
     const text =
       state === 'install-first'
@@ -157,6 +159,10 @@ export function PushToggle() {
       </div>
     )
   }
+
+  // Above the chat list, it only speaks up when there is something to switch on;
+  // the choices live under Settings → Notifications.
+  if (compact) return null
 
   return (
     <div>
