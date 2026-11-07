@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
+import { OverviewView } from './crm/OverviewView'
 import {
   Bot, Building2, CalendarClock, Clock, Eye, FileText, Globe, Hand, Heart, Inbox, Layers, ListChecks,
   MapPin, MessageSquare, MessagesSquare, UserPlus, Users,
@@ -114,6 +116,7 @@ export function AdminDashboardClient() {
   const [data, setData] = useState<DashboardData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
+  const router = useRouter()
 
   const load = useCallback(async (scope: Market) => {
     setLoading(true)
@@ -180,6 +183,17 @@ export function AdminDashboardClient() {
       {data && (
         <div className={cn('space-y-6 transition-opacity', loading && 'opacity-50')}>
           {data.work && <WorkRow work={data.work} />}
+
+          {/* The CRM's Overview, moved here from the pipeline page: how the
+              client side of the business is doing. Both markets, always. */}
+          <section className="space-y-2">
+            <h2 className="text-sm font-semibold text-slate-900">
+              Clients and deals <span className="font-normal text-slate-500">· both markets</span>
+            </h2>
+            <OverviewView
+              onFocus={(v) => router.push(v === 'list' ? '/admin/clients' : v === 'today' ? '/admin/crm?view=today' : '/admin/crm')}
+            />
+          </section>
 
           {/* Headline numbers — everything here respects the market switch */}
           <div className="grid grid-cols-2 gap-2.5 lg:grid-cols-6">
@@ -557,7 +571,7 @@ function WorkRow({ work }: { work: WorkSnapshot }) {
   const items = [
     { href: '/admin/inbox', icon: MessagesSquare, label: 'Chats waiting', value: work.waiting, hint: 'Unread WhatsApp and Instagram', urgent: work.waiting > 0 },
     { href: '/admin/inbox', icon: Hand, label: 'Handed to the team', value: work.handedOver, hint: 'The assistant stepped aside', urgent: work.handedOver > 0 },
-    { href: '/admin/crm', icon: CalendarClock, label: 'Follow-ups due', value: work.followUpsDue, hint: `${work.openLeads} open clients`, urgent: work.followUpsDue > 0 },
+    { href: '/admin/crm', icon: CalendarClock, label: 'Follow-ups due', value: work.followUpsDue, hint: `${work.openLeads} active clients`, urgent: work.followUpsDue > 0 },
     { href: '/admin/crm', icon: UserPlus, label: 'New clients', value: work.newLeadsThisWeek, hint: 'Last 7 days', urgent: false },
   ]
   return (

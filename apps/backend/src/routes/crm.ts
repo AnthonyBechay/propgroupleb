@@ -2,6 +2,7 @@ import express, { type Request, type Response, type Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '@propgroup/db';
 import { authenticateToken, requireAdmin, requireCrm, canSeeMoney, redactMoney, stripMoneyInput, logAdminAction } from '../middleware/auth.js';
+import { activeClientWhere } from '../utils/client-activity.js';
 import { commissionFields } from '../services/commission.service.js';
 import { asyncHandler } from '../utils/errors.js';
 import { sendSuccess, sendCreated, sendPaginated, sendNotFound, sendError } from '../utils/response.js';
@@ -380,9 +381,18 @@ router.get(
       : [];
     const projectById = new Map(soldProjects.map((b: any) => [b.id, b]));
 
+    // Which of these are in play right now — see utils/client-activity.ts.
+    const activeIds = new Set(
+      (await prisma.lead.findMany({
+        where: { id: { in: (items as any[]).map((l) => l.id) }, ...activeClientWhere() },
+        select: { id: true },
+      })).map((l) => l.id)
+    );
+
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const withDeals = (items as any[]).map((l) => ({
       ...l,
+      active: activeIds.has(l.id),
       deals: l.opportunities
         .filter((o: any) => o.stage === 'WON')
         .map((o: any) => {
@@ -423,15 +433,20 @@ router.get(
     const openStatuses = { notIn: ['WON', 'LOST', 'ARCHIVED'] as string[] };
     // "Due" now means a follow-up someone actually planned, not a date invented
     // from a cadence — so the number means something when it's non-zero.
-    const [total, dueFollowUps, byMarket, byStatus] = await Promise.all([
+    const [total, dueFollowUps, byMarket, byStatus, active, activeByMarket] = await Promise.all([
       prisma.lead.count({ where: { status: openStatuses as never } }),
       prisma.lead.count({ where: { nextContactAt: { lte: new Date() }, status: openStatuses as never } }),
       prisma.lead.groupBy({ by: ['market'], _count: { _all: true }, where: { status: openStatuses as never } }),
       prisma.lead.groupBy({ by: ['status'], _count: { _all: true } }),
+      prisma.lead.count({ where: activeClientWhere() }),
+      prisma.lead.groupBy({ by: ['market'], _count: { _all: true }, where: activeClientWhere() }),
     ]);
 
     sendSuccess(res, {
       openLeads: total,
+      // Open AND something happening — the number to quote. See client-activity.ts.
+      activeLeads: active,
+      activeByMarket: Object.fromEntries(activeByMarket.map((r) => [r.market, r._count._all])),
       dueFollowUps,
       byMarket: Object.fromEntries(byMarket.map((r) => [r.market, r._count._all])),
       byStatus: Object.fromEntries(byStatus.map((r) => [r.status, r._count._all])),
@@ -563,26 +578,40 @@ router.get(
     const monthStart = new Date();
     monthStart.setDate(1);
     monthStart.setHours(0, 0, 0, 0);
-    const cold = new Date();
-    cold.setDate(cold.getDate() - 21);
+    const DAY = 24 * 60 * 60 * 1000;
+    const twoWeeks = new Date(Date.now() - 14 * DAY);
+    // Everything below is about clients in play (utils/client-activity.ts).
+    // Counting every open record said "125 open clients" for a board of a few
+    // dozen, and "never called" counted every contact ever imported.
+    const active = activeClientWhere();
 
     const [
       byStatus, byMarket, byType, bySubStatus,
       liveDeals, viewingsBooked, feedbackOwed, neverCalled, goingCold,
       wonThisMonth,
       projectStock,
+      activeCount, openCount,
     ] = await Promise.all([
       prisma.lead.groupBy({ by: ['status'], _count: { _all: true } }),
-      prisma.lead.groupBy({ by: ['market'], _count: { _all: true }, where: { status: open as never } }),
-      prisma.lead.groupBy({ by: ['type'], _count: { _all: true }, where: { status: open as never } }),
-      prisma.lead.groupBy({ by: ['subStatus'], _count: { _all: true }, where: { status: open as never } }),
+      prisma.lead.groupBy({ by: ['market'], _count: { _all: true }, where: active }),
+      prisma.lead.groupBy({ by: ['type'], _count: { _all: true }, where: active }),
+      prisma.lead.groupBy({ by: ['subStatus'], _count: { _all: true }, where: active }),
 
-      // Deals actually in motion — the pipeline that matters this week.
-      prisma.leadOpportunity.count({ where: { stage: { in: ['SHARED', 'VIEWING_BOOKED', 'VIEWED', 'INTERESTED', 'OFFER_MADE'] } } }),
+      // Deals actually in motion — the board's deal columns, nothing shortlisted.
+      prisma.leadOpportunity.count({ where: { stage: { in: ['VIEWING_BOOKED', 'VIEWED', 'INTERESTED', 'OFFER_MADE', 'RESERVED'] } } }),
       prisma.leadOpportunity.count({ where: { stage: 'VIEWING_BOOKED' } }),
       prisma.leadOpportunity.count({ where: { stage: 'VIEWED' } }),
-      prisma.lead.count({ where: { lastContactAt: null, status: open as never } }),
-      prisma.lead.count({ where: { lastContactAt: { lt: cold }, nextContactAt: null, status: open as never } }),
+      // Came in the last two weeks with no chat and nobody has called: a lead form.
+      prisma.lead.count({ where: { status: open as never, lastContactAt: null, createdAt: { gte: twoWeeks }, conversations: { none: {} } } }),
+      // A live deal nobody has touched in two weeks — business slipping, not an old contact.
+      prisma.lead.count({
+        where: {
+          status: open as never,
+          opportunities: { some: { stage: { in: ['VIEWING_BOOKED', 'VIEWED', 'INTERESTED', 'OFFER_MADE'] }, updatedAt: { lt: twoWeeks } } },
+          OR: [{ lastContactAt: null }, { lastContactAt: { lt: twoWeeks } }],
+          conversations: { none: { lastMessageAt: { gte: twoWeeks } } },
+        },
+      }),
 
       prisma.leadOpportunity.count({ where: { stage: 'WON', closedAt: { gte: monthStart } } }),
 
@@ -596,6 +625,8 @@ router.get(
           listings: { select: { id: true } },
         },
       }),
+      prisma.lead.count({ where: active }),
+      prisma.lead.count({ where: { status: open as never } }),
     ]);
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -626,6 +657,8 @@ router.get(
       .sort((a, b) => b.sold - a.sold);
 
     sendSuccess(res, {
+      activeClients: activeCount,
+      dormantClients: Math.max(0, openCount - activeCount),
       pipeline: tally(byStatus, 'status'),
       byMarket: tally(byMarket, 'market'),
       byType: tally(byType, 'type'),
@@ -1689,6 +1722,12 @@ export async function syncLeadStatus(leadId: string) {
       subStatus,
       ...(next && ['WON', 'LOST'].includes(next) ? { closedAt: new Date() } : {}),
       ...(next && !['WON', 'LOST'].includes(next) ? { closedAt: null } : {}),
+      // A viewing or anything past it means whatever they were on hold for is
+      // resolved; left on, the card would come back to "On hold" with a stale
+      // note the day that deal is ruled out.
+      ...(lead.holdAt && lead.opportunities.some((o) => ['VIEWING_BOOKED', 'VIEWED', 'INTERESTED', 'OFFER_MADE', 'RESERVED', 'WON'].includes(o.stage))
+        ? { holdAt: null, holdKind: null, holdNote: null }
+        : {}),
     },
   });
 }

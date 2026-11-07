@@ -7,7 +7,7 @@ import type { Metadata, Viewport } from 'next'
  * site should stay a bookmark of the site, not an app that opens the back office.
  */
 export const metadata: Metadata = {
-  title: 'Inbox',
+  title: 'WhatsApp',
   manifest: '/inbox.webmanifest',
   appleWebApp: { capable: true, title: 'Inbox', statusBarStyle: 'default' },
   robots: { index: false, follow: false },

@@ -240,19 +240,26 @@ router.delete('/recurring/:id', asyncHandler(async (req: Request, res: Response)
   sendSuccess(res, { id: existing.id });
 }));
 
-/** ?from=YYYY-MM-DD&to=YYYY-MM-DD, both inclusive; defaults to this year. */
+/**
+ * ?from=YYYY-MM-DD&to=YYYY-MM-DD, both inclusive; defaults to this year.
+ * ?market=LEBANON|GEORGIA narrows to one office; shared costs then sit apart.
+ */
 function period(req: Request) {
   const q = req.query as Record<string, string>;
   const now = new Date();
   const from = q.from ? new Date(`${q.from}T00:00:00`) : new Date(now.getFullYear(), 0, 1);
   const to = q.to ? new Date(`${q.to}T23:59:59.999`) : new Date(now.getFullYear(), 11, 31, 23, 59, 59, 999);
-  return { from, to };
+  const market = q.market === 'LEBANON' || q.market === 'GEORGIA' ? (q.market as 'LEBANON' | 'GEORGIA') : null;
+  return { from, to, market };
 }
 
 router.get('/expenses', asyncHandler(async (req: Request, res: Response) => {
   await generateRecurring();
-  const { from, to } = period(req);
-  sendSuccess(res, await prisma.expense.findMany({ where: { date: { gte: from, lte: to } }, orderBy: { date: 'desc' } }));
+  const { from, to, market } = period(req);
+  sendSuccess(res, await prisma.expense.findMany({
+    where: { date: { gte: from, lte: to }, ...(market ? { market } : {}) },
+    orderBy: { date: 'desc' },
+  }));
 }));
 
 router.post('/expenses', asyncHandler(async (req: Request, res: Response) => {
@@ -297,6 +304,54 @@ router.delete('/expenses/:id', asyncHandler(async (req: Request, res: Response) 
   sendSuccess(res, { id: existing.id });
 }));
 
+// ── Other income ─────────────────────────────────────────────────────────────
+// Money in that is not a deal in the CRM: a consulting fee, a management fee,
+// a commission on a sale nobody entered as a deal.
+
+const incomeSchema = z.object({
+  date: z.string(),
+  amountUsd: z.number().min(0),
+  description: z.string().trim().max(500).optional().nullable(),
+  market: z.enum(['LEBANON', 'GEORGIA']).optional().nullable(),
+});
+
+router.get('/income', asyncHandler(async (req: Request, res: Response) => {
+  const { from, to, market } = period(req);
+  sendSuccess(res, await prisma.income.findMany({
+    where: { date: { gte: from, lte: to }, ...(market ? { market } : {}) },
+    orderBy: { date: 'desc' },
+  }));
+}));
+
+router.post('/income', asyncHandler(async (req: Request, res: Response) => {
+  const body = incomeSchema.parse(req.body ?? {});
+  const row = await prisma.income.create({
+    data: { ...body, date: new Date(body.date), createdBy: (req as AuthenticatedRequest).user?.id ?? null },
+  });
+  await logAdminAction('CREATE_INCOME', 'income', row.id, { amountUsd: row.amountUsd }, req as AuthenticatedRequest);
+  sendCreated(res, row);
+}));
+
+router.put('/income/:id', asyncHandler(async (req: Request, res: Response) => {
+  const body = incomeSchema.partial().parse(req.body ?? {});
+  const existing = await prisma.income.findUnique({ where: { id: req.params.id } });
+  if (!existing) { sendNotFound(res, 'Income'); return; }
+  const row = await prisma.income.update({
+    where: { id: existing.id },
+    data: { ...body, ...(body.date ? { date: new Date(body.date) } : {}) },
+  });
+  await logAdminAction('UPDATE_INCOME', 'income', row.id, body, req as AuthenticatedRequest);
+  sendSuccess(res, row);
+}));
+
+router.delete('/income/:id', asyncHandler(async (req: Request, res: Response) => {
+  const existing = await prisma.income.findUnique({ where: { id: req.params.id } });
+  if (!existing) { sendNotFound(res, 'Income'); return; }
+  await prisma.income.delete({ where: { id: existing.id } });
+  await logAdminAction('DELETE_INCOME', 'income', existing.id, { amountUsd: existing.amountUsd }, req as AuthenticatedRequest);
+  sendSuccess(res, { id: existing.id });
+}));
+
 // ── The accounting summary ───────────────────────────────────────────────────
 
 /**
@@ -310,26 +365,33 @@ router.delete('/expenses/:id', asyncHandler(async (req: Request, res: Response) 
  */
 router.get('/summary', asyncHandler(async (req: Request, res: Response) => {
   await generateRecurring();
-  const { from, to } = period(req);
+  const { from, to, market } = period(req);
+  // One office: its deals (by the client's market) and its own costs. Shared
+  // costs are reported beside it, not split by a rule nobody agreed.
+  const leadWhere = market ? { lead: { market } } : {};
 
-  const [received, open, sellerSales, expenses] = await Promise.all([
+  const [received, open, sellerSales, expenses, otherIncome, sharedCosts] = await Promise.all([
     prisma.leadOpportunity.findMany({
-      where: { stage: { in: ['RESERVED', 'WON'] as never }, commissionReceivedAt: { gte: from, lte: to } },
+      where: { stage: { in: ['RESERVED', 'WON'] as never }, commissionReceivedAt: { gte: from, lte: to }, ...leadWhere },
       include: { lead: { select: { id: true, name: true, market: true } }, broker: { select: { id: true, name: true } } },
       orderBy: { commissionReceivedAt: 'desc' },
     }),
     prisma.leadOpportunity.findMany({
-      where: { stage: { in: ['RESERVED', 'WON'] as never }, commissionReceivedAt: null },
+      where: { stage: { in: ['RESERVED', 'WON'] as never }, commissionReceivedAt: null, ...leadWhere },
       include: { lead: { select: { id: true, name: true, market: true } }, broker: { select: { id: true, name: true } } },
       orderBy: { updatedAt: 'desc' },
       take: 300,
     }),
     // A seller's own property sold through us — the other place a sale is recorded.
     prisma.leadProperty.findMany({
-      where: { status: 'SOLD' as never, soldAt: { gte: from, lte: to }, commissionUsd: { not: null } },
+      where: { status: 'SOLD' as never, soldAt: { gte: from, lte: to }, commissionUsd: { not: null }, ...leadWhere },
       select: { id: true, title: true, soldAt: true, commissionUsd: true, lead: { select: { id: true, name: true } } },
     }),
-    prisma.expense.findMany({ where: { date: { gte: from, lte: to } } }),
+    prisma.expense.findMany({ where: { date: { gte: from, lte: to }, ...(market ? { market } : {}) } }),
+    prisma.income.findMany({ where: { date: { gte: from, lte: to }, ...(market ? { market } : {}) } }),
+    market
+      ? prisma.expense.aggregate({ where: { date: { gte: from, lte: to }, market: null }, _sum: { amountUsd: true } })
+      : Promise.resolve(null),
   ]);
 
   const net = (o: { commissionUsd: number | null; brokerCutUsd: number | null }) => (o.commissionUsd ?? 0) - (o.brokerCutUsd ?? 0);
@@ -338,7 +400,8 @@ router.get('/summary', asyncHandler(async (req: Request, res: Response) => {
   const gross = received.reduce((t, o) => t + (o.commissionUsd ?? 0), 0);
   const brokerCuts = received.reduce((t, o) => t + (o.brokerCutUsd ?? 0), 0);
   const sellerSide = sellerSales.reduce((t, p) => t + (p.commissionUsd ?? 0), 0);
-  const income = gross - brokerCuts + sellerSide;
+  const other = otherIncome.reduce((t, i) => t + i.amountUsd, 0);
+  const income = gross - brokerCuts + sellerSide + other;
 
   const byCategory: Record<string, number> = {};
   for (const e of expenses) byCategory[e.category] = (byCategory[e.category] ?? 0) + e.amountUsd;
@@ -352,6 +415,7 @@ router.get('/summary', asyncHandler(async (req: Request, res: Response) => {
   }
   for (const o of received) { const m = months.get(monthKey(o.commissionReceivedAt as Date)); if (m) m.income += net(o); }
   for (const p of sellerSales) { const m = months.get(monthKey(p.soldAt as Date)); if (m) m.income += p.commissionUsd ?? 0; }
+  for (const i of otherIncome) { const m = months.get(monthKey(i.date)); if (m) m.income += i.amountUsd; }
   for (const e of expenses) { const m = months.get(monthKey(e.date)); if (m) { if (e.category === 'TAX') m.tax += e.amountUsd; else m.costs += e.amountUsd; } }
 
   const [namedReceived, namedOpen] = await Promise.all([hydrateOpportunities(received), hydrateOpportunities(open)]);
@@ -382,13 +446,15 @@ router.get('/summary', asyncHandler(async (req: Request, res: Response) => {
 
   sendSuccess(res, {
     from, to,
-    income: { gross, brokerCuts, sellerSide, net: income },
-    expenses: { byCategory, costs, tax, total: costs + tax },
+    market,
+    income: { gross, brokerCuts, sellerSide, other, net: income },
+    expenses: { byCategory, costs, tax, total: costs + tax, shared: sharedCosts?._sum.amountUsd ?? 0 },
     profitBeforeTax: income - costs,
     profitAfterTax: income - costs - tax,
     months: [...months].map(([month, m]) => ({ month, ...m, profit: m.income - m.costs - m.tax })),
     received: namedReceived.map((o, i) => row(o, i, received)),
     sellerSales,
+    otherIncome,
     due: openRows.filter((r) => r.status === 'DUE'),
     waiting: openRows.filter((r) => r.status === 'WAITING'),
     // Payment plans, by the month the commission should be ours. Past that
@@ -401,6 +467,28 @@ router.get('/summary', asyncHandler(async (req: Request, res: Response) => {
       }))
       .sort((a, b) => (a.expectedAt?.getTime() ?? Infinity) - (b.expectedAt?.getTime() ?? Infinity)),
   });
+}));
+
+// PATCH /api/finance/deals/:id — correct a deal's figures from the books: the
+// commission, the broker's cut, what the client has paid, when it arrived.
+// Typed figures are kept as typed; nothing is worked out again from the rates.
+router.patch('/deals/:id', asyncHandler(async (req: Request, res: Response) => {
+  const body = z.object({
+    commissionUsd: z.number().min(0).nullable().optional(),
+    brokerCutUsd: z.number().min(0).nullable().optional(),
+    paidPct: pct.nullable().optional(),
+    receivedOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
+  }).parse(req.body ?? {});
+  const existing = await prisma.leadOpportunity.findUnique({ where: { id: req.params.id }, select: { id: true, leadId: true } });
+  if (!existing) { sendNotFound(res, 'Deal'); return; }
+  const data: Record<string, unknown> = {};
+  if (body.commissionUsd !== undefined) data.commissionUsd = body.commissionUsd;
+  if (body.brokerCutUsd !== undefined) data.brokerCutUsd = body.brokerCutUsd;
+  if (body.paidPct !== undefined) data.paidPct = body.paidPct;
+  if (body.receivedOn !== undefined) data.commissionReceivedAt = body.receivedOn ? new Date(`${body.receivedOn}T12:00:00`) : null;
+  await prisma.leadOpportunity.update({ where: { id: existing.id }, data });
+  await logAdminAction('UPDATE_DEAL_BOOKS', 'lead', existing.leadId, { opportunityId: existing.id, ...body }, req as AuthenticatedRequest);
+  sendSuccess(res, { id: existing.id, ...data });
 }));
 
 // POST /api/finance/deals/:id/received — the commission on a deal arrived (or,

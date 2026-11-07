@@ -17,6 +17,8 @@ import { autoReplyEnabled } from '../services/auto-reply.service.js';
 //                 a lead form nobody has called, or a "ping later" that is due
 //   Assistant   — the assistant is handling the conversation
 //   With you    — the team is talking to them and the ball is in their court
+//   On hold     — someone is checking something for them, or they are parked
+//                 until something happens. Only a person puts them here.
 //   Gone quiet  — only when someone moves them there. Silence alone never
 //                 does it: a quiet chat is often a client the team is phoning.
 //                 Where "noise" (never answered) and "ping later" are decided
@@ -59,7 +61,7 @@ const INBOUND_SOURCES = ['FACEBOOK_AD', 'INQUIRY', 'WHATSAPP', 'FAVORITE'];
 /** Selling or renting out: someone to list, not someone to show property to. */
 const SUPPLY = ['SELLER', 'LANDLORD'];
 
-type Bucket = 'TO_ANSWER' | 'ASSISTANT' | 'WITH_YOU' | 'QUIET' | 'PING_LATER';
+type Bucket = 'TO_ANSWER' | 'ASSISTANT' | 'WITH_YOU' | 'ON_HOLD' | 'QUIET' | 'PING_LATER';
 
 // GET /api/crm/pipeline — open clients who have not reached a viewing yet
 router.get(
@@ -86,6 +88,7 @@ router.get(
         adLabel: true, adId: true, askingFor: true, budgetMax: true, lastContactAt: true, createdAt: true,
         nextContactAt: true, nextContactNote: true, snoozedAt: true, quietAt: true,
         flaggedAt: true, flagNote: true, flaggedBy: true,
+        holdAt: true, holdKind: true, holdNote: true,
         opportunities: { select: { stage: true } },
         conversations: {
           where: { archivedAt: null },
@@ -138,8 +141,12 @@ router.get(
       const chat = l.conversations[0] ?? null;
       const out = chat ? outOf.get(chat.id) : undefined;
       const inbound = chat ? inOf.get(chat.id) : undefined;
+      // A message already there when someone put them on hold is what they are
+      // on hold about; only a newer one needs answering.
       const waitingSince =
-        inbound && (!out || inbound.createdAt > out.createdAt) ? inbound.createdAt : null;
+        inbound && (!out || inbound.createdAt > out.createdAt) &&
+        !(l.holdAt && inbound.createdAt.getTime() <= l.holdAt.getTime())
+          ? inbound.createdAt : null;
       const waited = waitingSince ? now - waitingSince.getTime() : 0;
 
       // Who spoke last: the client, the assistant, or one of us.
@@ -182,6 +189,8 @@ router.get(
           bucket = 'TO_ANSWER';
           reason = pingAt && pingAt.getTime() > now
             ? 'They wrote while snoozed'
+            : l.holdAt
+              ? `They wrote while on hold${l.holdNote ? `: ${l.holdNote}` : ''}`
             : chat?.aiPaused
               ? `Handed over: ${chat.aiPausedReason ?? 'the assistant passed this to you'}`
               : teamRecently ? 'They replied to you' : 'Waiting for a reply';
@@ -192,6 +201,10 @@ router.get(
       } else if (pingAt) {
         bucket = 'TO_ANSWER';
         reason = `Ping them${l.nextContactNote ? `: ${l.nextContactNote}` : ' — the date you set has come'}`;
+      } else if (l.holdAt) {
+        // Someone is checking something for them, or parked them on purpose.
+        bucket = 'ON_HOLD';
+        reason = l.holdNote;
       } else if (!chat) {
         // A lead form or a website enquiry: no chat, so someone has to call.
         bucket = l.lastContactAt ? 'WITH_YOU' : 'TO_ANSWER';
@@ -243,6 +256,7 @@ router.get(
         lastActivity,
         silentFor,
         flag: l.flaggedAt ? { at: l.flaggedAt, note: l.flagNote, by: l.flaggedBy } : null,
+        hold: l.holdAt ? { at: l.holdAt, kind: l.holdKind === 'PARKED' ? 'PARKED' : 'CHECKING', note: l.holdNote } : null,
       };
     })
       // A month of silence with nothing planned: off the board until they write.
@@ -269,6 +283,10 @@ router.get(
 //                    afterwards brings them back.
 //   ping_later     — snooze until a date; then they are back in "To answer".
 //   not_interested — said no. Lost; still in the client list.
+//   hold           — "On hold": checking something for them (kind CHECKING)
+//                    or parked until something happens (PARKED), with a note.
+//   unhold         — off hold, back to wherever the conversation puts them.
+// Every other move takes them off hold.
 // POST /api/crm/pipeline/:id/flag — paint the client's cards red for the team
 // to look at, with a note; `{ clear: true }` takes it off.
 router.post(
@@ -295,27 +313,39 @@ router.post(
   asyncHandler(async (req: Request, res: Response) => {
     const body = z
       .object({
-        action: z.enum(['noise', 'quiet', 'ping_later', 'not_interested']),
+        action: z.enum(['noise', 'quiet', 'ping_later', 'not_interested', 'hold', 'unhold']),
+        kind: z.enum(['CHECKING', 'PARKED']).optional(),
         days: z.number().int().min(1).max(180).optional(),
         note: z.string().trim().max(200).optional(),
       })
       .parse(req.body ?? {});
-    const lead = await prisma.lead.findUnique({ where: { id: req.params.id }, select: { id: true } });
+    const lead = await prisma.lead.findUnique({ where: { id: req.params.id }, select: { id: true, holdNote: true } });
     if (!lead) { sendNotFound(res, 'Lead'); return; }
+    const offHold = { holdAt: null, holdKind: null, holdNote: null };
 
-    if (body.action === 'noise') {
+    if (body.action === 'hold') {
       await prisma.lead.update({
         where: { id: lead.id },
-        data: { status: 'ARCHIVED', subStatus: 'NO_RESPONSE', nextContactAt: null, nextContactNote: null },
+        data: {
+          holdAt: new Date(), holdKind: body.kind ?? 'CHECKING', holdNote: body.note || null,
+          quietAt: null, nextContactAt: null, nextContactNote: null,
+        },
+      });
+    } else if (body.action === 'unhold') {
+      await prisma.lead.update({ where: { id: lead.id }, data: offHold });
+    } else if (body.action === 'noise') {
+      await prisma.lead.update({
+        where: { id: lead.id },
+        data: { status: 'ARCHIVED', subStatus: 'NO_RESPONSE', nextContactAt: null, nextContactNote: null, ...offHold },
       });
       // Out of the inbox too. Both come back by themselves the moment they write.
       await prisma.conversation.updateMany({ where: { leadId: lead.id, archivedAt: null }, data: { archivedAt: new Date() } });
     } else if (body.action === 'quiet') {
-      await prisma.lead.update({ where: { id: lead.id }, data: { quietAt: new Date() } });
+      await prisma.lead.update({ where: { id: lead.id }, data: { quietAt: new Date(), ...offHold } });
     } else if (body.action === 'not_interested') {
       await prisma.lead.update({
         where: { id: lead.id },
-        data: { status: 'LOST', nextContactAt: null, nextContactNote: null, closedAt: new Date() },
+        data: { status: 'LOST', nextContactAt: null, nextContactNote: null, closedAt: new Date(), ...offHold },
       });
       // "They said no to everything": their open deals end too. Left alone,
       // a client marked not interested stayed on the board as a Negotiating
@@ -332,13 +362,15 @@ router.post(
           nextContactAt: new Date(Date.now() + days * DAY_MS),
           snoozedAt: new Date(),
           quietAt: null,
-          // Snoozing again keeps what you meant to do ("send new prices").
-          ...(body.note ? { nextContactNote: body.note } : {}),
+          ...offHold,
+          // Snoozing again keeps what you meant to do ("send new prices"); a
+          // hold's note ("asking the developer for the 3rd floor") carries over.
+          ...(body.note || lead.holdNote ? { nextContactNote: body.note || lead.holdNote } : {}),
           subStatus: 'AWAITING_REPLY',
         },
       });
     }
-    await logAdminAction('PIPELINE_ACTION', 'lead', lead.id, { action: body.action, days: body.days }, req as AuthenticatedRequest);
+    await logAdminAction('PIPELINE_ACTION', 'lead', lead.id, { action: body.action, days: body.days, kind: body.kind }, req as AuthenticatedRequest);
     sendSuccess(res, { ok: true });
   })
 );

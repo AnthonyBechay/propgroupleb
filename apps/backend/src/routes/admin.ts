@@ -7,6 +7,7 @@ import { sendSuccess, sendCreated, sendPaginated } from '../utils/response.js';
 import { parsePagination, buildPaginationResponse } from '../utils/pagination.js';
 import type { AuthenticatedRequest } from '../types/index.js';
 import { aiBudget } from '../utils/ai-budget.js';
+import { activeClientWhere } from '../utils/client-activity.js';
 
 type MarketScope = 'LEBANON' | 'INTERNATIONAL' | null;
 
@@ -43,7 +44,8 @@ async function workSnapshot(market: MarketScope) {
       where: { ...leadScope, status: { in: [...OPEN_LEAD_STATUSES] }, nextContactAt: { lte: now } },
     }),
     prisma.lead.count({ where: { ...leadScope, createdAt: { gte: weekAgo } } }),
-    prisma.lead.count({ where: { ...leadScope, status: { in: [...OPEN_LEAD_STATUSES] } } }),
+    // Clients in play, not every record never closed (utils/client-activity.ts).
+    prisma.lead.count({ where: { ...leadScope, ...activeClientWhere(now) } }),
     prisma.lead.groupBy({ by: ['status'], where: leadScope, _count: { _all: true } }),
     aiBudget(),
   ]);
@@ -84,6 +86,22 @@ const router: Router = express.Router();
  *                                          platform. Reported unscoped, and
  *                                          labelled as such on the dashboard.
  */
+// GET /api/admin/nav-counts — what the sidebar badges: things that arrived and
+// nobody has looked at. Polled by the menu, so it is four counts and nothing else.
+router.get(
+  '/nav-counts',
+  authenticateToken,
+  requireAdmin,
+  asyncHandler(async (_req: Request, res: Response) => {
+    const [inquiries, contacts, submissions] = await Promise.all([
+      prisma.propertyInquiry.count({ where: { status: 'NEW' } }),
+      prisma.contactMessage.count({ where: { isRead: false } }),
+      prisma.propertySubmission.count({ where: { status: 'PENDING' } }),
+    ]);
+    sendSuccess(res, { inquiries, contacts, submissions });
+  })
+);
+
 router.get(
   '/stats',
   authenticateToken,

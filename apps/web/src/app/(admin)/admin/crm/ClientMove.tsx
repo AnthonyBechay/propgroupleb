@@ -38,7 +38,7 @@ export async function flagClient(apiUrl: string, leadId: string, name: string, f
 
 /** A move that needs no property: it waits, or it ends. */
 export const isPlainMove = (to: ClientMove) =>
-  to === 'LOST' || to === 'NOISE' || to === 'QUIET' || to.startsWith('PING:')
+  to === 'LOST' || to === 'NOISE' || to === 'QUIET' || to === 'UNHOLD' || to.startsWith('PING:') || to.startsWith('HOLD:')
 
 /**
  * What a plain move asks first, sends, and says afterwards. One wording for the
@@ -47,7 +47,22 @@ export const isPlainMove = (to: ClientMove) =>
  */
 export function plainMoveCopy(to: ClientMove, name: string) {
   const days = to.startsWith('PING:') ? Number(to.slice(5)) : 0
+  if (to.startsWith('HOLD:') || to === 'UNHOLD') {
+    const parked = to === 'HOLD:PARKED'
+    return {
+      confirm: null,
+      ask: to === 'UNHOLD' ? null : parked
+        ? `Park ${name} for now.\n\nWhat are you waiting for? (optional)`
+        : `Checking something for ${name}.\n\nWhat are you checking? (optional, e.g. "asking the developer about the 3rd floor")`,
+      body: to === 'UNHOLD' ? { action: 'unhold' } : { action: 'hold', kind: parked ? 'PARKED' : 'CHECKING' },
+      title: to === 'UNHOLD' ? `${name}: off hold` : parked ? `${name}: parked` : `${name}: checking for them`,
+      description: to === 'UNHOLD'
+        ? 'Back in the column their chat puts them in.'
+        : 'In "On hold" until someone moves them. If they write, they show in "To answer".',
+    }
+  }
   return {
+    ask: null as string | null,
     confirm: to === 'NOISE'
       ? `Mark ${name} as noise?\n\nThey leave the board and the inbox, and come back by themselves if they ever write again.`
       : to === 'LOST'
@@ -63,9 +78,25 @@ export function plainMoveCopy(to: ClientMove, name: string) {
       : `${name}: ping in ${days === 30 ? 'a month' : days === 7 ? 'a week' : `${days} days`}`,
     description: to === 'NOISE'
       ? 'Off the board and out of the inbox until they write again.'
-      : to === 'QUIET' ? 'They come back by themselves when they write or you log a call.'
+      : to === 'QUIET' ? 'Off the board — on the Clients page under Gone quiet. They come back by themselves when they write or you log a call.'
       : to === 'LOST' ? 'Off the board. Find them under Lost on the Clients page.' : 'Back in "To answer" on the day.',
   }
+}
+
+/**
+ * Everything a plain move asks before it is sent — the confirm, or the note
+ * for a hold — and what to send. Null when the person cancelled.
+ */
+export function preparePlainMove(to: ClientMove, name: string) {
+  const copy = plainMoveCopy(to, name)
+  if (copy.confirm && !window.confirm(copy.confirm)) return null
+  let body: Record<string, unknown> = copy.body
+  if (copy.ask) {
+    const typed = window.prompt(copy.ask, '')
+    if (typed === null) return null
+    if (typed.trim()) body = { ...body, note: typed.trim().slice(0, 200) }
+  }
+  return { ...copy, body }
 }
 
 /**
@@ -77,7 +108,7 @@ export function plainMoveCopy(to: ClientMove, name: string) {
 export function ClientMoveButton({
   lead, onMoved, buttonClassName,
 }: {
-  lead: { id: string; name: string; market?: string | null; type?: LeadType | null; intents?: LeadType[] | null; flaggedAt?: string | null }
+  lead: { id: string; name: string; market?: string | null; type?: LeadType | null; intents?: LeadType[] | null; flaggedAt?: string | null; holdAt?: string | null }
   /** After the move saved: refresh whatever shows this client. */
   onMoved?: (to: ClientMove) => void
   buttonClassName?: string
@@ -93,8 +124,8 @@ export function ClientMoveButton({
       return
     }
     if (isPlainMove(to)) {
-      const copy = plainMoveCopy(to, lead.name)
-      if (copy.confirm && !window.confirm(copy.confirm)) return
+      const copy = preparePlainMove(to, lead.name)
+      if (!copy) return
       try {
         const res = await fetch(`${apiUrl}/api/crm/pipeline/${lead.id}/action`, {
           method: 'POST', credentials: 'include',
@@ -129,6 +160,7 @@ export function ClientMoveButton({
         meeting={lead.market !== 'LEBANON'}
         supplyOnly={supplyOnly}
         flagged={Boolean(lead.flaggedAt)}
+        held={Boolean(lead.holdAt)}
         onPick={(to) => { void pick(to) }}
         buttonClassName={buttonClassName}
       />

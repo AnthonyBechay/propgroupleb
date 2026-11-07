@@ -32,6 +32,9 @@ interface ThreadLead {
   type?: LeadType | null
   intents?: LeadType[] | null
   flaggedAt?: string | null
+  holdAt?: string | null
+  holdKind?: 'CHECKING' | 'PARKED' | null
+  holdNote?: string | null
   flagNote?: string | null
 }
 
@@ -930,6 +933,11 @@ export function InboxView({
                 )}
                 {detail.lead?.flaggedAt && (
                   <p className="text-xs font-semibold text-red-700 truncate">Flagged{detail.lead.flagNote ? `: ${detail.lead.flagNote}` : ''}</p>
+                )}
+                {detail.lead?.holdAt && (
+                  <p className="text-xs font-medium text-violet-700 truncate">
+                    {detail.lead.holdKind === 'PARKED' ? 'Parked' : 'Checking for them'}{detail.lead.holdNote ? `: ${detail.lead.holdNote}` : ''}
+                  </p>
                 )}
                 {detail.adId && (
                   <p className="text-xs text-slate-500 truncate" title={detail.adLabel ?? undefined}>

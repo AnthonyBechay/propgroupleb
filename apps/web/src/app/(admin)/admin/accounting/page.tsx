@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
-import { Loader2, Plus, Pencil, Trash2, Check, X, Wallet, Receipt, Landmark, TrendingUp, Clock, Repeat, BellRing } from 'lucide-react'
+import { Loader2, Plus, Pencil, Trash2, Check, X, Wallet, Receipt, Landmark, TrendingUp, Clock, Repeat, BellRing, Download, Coins } from 'lucide-react'
 import { PageHeader, StatCard, EmptyState } from '@/components/admin/ui/layout'
 import { normalizeApiUrl } from '@/lib/utils/api-url'
 
@@ -71,9 +71,20 @@ interface Recurring {
   active: boolean
 }
 
+interface OtherIncome {
+  id: string
+  date: string
+  amountUsd: number
+  description: string | null
+  market: 'LEBANON' | 'GEORGIA' | null
+}
+
 interface Summary {
-  income: { gross: number; brokerCuts: number; sellerSide: number; net: number }
-  expenses: { byCategory: Partial<Record<Category, number>>; costs: number; tax: number; total: number }
+  income: { gross: number; brokerCuts: number; sellerSide: number; other?: number; net: number }
+  /** `shared`: costs belonging to no office — set apart when one office is shown. */
+  expenses: { byCategory: Partial<Record<Category, number>>; costs: number; tax: number; total: number; shared?: number }
+  sellerSales?: Array<{ id: string; title: string | null; soldAt: string; commissionUsd: number | null; lead: { id: string; name: string } | null }>
+  otherIncome?: OtherIncome[]
   profitBeforeTax: number
   profitAfterTax: number
   months: Array<{ month: string; income: number; costs: number; tax: number; profit: number }>
@@ -115,6 +126,27 @@ const monthLabel = (key: string) => {
   return new Date(y, m - 1, 1).toLocaleDateString(undefined, { month: 'short', year: 'numeric' })
 }
 
+type Office = 'all' | 'LEBANON' | 'GEORGIA'
+const OFFICE_LABEL: Record<Office, string> = { all: 'Both offices', LEBANON: '🇱🇧 Lebanon', GEORGIA: '🇬🇪 Georgia' }
+
+/** Months, or the same figures added up by quarter. */
+function byQuarter(months: Summary['months']): Summary['months'] {
+  const out = new Map<string, { month: string; income: number; costs: number; tax: number; profit: number }>()
+  for (const m of months) {
+    const [y, mo] = m.month.split('-').map(Number)
+    const key = `${y}-Q${Math.floor((mo - 1) / 3) + 1}`
+    const row = out.get(key) ?? { month: key, income: 0, costs: 0, tax: 0, profit: 0 }
+    row.income += m.income; row.costs += m.costs; row.tax += m.tax; row.profit += m.profit
+    out.set(key, row)
+  }
+  return [...out.values()]
+}
+
+const csvCell = (v: string | number) => {
+  const t = String(v)
+  return /[",\n]/.test(t) ? `"${t.replace(/"/g, '""')}"` : t
+}
+
 type Draft = { date: string; category: Category; amount: string; description: string; market: '' | 'LEBANON' | 'GEORGIA' }
 const newDraft = (): Draft => ({ date: iso(new Date()), category: 'OFFICE', amount: '', description: '', market: '' })
 
@@ -129,6 +161,11 @@ const newDraft = (): Draft => ({ date: iso(new Date()), category: 'OFFICE', amou
 export default function AccountingPage() {
   const apiUrl = normalizeApiUrl(process.env.NEXT_PUBLIC_API_URL || '')
   const [period, setPeriod] = useState<PeriodKey>('this_year')
+  // One office's books, or both together.
+  const [office, setOffice] = useState<Office>('all')
+  const [grouping, setGrouping] = useState<'month' | 'quarter'>('month')
+  // A deal's figures being corrected from here.
+  const [editingDeal, setEditingDeal] = useState<DealRow | null>(null)
   const [custom, setCustom] = useState(rangeOf('this_year'))
   const range = period === 'custom' ? custom : rangeOf(period)
   const [summary, setSummary] = useState<Summary | null>(null)
@@ -141,7 +178,7 @@ export default function AccountingPage() {
 
   const load = useCallback(async () => {
     setLoading(true); setError(null)
-    const q = `from=${range.from}&to=${range.to}`
+    const q = `from=${range.from}&to=${range.to}${office === 'all' ? '' : `&market=${office}`}`
     try {
       const [s, e] = await Promise.all([
         fetch(`${apiUrl}/api/finance/summary?${q}`, { credentials: 'include', cache: 'no-store' }),
@@ -153,8 +190,30 @@ export default function AccountingPage() {
     } catch {
       setError('Could not load the accounts. Check your connection.')
     } finally { setLoading(false) }
-  }, [apiUrl, range.from, range.to])
+  }, [apiUrl, range.from, range.to, office])
   useEffect(() => { void load() }, [load])
+
+  /** Everything in the period, one line each — for a spreadsheet or the accountant. */
+  function exportCsv() {
+    if (!summary) return
+    const lines: Array<[string, string, string, string, number]> = []
+    const officeOf = (m?: string | null) => (m === 'LEBANON' ? 'Lebanon' : m === 'GEORGIA' ? 'Georgia' : 'Shared')
+    for (const d of summary.received) {
+      lines.push([(d.commissionReceivedAt ?? '').slice(0, 10), 'Commission', `${d.lead.name} — ${d.title}`, officeOf(d.lead.market), d.commissionUsd ?? 0])
+      if (d.brokerCutUsd) lines.push([(d.commissionReceivedAt ?? '').slice(0, 10), 'Broker share', `${d.broker?.name ?? 'Broker'} — ${d.title}`, officeOf(d.lead.market), -d.brokerCutUsd])
+    }
+    for (const p of summary.sellerSales ?? []) lines.push([p.soldAt.slice(0, 10), 'Commission (seller)', `${p.lead?.name ?? ''} — ${p.title ?? 'Property'}`, '', p.commissionUsd ?? 0])
+    for (const i of summary.otherIncome ?? []) lines.push([i.date.slice(0, 10), 'Other income', i.description ?? '', officeOf(i.market), i.amountUsd])
+    for (const e of expenses) lines.push([e.date.slice(0, 10), SHORT_LABEL[e.category], e.description ?? '', officeOf(e.market), -e.amountUsd])
+    lines.sort((a, b) => a[0].localeCompare(b[0]))
+    const csv = [['Date', 'Type', 'What', 'Office', 'Amount USD'], ...lines].map((r) => r.map(csvCell).join(',')).join('\n')
+    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }))
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `propgroup-books-${range.from}-to-${range.to}${office === 'all' ? '' : `-${office.toLowerCase()}`}.csv`
+    document.body.appendChild(a); a.click(); a.remove()
+    URL.revokeObjectURL(url)
+  }
 
   const startEdit = (e?: Expense) => {
     setEditing(e ? e.id : 'new')
@@ -273,6 +332,26 @@ export default function AccountingPage() {
         )}
         {loading && <Loader2 className="h-4 w-4 animate-spin text-slate-400" />}
       </div>
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="flex gap-1 rounded-lg bg-slate-100 p-1">
+          {(Object.keys(OFFICE_LABEL) as Office[]).map((o) => (
+            <button key={o} onClick={() => setOffice(o)}
+              className={`min-h-10 rounded-md px-3 text-sm font-medium ${office === o ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}>
+              {OFFICE_LABEL[o]}
+            </button>
+          ))}
+        </div>
+        {office !== 'all' && (summary?.expenses.shared ?? 0) > 0 && (
+          <span className="text-xs text-slate-500">
+            Shared costs not in these figures: <strong className="text-slate-700">{money(summary?.expenses.shared ?? 0)}</strong>
+          </span>
+        )}
+        <span className="flex-1" />
+        <button onClick={exportCsv} disabled={!summary}
+          className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50">
+          <Download className="h-4 w-4" /> Export
+        </button>
+      </div>
 
       {error && <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
 
@@ -280,7 +359,10 @@ export default function AccountingPage() {
         <>
           <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
             <StatCard icon={<Wallet className="h-3.5 w-3.5" />} label="Commission received" value={money(summary.income.net)}
-              hint={summary.income.brokerCuts > 0 ? `${money(summary.income.gross + summary.income.sellerSide)} less ${money(summary.income.brokerCuts)} to brokers` : undefined}
+              hint={[
+                summary.income.brokerCuts > 0 ? `${money(summary.income.gross + summary.income.sellerSide)} less ${money(summary.income.brokerCuts)} to brokers` : null,
+                (summary.income.other ?? 0) > 0 ? `incl. ${money(summary.income.other ?? 0)} other income` : null,
+              ].filter(Boolean).join(' · ') || undefined}
               accent="text-emerald-700" />
             <StatCard icon={<Receipt className="h-3.5 w-3.5" />} label="Expenses" value={money(summary.expenses.costs)} hint="Before tax" />
             <StatCard icon={<TrendingUp className="h-3.5 w-3.5" />} label="Profit before tax" value={money(summary.profitBeforeTax)}
@@ -303,6 +385,7 @@ export default function AccountingPage() {
                         <p className="truncate text-sm font-medium text-slate-900">{d.lead.name} <span className="font-normal text-slate-500">· {d.title}</span></p>
                         <p className="text-xs text-slate-500">{money(d.netUsd)}{d.broker ? ` after ${money(d.brokerCutUsd ?? 0)} to ${d.broker.name}` : ''}</p>
                       </div>
+                      <EditDealButton onClick={() => setEditingDeal(d)} />
                       <button onClick={() => markReceived(d)} disabled={busy} className="min-h-11 shrink-0 rounded-lg border border-emerald-200 px-3 text-sm font-medium text-emerald-700 hover:bg-emerald-50 disabled:opacity-50">Received</button>
                     </li>
                   ))}
@@ -317,7 +400,10 @@ export default function AccountingPage() {
                 <ul className="mt-2 divide-y divide-slate-100">
                   {waitingRows.map((d) => (
                     <li key={d.id} className="py-2">
-                      <p className="truncate text-sm font-medium text-slate-900">{d.lead.name} <span className="font-normal text-slate-500">· {d.title}</span></p>
+                      <div className="flex items-start gap-2">
+                      <p className="min-w-0 flex-1 truncate text-sm font-medium text-slate-900">{d.lead.name} <span className="font-normal text-slate-500">· {d.title}</span></p>
+                      <EditDealButton onClick={() => setEditingDeal(d)} />
+                      </div>
                       <p className="text-xs text-slate-500">
                         {money(d.netUsd)} · {(d.payoutAtPct ?? 0) > 0 ? `paid ${d.paidPct ?? 0}% of ${d.payoutAtPct}%` : 'paid when it closes'}
                       </p>
@@ -334,7 +420,7 @@ export default function AccountingPage() {
             </section>
           </div>
 
-          <PlansSection plans={summary.plans} busy={busy} onReceived={markReceived} />
+          <PlansSection plans={summary.plans} busy={busy} onReceived={markReceived} onEdit={setEditingDeal} />
 
           {/* Expenses */}
           <section className="rounded-2xl border border-slate-200 bg-white p-4 space-y-3">
@@ -385,10 +471,22 @@ export default function AccountingPage() {
 
           <RecurringSection apiUrl={apiUrl} onChanged={load} />
 
+          <OtherIncomeSection apiUrl={apiUrl} rows={summary.otherIncome ?? []} onChanged={load} />
+
           {/* Month by month */}
           {summary.months.length > 1 && (
             <section className="rounded-2xl border border-slate-200 bg-white p-4">
-              <h2 className="text-sm font-semibold text-slate-900">Month by month</h2>
+              <div className="flex flex-wrap items-center gap-2">
+                <h2 className="flex-1 text-sm font-semibold text-slate-900">{grouping === 'month' ? 'Month by month' : 'Quarter by quarter'}</h2>
+                <div className="flex gap-1 rounded-lg bg-slate-100 p-1">
+                  {(['month', 'quarter'] as const).map((g) => (
+                    <button key={g} onClick={() => setGrouping(g)}
+                      className={`min-h-9 rounded-md px-2.5 text-xs font-medium ${grouping === g ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600'}`}>
+                      {g === 'month' ? 'Months' : 'Quarters'}
+                    </button>
+                  ))}
+                </div>
+              </div>
               <div className="pg-scroll-x mt-2">
                 <table className="w-full min-w-[480px] text-sm">
                   <thead>
@@ -401,9 +499,9 @@ export default function AccountingPage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
-                    {summary.months.map((m) => (
+                    {(grouping === 'quarter' ? byQuarter(summary.months) : summary.months).map((m) => (
                       <tr key={m.month}>
-                        <td className="py-1.5 text-slate-700">{monthLabel(m.month)}</td>
+                        <td className="py-1.5 text-slate-700">{m.month.includes('Q') ? m.month.replace('-', ' ') : monthLabel(m.month)}</td>
                         <td className="py-1.5 text-right text-emerald-700">{m.income ? money(m.income) : '—'}</td>
                         <td className="py-1.5 text-right text-slate-700">{m.costs ? money(m.costs) : '—'}</td>
                         <td className="py-1.5 text-right text-slate-700">{m.tax ? money(m.tax) : '—'}</td>
@@ -411,6 +509,15 @@ export default function AccountingPage() {
                       </tr>
                     ))}
                   </tbody>
+                  <tfoot>
+                    <tr className="border-t border-slate-300 font-semibold">
+                      <td className="py-1.5 text-slate-900">Total</td>
+                      <td className="py-1.5 text-right text-emerald-700">{money(summary.income.net)}</td>
+                      <td className="py-1.5 text-right text-slate-900">{money(summary.expenses.costs)}</td>
+                      <td className="py-1.5 text-right text-slate-900">{money(summary.expenses.tax)}</td>
+                      <td className={`py-1.5 text-right ${summary.profitAfterTax < 0 ? 'text-red-600' : 'text-slate-900'}`}>{money(summary.profitAfterTax)}</td>
+                    </tr>
+                  </tfoot>
                 </table>
               </div>
             </section>
@@ -429,6 +536,7 @@ export default function AccountingPage() {
                       {d.broker && <p className="text-xs text-slate-500">{money(d.brokerCutUsd ?? 0)} to {d.broker.name}</p>}
                     </div>
                     <span className="shrink-0 text-sm font-semibold text-emerald-700">{money(d.netUsd)}</span>
+                    <EditDealButton onClick={() => setEditingDeal(d)} />
                   </li>
                 ))}
               </ul>
@@ -439,7 +547,203 @@ export default function AccountingPage() {
           </section>
         </>
       )}
+
+      {editingDeal && (
+        <DealEditor apiUrl={apiUrl} deal={editingDeal} onClose={() => setEditingDeal(null)} onSaved={() => { setEditingDeal(null); void load() }} />
+      )}
     </div>
+  )
+}
+
+function EditDealButton({ onClick }: { onClick: () => void }) {
+  return (
+    <button onClick={onClick} aria-label="Edit the figures" title="Edit the figures"
+      className="flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100">
+      <Pencil className="h-4 w-4" />
+    </button>
+  )
+}
+
+/**
+ * Correct a deal's figures from the books: what we earned, the broker's share,
+ * what the client has paid, and when the money came. What is typed here is
+ * kept as typed — nothing is worked out again from the rates.
+ */
+function DealEditor({ apiUrl, deal, onClose, onSaved }: { apiUrl: string; deal: DealRow; onClose: () => void; onSaved: () => void }) {
+  const [commission, setCommission] = useState(deal.commissionUsd != null ? String(deal.commissionUsd) : '')
+  const [cut, setCut] = useState(deal.brokerCutUsd != null ? String(deal.brokerCutUsd) : '')
+  const [paid, setPaid] = useState(deal.paidPct != null ? String(deal.paidPct) : '')
+  const [receivedOn, setReceivedOn] = useState(deal.commissionReceivedAt ? deal.commissionReceivedAt.slice(0, 10) : '')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const num = (v: string) => (v.trim() === '' ? null : Number(v))
+  const net = (num(commission) ?? 0) - (num(cut) ?? 0)
+
+  async function save() {
+    const c = num(commission), b = num(cut), p = num(paid)
+    if ([c, b].some((v) => v != null && (!Number.isFinite(v) || v < 0))) { setError('Amounts must be zero or more.'); return }
+    if (p != null && (!Number.isFinite(p) || p < 0 || p > 100)) { setError('Paid so far is a % between 0 and 100.'); return }
+    setBusy(true); setError(null)
+    try {
+      const res = await fetch(`${apiUrl}/api/finance/deals/${deal.id}`, {
+        method: 'PATCH', credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ commissionUsd: c, brokerCutUsd: b, paidPct: p, receivedOn: receivedOn || null }),
+      })
+      if (!res.ok) throw new Error()
+      onSaved()
+    } catch {
+      setError('That did not save. Try again.')
+    } finally { setBusy(false) }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-900/40 p-0 sm:items-center sm:p-6" onClick={onClose}>
+      <div className="w-full max-w-md rounded-t-2xl bg-white p-4 shadow-xl sm:rounded-2xl" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-start gap-2">
+          <div className="min-w-0 flex-1">
+            <h2 className="text-base font-semibold text-slate-900">Edit the figures</h2>
+            <p className="truncate text-sm text-slate-500">{deal.lead.name} · {deal.title}</p>
+          </div>
+          <button onClick={onClose} aria-label="Close" className="flex min-h-11 min-w-11 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100"><X className="h-4 w-4" /></button>
+        </div>
+        <div className="mt-3 grid grid-cols-2 gap-3">
+          <label className="block text-sm text-slate-700">Our commission, USD
+            <input type="number" min="0" step="1" inputMode="decimal" value={commission} onChange={(e) => setCommission(e.target.value)} className={inp} />
+          </label>
+          <label className="block text-sm text-slate-700">{deal.broker ? `To ${deal.broker.name}, USD` : 'Broker share, USD'}
+            <input type="number" min="0" step="1" inputMode="decimal" value={cut} onChange={(e) => setCut(e.target.value)} placeholder="0" className={inp} />
+          </label>
+          <label className="block text-sm text-slate-700">Client paid so far, %
+            <input type="number" min="0" max="100" step="1" inputMode="decimal" value={paid} onChange={(e) => setPaid(e.target.value)} className={inp} />
+          </label>
+          <label className="block text-sm text-slate-700">Received on
+            <input type="date" value={receivedOn} onChange={(e) => setReceivedOn(e.target.value)} className={inp} />
+          </label>
+        </div>
+        <p className="mt-2 text-xs text-slate-500">
+          We keep <strong className="text-slate-800">{money(net)}</strong>.
+          {' '}Leave "Received on" empty if the money has not come yet.
+        </p>
+        {error && <p className="mt-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
+        <div className="mt-3 flex justify-end gap-2">
+          <button onClick={onClose} className="inline-flex min-h-11 items-center gap-1 rounded-lg border border-slate-200 px-3 text-sm text-slate-700 hover:bg-slate-50">Cancel</button>
+          <button onClick={save} disabled={busy} className="inline-flex min-h-11 items-center gap-1.5 rounded-lg bg-slate-900 px-4 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-50">
+            {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />} Save
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+type IDraft = { date: string; amount: string; description: string; market: '' | 'LEBANON' | 'GEORGIA' }
+const newIDraft = (): IDraft => ({ date: iso(new Date()), amount: '', description: '', market: '' })
+
+/**
+ * Money in that is not a deal in the CRM — a consulting fee, a management fee,
+ * a sale nobody entered. Counted on its date, in the same profit.
+ */
+function OtherIncomeSection({ apiUrl, rows, onChanged }: { apiUrl: string; rows: OtherIncome[]; onChanged: () => void }) {
+  const [editing, setEditing] = useState<string | 'new' | null>(null)
+  const [draft, setDraft] = useState<IDraft>(newIDraft)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const total = rows.reduce((t, r) => t + r.amountUsd, 0)
+
+  const start = (r?: OtherIncome) => {
+    setError(null)
+    setEditing(r ? r.id : 'new')
+    setDraft(r ? { date: r.date.slice(0, 10), amount: String(r.amountUsd), description: r.description ?? '', market: r.market ?? '' } : newIDraft())
+  }
+  async function save() {
+    const amount = Number(draft.amount)
+    if (!draft.amount || !Number.isFinite(amount) || amount < 0) { setError('Enter the amount in USD.'); return }
+    setBusy(true); setError(null)
+    try {
+      const res = await fetch(`${apiUrl}/api/finance/income${editing === 'new' ? '' : `/${editing}`}`, {
+        method: editing === 'new' ? 'POST' : 'PUT', credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ date: draft.date, amountUsd: amount, description: draft.description.trim() || null, market: draft.market || null }),
+      })
+      if (!res.ok) throw new Error()
+      setEditing(null)
+      onChanged()
+    } catch {
+      setError('That did not save. Try again.')
+    } finally { setBusy(false) }
+  }
+  async function remove(r: OtherIncome) {
+    if (!window.confirm(`Delete this income of ${money(r.amountUsd)}?`)) return
+    setBusy(true)
+    try {
+      const res = await fetch(`${apiUrl}/api/finance/income/${r.id}`, { method: 'DELETE', credentials: 'include' })
+      if (!res.ok) throw new Error()
+      onChanged()
+    } catch {
+      setError('That did not delete. Try again.')
+    } finally { setBusy(false) }
+  }
+
+  const form = (
+    <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 space-y-3">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <label className="block text-sm text-slate-700">Date<input type="date" value={draft.date} onChange={(e) => setDraft({ ...draft, date: e.target.value })} className={inp} /></label>
+        <label className="block text-sm text-slate-700">Amount (USD)<input type="number" min="0" step="0.01" inputMode="decimal" value={draft.amount} onChange={(e) => setDraft({ ...draft, amount: e.target.value })} className={inp} autoFocus /></label>
+        <label className="col-span-2 block text-sm text-slate-700 sm:col-span-1">Office
+          <select value={draft.market} onChange={(e) => setDraft({ ...draft, market: e.target.value as IDraft['market'] })} className={inp}>
+            <option value="">Shared</option>
+            <option value="LEBANON">Lebanon</option>
+            <option value="GEORGIA">Georgia</option>
+          </select>
+        </label>
+        <label className="col-span-2 block text-sm text-slate-700 sm:col-span-4">What for<input value={draft.description} onChange={(e) => setDraft({ ...draft, description: e.target.value })} placeholder="Consulting fee, rental management for…" className={inp} /></label>
+      </div>
+      <div className="flex justify-end gap-2">
+        <button onClick={() => setEditing(null)} className="inline-flex min-h-11 items-center gap-1 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700 hover:bg-slate-50"><X className="h-4 w-4" /> Cancel</button>
+        <button onClick={save} disabled={busy} className="inline-flex min-h-11 items-center gap-1.5 rounded-lg bg-slate-900 px-4 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-50">
+          {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />} Save
+        </button>
+      </div>
+    </div>
+  )
+
+  return (
+    <section className="rounded-2xl border border-slate-200 bg-white p-4 space-y-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <h2 className="flex-1 text-sm font-semibold text-slate-900">
+          <Coins className="-mt-0.5 mr-1 inline h-4 w-4 text-emerald-600" />Other income <span className="font-normal text-slate-500">· {money(total)}</span>
+        </h2>
+        {editing === null && (
+          <button onClick={() => start()} className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-700 hover:bg-slate-50">
+            <Plus className="h-4 w-4" /> Add income
+          </button>
+        )}
+      </div>
+      <p className="text-xs text-slate-500">Money in that is not a deal in the CRM. It counts in the profit on its date.</p>
+      {error && <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
+      {editing === 'new' && form}
+      {rows.length > 0 && (
+        <ul className="divide-y divide-slate-100">
+          {rows.map((r) => (
+            <li key={r.id} className="py-2">
+              {editing === r.id ? form : (
+                <div className="flex items-center gap-2">
+                  <span className="w-20 shrink-0 text-xs text-slate-500">{new Date(r.date).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}</span>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm text-slate-900">{r.description || 'Income'}</p>
+                    {r.market && <p className="text-xs text-slate-500">{r.market === 'LEBANON' ? 'Lebanon' : 'Georgia'}</p>}
+                  </div>
+                  <span className="shrink-0 text-sm font-semibold text-emerald-700">{money(r.amountUsd)}</span>
+                  <button onClick={() => start(r)} aria-label="Edit income" className="flex min-h-11 min-w-11 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100"><Pencil className="h-4 w-4" /></button>
+                  <button onClick={() => remove(r)} aria-label="Delete income" className="flex min-h-11 min-w-11 items-center justify-center rounded-lg text-slate-400 hover:bg-red-50 hover:text-red-600"><Trash2 className="h-4 w-4" /></button>
+                </div>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
   )
 }
 
@@ -450,7 +754,7 @@ const monthYear = (iso: string) => new Date(iso).toLocaleDateString(undefined, {
  * when that month has passed (or the client has paid past the point) and the
  * money has not come: that is the developer to call.
  */
-function PlansSection({ plans, busy, onReceived }: { plans: PlanRow[]; busy: boolean; onReceived: (d: DealRow) => void }) {
+function PlansSection({ plans, busy, onReceived, onEdit }: { plans: PlanRow[]; busy: boolean; onReceived: (d: DealRow) => void; onEdit: (d: DealRow) => void }) {
   const chase = plans.filter((p) => p.chase)
   return (
     <section className="rounded-2xl border border-slate-200 bg-white p-4">
@@ -490,6 +794,7 @@ function PlansSection({ plans, busy, onReceived }: { plans: PlanRow[]; busy: boo
                     <div className={`h-full rounded-full ${d.chase ? 'bg-red-500' : 'bg-amber-500'}`} style={{ width: `${Math.min(100, threshold ? (Math.max(paid, d.expectedPaidNow ?? 0) / threshold) * 100 : 0)}%` }} />
                   </div>
                 </div>
+                <EditDealButton onClick={() => onEdit(d)} />
                 {d.chase && (
                   <button onClick={() => onReceived(d)} disabled={busy} className="min-h-11 shrink-0 rounded-lg border border-emerald-200 bg-white px-3 text-sm font-medium text-emerald-700 hover:bg-emerald-50 disabled:opacity-50">Received</button>
                 )}

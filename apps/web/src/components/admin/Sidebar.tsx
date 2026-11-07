@@ -1,8 +1,10 @@
 'use client'
 
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname } from 'next/navigation'
+import { normalizeApiUrl } from '@/lib/utils/api-url'
 import {
   Home,
   Building2,
@@ -18,7 +20,7 @@ import {
   ListFilter,
   ClipboardList,
   UserSearch,
-  X, MessagesSquare, Bot, Bell, Gauge, Wallet, Handshake, Percent,
+  X, MessageCircle, Bot, Bell, Gauge, Wallet, Handshake, Percent, Megaphone,
 } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { canAccessAdminPath, isSuperAdmin, ROLE_LABELS, type Role } from '@/lib/permissions'
@@ -30,7 +32,11 @@ interface NavItem {
   icon: React.ComponentType<{ className?: string }>
   /** Matched in addition to `href` so a detail route keeps its parent lit. */
   match?: string[]
+  /** Which count to badge it with — something arrived and nobody has looked. */
+  badge?: BadgeKey
 }
+
+type BadgeKey = 'inbox' | 'inquiries' | 'contacts' | 'submissions'
 
 interface NavGroup {
   id: string
@@ -55,24 +61,27 @@ interface NavGroup {
  */
 const GROUPS: NavGroup[] = [
   {
-    // First, because it is where the day's work arrives.
+    // First, because it is where the day's work arrives — every way a client
+    // or an owner reaches us, each badged when something new is waiting.
     id: 'clients',
     label: 'Clients',
     items: [
-      { name: 'Inbox', href: '/admin/inbox', icon: MessagesSquare },
+      { name: 'WhatsApp', href: '/admin/inbox', icon: MessageCircle, badge: 'inbox' },
       { name: 'Pipeline', href: '/admin/crm', icon: UserSearch },
       { name: 'Clients', href: '/admin/clients', icon: Users },
-      { name: 'Inquiries', href: '/admin/inquiries', icon: MessageSquare },
-      { name: 'Contact messages', href: '/admin/contacts', icon: Inbox },
+      { name: 'Inquiries', href: '/admin/inquiries', icon: MessageSquare, badge: 'inquiries' },
+      { name: 'Contact messages', href: '/admin/contacts', icon: Inbox, badge: 'contacts' },
+      { name: 'Owner submissions', href: '/admin/submissions', icon: ClipboardList, badge: 'submissions' },
     ],
   },
   {
     id: 'inventory',
     label: 'Inventory',
     items: [
-      { name: 'Properties', href: '/admin/buildings', icon: Building2 },
-      { name: 'Listings', href: '/admin/listings', icon: ListFilter },
-      { name: 'Owner submissions', href: '/admin/submissions', icon: ClipboardList },
+      // Listings are reached from each property (its units' "listings" links)
+      // and keep Properties lit; a second list of the same stock was one more
+      // place to look.
+      { name: 'Properties', href: '/admin/buildings', icon: Building2, match: ['/admin/listings'] },
       { name: 'Location guides', href: '/admin/location-guides', icon: MapPin },
       { name: 'Documents', href: '/admin/documents', icon: FileText },
     ],
@@ -104,6 +113,8 @@ export const ADMIN_NAV_ITEMS = [
   { name: 'Dashboard', href: '/admin', icon: Home },
   ...GROUPS.flatMap((g) => g.items),
   // Not in the rail any more, but still a place you can search for.
+  { name: 'Listings', href: '/admin/listings', icon: ListFilter },
+  { name: 'Meta ads', href: '/admin/settings/ads', icon: Megaphone },
   { name: 'Users and roles', href: '/admin/users', icon: Users },
   { name: 'Chat assistant', href: '/admin/settings/assistant', icon: Bot },
   { name: 'Notifications', href: '/admin/settings/notifications', icon: Bell },
@@ -158,10 +169,47 @@ function isActive(pathname: string, item: NavItem): boolean {
   return all.some((h) => pathname === h || pathname.startsWith(h + '/'))
 }
 
+/**
+ * The menu's badges. Polled once a minute and on every page change, so
+ * opening Inquiries and reading them clears its badge on the way back.
+ * Each count is asked only of a role that can open the page.
+ */
+function useNavCounts(role: Role, pathname: string): Partial<Record<BadgeKey, number>> {
+  const [counts, setCounts] = useState<Partial<Record<BadgeKey, number>>>({})
+  const canInbox = canAccessAdminPath(role, '/admin/inbox')
+  const canRest = canAccessAdminPath(role, '/admin/inquiries')
+  useEffect(() => {
+    const apiUrl = normalizeApiUrl(process.env.NEXT_PUBLIC_API_URL || '')
+    let alive = true
+    const get = (path: string) =>
+      fetch(`${apiUrl}${path}`, { credentials: 'include', cache: 'no-store' })
+        .then((r) => (r.ok ? r.json() : null))
+        .then((j) => j?.data ?? null)
+        .catch(() => null)
+    const check = async () => {
+      if (document.visibilityState === 'hidden') return
+      const [inbox, rest] = await Promise.all([
+        canInbox ? get('/api/crm/inbox/unread/count') : null,
+        canRest ? get('/api/admin/nav-counts') : null,
+      ])
+      if (!alive) return
+      setCounts({
+        ...(inbox ? { inbox: inbox.count ?? 0 } : {}),
+        ...(rest ? { inquiries: rest.inquiries ?? 0, contacts: rest.contacts ?? 0, submissions: rest.submissions ?? 0 } : {}),
+      })
+    }
+    void check()
+    const timer = setInterval(check, 60_000)
+    return () => { alive = false; clearInterval(timer) }
+  }, [canInbox, canRest, pathname])
+  return counts
+}
+
 function SidebarNav({ onNavigate, onClose }: { onNavigate?: () => void; onClose?: () => void }) {
   const pathname = usePathname()
   const { signOut, user } = useAuth()
   const role = (user?.role ?? 'USER') as Role
+  const counts = useNavCounts(role, pathname)
 
   // A restricted role sees only what it can actually open. Filtering here (not
   // just guarding the route) is the difference between a nav that reflects the
@@ -242,6 +290,17 @@ function SidebarNav({ onNavigate, onClose }: { onNavigate?: () => void; onClose?
                       >
                         <item.icon className={iconCls(active)} aria-hidden="true" />
                         <span className="truncate">{item.name}</span>
+                        {item.badge && (counts[item.badge] ?? 0) > 0 && (
+                          <span
+                            className={cn(
+                              'ml-auto min-w-5 h-5 px-1.5 rounded-full text-[11px] font-semibold inline-flex items-center justify-center',
+                              item.badge === 'inbox' ? 'bg-emerald-500 text-white' : 'bg-red-500 text-white',
+                            )}
+                            aria-label={`${counts[item.badge]} new`}
+                          >
+                            {(counts[item.badge] ?? 0) > 99 ? '99+' : counts[item.badge]}
+                          </span>
+                        )}
                         {active && <ActiveMark />}
                       </Link>
                     </li>

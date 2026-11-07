@@ -8,11 +8,11 @@ import {
 import { normalizeApiUrl } from '@/lib/utils/api-url'
 import { SUB_STATUS_META, TYPE_LABELS, type LeadSubStatus, type LeadType } from './types'
 import { countryFlag } from '@/lib/market'
-import { AdsPanel } from './AdsPanel'
-import { AiUsagePanel } from './AiUsagePanel'
 
 /**
- * The state of the business on one screen.
+ * The state of the business on one screen — on the Dashboard now, not inside
+ * the pipeline, which is for work. The ad account moved to Settings → Meta ads
+ * and AI spend to Settings → AI usage: setup to check, not numbers to read daily.
  *
  * Distinct from Today, which is a to-do list. This answers "how are we doing"
  * — what's in motion, where clients are stuck, what's selling.
@@ -21,6 +21,10 @@ import { AiUsagePanel } from './AiUsagePanel'
  */
 
 interface Overview {
+  /** Open and something happening (a live deal, contact in 30 days, a plan). */
+  activeClients?: number
+  /** Open, but nothing in 30 days. Still on file. */
+  dormantClients?: number
   pipeline: Record<string, number>
   byMarket: Record<string, number>
   byType: Record<string, number>
@@ -53,7 +57,9 @@ export function OverviewView({ onFocus }: { onFocus: (view: 'today' | 'board' | 
   }
   if (!d) return null
 
-  const openClients = Object.entries(d.pipeline)
+  // "Open" used to be every record never closed — 125 for a board of a few
+  // dozen. Active is what is actually in play; the rest is named, not hidden.
+  const openClients = d.activeClients ?? Object.entries(d.pipeline)
     .filter(([k]) => !['WON', 'LOST', 'ARCHIVED'].includes(k))
     .reduce((t, [, n]) => t + n, 0)
 
@@ -65,8 +71,8 @@ export function OverviewView({ onFocus }: { onFocus: (view: 'today' | 'board' | 
       {/* The four numbers worth knowing before anything else */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <Stat
-          label="Open clients" value={openClients}
-          hint={`${d.byMarket.LEBANON ?? 0} 🇱🇧 · ${d.byMarket.GEORGIA ?? 0} 🇬🇪`}
+          label="Active clients" value={openClients}
+          hint={`${d.byMarket.LEBANON ?? 0} 🇱🇧 · ${d.byMarket.GEORGIA ?? 0} 🇬🇪${d.dormantClients ? ` · ${d.dormantClients} dormant` : ''}`}
           icon={<Users className="h-4 w-4" />} tone="slate"
           onClick={() => onFocus('list')}
         />
@@ -84,7 +90,7 @@ export function OverviewView({ onFocus }: { onFocus: (view: 'today' | 'board' | 
         />
         <Stat
           label="Needs attention" value={attention}
-          hint={attention === 0 ? 'all clear' : 'uncalled or going cold'}
+          hint={attention === 0 ? 'all clear' : 'uncalled forms or silent deals'}
           icon={<AlertTriangle className="h-4 w-4" />}
           tone={attention > 0 ? 'red' : 'slate'}
           onClick={() => onFocus('today')}
@@ -95,11 +101,11 @@ export function OverviewView({ onFocus }: { onFocus: (view: 'today' | 'board' | 
         {/* What's slipping */}
         <Panel title="What's slipping" hint="Left alone, these become lost business">
           <Row
-            label="Never called" value={d.needsAttention.neverCalled}
+            label="Lead forms nobody called (2 weeks)" value={d.needsAttention.neverCalled}
             icon={<Zap className="h-3.5 w-3.5 text-red-600" />} onClick={() => onFocus('today')}
           />
           <Row
-            label="Going cold (3+ weeks)" value={d.needsAttention.goingCold}
+            label="Deals gone silent (2+ weeks)" value={d.needsAttention.goingCold}
             icon={<Snowflake className="h-3.5 w-3.5 text-slate-400" />} onClick={() => onFocus('today')}
           />
           <Row
@@ -109,7 +115,7 @@ export function OverviewView({ onFocus }: { onFocus: (view: 'today' | 'board' | 
         </Panel>
 
         {/* Why open clients are still open */}
-        <Panel title="What clients are waiting on" hint="Why they haven't closed yet">
+        <Panel title="What clients are waiting on" hint="Active clients — why they haven't closed yet">
           {Object.entries(d.waitingOn)
             .filter(([k, n]) => k !== 'NONE' && n > 0)
             .sort((a, b) => b[1] - a[1])
@@ -127,7 +133,7 @@ export function OverviewView({ onFocus }: { onFocus: (view: 'today' | 'board' | 
         </Panel>
 
         {/* Who we're working with */}
-        <Panel title="Who's on the books" hint="Open clients by side of the deal">
+        <Panel title="Who's on the books" hint="Active clients by side of the deal">
           {Object.entries(d.byType)
             .sort((a, b) => b[1] - a[1])
             .map(([k, n]) => (
@@ -163,8 +169,6 @@ export function OverviewView({ onFocus }: { onFocus: (view: 'today' | 'board' | 
         </Panel>
       </div>
 
-      <AdsPanel />
-      <AiUsagePanel />
     </div>
   )
 }

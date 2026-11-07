@@ -1,13 +1,12 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import {
-  Phone, MessageCircle, Mail, MapPin, StickyNote, Home, Handshake,
-  Users, CheckCircle2,
+  Phone, MessageCircle, Mail, MapPin, StickyNote, Home, Handshake, Users,
 } from 'lucide-react'
 import {
   type Lead, type LeadType, TYPE_LABELS, TYPE_META, STATUS_META,
-  formatLastContact, hasSupplyIntent, hasDemandIntent, isPastClient, isReturningClient, hasClosedBefore,
+  formatLastContact, isPastClient, isReturningClient, formatPlanned, hasAwaitingFeedback, isWaitingOnUs,
 } from './types'
 import { countryFlag } from '@/lib/market'
 
@@ -15,95 +14,144 @@ import { countryFlag } from '@/lib/market'
  * Every client, buyers and sellers together, with what they bought or sold.
  *
  * The board answers "where is this deal"; this answers "who do I know". It's
- * the screen you open to look someone up — so it favours completeness and
- * search over pipeline mechanics, and shows closed business rather than hiding
- * it once a deal is done.
+ * the screen you open to look someone up. One "Show" row picks the group
+ * (active by default, so the 100-odd records nobody has spoken to in months
+ * stay out of the way), and two selects narrow and order it. It used to open
+ * with four focus chips, an intent toggle and a second toggle all at once.
  */
+
+type Show = 'active' | 'hold' | 'quiet' | 'dormant' | 'past' | 'lost' | 'noise' | 'all'
+type Need = 'any' | 'followup' | 'feedback' | 'options' | 'untapped' | 'flagged'
+type Sort = 'recent' | 'contact' | 'newest' | 'name'
+
+const CLOSED = ['WON', 'LOST', 'ARCHIVED']
+const SHOWS: Array<{ key: Show; label: string; hint: string }> = [
+  { key: 'active', label: 'Active', hint: 'Something happening: a live deal, a chat or call in the last 30 days, a follow-up planned, or new' },
+  { key: 'hold', label: 'On hold', hint: 'Checking something for them, or parked' },
+  { key: 'quiet', label: 'Gone quiet', hint: 'Moved off the board as not answering. They come back when they write' },
+  { key: 'dormant', label: 'Dormant', hint: 'Still open, nothing in 30 days' },
+  { key: 'past', label: 'Past clients', hint: 'Bought or sold with us' },
+  { key: 'lost', label: 'Lost', hint: 'Said no' },
+  { key: 'noise', label: 'Noise & parked', hint: 'Never replied. Back by themselves if they write' },
+  { key: 'all', label: 'Everyone', hint: 'Every record' },
+]
+
 export function ClientDirectory({
-  leads,
-  canSeeMoney,
-  onOpen,
-  search,
+  leads, canSeeMoney, onOpen, search, untapped = {}, quietIds, holdIds, initialShow,
 }: {
   leads: Lead[]
   canSeeMoney: boolean
   onOpen: (id: string) => void
   /** The page's single search box. The directory doesn't own one. */
   search: string
+  /** leadId -> strong matches nobody has shortlisted yet. */
+  untapped?: Record<string, number>
+  /** Clients in the board's hidden Gone quiet bucket, and those on hold. */
+  quietIds: Set<string>
+  holdIds: Set<string>
+  /** From the URL: ?show=quiet, or the older ?status=LOST / ARCHIVED. */
+  initialShow?: string | null
 }) {
-  const q = search
-  const [side, setSide] = useState<'all' | 'demand' | 'supply'>('all')
-  // Working with them now, or someone who already bought? Two different jobs.
-  const [group, setGroup] = useState<'active' | 'past' | 'all'>('active')
+  const [show, setShow] = useState<Show>('active')
+  const [need, setNeed] = useState<Need>('any')
+  const [sort, setSort] = useState<Sort>('recent')
+  useEffect(() => {
+    if (initialShow && SHOWS.some((x) => x.key === initialShow)) setShow(initialShow as Show)
+  }, [initialShow])
+
+  const inShow = useMemo(() => {
+    const open = (l: Lead) => !CLOSED.includes(l.status)
+    const tests: Record<Show, (l: Lead) => boolean> = {
+      active: (l) => open(l) && l.active !== false,
+      hold: (l) => holdIds.has(l.id) || Boolean(l.holdAt && open(l)),
+      quiet: (l) => quietIds.has(l.id),
+      dormant: (l) => open(l) && l.active === false,
+      past: (l) => isPastClient(l),
+      lost: (l) => l.status === 'LOST',
+      noise: (l) => l.status === 'ARCHIVED',
+      all: () => true,
+    }
+    return tests
+  }, [quietIds, holdIds])
+
+  const showCounts = useMemo(
+    () => Object.fromEntries(SHOWS.map((x) => [x.key, leads.filter(inShow[x.key]).length])) as Record<Show, number>,
+    [leads, inShow],
+  )
+
+  const needTests: Record<Need, (l: Lead) => boolean> = {
+    any: () => true,
+    followup: (l) => Boolean(formatPlanned(l.nextContactAt)?.due),
+    feedback: hasAwaitingFeedback,
+    options: isWaitingOnUs,
+    untapped: (l) => (untapped[l.id] ?? 0) > 0,
+    flagged: (l) => Boolean(l.flaggedAt),
+  }
+  const grouped = useMemo(() => leads.filter(inShow[show]), [leads, inShow, show])
+  const needCounts = Object.fromEntries(
+    (Object.keys(needTests) as Need[]).map((k) => [k, grouped.filter(needTests[k]).length]),
+  ) as Record<Need, number>
 
   const rows = useMemo(() => {
-    const needle = q.trim().toLowerCase()
-    return leads
-      .filter((l) => {
-        if (side !== 'all') {
-          // Someone doing both belongs under both filters.
-          if (side === 'supply' ? !hasSupplyIntent(l) : !hasDemandIntent(l)) return false
-        }
-        if (group !== 'all') {
-          const past = isPastClient(l)
-          if (group === 'past' ? !past : past) return false
-        }
-        if (!needle) return true
-        // Searching a directory means name, number, area, or what they wanted.
-        return [
-          l.name, l.phone, l.whatsapp, l.email, l.askingFor, l.notes,
-          ...(l.areas ?? []),
-          ...(l.deals ?? []).map((d) => `${d.ref ?? ''} ${d.title} ${d.unitRef ?? ''}`),
-        ]
-          .filter(Boolean)
-          .some((v) => String(v).toLowerCase().includes(needle))
-      })
-      .sort((a, b) => a.name.localeCompare(b.name))
-  }, [leads, q, side, group])
+    const needle = search.trim().toLowerCase()
+    const out = grouped.filter((l) => {
+      if (!needTests[need](l)) return false
+      if (!needle) return true
+      // Searching a directory means name, number, area, or what they wanted.
+      return [
+        l.name, l.phone, l.whatsapp, l.email, l.askingFor, l.notes,
+        ...(l.areas ?? []),
+        ...(l.deals ?? []).map((d) => `${d.ref ?? ''} ${d.title} ${d.unitRef ?? ''}`),
+      ]
+        .filter(Boolean)
+        .some((v) => String(v).toLowerCase().includes(needle))
+    })
+    const time = (v?: string | null) => (v ? new Date(v).getTime() : 0)
+    if (sort === 'name') out.sort((a, b) => a.name.localeCompare(b.name))
+    else if (sort === 'newest') out.sort((a, b) => time(b.createdAt) - time(a.createdAt))
+    else if (sort === 'contact') out.sort((a, b) => time(b.lastContactAt) - time(a.lastContactAt))
+    // 'recent': the API's order — last touched first.
+    return out
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [grouped, search, need, sort, untapped])
 
-  const pastCount = leads.filter(isPastClient).length
-  const activeCount = leads.length - pastCount
+  const sel = 'min-h-11 sm:min-h-9 rounded-lg border border-slate-200 bg-white px-2.5 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-900/10'
 
   return (
     <div className="space-y-3">
-      {/* Directory controls — separate from the board's pipeline filters */}
-      <div className="flex gap-2 flex-wrap items-center bg-white border border-slate-200 rounded-xl p-2">
-        <div className="flex gap-1 bg-slate-100 rounded-lg p-1">
-          {([
-            ['all', 'Any intent'],
-            ['demand', 'Buying / renting'],
-            ['supply', 'Selling / letting'],
-          ] as const).map(([v, label]) => (
+      <div className="bg-white border border-slate-200 rounded-xl p-2 space-y-2">
+        {/* Which group. Scrolls sideways on a phone rather than wrapping into four rows. */}
+        <div className="pg-scroll-x flex gap-1 [&>*]:shrink-0">
+          {SHOWS.map((x) => (
             <button
-              key={v}
-              onClick={() => setSide(v)}
-              className={`px-2.5 py-1.5 rounded-md text-sm font-medium transition-all ${
-                side === v ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-900'
+              key={x.key}
+              onClick={() => setShow(x.key)}
+              title={x.hint}
+              className={`min-h-10 px-3 rounded-lg text-sm font-medium transition-colors ${
+                show === x.key ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-100'
               }`}
             >
-              {label}
+              {x.label}{' '}
+              <span className={show === x.key ? 'text-white/70' : 'text-slate-400'}>{showCounts[x.key]}</span>
             </button>
           ))}
         </div>
-
-        {/* The primary split: people you're working with vs people who already
-            bought. Mixing them is what made everyone look "active". */}
-        <div className="flex gap-1 bg-slate-100 rounded-lg p-1">
-          {([
-            ['active', `Working with (${activeCount})`],
-            ['past', `Past clients (${pastCount})`],
-            ['all', 'Everyone'],
-          ] as const).map(([v, label]) => (
-            <button
-              key={v}
-              onClick={() => setGroup(v)}
-              className={`px-2.5 py-1.5 rounded-md text-sm font-medium transition-all ${
-                group === v ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              {label}
-            </button>
-          ))}
+        <div className="flex flex-wrap items-center gap-2 border-t border-slate-100 pt-2">
+          <p className="flex-1 min-w-[12rem] px-1 text-[11px] text-slate-500">{SHOWS.find((x) => x.key === show)?.hint}</p>
+          <select value={need} onChange={(e) => setNeed(e.target.value as Need)} className={sel} aria-label="Needs">
+            <option value="any">Any</option>
+            <option value="followup">Follow-up due ({needCounts.followup})</option>
+            <option value="feedback">Viewing feedback owed ({needCounts.feedback})</option>
+            <option value="options">Needs new options ({needCounts.options})</option>
+            <option value="untapped">Matches to explore ({needCounts.untapped})</option>
+            <option value="flagged">Flagged ({needCounts.flagged})</option>
+          </select>
+          <select value={sort} onChange={(e) => setSort(e.target.value as Sort)} className={sel} aria-label="Sort">
+            <option value="recent">Recently touched</option>
+            <option value="contact">Last contact</option>
+            <option value="newest">Newest first</option>
+            <option value="name">Name A–Z</option>
+          </select>
         </div>
       </div>
 
@@ -111,17 +159,14 @@ export function ClientDirectory({
         <div className="bg-white border border-slate-200 rounded-xl p-16 text-center">
           <Users className="h-10 w-10 mx-auto text-slate-200 mb-2" />
           <p className="text-sm text-slate-500">
-            {q
-            ? `Nobody matches “${q}”.`
-            : group === 'past'
-              ? 'Nobody has bought or sold with you yet.'
-              : 'No active clients.'}
+            {search ? `Nobody matches “${search}” here.` : need !== 'any' ? 'Nobody here needs that.' : 'Nobody here.'}
           </p>
         </div>
       ) : (
         <div className="space-y-1.5">
+          <p className="px-1 text-[11px] text-slate-500">{rows.length} {rows.length === 1 ? 'client' : 'clients'}</p>
           {rows.map((l) => (
-            <ClientRow key={l.id} lead={l} canSeeMoney={canSeeMoney} onOpen={onOpen} />
+            <ClientRow key={l.id} lead={l} canSeeMoney={canSeeMoney} onOpen={onOpen} held={holdIds.has(l.id) || Boolean(l.holdAt)} quiet={quietIds.has(l.id)} />
           ))}
         </div>
       )}
@@ -130,9 +175,9 @@ export function ClientDirectory({
 }
 
 function ClientRow({
-  lead: l, canSeeMoney, onOpen,
+  lead: l, canSeeMoney, onOpen, held = false, quiet = false,
 }: {
-  lead: Lead; canSeeMoney: boolean; onOpen: (id: string) => void
+  lead: Lead; canSeeMoney: boolean; onOpen: (id: string) => void; held?: boolean; quiet?: boolean
 }) {
   const last = formatLastContact(l.lastContactAt)
   const phone = l.whatsapp || l.phone
@@ -172,6 +217,16 @@ function ClientRow({
             <span className={`text-[10px] px-1.5 py-0.5 rounded ${STATUS_META[l.status].cls}`}>
               {STATUS_META[l.status].label}
             </span>
+            {held && (
+              <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-violet-50 text-violet-700 border border-violet-200" title={l.holdNote ?? undefined}>
+                {l.holdKind === 'PARKED' ? 'Parked' : 'Checking'}{l.holdNote ? `: ${l.holdNote}` : ''}
+              </span>
+            )}
+            {quiet && <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-600">Gone quiet</span>}
+            {l.active === false && !['WON', 'LOST', 'ARCHIVED'].includes(l.status) && (
+              <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-50 text-slate-400 border border-slate-200">Dormant</span>
+            )}
+            {l.flaggedAt && <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-red-50 text-red-700 border border-red-200">Flagged</span>}
           </div>
 
           <p className="text-sm text-slate-600 mt-0.5">

@@ -267,6 +267,12 @@ export interface Lead {
   flaggedAt?: string | null
   flagNote?: string | null
   flaggedBy?: string | null
+  /** On hold on the board: CHECKING something for them, or PARKED. */
+  holdAt?: string | null
+  holdKind?: 'CHECKING' | 'PARKED' | null
+  holdNote?: string | null
+  /** Something is happening with them (see utils/client-activity.ts on the API). */
+  active?: boolean
 }
 
 /**
@@ -657,7 +663,7 @@ export interface PipelineClient {
   adLabel: string | null
   askingFor: string | null
   budgetMax: number | null
-  bucket: 'TO_ANSWER' | 'ASSISTANT' | 'WITH_YOU' | 'QUIET' | 'PING_LATER'
+  bucket: 'TO_ANSWER' | 'ASSISTANT' | 'WITH_YOU' | 'ON_HOLD' | 'QUIET' | 'PING_LATER'
   /** Ping later: when they come back to "To answer". */
   pingAt: string | null
   reason: string | null
@@ -678,13 +684,15 @@ export interface PipelineClient {
   lastActivity: string
   /** Flagged red for the team. */
   flag: { at: string; note: string | null; by: string | null } | null
+  /** On hold: checking something for them, or parked until something happens. */
+  hold: { at: string; kind: 'CHECKING' | 'PARKED'; note: string | null } | null
 }
 
 export const CLIENT_COLUMNS: Array<{ key: PipelineClient['bucket']; label: string; hint: string; accent: string }> = [
   { key: 'TO_ANSWER', label: 'To answer', hint: 'A person owes them a message: handed over, waiting, a lead to call, or a ping due', accent: 'bg-red-500' },
   { key: 'ASSISTANT', label: 'Assistant', hint: 'The assistant is talking to them', accent: 'bg-emerald-500' },
   { key: 'WITH_YOU', label: 'With you', hint: 'You are talking to them — the ball is in their court', accent: 'bg-amber-500' },
-  { key: 'QUIET', label: 'Gone quiet', hint: 'Moved here by you — never by itself. A message or a logged call brings them back', accent: 'bg-slate-400' },
+  { key: 'ON_HOLD', label: 'On hold', hint: 'Checking something for them, or parked until something happens. A new message from them still goes to "To answer"', accent: 'bg-violet-500' },
   { key: 'PING_LATER', label: 'Ping later', hint: 'Snoozed — back in "To answer" on the date', accent: 'bg-sky-500' },
 ]
 

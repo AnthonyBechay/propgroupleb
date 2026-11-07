@@ -1603,6 +1603,14 @@ model Lead {
   flagNote            String?
   flaggedBy           String?
 
+  // "On hold" on the board: we are checking something for them (CHECKING) or
+  // waiting on something before the next step (PARKED). Set only by a person,
+  // kept until someone moves them on. A message from them still puts them in
+  // "To answer" first.
+  holdAt              DateTime?
+  holdKind            String?
+  holdNote            String?
+
   notes String?
 
   // When the relationship reached a terminal state (WON/LOST). Lets the board
@@ -2138,6 +2146,23 @@ model Expense {
   @@index([date])
   @@index([category])
   @@map("expenses")
+}
+
+// Money in that is not a deal's commission: a consulting fee, a rental
+// management fee, a commission on a sale that was never in the CRM. Counted on
+// its date, like an expense.
+model Income {
+  id          String      @id @default(cuid())
+  date        DateTime
+  amountUsd   Float
+  description String?
+  market      LeadMarket?
+  createdBy   String?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  @@index([date])
+  @@map("incomes")
 }
 
 // Rent, salaries, subscriptions: added to the expenses by itself every month,

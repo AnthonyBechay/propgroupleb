@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import {
   Phone, MessageCircle, Calendar, AlertCircle, Handshake,
-  TrendingUp, Loader2, Check, Plus, X, ChevronRight, ChevronDown, MessagesSquare, Instagram, Clock, VolumeX, Moon, Flag,
+  TrendingUp, Loader2, Check, Plus, X, ChevronRight, ChevronDown, MessagesSquare, Instagram, Clock, VolumeX, Moon, Flag, Search, PauseCircle, PlayCircle,
 } from 'lucide-react'
 import {
   type Deal, type OpportunityStage, BOARD_DEAL_COLUMNS, CLIENT_COLUMNS, type PipelineClient, dealColumnOf, stageLabel,
@@ -18,6 +18,7 @@ import type { StartStage } from './BookViewingModal'
  * the property), snoozed for some days, or off the board as noise / not interested.
  */
 export type ClientMove = StartStage | 'NOISE' | 'QUIET' | 'LOST' | 'FLAG' | 'UNFLAG' | `PING:${number}`
+  | 'HOLD:CHECKING' | 'HOLD:PARKED' | 'UNHOLD'
 
 /**
  * The pipeline, as deals.
@@ -246,8 +247,8 @@ export function DealBoard({
             <div
               key={col.key}
               // A person dropped on "Ping later" is snoozed for a week; on
-              // "Gone quiet", parked there until something happens.
-              {...(col.key === 'PING_LATER' || col.key === 'QUIET' ? {
+              // "On hold", asked what is being checked.
+              {...(col.key === 'PING_LATER' || col.key === 'ON_HOLD' ? {
                 onDragOver: (e: React.DragEvent) => { e.preventDefault(); setOver(col.key) },
                 onDragLeave: () => setOver((k) => (k === col.key ? null : k)),
                 onDrop: (e: React.DragEvent) => {
@@ -255,7 +256,7 @@ export function DealBoard({
                   setOver(null)
                   const id = e.dataTransfer.getData('text/plain') || dragging
                   setDragging(null)
-                  if (id?.startsWith('client:')) onBook(id.slice(7), col.key === 'QUIET' ? 'QUIET' : 'PING:7')
+                  if (id?.startsWith('client:')) onBook(id.slice(7), col.key === 'ON_HOLD' ? 'HOLD:CHECKING' : 'PING:7')
                 },
               } : {})}
               className={`rounded-xl border lg:pg-snap-start lg:w-[264px] lg:shrink-0 ${
@@ -449,7 +450,13 @@ function ClientCard({
           Ping {new Date(c.pingAt).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' })}{c.reason ? ` — ${c.reason}` : ''}
         </p>
       )}
-      {c.reason && c.bucket !== 'PING_LATER' && (
+      {c.bucket === 'ON_HOLD' && c.hold && (
+        <p className="text-[11px] text-violet-800 mt-1">
+          <span className="font-semibold">{c.hold.kind === 'PARKED' ? 'Parked' : 'Checking'}</span>
+          {' · '}{sinceLabel(c.hold.at)}{c.hold.note ? ` — ${c.hold.note}` : ''}
+        </p>
+      )}
+      {c.reason && c.bucket !== 'PING_LATER' && c.bucket !== 'ON_HOLD' && (
         <p className={`text-[11px] mt-1 ${c.bucket === 'TO_ANSWER' ? 'text-red-700 font-medium' : 'text-slate-600'}`}>{c.reason}</p>
       )}
       <div className="flex items-center gap-1.5 mt-1.5 pt-1.5 border-t border-slate-100 flex-wrap">
@@ -474,7 +481,7 @@ function ClientCard({
             {c.chat.unread > 0 && c.chat.unread}
           </button>
         )}
-        <MoveMenu meeting={meeting} supplyOnly={c.supplyOnly} flagged={Boolean(c.flag)} onPick={(to) => onBook(c.id, to)} />
+        <MoveMenu meeting={meeting} supplyOnly={c.supplyOnly} flagged={Boolean(c.flag)} held={Boolean(c.hold)} onPick={(to) => onBook(c.id, to)} />
       </div>
     </div>
   )
@@ -602,8 +609,10 @@ function FlagItem({ flagged, onPick }: { flagged: boolean; onPick: (to: 'FLAG' |
  * eleven entries that put "Met / discussed" next to "In 2 weeks".
  */
 export function MoveMenu({
-  meeting, supplyOnly, onPick, buttonClassName, flagged = false,
+  meeting, supplyOnly, onPick, buttonClassName, flagged = false, held = false,
 }: {
+  /** Whether the client is on hold now — offers taking them off it. */
+  held?: boolean
   /** Abroad the next step is a meeting at the office; in Lebanon, a viewing. */
   meeting: boolean
   supplyOnly: boolean
@@ -613,7 +622,7 @@ export function MoveMenu({
   buttonClassName?: string
 }) {
   return (
-    <MenuShell label="Move" height={supplyOnly ? 330 : 500} buttonClassName={buttonClassName}>
+    <MenuShell label="Move" height={supplyOnly ? 430 : 600} buttonClassName={buttonClassName}>
       {(close) => {
         const pick = (to: ClientMove) => { close(); onPick(to) }
         return (
@@ -627,6 +636,14 @@ export function MoveMenu({
               </>
             )}
             <p className={MENU_GROUP}>Not now</p>
+            {held ? (
+              <MenuItem icon={<PlayCircle className="h-4 w-4 text-violet-600" />} title="Take off hold" hint="Back to wherever the chat puts them" onClick={() => pick('UNHOLD')} />
+            ) : (
+              <>
+                <MenuItem icon={<Search className="h-4 w-4 text-violet-600" />} title="Checking for them" hint="Finding something or asking internally — you owe them an answer" onClick={() => pick('HOLD:CHECKING')} />
+                <MenuItem icon={<PauseCircle className="h-4 w-4 text-violet-600" />} title="Park for now" hint="Waiting on something before the next step" onClick={() => pick('HOLD:PARKED')} />
+              </>
+            )}
             <div className="px-2.5 pb-1">
               <span className="flex items-center gap-1.5 text-sm font-medium text-slate-900"><Clock className="h-4 w-4 text-sky-600" /> Ping later</span>
               <div className="mt-1.5 flex gap-1">
@@ -637,7 +654,7 @@ export function MoveMenu({
                 ))}
               </div>
             </div>
-            <MenuItem icon={<Moon className="h-4 w-4 text-slate-500" />} title="Gone quiet" hint="Not answering — park them until they write or you log a call" onClick={() => pick('QUIET')} />
+            <MenuItem icon={<Moon className="h-4 w-4 text-slate-500" />} title="Gone quiet" hint="Not answering — off the board until they write. Listed on the Clients page" onClick={() => pick('QUIET')} />
             <p className={MENU_GROUP}>Close</p>
             <MenuItem icon={<VolumeX className="h-4 w-4 text-slate-500" />} title="Noise" hint="Never replied — hide until they write" onClick={() => pick('NOISE')} />
             <MenuItem icon={<X className="h-4 w-4 text-red-600" />} title="Not interested" hint="They said no" onClick={() => pick('LOST')} />

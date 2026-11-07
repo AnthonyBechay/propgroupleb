@@ -242,8 +242,34 @@ Human codes clients quote back over WhatsApp. `apps/backend/src/utils/reference.
 
 ## CRM (`apps/web/src/app/(admin)/admin/crm/**`)
 
-Four views: **Overview** (state of the business), **Today** (what needs you now),
-**Board** (pipeline), **All clients** (directory). Plus a drawer per client.
+The pipeline page has **Board** and **Today** (what needs you now). The
+**Overview** (state of the business) is on the Dashboard (`/admin`), not in the
+pipeline; its ad account panel is Settings → Meta ads (`/admin/settings/ads`)
+and AI spend is Settings → AI usage. **Clients** (`/admin/clients`) is the
+directory. Plus a drawer per client.
+
+**Active, not "open".** `utils/client-activity.ts` (`activeClientWhere`) is the
+one definition of a client in play: a live deal, a chat or logged contact in
+30 days, a follow-up planned, on hold, or new in 30 days. Open-but-none-of-that
+is *dormant*. The Overview, the Dashboard and the Clients page count active
+clients; counting every record never closed said "125 open clients" for a
+board of a few dozen. `GET /api/crm` rows carry `active`.
+
+**On hold** (`Lead.holdAt`/`holdKind`/`holdNote`, a board column): *Checking
+for them* (we owe them an answer) or *Park for now*, with a note, from any Move
+menu. Only a person sets it; every other move, and a deal reaching a viewing
+(`syncLeadStatus`), clears it. A message they sent before the hold does not
+make them "To answer"; a newer one does. Today lists checks older than 2 days.
+
+**Gone quiet has no column.** The bucket still exists (`quietAt`), but the board
+hides it; those clients are on the Clients page (Show → Gone quiet,
+`?show=quiet`), linked under the board and from Today.
+
+**The menu badges what is new**: WhatsApp (unread chats), Inquiries (`NEW`),
+Contact messages (unread), Owner submissions (`PENDING`), from
+`GET /api/admin/nav-counts`, polled each minute and on every page change.
+Listings has no menu entry — it is reached from each property and keeps
+Properties lit.
 
 ### The board is a pipeline of DEALS, not of people
 
@@ -341,6 +367,12 @@ a non-USD price.
   whenever the books are read (`generateRecurring` in `routes/finance.ts`), keyed
   `(recurringId, period)` so it never doubles. Deleting a generated month skips
   it for good (`recurring_skips_<id>`). There is no scheduler to depend on.
+- **Other income** (`Income`, `/api/finance/income`): money in that is not a
+  CRM deal. Counted on its date in the same profit.
+- **Accounting can correct a deal** (`PATCH /api/finance/deals/:id`: commission,
+  broker cut, paid %, received date) — kept as typed, never recomputed.
+  `?market=` narrows the books to one office; shared costs (`market: null`) are
+  then reported apart, never split by a rule.
 - **Payout threshold** (`payoutAtPct`, 0 = paid on closing): abroad we are paid
   once the buyer has paid 30%. It is stamped on the deal *as it becomes
   RESERVED/WON*, never onto older deals, so a changed default does not move a

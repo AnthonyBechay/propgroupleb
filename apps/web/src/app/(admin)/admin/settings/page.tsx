@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import {
-  Bell, Bot, ChevronRight, FileText, Gauge, Handshake, KeyRound, Palette, Percent, User, Users,
+  Bell, Bot, ChevronRight, FileText, Gauge, Handshake, KeyRound, Megaphone, Palette, Percent, User, Users,
 } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { canAccessAdminPath } from '@/lib/permissions'
@@ -33,10 +33,11 @@ const GROUPS: Array<{ label: string; cards: Card[] }> = [
     ],
   },
   {
-    label: 'Chats and AI',
+    label: 'Chats, ads and AI',
     cards: [
       { href: '/admin/settings/assistant', title: 'Chat assistant', description: 'Who it answers on WhatsApp and Instagram, what it recommends, and its saved answers.', icon: Bot },
       { href: '/admin/settings/ai-usage', title: 'AI usage and budget', description: 'What AI has cost today and this month, and the limit where it stops.', icon: Gauge },
+      { href: '/admin/settings/ads', title: 'Meta ads', description: 'The Facebook / Instagram ad account: spend, leads, and the Conversions API that reports viewings and sales back to Meta.', icon: Megaphone },
     ],
   },
   {

@@ -3,9 +3,11 @@
 import { useCallback, useEffect, useState } from 'react'
 import {
   Loader2, Phone, MessageCircle, CalendarCheck, MessageSquareWarning,
-  Sparkles, Snowflake, Zap, CheckCircle2, ArrowRight,
+  Sparkles, Snowflake, Zap, CheckCircle2, ArrowRight, Search, Moon,
 } from 'lucide-react'
+import Link from 'next/link'
 import { normalizeApiUrl } from '@/lib/utils/api-url'
+import type { PipelineClient } from './types'
 
 /**
  * The working screen.
@@ -68,7 +70,13 @@ export function TodayView({
   toAnswer,
   onBoard,
   onShowBoard,
+  onHold = [],
+  quietCount = 0,
 }: {
+  /** The board's On hold column. Today lists the ones left there for days. */
+  onHold?: PipelineClient[]
+  /** Clients under Gone quiet — no column on the board any more. */
+  quietCount?: number
   market: 'all' | 'LEBANON' | 'GEORGIA'
   onOpen: (id: string) => void
   /** People in the board's "To answer" column. */
@@ -113,7 +121,15 @@ export function TodayView({
   )
   const viewingsSoon = agenda.upcomingViewings.filter((o) => !viewingsToday.includes(o))
 
+  // "I'll check and get back to you", two days ago and still nothing: the
+  // one hold that decays. Parked clients are waiting on something else.
+  const HOLD_STALE_MS = 2 * 86_400_000
+  const staleChecks = onHold
+    .filter((c) => c.hold?.kind === 'CHECKING' && Date.now() - new Date(c.hold.at).getTime() > HOLD_STALE_MS)
+    .sort((a, b) => new Date(a.hold!.at).getTime() - new Date(b.hold!.at).getTime())
+
   const totalWork =
+    staleChecks.length +
     freshLeads.length + viewingsToday.length + dueFollowUps.length +
     agenda.awaitingFeedback.length + viewingsSoon.length +
     agenda.needsNewOptions.length + goingCold.length
@@ -129,8 +145,19 @@ export function TodayView({
     </button>
   )
 
+  const quietLine = quietCount > 0 && (
+    <Link
+      href="/admin/clients?show=quiet"
+      className="w-full min-h-11 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-left text-sm text-slate-600 inline-flex items-center gap-2 hover:bg-slate-50"
+    >
+      <Moon className="h-4 w-4 shrink-0 text-slate-400" />
+      <span className="flex-1"><strong className="text-slate-800">{quietCount}</strong> gone quiet — off the board until they write. Worth a nudge now and then.</span>
+      <ArrowRight className="h-4 w-4 shrink-0 text-slate-300" />
+    </Link>
+  )
+
   if (totalWork === 0) {
-    return toAnswer > 0 ? <div className="space-y-3">{toAnswerBanner}</div> : (
+    return toAnswer > 0 || quietLine ? <div className="space-y-3">{toAnswerBanner}{quietLine}</div> : (
       <div className="bg-white border border-slate-200 rounded-xl p-16 text-center">
         <CheckCircle2 className="h-12 w-12 mx-auto text-emerald-400 mb-3" />
         <p className="font-semibold text-slate-800">Nothing needs you right now.</p>
@@ -145,6 +172,19 @@ export function TodayView({
     <div className="space-y-3">
     {toAnswerBanner}
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+      <Section
+        title="You said you would check"
+        hint="On hold as “checking for them” for 2+ days — get back to them, even to say not yet"
+        icon={<Search className="h-4 w-4" />}
+        tone="violet"
+        count={staleChecks.length}
+      >
+        {staleChecks.map((c) => (
+          <Row key={c.id} lead={{ id: c.id, name: c.name, phone: null, market: c.market }} onOpen={onOpen}
+               meta={`since ${dayLabel(c.hold!.at)}`} detail={c.hold!.note} />
+        ))}
+      </Section>
+
       <Section
         title="Never called"
         hint="Came in the last 3 days, nobody has spoken to them"
@@ -236,6 +276,7 @@ export function TodayView({
         </Section>
       )}
     </div>
+    {quietLine}
     </div>
   )
 }
