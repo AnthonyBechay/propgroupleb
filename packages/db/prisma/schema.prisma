@@ -2022,9 +2022,11 @@ model LeadOpportunity {
   // that never set its own. commissionUsd is what that comes to, ours in full.
   sellerPct Float?
   buyerPct  Float?
-  // A broker who brought or shared the deal takes this share of OUR
-  // commission (a percentage of commissionUsd, not of the price).
+  // A broker on the deal. Either takes brokerPct of OUR commission, or takes
+  // one side outright — he brought the seller, we brought the buyer, so the
+  // seller's part is his (brokerTakes).
   brokerId     String?
+  brokerTakes  BrokerTakes?
   brokerPct    Float?
   brokerCutUsd Float?
   // Payment plans abroad: we are paid once the client has paid payoutAtPct of
@@ -2033,6 +2035,12 @@ model LeadOpportunity {
   paidPct              Float?
   payoutAtPct          Float?
   commissionReceivedAt DateTime?
+  // The client's payment plan: a down payment, then the rest in equal monthly
+  // instalments from planStartAt. With payoutAtPct it gives the month the
+  // commission falls due — when to ping the developer.
+  downPaymentPct Float?
+  planMonths     Int?
+  planStartAt    DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -2052,6 +2060,12 @@ model LeadOpportunity {
   @@map("lead_opportunities")
 }
 
+enum BrokerTakes {
+  SHARE // a percentage of our commission
+  SELLER_SIDE // the commission from the seller — he brought the seller
+  BUYER_SIDE // the commission from the buyer — he brought the buyer
+}
+
 // An outside broker or agent we split commission with.
 model Broker {
   id       String  @id @default(cuid())
@@ -2062,6 +2076,8 @@ model Broker {
   // Their usual share of our commission, in percent. Copied onto a deal when
   // they are picked, so changing it later does not rewrite closed deals.
   sharePct Float   @default(50)
+  // How he is usually paid; copied onto a deal when picked, changeable there.
+  takes    BrokerTakes @default(SHARE)
   notes    String?
   active   Boolean @default(true)
 
@@ -2112,7 +2128,36 @@ model Expense {
   createdAt   DateTime        @default(now())
   updatedAt   DateTime        @updatedAt
 
+  // Made from a recurring expense, for this month ("2026-11"). The pair is
+  // unique so the same month can never be added twice.
+  recurringId String?
+  period      String?
+  recurring   RecurringExpense? @relation(fields: [recurringId], references: [id], onDelete: SetNull)
+
+  @@unique([recurringId, period])
   @@index([date])
   @@index([category])
   @@map("expenses")
+}
+
+// Rent, salaries, subscriptions: added to the expenses by itself every month,
+// on dayOfMonth (0 = the last day of the month).
+model RecurringExpense {
+  id          String          @id @default(cuid())
+  category    ExpenseCategory
+  amountUsd   Float
+  description String?
+  market      LeadMarket?
+  dayOfMonth  Int             @default(0)
+  // First and (optional) last month it runs, as dates.
+  startsOn    DateTime
+  endsOn      DateTime?
+  active      Boolean         @default(true)
+  createdBy   String?
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  expenses Expense[]
+
+  @@map("recurring_expenses")
 }

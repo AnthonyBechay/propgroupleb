@@ -12,6 +12,7 @@ interface Broker {
   email: string | null
   company: string | null
   sharePct: number
+  takes: Takes
   notes: string | null
   active: boolean
   deals: number
@@ -19,8 +20,15 @@ interface Broker {
   earnedUsd: number
 }
 
-type Draft = { name: string; phone: string; email: string; company: string; sharePct: string; notes: string; active: boolean }
-const EMPTY: Draft = { name: '', phone: '', email: '', company: '', sharePct: '50', notes: '', active: true }
+type Takes = 'SHARE' | 'SELLER_SIDE' | 'BUYER_SIDE'
+const TAKES_LABEL: Record<Takes, string> = {
+  SHARE: 'A share of our commission',
+  SELLER_SIDE: "The seller's side — he brings the seller, we bring the buyer",
+  BUYER_SIDE: "The buyer's side — he brings the buyer, we bring the seller",
+}
+
+type Draft = { name: string; phone: string; email: string; company: string; sharePct: string; takes: Takes; notes: string; active: boolean }
+const EMPTY: Draft = { name: '', phone: '', email: '', company: '', sharePct: '50', takes: 'SHARE', notes: '', active: true }
 
 const inp = 'mt-1 w-full min-h-11 rounded-lg border border-slate-200 bg-white px-3 text-sm focus:outline-none focus:ring-2 focus:ring-slate-300'
 const money = (n: number) => `$${Math.round(n).toLocaleString()}`
@@ -54,7 +62,7 @@ export default function BrokersPage() {
     setError(null)
     setEditing(b ? b.id : 'new')
     setDraft(b
-      ? { name: b.name, phone: b.phone ?? '', email: b.email ?? '', company: b.company ?? '', sharePct: String(b.sharePct), notes: b.notes ?? '', active: b.active }
+      ? { name: b.name, phone: b.phone ?? '', email: b.email ?? '', company: b.company ?? '', sharePct: String(b.sharePct), takes: b.takes ?? 'SHARE', notes: b.notes ?? '', active: b.active }
       : EMPTY)
   }
 
@@ -64,7 +72,7 @@ export default function BrokersPage() {
     try {
       const body = {
         name: draft.name.trim(), phone: draft.phone.trim() || null, email: draft.email.trim() || null,
-        company: draft.company.trim() || null, sharePct: Number(draft.sharePct || 0), notes: draft.notes.trim() || null,
+        company: draft.company.trim() || null, sharePct: Number(draft.sharePct || 0), takes: draft.takes, notes: draft.notes.trim() || null,
         active: draft.active,
       }
       const res = await fetch(`${apiUrl}/api/finance/brokers${editing === 'new' ? '' : `/${editing}`}`, {
@@ -102,11 +110,20 @@ export default function BrokersPage() {
         <label className="block text-sm text-slate-700">Company<input value={draft.company} onChange={(e) => setDraft({ ...draft, company: e.target.value })} className={inp} /></label>
         <label className="block text-sm text-slate-700">Phone<input type="tel" value={draft.phone} onChange={(e) => setDraft({ ...draft, phone: e.target.value })} className={inp} /></label>
         <label className="block text-sm text-slate-700">Email<input type="email" value={draft.email} onChange={(e) => setDraft({ ...draft, email: e.target.value })} className={inp} /></label>
-        <label className="block text-sm text-slate-700">
-          Their share of our commission, %
-          <input type="number" min="0" max="100" step="1" inputMode="decimal" value={draft.sharePct} onChange={(e) => setDraft({ ...draft, sharePct: e.target.value })} className={inp} />
-          <span className="mt-1 block text-xs text-slate-500">50 = they get half of what we earn on the deal.</span>
+        <label className="block text-sm text-slate-700 sm:col-span-2">
+          Usually takes
+          <select value={draft.takes} onChange={(e) => setDraft({ ...draft, takes: e.target.value as Takes })} className={inp}>
+            {(Object.keys(TAKES_LABEL) as Takes[]).map((k) => <option key={k} value={k}>{TAKES_LABEL[k]}</option>)}
+          </select>
+          <span className="mt-1 block text-xs text-slate-500">This is his default. Each deal can say otherwise, for the apartments he is the broker on.</span>
         </label>
+        {draft.takes === 'SHARE' && (
+          <label className="block text-sm text-slate-700">
+            Share of our commission, %
+            <input type="number" min="0" max="100" step="1" inputMode="decimal" value={draft.sharePct} onChange={(e) => setDraft({ ...draft, sharePct: e.target.value })} className={inp} />
+            <span className="mt-1 block text-xs text-slate-500">50 = half of what we earn on the deal.</span>
+          </label>
+        )}
         <label className="flex items-center gap-2 text-sm text-slate-700 sm:mt-7">
           <input type="checkbox" checked={draft.active} onChange={(e) => setDraft({ ...draft, active: e.target.checked })} className="h-4 w-4" />
           Active — offered on new deals
@@ -126,7 +143,7 @@ export default function BrokersPage() {
     <div className="max-w-4xl space-y-4">
       <PageHeader
         title="Brokers"
-        description="Brokers and agents we share commission with. Pick one on a deal and their share comes off our commission."
+        description="Brokers and agents we share deals with. Pick one on a deal and what he takes — a share, or the seller's or buyer's side — comes off our commission."
         actions={editing === null && (
           <button onClick={() => startEdit()} className="inline-flex min-h-11 items-center gap-1.5 rounded-lg bg-slate-900 px-4 text-sm font-semibold text-white hover:bg-slate-800">
             <Plus className="h-4 w-4" /> Add broker
@@ -153,7 +170,7 @@ export default function BrokersPage() {
                       {!b.active && <span className="ml-2 rounded bg-slate-100 px-1.5 py-0.5 text-[11px] font-medium text-slate-500">Inactive</span>}
                     </p>
                     <p className="mt-0.5 text-sm text-slate-600">
-                      {b.sharePct}% of our commission{[b.phone, b.email].filter(Boolean).length > 0 && ` · ${[b.phone, b.email].filter(Boolean).join(' · ')}`}
+                      {b.takes === 'SELLER_SIDE' ? "Takes the seller's side" : b.takes === 'BUYER_SIDE' ? "Takes the buyer's side" : `${b.sharePct}% of our commission`}{[b.phone, b.email].filter(Boolean).length > 0 && ` · ${[b.phone, b.email].filter(Boolean).join(' · ')}`}
                     </p>
                     <p className="mt-1 text-xs text-slate-500">
                       {b.deals} deal{b.deals === 1 ? '' : 's'} · {money(b.earnedUsd)} their share in all

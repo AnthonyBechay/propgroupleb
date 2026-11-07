@@ -1724,6 +1724,11 @@ const opportunitySchema = z.object({
   paidPct: z.number().min(0).max(100).optional().nullable(),
   payoutAtPct: z.number().min(0).max(100).optional().nullable(),
   commissionReceivedAt: z.string().optional().nullable(),
+  brokerTakes: z.enum(['SHARE', 'SELLER_SIDE', 'BUYER_SIDE']).optional().nullable(),
+  // The client's payment plan: down payment %, months of instalments, first payment.
+  downPaymentPct: z.number().min(0).max(100).optional().nullable(),
+  planMonths: z.number().int().min(0).max(240).optional().nullable(),
+  planStartAt: z.string().optional().nullable(),
 });
 
 // GET /:id/history — what happened to this client, newest first: every move on
@@ -1813,7 +1818,7 @@ router.post(
             commissionUsd: data.commissionUsd ?? existing.commissionUsd,
             soldUnitRef: data.soldUnitRef || existing.soldUnitRef,
             closedAt: data.closedAt ? new Date(data.closedAt) : (existing.closedAt ?? new Date()),
-            ...termsData({ ...data, brokerPct: await brokerShare(data.brokerId, data.brokerPct) }),
+            ...termsData({ ...data, brokerPct: await brokerShare(data.brokerId, data.brokerPct), brokerTakes: await brokerTakesFor(data.brokerId, data.brokerTakes) }),
             ...(await commissionFields({
               ...existing, ...termsData(data), stage: 'WON', leadId: lead.id,
               brokerPct: (await brokerShare(data.brokerId, data.brokerPct)) ?? existing.brokerPct,
@@ -1833,12 +1838,13 @@ router.post(
       return;
     }
 
-    const terms = termsData({ ...data, brokerPct: await brokerShare(data.brokerId, data.brokerPct) });
+    const terms = termsData({ ...data, brokerPct: await brokerShare(data.brokerId, data.brokerPct), brokerTakes: await brokerTakesFor(data.brokerId, data.brokerTakes) });
     const money = await commissionFields({
       stage: data.stage, leadId: lead.id, buildingId: data.buildingId, listingId: data.listingId,
       soldPrice: data.soldPrice ?? null, soldCurrency: data.soldCurrency ?? 'USD', commissionUsd: data.commissionUsd ?? null,
       sellerPct: data.sellerPct ?? null, buyerPct: data.buyerPct ?? null,
       brokerPct: (terms.brokerPct as number | null | undefined) ?? null, payoutAtPct: data.payoutAtPct ?? null,
+      brokerTakes: (terms.brokerTakes as never) ?? null, brokerId: data.brokerId ?? null,
     }, data.commissionUsd != null);
     const opportunity = await prisma.leadOpportunity.create({
       data: {
@@ -1907,6 +1913,11 @@ const opportunityUpdateSchema = z.object({
   paidPct: z.number().min(0).max(100).optional().nullable(),
   payoutAtPct: z.number().min(0).max(100).optional().nullable(),
   commissionReceivedAt: z.string().optional().nullable(),
+  brokerTakes: z.enum(['SHARE', 'SELLER_SIDE', 'BUYER_SIDE']).optional().nullable(),
+  // The client's payment plan: down payment %, months of instalments, first payment.
+  downPaymentPct: z.number().min(0).max(100).optional().nullable(),
+  planMonths: z.number().int().min(0).max(240).optional().nullable(),
+  planStartAt: z.string().optional().nullable(),
 });
 
 /** A price is agreed from here on: what the commission is worked from. */
@@ -1919,14 +1930,24 @@ async function brokerShare(brokerId: string | null | undefined, given: number | 
   return b?.sharePct ?? null;
 }
 
+/** How the broker is usually paid, when a broker is picked without saying. */
+async function brokerTakesFor(brokerId: string | null | undefined, given: string | null | undefined) {
+  if (given !== undefined || !brokerId) return given;
+  const b = await prisma.broker.findUnique({ where: { id: brokerId }, select: { takes: true } });
+  return b?.takes ?? null;
+}
+
 /** The terms fields of a create/update body, as Prisma data. */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function termsData(data: any): Record<string, unknown> {
   const out: Record<string, unknown> = {};
-  for (const k of ['sellerPct', 'buyerPct', 'brokerPct', 'paidPct', 'payoutAtPct'] as const) {
+  for (const k of ['sellerPct', 'buyerPct', 'brokerPct', 'paidPct', 'payoutAtPct', 'brokerTakes', 'downPaymentPct', 'planMonths'] as const) {
     if (data[k] !== undefined) out[k] = data[k];
   }
+  if (data.planStartAt !== undefined) out.planStartAt = data.planStartAt ? new Date(data.planStartAt) : null;
   if (data.brokerId !== undefined) out.brokerId = data.brokerId || null;
+  // No broker: nothing of his stays on the deal.
+  if (data.brokerId === null || data.brokerId === '') { out.brokerPct = null; out.brokerTakes = null; }
   if (data.commissionReceivedAt !== undefined) {
     out.commissionReceivedAt = data.commissionReceivedAt ? new Date(data.commissionReceivedAt) : null;
   }
@@ -1964,7 +1985,7 @@ router.patch(
     else if (data.stage === 'WON' && !existing.closedAt) patch.closedAt = new Date();
     if (data.stage && data.stage !== 'WON') patch.closedAt = null;
 
-    Object.assign(patch, termsData({ ...data, brokerPct: await brokerShare(data.brokerId, data.brokerPct) }));
+    Object.assign(patch, termsData({ ...data, brokerPct: await brokerShare(data.brokerId, data.brokerPct), brokerTakes: await brokerTakesFor(data.brokerId, data.brokerTakes) }));
     // Commission follows the price and the rates, unless a figure was typed in.
     // Only when the price or the rates changed: editing a viewing note must not
     // overwrite a commission somebody typed in before rates existed.

@@ -21,15 +21,33 @@ export interface Terms {
   /** The amount was typed in, so it no longer follows the rates. */
   commissionTyped: boolean
   brokerId: string
+  brokerTakes: BrokerTakes
   brokerPct: string
   paidPct: string
+  downPaymentPct: string
+  planMonths: string
+  planStartAt: string
   payoutAtPct: string
   received: boolean
   receivedOn: string
 }
 
 interface Defaults { sellerPct: number; buyerPct: number; payoutAtPct: number; source: 'project' | 'market' }
-interface BrokerOption { id: string; name: string; sharePct: number; active: boolean; company?: string | null }
+type BrokerTakes = 'SHARE' | 'SELLER_SIDE' | 'BUYER_SIDE'
+interface BrokerOption { id: string; name: string; sharePct: number; takes?: BrokerTakes; active: boolean; company?: string | null }
+
+/**
+ * The month the client's payments reach the point we are paid at — mirrors
+ * expectedPayoutDate() on the server. Null without a plan.
+ */
+export function expectedPayout(threshold: number, down: number, months: number, start: string): Date | null {
+  if (threshold <= 0 || !start) return null
+  const d = new Date(`${start}T12:00:00`)
+  if (down >= threshold) return d
+  if (!months || months <= 0 || down >= 100) return null
+  d.setMonth(d.getMonth() + Math.ceil((threshold - down) / ((100 - down) / months) - 1e-9))
+  return d
+}
 
 const str = (n: number | null | undefined) => (n == null ? '' : String(n))
 const today = () => new Date().toISOString().slice(0, 10)
@@ -41,8 +59,12 @@ export function termsFrom(o?: Opportunity): Terms {
     commission: str(o?.commissionUsd),
     commissionTyped: o?.commissionUsd != null,
     brokerId: o?.brokerId ?? '',
+    brokerTakes: o?.brokerTakes ?? 'SHARE',
     brokerPct: str(o?.brokerPct),
     paidPct: str(o?.paidPct),
+    downPaymentPct: str(o?.downPaymentPct),
+    planMonths: str(o?.planMonths),
+    planStartAt: o?.planStartAt ? o.planStartAt.slice(0, 10) : '',
     payoutAtPct: str(o?.payoutAtPct),
     received: Boolean(o?.commissionReceivedAt),
     receivedOn: o?.commissionReceivedAt ? o.commissionReceivedAt.slice(0, 10) : today(),
@@ -58,8 +80,12 @@ export function termsBody(t: Terms): Record<string, unknown> {
     buyerPct: numOrNull(t.buyerPct),
     ...(t.commissionTyped ? { commissionUsd: numOrNull(t.commission) } : {}),
     brokerId: t.brokerId || null,
-    brokerPct: t.brokerId ? numOrNull(t.brokerPct) : null,
+    brokerTakes: t.brokerId ? t.brokerTakes : null,
+    brokerPct: t.brokerId && t.brokerTakes === 'SHARE' ? numOrNull(t.brokerPct) : null,
     paidPct: numOrNull(t.paidPct),
+    downPaymentPct: numOrNull(t.downPaymentPct),
+    planMonths: t.planMonths.trim() === '' ? null : Math.round(Number(t.planMonths)),
+    planStartAt: t.planStartAt ? new Date(`${t.planStartAt}T12:00:00`).toISOString() : null,
     ...(t.payoutAtPct.trim() !== '' ? { payoutAtPct: Number(t.payoutAtPct) } : {}),
     commissionReceivedAt: t.received ? new Date(`${t.receivedOn || today()}T12:00:00`).toISOString() : null,
   }
@@ -111,7 +137,14 @@ export function CommissionFields({
 
   const commission = t.commissionTyped ? numOrNull(t.commission) : auto
   const brokerPct = t.brokerId ? (t.brokerPct !== '' ? Number(t.brokerPct) : 0) : 0
-  const cut = commission != null ? Math.round((commission * brokerPct) / 100) : null
+  // A side is that side's rate on the price, never more than the whole commission.
+  const side = price != null && currency === 'USD'
+    ? Math.round((price * (t.brokerTakes === 'SELLER_SIDE' ? seller : buyer)) / 100)
+    : null
+  const cut = !t.brokerId ? null
+    : t.brokerTakes === 'SHARE'
+      ? (commission != null ? Math.round((commission * brokerPct) / 100) : null)
+      : side != null && commission != null ? Math.min(side, commission) : side
   const threshold = t.payoutAtPct !== '' ? Number(t.payoutAtPct) : defaults?.payoutAtPct ?? 0
   const from = defaults?.source === 'project' ? "project's terms" : 'market default'
 
@@ -150,29 +183,41 @@ export function CommissionFields({
         )}
       </label>
 
-      <div className="grid grid-cols-3 gap-2">
-        <label className="block col-span-2">
-          <span className="text-[11px] text-slate-500">Broker</span>
-          <select value={t.brokerId} className={inp}
-            onChange={(e) => {
-              const b = brokers.find((x) => x.id === e.target.value)
-              set({ brokerId: e.target.value, brokerPct: b ? String(b.sharePct) : '' })
-            }}>
-            <option value="">No broker</option>
-            {brokers.filter((b) => b.active || b.id === t.brokerId).map((b) => (
-              <option key={b.id} value={b.id}>{b.name}{b.company ? ` · ${b.company}` : ''}</option>
-            ))}
-          </select>
-        </label>
-        <label className="block">
-          <span className="text-[11px] text-slate-500">Their share, %</span>
-          <input type="number" min="0" max="100" step="1" inputMode="decimal" value={t.brokerPct} disabled={!t.brokerId}
-            onChange={(e) => set({ brokerPct: e.target.value })} className={`${inp} disabled:opacity-50`} />
-        </label>
-      </div>
+      <label className="block">
+        <span className="text-[11px] text-slate-500">Broker</span>
+        <select value={t.brokerId} className={inp}
+          onChange={(e) => {
+            const b = brokers.find((x) => x.id === e.target.value)
+            set({ brokerId: e.target.value, brokerPct: b ? String(b.sharePct) : '', brokerTakes: b?.takes ?? 'SHARE' })
+          }}>
+          <option value="">No broker</option>
+          {brokers.filter((b) => b.active || b.id === t.brokerId).map((b) => (
+            <option key={b.id} value={b.id}>{b.name}{b.company ? ` · ${b.company}` : ''}</option>
+          ))}
+        </select>
+      </label>
+      {t.brokerId && (
+        <div className="grid grid-cols-3 gap-2">
+          <label className={`block ${t.brokerTakes === 'SHARE' ? 'col-span-2' : 'col-span-3'}`}>
+            <span className="text-[11px] text-slate-500">He takes</span>
+            <select value={t.brokerTakes} onChange={(e) => set({ brokerTakes: e.target.value as BrokerTakes })} className={inp}>
+              <option value="SHARE">A share of our commission</option>
+              <option value="SELLER_SIDE">The seller&apos;s side — he brought the seller</option>
+              <option value="BUYER_SIDE">The buyer&apos;s side — he brought the buyer</option>
+            </select>
+          </label>
+          {t.brokerTakes === 'SHARE' && (
+            <label className="block">
+              <span className="text-[11px] text-slate-500">Share, %</span>
+              <input type="number" min="0" max="100" step="1" inputMode="decimal" value={t.brokerPct}
+                onChange={(e) => set({ brokerPct: e.target.value })} className={inp} />
+            </label>
+          )}
+        </div>
+      )}
       {t.brokerId && commission != null && (
         <p className="text-[11px] text-slate-600">
-          Broker gets {money(cut ?? 0)} · we keep <strong>{money(commission - (cut ?? 0))}</strong>
+          Broker gets {money(cut ?? 0)}{t.brokerTakes !== 'SHARE' ? ` (${t.brokerTakes === 'SELLER_SIDE' ? seller : buyer}% of the price)` : ''} · we keep <strong>{money(commission - (cut ?? 0))}</strong>
         </p>
       )}
 
@@ -191,11 +236,33 @@ export function CommissionFields({
         </label>
       </div>
       {threshold > 0 && (
-        <p className={`text-[11px] ${Number(t.paidPct || 0) >= threshold ? 'text-emerald-700' : 'text-amber-700'}`}>
-          {Number(t.paidPct || 0) >= threshold
-            ? `They have reached ${threshold}% — the commission is due.`
-            : `Commission is due when they reach ${threshold}% (now ${Number(t.paidPct || 0)}%).`}
-        </p>
+        <>
+          <p className="pt-1 text-[11px] font-semibold text-slate-600">Their payment plan</p>
+          <div className="grid grid-cols-3 gap-2">
+            <label className="block">
+              <span className="text-[11px] text-slate-500">Down payment, %</span>
+              <input type="number" min="0" max="100" step="1" inputMode="decimal" value={t.downPaymentPct} placeholder="20"
+                onChange={(e) => set({ downPaymentPct: e.target.value })} className={inp} />
+            </label>
+            <label className="block">
+              <span className="text-[11px] text-slate-500">Then monthly for</span>
+              <input type="number" min="0" max="240" step="1" inputMode="numeric" value={t.planMonths} placeholder="36 months"
+                onChange={(e) => set({ planMonths: e.target.value })} className={inp} />
+            </label>
+            <label className="block">
+              <span className="text-[11px] text-slate-500">Down payment on</span>
+              <input type="date" value={t.planStartAt} onChange={(e) => set({ planStartAt: e.target.value })} className={inp} />
+            </label>
+          </div>
+          <PlanLine
+            threshold={threshold}
+            paid={Number(t.paidPct || 0)}
+            price={price}
+            down={Number(t.downPaymentPct || 0)}
+            months={Number(t.planMonths || 0)}
+            start={t.planStartAt}
+          />
+        </>
       )}
 
       <div className="flex items-center gap-2 flex-wrap">
@@ -212,18 +279,53 @@ export function CommissionFields({
   )
 }
 
+/**
+ * What the plan means: how much each payment is, the month the commission
+ * falls due, and whether that month has passed.
+ */
+function PlanLine({ threshold, paid, price, down, months, start }: {
+  threshold: number; paid: number; price: number | null; down: number; months: number; start: string
+}) {
+  if (paid >= threshold) {
+    return <p className="text-[11px] text-emerald-700">They have paid {paid}% — past the {threshold}%, so the commission is due. Ask the developer for it.</p>
+  }
+  const at = expectedPayout(threshold, down, months, start)
+  if (!at) {
+    return <p className="text-[11px] text-amber-700">Commission is due when they reach {threshold}% (now {paid}%). Add the plan to know when.</p>
+  }
+  const monthly = months > 0 ? (100 - down) / months : 0
+  const late = at.getTime() <= Date.now()
+  const when = at.toLocaleDateString(undefined, { month: 'long', year: 'numeric' })
+  return (
+    <p className={`text-[11px] ${late ? 'font-semibold text-red-700' : 'text-slate-600'}`}>
+      {price != null && `${money((price * down) / 100)} down, then ${monthly ? `${money((price * monthly) / 100)} a month` : 'nothing monthly'}. `}
+      {late
+        ? `They should have reached ${threshold}% by ${when} — chase the developer for the commission.`
+        : `They reach ${threshold}% in ${when}: that is when the commission is ours.`}
+    </p>
+  )
+}
+
 /** One line under a deal: where its money stands. */
 export function PayoutLine({ deal: d }: { deal: Opportunity }) {
   const status = payoutStatus(d)
   if (!status) return null
   const net = (d.commissionUsd ?? 0) - (d.brokerCutUsd ?? 0)
+  const at = status === 'WAITING'
+    ? expectedPayout(d.payoutAtPct ?? 0, d.downPaymentPct ?? 0, d.planMonths ?? 0, d.planStartAt?.slice(0, 10) ?? '')
+    : null
+  const late = at != null && at.getTime() <= Date.now()
   const text = status === 'RECEIVED'
     ? `Received${d.commissionReceivedAt ? ` ${new Date(d.commissionReceivedAt).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })}` : ''}`
     : status === 'DUE'
       ? `Due to us${net ? `: ${money(net)}` : ''}`
       : (d.payoutAtPct ?? 0) > 0
-        ? `Waiting — they have paid ${d.paidPct ?? 0}% of the ${d.payoutAtPct}% we are paid at`
+        ? at
+          ? late
+            ? `Should be due since ${at.toLocaleDateString(undefined, { month: 'short', year: 'numeric' })} — chase the developer`
+            : `Due ${at.toLocaleDateString(undefined, { month: 'short', year: 'numeric' })}, when they reach ${d.payoutAtPct}%`
+          : `Waiting — they have paid ${d.paidPct ?? 0}% of the ${d.payoutAtPct}% we are paid at`
         : 'Paid when the sale closes'
-  const cls = status === 'RECEIVED' ? 'text-emerald-700 bg-emerald-50' : status === 'DUE' ? 'text-red-700 bg-red-50' : 'text-amber-800 bg-amber-50'
+  const cls = status === 'RECEIVED' ? 'text-emerald-700 bg-emerald-50' : status === 'DUE' || late ? 'text-red-700 bg-red-50' : 'text-amber-800 bg-amber-50'
   return <p className={`mt-1 inline-block rounded px-1.5 py-0.5 text-[11px] font-medium ${cls}`}>{text}</p>
 }

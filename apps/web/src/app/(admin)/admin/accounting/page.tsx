@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
-import { Loader2, Plus, Pencil, Trash2, Check, X, Wallet, Receipt, Landmark, TrendingUp, Clock } from 'lucide-react'
+import { Loader2, Plus, Pencil, Trash2, Check, X, Wallet, Receipt, Landmark, TrendingUp, Clock, Repeat, BellRing } from 'lucide-react'
 import { PageHeader, StatCard, EmptyState } from '@/components/admin/ui/layout'
 import { normalizeApiUrl } from '@/lib/utils/api-url'
 
@@ -43,8 +43,32 @@ interface DealRow {
   netUsd: number
   paidPct: number | null
   payoutAtPct: number | null
+  downPaymentPct: number | null
+  planMonths: number | null
+  planStartAt: string | null
+  /** The month the client's payments reach the payout point, from their plan. */
+  expectedAt: string | null
+  /** What the plan says they should have paid by today, %. */
+  expectedPaidNow: number | null
   closedAt: string | null
   commissionReceivedAt: string | null
+}
+
+interface PlanRow extends DealRow {
+  /** Past the expected month, or already paid past the point: ask the developer. */
+  chase: boolean
+}
+
+interface Recurring {
+  id: string
+  category: Category
+  amountUsd: number
+  description: string | null
+  market: 'LEBANON' | 'GEORGIA' | null
+  dayOfMonth: number
+  startsOn: string
+  endsOn: string | null
+  active: boolean
 }
 
 interface Summary {
@@ -56,6 +80,7 @@ interface Summary {
   received: DealRow[]
   due: DealRow[]
   waiting: DealRow[]
+  plans: PlanRow[]
 }
 
 const money = (n: number) => `${n < 0 ? '−' : ''}$${Math.abs(Math.round(n)).toLocaleString()}`
@@ -193,7 +218,8 @@ export default function AccountingPage() {
     [summary],
   )
   const owed = (summary?.due ?? []).reduce((t, d) => t + d.netUsd, 0)
-  const waiting = (summary?.waiting ?? []).reduce((t, d) => t + d.netUsd, 0)
+  const waitingRows = (summary?.waiting ?? []).filter((d) => !((d.payoutAtPct ?? 0) > 0))
+  const waiting = waitingRows.reduce((t, d) => t + d.netUsd, 0)
 
   const expenseForm = (
     <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 space-y-3">
@@ -286,10 +312,10 @@ export default function AccountingPage() {
 
             <section className="rounded-2xl border border-slate-200 bg-white p-4">
               <h2 className="text-sm font-semibold text-slate-900"><Clock className="-mt-0.5 mr-1 inline h-4 w-4 text-amber-600" />Waiting on clients <span className="font-normal text-slate-500">· {money(waiting)}</span></h2>
-              <p className="mt-0.5 text-xs text-slate-500">Agreed, but not owed yet: the client has not reached the payment we are paid at, or the sale has not closed.</p>
-              {summary.waiting.length === 0 ? <p className="mt-3 text-sm text-slate-500">Nothing waiting.</p> : (
+              <p className="mt-0.5 text-xs text-slate-500">Agreed, but paid when the sale closes. Payment plans are below.</p>
+              {waitingRows.length === 0 ? <p className="mt-3 text-sm text-slate-500">Nothing waiting.</p> : (
                 <ul className="mt-2 divide-y divide-slate-100">
-                  {summary.waiting.map((d) => (
+                  {waitingRows.map((d) => (
                     <li key={d.id} className="py-2">
                       <p className="truncate text-sm font-medium text-slate-900">{d.lead.name} <span className="font-normal text-slate-500">· {d.title}</span></p>
                       <p className="text-xs text-slate-500">
@@ -307,6 +333,8 @@ export default function AccountingPage() {
               <p className="mt-2 text-xs text-slate-500">Update what a client has paid from their card, under Deal &amp; commission.</p>
             </section>
           </div>
+
+          <PlansSection plans={summary.plans} busy={busy} onReceived={markReceived} />
 
           {/* Expenses */}
           <section className="rounded-2xl border border-slate-200 bg-white p-4 space-y-3">
@@ -354,6 +382,8 @@ export default function AccountingPage() {
               </ul>
             )}
           </section>
+
+          <RecurringSection apiUrl={apiUrl} onChanged={load} />
 
           {/* Month by month */}
           {summary.months.length > 1 && (
@@ -410,5 +440,217 @@ export default function AccountingPage() {
         </>
       )}
     </div>
+  )
+}
+
+const monthYear = (iso: string) => new Date(iso).toLocaleDateString(undefined, { month: 'short', year: 'numeric' })
+
+/**
+ * Payment plans, by the month the commission should be ours. A row turns red
+ * when that month has passed (or the client has paid past the point) and the
+ * money has not come: that is the developer to call.
+ */
+function PlansSection({ plans, busy, onReceived }: { plans: PlanRow[]; busy: boolean; onReceived: (d: DealRow) => void }) {
+  const chase = plans.filter((p) => p.chase)
+  return (
+    <section className="rounded-2xl border border-slate-200 bg-white p-4">
+      <h2 className="text-sm font-semibold text-slate-900">
+        <BellRing className="-mt-0.5 mr-1 inline h-4 w-4 text-slate-500" />Payment plans
+        {chase.length > 0 && <span className="ml-2 rounded bg-red-600 px-1.5 py-0.5 text-[11px] font-semibold text-white">{chase.length} to chase</span>}
+      </h2>
+      <p className="mt-0.5 text-xs text-slate-500">
+        When each client&apos;s payments reach the point we are paid at. Red: that month has passed — ask the developer for the commission.
+      </p>
+      {plans.length === 0 ? <p className="mt-3 text-sm text-slate-500">No deals on a payment plan.</p> : (
+        <ul className="mt-2 divide-y divide-slate-100">
+          {plans.map((d) => {
+            const threshold = d.payoutAtPct ?? 0
+            const paid = d.paidPct ?? 0
+            return (
+              <li key={d.id} className={`flex items-start gap-2 py-2.5 ${d.chase ? '-mx-2 rounded-lg bg-red-50 px-2' : ''}`}>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-medium text-slate-900">{d.lead.name} <span className="font-normal text-slate-500">· {d.title}</span></p>
+                  <p className={`text-xs ${d.chase ? 'font-semibold text-red-700' : 'text-slate-600'}`}>
+                    {paid >= threshold
+                      ? `Paid ${paid}% — past ${threshold}%. Commission due now.`
+                      : d.expectedAt
+                        ? d.chase
+                          ? `Should have reached ${threshold}% by ${monthYear(d.expectedAt)} — chase the developer`
+                          : `Reaches ${threshold}% in ${monthYear(d.expectedAt)}`
+                        : `Due at ${threshold}% — add their payment plan to know when`}
+                  </p>
+                  <p className="text-xs text-slate-500">
+                    {money(d.netUsd)} to us
+                    {d.downPaymentPct != null && ` · ${d.downPaymentPct}% down`}
+                    {d.planMonths ? ` + ${d.planMonths} monthly` : ''}
+                    {` · recorded paid ${paid}%`}
+                    {d.expectedPaidNow != null && d.expectedPaidNow !== paid && ` (plan says ${d.expectedPaidNow}% by now)`}
+                  </p>
+                  <div className="mt-1 h-1.5 w-full max-w-xs overflow-hidden rounded-full bg-slate-100">
+                    <div className={`h-full rounded-full ${d.chase ? 'bg-red-500' : 'bg-amber-500'}`} style={{ width: `${Math.min(100, threshold ? (Math.max(paid, d.expectedPaidNow ?? 0) / threshold) * 100 : 0)}%` }} />
+                  </div>
+                </div>
+                {d.chase && (
+                  <button onClick={() => onReceived(d)} disabled={busy} className="min-h-11 shrink-0 rounded-lg border border-emerald-200 bg-white px-3 text-sm font-medium text-emerald-700 hover:bg-emerald-50 disabled:opacity-50">Received</button>
+                )}
+              </li>
+            )
+          })}
+        </ul>
+      )}
+      <p className="mt-2 text-xs text-slate-500">Each plan is set on the client&apos;s card, under Deal &amp; commission.</p>
+    </section>
+  )
+}
+
+type RDraft = { description: string; category: Category; amount: string; day: string; startsOn: string; endsOn: string; market: '' | 'LEBANON' | 'GEORGIA' }
+const firstOfMonth = () => { const d = new Date(); return iso(new Date(d.getFullYear(), d.getMonth(), 1)) }
+const newRDraft = (): RDraft => ({ description: '', category: 'OFFICE', amount: '', day: '0', startsOn: firstOfMonth(), endsOn: '', market: '' })
+const dayLabel = (n: number) => (n <= 0 ? 'last day of the month' : `the ${n}${n % 10 === 1 && n !== 11 ? 'st' : n % 10 === 2 && n !== 12 ? 'nd' : n % 10 === 3 && n !== 13 ? 'rd' : 'th'}`)
+
+/**
+ * Rent, salaries, subscriptions: added to the expenses by themselves each
+ * month on their day. Deleting one month's entry skips that month; changing
+ * the amount applies from the next month on.
+ */
+function RecurringSection({ apiUrl, onChanged }: { apiUrl: string; onChanged: () => void }) {
+  const [items, setItems] = useState<Recurring[] | null>(null)
+  const [editing, setEditing] = useState<string | 'new' | null>(null)
+  const [draft, setDraft] = useState<RDraft>(newRDraft)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const load = useCallback(async () => {
+    try {
+      const res = await fetch(`${apiUrl}/api/finance/recurring`, { credentials: 'include', cache: 'no-store' })
+      if (!res.ok) throw new Error()
+      setItems((await res.json()).data ?? [])
+    } catch { setItems([]); setError('Could not load the recurring expenses.') }
+  }, [apiUrl])
+  useEffect(() => { void load() }, [load])
+
+  const start = (r?: Recurring) => {
+    setError(null)
+    setEditing(r ? r.id : 'new')
+    setDraft(r
+      ? { description: r.description ?? '', category: r.category, amount: String(r.amountUsd), day: String(r.dayOfMonth), startsOn: r.startsOn.slice(0, 10), endsOn: r.endsOn ? r.endsOn.slice(0, 10) : '', market: r.market ?? '' }
+      : newRDraft())
+  }
+
+  async function save() {
+    const amount = Number(draft.amount)
+    if (!draft.amount || !Number.isFinite(amount) || amount < 0) { setError('Enter the monthly amount in USD.'); return }
+    setBusy(true); setError(null)
+    try {
+      const res = await fetch(`${apiUrl}/api/finance/recurring${editing === 'new' ? '' : `/${editing}`}`, {
+        method: editing === 'new' ? 'POST' : 'PUT', credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          description: draft.description.trim() || null, category: draft.category, amountUsd: amount,
+          dayOfMonth: Number(draft.day), startsOn: draft.startsOn, endsOn: draft.endsOn || null, market: draft.market || null,
+        }),
+      })
+      if (!res.ok) throw new Error()
+      setEditing(null)
+      await load()
+      onChanged()
+    } catch { setError('That did not save. Try again.') } finally { setBusy(false) }
+  }
+
+  async function toggle(r: Recurring) {
+    setBusy(true)
+    try {
+      await fetch(`${apiUrl}/api/finance/recurring/${r.id}`, {
+        method: 'PUT', credentials: 'include', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ active: !r.active }),
+      })
+      await load(); onChanged()
+    } finally { setBusy(false) }
+  }
+
+  async function remove(r: Recurring) {
+    if (!window.confirm(`Stop "${r.description || SHORT_LABEL[r.category]}"? The months already added stay in the books.`)) return
+    setBusy(true)
+    try {
+      await fetch(`${apiUrl}/api/finance/recurring/${r.id}`, { method: 'DELETE', credentials: 'include' })
+      await load(); onChanged()
+    } finally { setBusy(false) }
+  }
+
+  const form = (
+    <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 space-y-3">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <label className="col-span-2 block text-sm text-slate-700">What<input value={draft.description} onChange={(e) => setDraft({ ...draft, description: e.target.value })} placeholder="Office rent, Achrafieh" className={inp} autoFocus /></label>
+        <label className="block text-sm text-slate-700">Each month (USD)<input type="number" min="0" step="0.01" inputMode="decimal" value={draft.amount} onChange={(e) => setDraft({ ...draft, amount: e.target.value })} className={inp} /></label>
+        <label className="block text-sm text-slate-700">On
+          <select value={draft.day} onChange={(e) => setDraft({ ...draft, day: e.target.value })} className={inp}>
+            <option value="0">Last day of the month</option>
+            {Array.from({ length: 28 }, (_, i) => i + 1).map((d) => <option key={d} value={d}>{dayLabel(d)}</option>)}
+          </select>
+        </label>
+        <label className="col-span-2 block text-sm text-slate-700">Type
+          <select value={draft.category} onChange={(e) => setDraft({ ...draft, category: e.target.value as Category })} className={inp}>
+            {(Object.keys(CATEGORY_LABEL) as Category[]).map((c) => <option key={c} value={c}>{CATEGORY_LABEL[c]}</option>)}
+          </select>
+        </label>
+        <label className="block text-sm text-slate-700">Starting<input type="date" value={draft.startsOn} onChange={(e) => setDraft({ ...draft, startsOn: e.target.value })} className={inp} /></label>
+        <label className="block text-sm text-slate-700">Until (optional)<input type="date" value={draft.endsOn} onChange={(e) => setDraft({ ...draft, endsOn: e.target.value })} className={inp} /></label>
+        <label className="col-span-2 block text-sm text-slate-700 sm:col-span-1">Office
+          <select value={draft.market} onChange={(e) => setDraft({ ...draft, market: e.target.value as RDraft['market'] })} className={inp}>
+            <option value="">Shared</option>
+            <option value="LEBANON">Lebanon</option>
+            <option value="GEORGIA">Georgia</option>
+          </select>
+        </label>
+      </div>
+      <p className="text-xs text-slate-500">Months from the start date up to today are added at once; after that, each on its day.</p>
+      <div className="flex justify-end gap-2">
+        <button onClick={() => setEditing(null)} className="inline-flex min-h-11 items-center gap-1 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700 hover:bg-slate-50"><X className="h-4 w-4" /> Cancel</button>
+        <button onClick={save} disabled={busy} className="inline-flex min-h-11 items-center gap-1.5 rounded-lg bg-slate-900 px-4 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-50">
+          {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />} Save
+        </button>
+      </div>
+    </div>
+  )
+
+  return (
+    <section className="rounded-2xl border border-slate-200 bg-white p-4 space-y-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <h2 className="flex-1 text-sm font-semibold text-slate-900"><Repeat className="-mt-0.5 mr-1 inline h-4 w-4 text-slate-500" />Recurring expenses</h2>
+        {editing === null && (
+          <button onClick={() => start()} className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-slate-300 px-3 text-sm font-medium text-slate-800 hover:bg-slate-50">
+            <Plus className="h-4 w-4" /> Add recurring
+          </button>
+        )}
+      </div>
+      <p className="text-xs text-slate-500">Added to the expenses by themselves every month. To skip one month, delete that month&apos;s entry above.</p>
+      {error && <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
+      {editing === 'new' && form}
+      {items === null ? <Loader2 className="h-4 w-4 animate-spin text-slate-400" /> : items.length === 0 && editing !== 'new' ? (
+        <p className="text-sm text-slate-500">None yet — add rent, salaries and subscriptions here.</p>
+      ) : (
+        <ul className="divide-y divide-slate-100">
+          {items.map((r) => (
+            <li key={r.id} className="py-2">
+              {editing === r.id ? form : (
+                <div className={`flex items-center gap-2 ${r.active ? '' : 'opacity-60'}`}>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm text-slate-900">{r.description || SHORT_LABEL[r.category]}{!r.active && <span className="ml-2 rounded bg-slate-100 px-1.5 py-0.5 text-[11px] text-slate-500">Paused</span>}</p>
+                    <p className="text-xs text-slate-500">
+                      {SHORT_LABEL[r.category]} · on {dayLabel(r.dayOfMonth)} · from {monthYear(r.startsOn)}{r.endsOn ? ` to ${monthYear(r.endsOn)}` : ''}
+                      {r.market ? ` · ${r.market === 'LEBANON' ? 'Lebanon' : 'Georgia'}` : ''}
+                    </p>
+                  </div>
+                  <span className="shrink-0 text-sm font-semibold text-slate-900">{money(r.amountUsd)}<span className="text-xs font-normal text-slate-500">/mo</span></span>
+                  <button onClick={() => toggle(r)} disabled={busy} className="min-h-11 shrink-0 rounded-lg px-2 text-xs font-medium text-slate-600 hover:bg-slate-100">{r.active ? 'Pause' : 'Resume'}</button>
+                  <button onClick={() => start(r)} aria-label="Edit recurring expense" className="flex min-h-11 min-w-11 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100"><Pencil className="h-4 w-4" /></button>
+                  <button onClick={() => remove(r)} aria-label="Stop recurring expense" className="flex min-h-11 min-w-11 items-center justify-center rounded-lg text-slate-400 hover:bg-red-50 hover:text-red-600"><Trash2 className="h-4 w-4" /></button>
+                </div>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
   )
 }

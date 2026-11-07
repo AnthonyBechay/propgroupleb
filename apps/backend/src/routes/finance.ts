@@ -7,6 +7,7 @@ import { sendCreated, sendNotFound, sendSuccess } from '../utils/response.js';
 import type { AuthenticatedRequest } from '../types/index.js';
 import {
   getCommissionSettings, saveCommissionSettings, resolveTerms, payoutStatus, type CommissionSettings,
+  expectedPayoutDate, expectedPaidPct,
 } from '../services/commission.service.js';
 import { hydrateOpportunities } from './crm.js';
 
@@ -72,6 +73,7 @@ const brokerSchema = z.object({
   email: z.string().trim().email().max(200).optional().nullable().or(z.literal('')),
   company: z.string().trim().max(120).optional().nullable(),
   sharePct: pct,
+  takes: z.enum(['SHARE', 'SELLER_SIDE', 'BUYER_SIDE']).optional(),
   notes: z.string().max(2000).optional().nullable(),
   active: z.boolean().optional(),
 });
@@ -142,6 +144,102 @@ const expenseSchema = z.object({
   market: z.enum(['LEBANON', 'GEORGIA']).optional().nullable(),
 });
 
+const monthOf = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+
+/** The day a recurring expense falls on in a month: its day, or the month's last. */
+function dayIn(year: number, month: number, dayOfMonth: number) {
+  const last = new Date(year, month + 1, 0).getDate();
+  return new Date(year, month, dayOfMonth <= 0 ? last : Math.min(dayOfMonth, last), 12);
+}
+
+/**
+ * Add every recurring expense's months that are due by today and missing.
+ * Runs whenever the books are read, so nothing depends on a scheduler having
+ * been up on the right night. The (recurringId, period) key makes a second run
+ * a no-op. Deleting a month it added is how you skip that month, so a deleted
+ * month is remembered (`recurring_skips_<id>`) and never added back.
+ */
+async function generateRecurring(now = new Date()) {
+  const items = await prisma.recurringExpense.findMany({ where: { active: true, startsOn: { lte: now } } });
+  for (const r of items) {
+    const done = new Set(
+      (await prisma.expense.findMany({ where: { recurringId: r.id }, select: { period: true } })).map((e) => e.period),
+    );
+    const skipped = new Set(((await prisma.systemSetting.findUnique({ where: { key: `recurring_skips_${r.id}` } }))?.value as string[] | undefined) ?? []);
+    const start = new Date(r.startsOn);
+    for (let y = start.getFullYear(), m = start.getMonth(); ; m++) {
+      if (m > 11) { y++; m = 0; }
+      const on = dayIn(y, m, r.dayOfMonth);
+      if (on > now || (r.endsOn && on > r.endsOn)) break;
+      if (on < start) continue;
+      const period = monthOf(on);
+      if (done.has(period) || skipped.has(period)) continue;
+      await prisma.expense.create({
+        data: {
+          date: on, category: r.category, amountUsd: r.amountUsd, description: r.description,
+          market: r.market, recurringId: r.id, period, createdBy: r.createdBy,
+        },
+      }).catch(() => {}); // a parallel read made it first
+    }
+  }
+}
+
+const recurringSchema = z.object({
+  category: z.enum(['OFFICE', 'SALARIES', 'MARKETING', 'TRAVEL', 'FEES', 'TAX', 'OTHER']),
+  amountUsd: z.number().min(0),
+  description: z.string().trim().max(500).optional().nullable(),
+  market: z.enum(['LEBANON', 'GEORGIA']).optional().nullable(),
+  dayOfMonth: z.number().int().min(0).max(31),
+  startsOn: z.string(),
+  endsOn: z.string().optional().nullable(),
+  active: z.boolean().optional(),
+});
+
+router.get('/recurring', asyncHandler(async (_req: Request, res: Response) => {
+  sendSuccess(res, await prisma.recurringExpense.findMany({ orderBy: [{ active: 'desc' }, { createdAt: 'asc' }] }));
+}));
+
+router.post('/recurring', asyncHandler(async (req: Request, res: Response) => {
+  const body = recurringSchema.parse(req.body ?? {});
+  const r = await prisma.recurringExpense.create({
+    data: {
+      ...body, startsOn: new Date(`${body.startsOn}T00:00:00`),
+      endsOn: body.endsOn ? new Date(`${body.endsOn}T23:59:59`) : null,
+      createdBy: (req as AuthenticatedRequest).user?.id ?? null,
+    },
+  });
+  await logAdminAction('CREATE_RECURRING_EXPENSE', 'expense', r.id, { category: r.category, amountUsd: r.amountUsd }, req as AuthenticatedRequest);
+  await generateRecurring();
+  sendCreated(res, r);
+}));
+
+// Changes apply from now on: months already added keep the amount they had.
+router.put('/recurring/:id', asyncHandler(async (req: Request, res: Response) => {
+  const body = recurringSchema.partial().parse(req.body ?? {});
+  const existing = await prisma.recurringExpense.findUnique({ where: { id: req.params.id } });
+  if (!existing) { sendNotFound(res, 'Recurring expense'); return; }
+  const r = await prisma.recurringExpense.update({
+    where: { id: existing.id },
+    data: {
+      ...body,
+      ...(body.startsOn ? { startsOn: new Date(`${body.startsOn}T00:00:00`) } : {}),
+      ...(body.endsOn !== undefined ? { endsOn: body.endsOn ? new Date(`${body.endsOn}T23:59:59`) : null } : {}),
+    },
+  });
+  await logAdminAction('UPDATE_RECURRING_EXPENSE', 'expense', r.id, body, req as AuthenticatedRequest);
+  await generateRecurring();
+  sendSuccess(res, r);
+}));
+
+// Stops it. The months it already added stay in the books.
+router.delete('/recurring/:id', asyncHandler(async (req: Request, res: Response) => {
+  const existing = await prisma.recurringExpense.findUnique({ where: { id: req.params.id } });
+  if (!existing) { sendNotFound(res, 'Recurring expense'); return; }
+  await prisma.recurringExpense.delete({ where: { id: existing.id } });
+  await logAdminAction('DELETE_RECURRING_EXPENSE', 'expense', existing.id, { description: existing.description }, req as AuthenticatedRequest);
+  sendSuccess(res, { id: existing.id });
+}));
+
 /** ?from=YYYY-MM-DD&to=YYYY-MM-DD, both inclusive; defaults to this year. */
 function period(req: Request) {
   const q = req.query as Record<string, string>;
@@ -152,6 +250,7 @@ function period(req: Request) {
 }
 
 router.get('/expenses', asyncHandler(async (req: Request, res: Response) => {
+  await generateRecurring();
   const { from, to } = period(req);
   sendSuccess(res, await prisma.expense.findMany({ where: { date: { gte: from, lte: to } }, orderBy: { date: 'desc' } }));
 }));
@@ -181,6 +280,19 @@ router.delete('/expenses/:id', asyncHandler(async (req: Request, res: Response) 
   const existing = await prisma.expense.findUnique({ where: { id: req.params.id } });
   if (!existing) { sendNotFound(res, 'Expense'); return; }
   await prisma.expense.delete({ where: { id: existing.id } });
+  // A month made by a recurring expense, deleted: that month is skipped, not
+  // added straight back on the next read.
+  if (existing.recurringId && existing.period) {
+    const key = `recurring_skips_${existing.recurringId}`;
+    const row = await prisma.systemSetting.findUnique({ where: { key } });
+    const skips = new Set(((row?.value as string[] | undefined) ?? []));
+    skips.add(existing.period);
+    await prisma.systemSetting.upsert({
+      where: { key },
+      create: { key, value: [...skips], category: 'finance', description: 'Months skipped for a recurring expense' },
+      update: { value: [...skips] },
+    });
+  }
   await logAdminAction('DELETE_EXPENSE', 'expense', existing.id, { category: existing.category, amountUsd: existing.amountUsd }, req as AuthenticatedRequest);
   sendSuccess(res, { id: existing.id });
 }));
@@ -197,6 +309,7 @@ router.delete('/expenses/:id', asyncHandler(async (req: Request, res: Response) 
  * waiting on clients' payment plans — neither is profit yet.
  */
 router.get('/summary', asyncHandler(async (req: Request, res: Response) => {
+  await generateRecurring();
   const { from, to } = period(req);
 
   const [received, open, sellerSales, expenses] = await Promise.all([
@@ -256,6 +369,11 @@ router.get('/summary', asyncHandler(async (req: Request, res: Response) => {
     netUsd: net(o),
     paidPct: o.paidPct,
     payoutAtPct: o.payoutAtPct,
+    downPaymentPct: o.downPaymentPct,
+    planMonths: o.planMonths,
+    planStartAt: o.planStartAt,
+    expectedAt: expectedPayoutDate(o),
+    expectedPaidNow: expectedPaidPct(o),
     closedAt: o.closedAt,
     commissionReceivedAt: o.commissionReceivedAt,
     status: payoutStatus(o),
@@ -273,6 +391,15 @@ router.get('/summary', asyncHandler(async (req: Request, res: Response) => {
     sellerSales,
     due: openRows.filter((r) => r.status === 'DUE'),
     waiting: openRows.filter((r) => r.status === 'WAITING'),
+    // Payment plans, by the month the commission should be ours. Past that
+    // month and not received: ping the developer.
+    plans: openRows
+      .filter((r) => (r.payoutAtPct ?? 0) > 0)
+      .map((r) => ({
+        ...r,
+        chase: (r.expectedAt != null && r.expectedAt <= new Date()) || (r.paidPct ?? 0) >= (r.payoutAtPct ?? 0),
+      }))
+      .sort((a, b) => (a.expectedAt?.getTime() ?? Infinity) - (b.expectedAt?.getTime() ?? Infinity)),
   });
 }));
 

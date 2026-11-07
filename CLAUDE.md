@@ -327,9 +327,20 @@ a non-USD price.
 - `commissionUsd` is worked out from those **only when the price or a rate
   changes in that save** and nobody typed a figure. Editing a viewing note must
   never overwrite a commission entered by hand. LBP prices are not converted.
-- **A broker takes `brokerPct` of OUR commission**, not of the price.
-  `brokerCutUsd` follows the commission. A broker on deals is deactivated, never
-  deleted.
+- **A broker is paid one of three ways** (`brokerTakes`, his default on
+  `Broker.takes`, changeable per deal): `SHARE` = `brokerPct` of OUR commission;
+  `SELLER_SIDE` / `BUYER_SIDE` = that side's rate on the price, capped at the
+  whole commission (he brought the seller, we brought the buyer).
+  `brokerCutUsd` follows. A broker on deals is deactivated, never deleted.
+- **Payment plan** (`downPaymentPct`, `planMonths`, `planStartAt`): down payment
+  then equal monthly instalments. `expectedPayoutDate()` gives the month they
+  reach `payoutAtPct` (50k, 20% down, 36 months, paid at 30% → 5 months in).
+  Accounting's *Payment plans* list turns red past that month: chase the
+  developer.
+- **Recurring expenses** (`RecurringExpense`) are materialised as `Expense` rows
+  whenever the books are read (`generateRecurring` in `routes/finance.ts`), keyed
+  `(recurringId, period)` so it never doubles. Deleting a generated month skips
+  it for good (`recurring_skips_<id>`). There is no scheduler to depend on.
 - **Payout threshold** (`payoutAtPct`, 0 = paid on closing): abroad we are paid
   once the buyer has paid 30%. It is stamped on the deal *as it becomes
   RESERVED/WON*, never onto older deals, so a changed default does not move a
@@ -342,6 +353,10 @@ a non-USD price.
   before this existed were backfilled as received on their close date.
 - The rates and the broker's cut are in `MONEY_FIELDS` with `commissionUsd`:
   they reveal it just as well.
+
+**Card menus render on `<body>`** (`MenuShell` in `DealBoard.tsx`, a portal):
+inside the client card a sticky tab bar on the same layer as the header
+covered the Move menu.
 
 **Flags.** `Lead.flaggedAt`/`flagNote`/`flaggedBy` paint every card of that
 client red on the board (`POST /api/crm/pipeline/:id/flag`), from any Move menu.

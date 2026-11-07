@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import {
   Phone, MessageCircle, Calendar, AlertCircle, Handshake,
   TrendingUp, Loader2, Check, Plus, X, ChevronRight, ChevronDown, MessagesSquare, Instagram, Clock, VolumeX, Moon, Flag,
@@ -499,6 +500,10 @@ function MenuShell({
   const [at, setAt] = useState<{ top: number; left: number } | 'sheet' | null>(null)
   const open = at !== null
   const ref = useRef<HTMLDivElement>(null)
+  // The menu itself is rendered on <body>: inside the client card a sticky tab
+  // bar on the same layer as the header covered it ("Find matches" sat on top
+  // of Move), and any scroll container would clip it the same way.
+  const pop = useRef<HTMLDivElement>(null)
   const button = useRef<HTMLButtonElement>(null)
   const close = () => setAt(null)
   const toggle = () => {
@@ -513,7 +518,10 @@ function MenuShell({
   }
   useEffect(() => {
     if (!open) return
-    const outside = (e: MouseEvent) => { if (!ref.current?.contains(e.target as Node)) setAt(null) }
+    const outside = (e: MouseEvent) => {
+      const t = e.target as Node
+      if (!ref.current?.contains(t) && !pop.current?.contains(t)) setAt(null)
+    }
     document.addEventListener('mousedown', outside)
     if (at === 'sheet') return () => document.removeEventListener('mousedown', outside)
     // The floating menu is placed once; if the page moves, it would point at nothing.
@@ -536,22 +544,27 @@ function MenuShell({
       >
         {label} <ChevronDown className="h-3 w-3" />
       </button>
-      {at === 'sheet' && <div className="fixed inset-0 z-50 bg-black/30" onClick={close} />}
-      {open && (
-        <div
-          style={at !== 'sheet' && at ? at : undefined}
-          className={at === 'sheet'
-            ? 'fixed inset-x-0 bottom-0 z-50 max-h-[85dvh] overflow-y-auto rounded-t-2xl bg-white p-3 pb-[max(1rem,env(safe-area-inset-bottom))] shadow-2xl'
-            : 'fixed z-50 w-64 rounded-xl border border-slate-200 bg-white p-1.5 shadow-lg'}
-        >
-          {children(close)}
-        </div>
+      {open && createPortal(
+        // Clicks inside must not reach the card under it (which opens the client).
+        <div onClick={(e) => e.stopPropagation()} onMouseDown={(e) => e.stopPropagation()}>
+          {at === 'sheet' && <div className="fixed inset-0 z-[90] bg-black/30" onClick={close} />}
+          <div
+            ref={pop}
+            style={at !== 'sheet' && at ? at : undefined}
+            className={at === 'sheet'
+              ? 'fixed inset-x-0 bottom-0 z-[90] max-h-[85dvh] overflow-y-auto rounded-t-2xl bg-white p-3 pb-[max(1rem,env(safe-area-inset-bottom))] shadow-2xl'
+              : 'fixed z-[90] w-64 rounded-xl border border-slate-200 bg-white p-1.5 shadow-lg'}
+          >
+            {children(close)}
+          </div>
+        </div>,
+        document.body,
       )}
     </div>
   )
 }
 
-const MENU_ITEM = 'w-full min-h-10 px-2.5 rounded-md text-left text-sm hover:bg-slate-50 flex items-start gap-2 disabled:opacity-60 disabled:hover:bg-transparent'
+const MENU_ITEM = 'w-full min-h-10 px-2.5 rounded-md text-left text-sm hover:bg-slate-100 active:bg-slate-200 flex items-start gap-2 disabled:cursor-default disabled:bg-slate-50 disabled:hover:bg-slate-50'
 const MENU_GROUP = 'px-2.5 pt-2 pb-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-400 first:pt-1'
 
 function MenuItem({ icon, title, hint, onClick, disabled, current }: {
@@ -561,7 +574,10 @@ function MenuItem({ icon, title, hint, onClick, disabled, current }: {
     <button className={MENU_ITEM} onClick={onClick} disabled={disabled}>
       <span className="mt-0.5 shrink-0">{icon}</span>
       <span className="flex-1">
-        <span className="block font-medium text-slate-900">{title}{current && <span className="ml-1.5 text-[11px] font-normal text-slate-500">· now</span>}</span>
+        <span className={`block font-medium ${current ? 'text-slate-500' : 'text-slate-900'}`}>
+          {title}
+          {current && <span className="ml-1.5 rounded bg-slate-200 px-1 py-px text-[10px] font-semibold uppercase tracking-wide text-slate-600">Now</span>}
+        </span>
         {hint && <span className="block text-[11px] text-slate-500">{hint}</span>}
       </span>
     </button>

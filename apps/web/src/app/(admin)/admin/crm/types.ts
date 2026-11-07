@@ -72,6 +72,12 @@ export interface Opportunity {
   /** We are paid once the client has paid this %; 0 = when the sale closes. */
   payoutAtPct?: number | null
   commissionReceivedAt?: string | null
+  /** How the broker is paid: a share of ours, or one side's commission outright. */
+  brokerTakes?: 'SHARE' | 'SELLER_SIDE' | 'BUYER_SIDE' | null
+  /** The client's payment plan: down payment %, monthly instalments, first payment. */
+  downPaymentPct?: number | null
+  planMonths?: number | null
+  planStartAt?: string | null
   updatedAt: string
   /** Resolved by the API so ruled-out items still show their real name. */
   subject?: {

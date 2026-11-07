@@ -14,7 +14,9 @@ import { prisma } from '@propgroup/db';
  * has paid 30% of the price, which on a payment plan can be months after they
  * reserve. `payoutAtPct` is that threshold; 0 means we are paid on closing.
  *
- * A broker who shared the deal takes `brokerPct` of OUR commission.
+ * A broker on the deal is paid one of three ways (`brokerTakes`): a share of
+ * OUR commission (`brokerPct`), or one side of it outright — he brought the
+ * seller and we brought the buyer, so the seller's part is his.
  */
 
 export type CommissionMarket = 'LEBANON' | 'INTERNATIONAL';
@@ -112,6 +114,7 @@ type Terms = {
   stage: string;
   soldPrice: number | null; soldCurrency: string | null; commissionUsd: number | null;
   sellerPct: number | null; buyerPct: number | null; brokerPct: number | null; payoutAtPct: number | null;
+  brokerTakes?: BrokerTakes | null; brokerId?: string | null;
   buildingId?: string | null; listingId?: string | null; leadId: string;
 };
 
@@ -130,21 +133,23 @@ export async function commissionFields(next: Terms, typedCommission: boolean, be
   const agreed = next.stage === 'RESERVED' || next.stage === 'WON';
   const needsTerms = next.soldPrice != null || agreed;
   let commission = next.commissionUsd;
+  let rates = { sellerPct: next.sellerPct ?? 0, buyerPct: next.buyerPct ?? 0 };
   if (needsTerms) {
     const lead = await prisma.lead.findUnique({ where: { id: next.leadId }, select: { market: true } });
     const terms = await resolveTerms({ buildingId: await buildingOf(next), leadMarket: lead?.market });
+    rates = { sellerPct: next.sellerPct ?? terms.sellerPct, buyerPct: next.buyerPct ?? terms.buyerPct };
     if (!typedCommission) {
-      const computed = computeCommission({
-        soldPrice: next.soldPrice, soldCurrency: next.soldCurrency,
-        sellerPct: next.sellerPct ?? terms.sellerPct, buyerPct: next.buyerPct ?? terms.buyerPct,
-      });
+      const computed = computeCommission({ soldPrice: next.soldPrice, soldCurrency: next.soldCurrency, ...rates });
       if (computed != null) { commission = computed; out.commissionUsd = computed; }
     }
     // Only as it is agreed: stamping a threshold onto deals closed long ago
     // would mark commission that was paid years back as still waiting.
     if (agreed && becameAgreed && next.payoutAtPct == null) out.payoutAtPct = terms.payoutAtPct;
   }
-  out.brokerCutUsd = brokerCut(commission, next.brokerPct);
+  out.brokerCutUsd = next.brokerId === null ? null : brokerCut({
+    takes: next.brokerTakes, commissionUsd: commission, brokerPct: next.brokerPct,
+    soldPrice: next.soldPrice, soldCurrency: next.soldCurrency, ...rates,
+  });
   return out;
 }
 
@@ -163,8 +168,28 @@ export function computeCommission(opts: {
   return Math.round((opts.soldPrice * (opts.sellerPct + opts.buyerPct)) / 100);
 }
 
-export const brokerCut = (commissionUsd: number | null | undefined, brokerPct: number | null | undefined) =>
-  commissionUsd != null && brokerPct ? Math.round((commissionUsd * brokerPct) / 100) : null;
+export type BrokerTakes = 'SHARE' | 'SELLER_SIDE' | 'BUYER_SIDE';
+
+/**
+ * What the broker gets. A side is that side's rate on the price, never more
+ * than the whole commission (a figure typed in by hand can be lower).
+ */
+export function brokerCut(o: {
+  takes: BrokerTakes | null | undefined;
+  commissionUsd: number | null | undefined;
+  brokerPct: number | null | undefined;
+  soldPrice: number | null | undefined;
+  soldCurrency?: string | null;
+  sellerPct: number;
+  buyerPct: number;
+}): number | null {
+  if (!o.takes || o.takes === 'SHARE') {
+    return o.commissionUsd != null && o.brokerPct ? Math.round((o.commissionUsd * o.brokerPct) / 100) : null;
+  }
+  if (o.soldPrice == null || (o.soldCurrency && o.soldCurrency !== 'USD')) return null;
+  const side = Math.round((o.soldPrice * (o.takes === 'SELLER_SIDE' ? o.sellerPct : o.buyerPct)) / 100);
+  return o.commissionUsd != null ? Math.min(side, o.commissionUsd) : side;
+}
 
 /**
  * Where our money on a deal stands.
@@ -186,4 +211,49 @@ export function payoutStatus(o: {
   // Paid on closing, and it has not closed: nothing is owed yet.
   if (threshold === 0) return o.stage === 'WON' ? 'DUE' : 'WAITING';
   return (o.paidPct ?? 0) >= threshold ? 'DUE' : 'WAITING';
+}
+
+const addMonths = (d: Date, n: number) => {
+  const out = new Date(d);
+  out.setMonth(out.getMonth() + n);
+  return out;
+};
+
+/**
+ * When the client's payments reach the point we are paid at, from their plan:
+ * a down payment on planStartAt, then the rest in equal monthly instalments
+ * over planMonths. 50k, 20% down, 36 months, paid at 30% → (30 − 20) / (80 / 36)
+ * = 4.5 → the 5th instalment, five months after the start.
+ *
+ * Null when we are paid on closing, or the plan is not filled in.
+ */
+export function expectedPayoutDate(o: {
+  payoutAtPct: number | null;
+  downPaymentPct: number | null;
+  planMonths: number | null;
+  planStartAt: Date | string | null;
+}): Date | null {
+  const threshold = o.payoutAtPct ?? 0;
+  if (threshold <= 0 || !o.planStartAt) return null;
+  const start = new Date(o.planStartAt);
+  const down = o.downPaymentPct ?? 0;
+  if (down >= threshold) return start;
+  if (!o.planMonths || o.planMonths <= 0 || down >= 100) return null;
+  const monthly = (100 - down) / o.planMonths;
+  return addMonths(start, Math.ceil((threshold - down) / monthly - 1e-9));
+}
+
+/** How much of the price the plan says they should have paid by `at`. */
+export function expectedPaidPct(o: {
+  downPaymentPct: number | null;
+  planMonths: number | null;
+  planStartAt: Date | string | null;
+}, at = new Date()): number | null {
+  if (!o.planStartAt) return null;
+  const start = new Date(o.planStartAt);
+  if (at < start) return 0;
+  const down = o.downPaymentPct ?? 0;
+  if (!o.planMonths || o.planMonths <= 0) return down;
+  const months = (at.getFullYear() - start.getFullYear()) * 12 + (at.getMonth() - start.getMonth()) - (at.getDate() < start.getDate() ? 1 : 0);
+  return Math.min(100, Math.round((down + ((100 - down) / o.planMonths) * Math.max(0, months)) * 10) / 10);
 }
