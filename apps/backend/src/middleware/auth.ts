@@ -257,7 +257,9 @@ export function canSeeMoney(req: Request): boolean {
  * property went for to price the next one. Hiding it made the role unable to do
  * the job it exists for.
  */
-const MONEY_FIELDS = ['commissionUsd'] as const;
+// The rates and the broker's cut give the commission away as surely as the
+// figure itself, so they travel with it.
+const MONEY_FIELDS = ['commissionUsd', 'brokerCutUsd', 'sellerPct', 'buyerPct', 'brokerPct', 'sharePct', 'commissionReceivedAt'] as const;
 
 /**
  * Strip commission from anything on its way to a CRM_MANAGER. Walks arrays and

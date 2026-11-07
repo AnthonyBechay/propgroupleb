@@ -203,4 +203,28 @@ export async function normaliseCrmData(): Promise<void> {
     }
     return `${filed} chat sellers filed as owner submissions`;
   });
+
+  // "Not interested" used to leave the client's open deals on the board. Close
+  // the ones it left behind, the way it does now.
+  await once('lost_clients_close_open_deals_v1', async () => {
+    const { count } = await prisma.leadOpportunity.updateMany({
+      where: { lead: { status: 'LOST' as never }, stage: { notIn: ['WON', 'REJECTED'] as never } },
+      data: { stage: 'REJECTED' as never, rejectionReason: 'CHANGED_MIND' as never },
+    });
+    return `${count} open deals of not-interested clients closed`;
+  });
+
+  // Accounting counts commission on the day it was received. Deals closed
+  // before that was recorded were paid long ago: date them on their close, so
+  // past profit does not show as money still owed.
+  await once('commission_received_backfill_v1', async () => {
+    const won = await prisma.leadOpportunity.findMany({
+      where: { stage: 'WON' as never, commissionUsd: { not: null }, commissionReceivedAt: null },
+      select: { id: true, closedAt: true, updatedAt: true },
+    });
+    for (const o of won) {
+      await prisma.leadOpportunity.update({ where: { id: o.id }, data: { commissionReceivedAt: o.closedAt ?? o.updatedAt } });
+    }
+    return `${won.length} closed deals marked as paid on their closing date`;
+  });
 }

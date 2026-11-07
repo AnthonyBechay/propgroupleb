@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   Phone, MessageCircle, Calendar, AlertCircle, Handshake,
-  TrendingUp, Loader2, Check, Plus, X, ChevronRight, ChevronDown, MessagesSquare, Instagram, Clock, VolumeX, Moon,
+  TrendingUp, Loader2, Check, Plus, X, ChevronRight, ChevronDown, MessagesSquare, Instagram, Clock, VolumeX, Moon, Flag,
 } from 'lucide-react'
 import {
   type Deal, type OpportunityStage, BOARD_DEAL_COLUMNS, CLIENT_COLUMNS, type PipelineClient, dealColumnOf, stageLabel,
@@ -16,7 +16,7 @@ import type { StartStage } from './BookViewingModal'
  * Where a person card can go: onto a property deal at a stage (which asks for
  * the property), snoozed for some days, or off the board as noise / not interested.
  */
-export type ClientMove = StartStage | 'NOISE' | 'QUIET' | 'LOST' | `PING:${number}`
+export type ClientMove = StartStage | 'NOISE' | 'QUIET' | 'LOST' | 'FLAG' | 'UNFLAG' | `PING:${number}`
 
 /**
  * The pipeline, as deals.
@@ -73,6 +73,7 @@ export function DealBoard({
 }) {
   const q = search
   const [onlyAlerts, setOnlyAlerts] = useState(false)
+  const [onlyFlagged, setOnlyFlagged] = useState(false)
   const [dragging, setDragging] = useState<string | null>(null)
   const [over, setOver] = useState<string | null>(null)
   // Below `lg` the board shows one column at a time. Seven 264px columns in a
@@ -97,11 +98,14 @@ export function DealBoard({
 
   const visibleClients = useMemo(() => {
     const needle = q.trim().toLowerCase()
-    if (!needle) return clients
-    return clients.filter((c) =>
-      [c.name, c.askingFor, c.adLabel, c.chat?.lastPreview].filter(Boolean).some((v) => String(v).toLowerCase().includes(needle))
-    )
-  }, [clients, q])
+    let out = onlyFlagged ? clients.filter((c) => c.flag) : clients
+    if (needle) {
+      out = out.filter((c) =>
+        [c.name, c.askingFor, c.adLabel, c.chat?.lastPreview].filter(Boolean).some((v) => String(v).toLowerCase().includes(needle))
+      )
+    }
+    return out
+  }, [clients, q, onlyFlagged])
 
   const filtered = useMemo(() => {
     const needle = q.trim().toLowerCase()
@@ -116,8 +120,15 @@ export function DealBoard({
     }
     // The one filter a deal board actually needs: what is going wrong.
     if (onlyAlerts) out = out.filter((d) => dealAlert(d) !== null)
+    if (onlyFlagged) out = out.filter((d) => d.lead.flaggedAt)
     return out
-  }, [deals, q, onlyAlerts])
+  }, [deals, q, onlyAlerts, onlyFlagged])
+
+  // Flagged people, counted once however many deals they have.
+  const flaggedCount = useMemo(() => new Set([
+    ...clients.filter((c) => c.flag).map((c) => c.id),
+    ...deals.filter((d) => d.lead.flaggedAt && BOARD_DEAL_COLUMNS.some((c) => c.stages.includes(d.stage))).map((d) => d.lead.id),
+  ]).size, [clients, deals])
 
   const alertCount = useMemo(() => deals.filter((d) => dealAlert(d) !== null).length, [deals])
 
@@ -145,6 +156,18 @@ export function DealBoard({
         >
           <AlertCircle className="h-4 w-4" />
           Needs attention {alertCount > 0 && <span className="opacity-70">{alertCount}</span>}
+        </button>
+        <button
+          onClick={() => setOnlyFlagged((v) => !v)}
+          disabled={flaggedCount === 0 && !onlyFlagged}
+          className={`inline-flex items-center gap-1.5 px-3 h-9 rounded-lg text-sm font-medium border transition-colors disabled:opacity-40 ${
+            onlyFlagged
+              ? 'bg-red-600 text-white border-red-600'
+              : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+          }`}
+        >
+          <Flag className="h-4 w-4" />
+          Flagged {flaggedCount > 0 && <span className="opacity-70">{flaggedCount}</span>}
         </button>
 
         <div className="flex-1" />
@@ -330,6 +353,7 @@ export function DealBoard({
                     onAction={(deal, action) => {
                       if (action === 'DELETE') onRemoveDeal(deal)
                       else if (action === 'CLIENT_LOST') onBook(deal.lead.id, 'LOST')
+                      else if (action === 'FLAG' || action === 'UNFLAG') onBook(deal.lead.id, action)
                       else onMove(deal.id, action)
                     }}
                   />
@@ -346,6 +370,18 @@ export function DealBoard({
         </section>
       </div>
     </div>
+  )
+}
+
+const FLAGGED_CARD = 'bg-red-50 border-red-400 ring-1 ring-red-300'
+
+/** Why a card is red, and who made it so. */
+function FlagLine({ note, by }: { note?: string | null; by?: string | null }) {
+  return (
+    <p className="mb-1.5 flex items-start gap-1 text-[11px] font-semibold text-red-700">
+      <Flag className="h-3 w-3 mt-0.5 shrink-0" />
+      <span className="min-w-0">{note || 'Flagged for the team'}{by && <span className="font-normal text-red-600/80"> · {by}</span>}</span>
+    </p>
   )
 }
 
@@ -379,8 +415,9 @@ function ClientCard({
       draggable
       onDragStart={(e) => { e.dataTransfer.setData('text/plain', `client:${c.id}`); onDragStart() }}
       data-lead={c.id}
-      className={`bg-white border rounded-lg p-2.5 cursor-pointer hover:border-slate-300 hover:shadow-sm transition-all ${focused ? 'border-amber-400 ring-2 ring-amber-300' : 'border-slate-200'}`}
+      className={`border rounded-lg p-2.5 cursor-pointer hover:shadow-sm transition-all ${focused ? 'border-amber-400 ring-2 ring-amber-300' : c.flag ? FLAGGED_CARD : 'bg-white border-slate-200 hover:border-slate-300'}`}
     >
+      {c.flag && <FlagLine note={c.flag.note} by={c.flag.by} />}
       <div className="flex items-start gap-1.5">
         <span className="text-[11px] shrink-0 mt-0.5">{countryFlag(c.market)}</span>
         <span className="text-sm font-medium text-slate-900 leading-snug truncate flex-1">{c.name}</span>
@@ -436,7 +473,7 @@ function ClientCard({
             {c.chat.unread > 0 && c.chat.unread}
           </button>
         )}
-        <MoveMenu meeting={meeting} supplyOnly={c.supplyOnly} onPick={(to) => onBook(c.id, to)} />
+        <MoveMenu meeting={meeting} supplyOnly={c.supplyOnly} flagged={Boolean(c.flag)} onPick={(to) => onBook(c.id, to)} />
       </div>
     </div>
   )
@@ -531,22 +568,36 @@ function MenuItem({ icon, title, hint, onClick, disabled, current }: {
   )
 }
 
+/** Red for the team: "someone look at this one". Same item in every menu. */
+function FlagItem({ flagged, onPick }: { flagged: boolean; onPick: (to: 'FLAG' | 'UNFLAG') => void }) {
+  return (
+    <>
+      <p className={MENU_GROUP}>Team</p>
+      {flagged
+        ? <MenuItem icon={<Flag className="h-4 w-4 text-slate-500" />} title="Remove the flag" hint="Checked — back to a normal card" onClick={() => onPick('UNFLAG')} />
+        : <MenuItem icon={<Flag className="h-4 w-4 text-red-600" />} title="Flag for the team" hint="Shows red so someone checks it" onClick={() => onPick('FLAG')} />}
+    </>
+  )
+}
+
 /**
  * What to do next with a person. Three groups, in the order a conversation
  * goes: it becomes a deal, it waits, or it ends. It replaced a dropdown of
  * eleven entries that put "Met / discussed" next to "In 2 weeks".
  */
 export function MoveMenu({
-  meeting, supplyOnly, onPick, buttonClassName,
+  meeting, supplyOnly, onPick, buttonClassName, flagged = false,
 }: {
   /** Abroad the next step is a meeting at the office; in Lebanon, a viewing. */
   meeting: boolean
   supplyOnly: boolean
+  /** Whether the client is flagged for the team now. */
+  flagged?: boolean
   onPick: (to: ClientMove) => void
   buttonClassName?: string
 }) {
   return (
-    <MenuShell label="Move" height={supplyOnly ? 280 : 450} buttonClassName={buttonClassName}>
+    <MenuShell label="Move" height={supplyOnly ? 330 : 500} buttonClassName={buttonClassName}>
       {(close) => {
         const pick = (to: ClientMove) => { close(); onPick(to) }
         return (
@@ -574,6 +625,7 @@ export function MoveMenu({
             <p className={MENU_GROUP}>Close</p>
             <MenuItem icon={<VolumeX className="h-4 w-4 text-slate-500" />} title="Noise" hint="Never replied — hide until they write" onClick={() => pick('NOISE')} />
             <MenuItem icon={<X className="h-4 w-4 text-red-600" />} title="Not interested" hint="They said no" onClick={() => pick('LOST')} />
+            <FlagItem flagged={flagged} onPick={pick} />
           </>
         )
       }}
@@ -582,7 +634,7 @@ export function MoveMenu({
 }
 
 /** What a deal card can do — one menu, the same on a computer and a phone. */
-export type DealAction = OpportunityStage | 'CLIENT_LOST' | 'DELETE'
+export type DealAction = OpportunityStage | 'CLIENT_LOST' | 'DELETE' | 'FLAG' | 'UNFLAG'
 
 /**
  * Moving a deal. It replaced a phone-only dropdown that offered stages the
@@ -593,7 +645,7 @@ export type DealAction = OpportunityStage | 'CLIENT_LOST' | 'DELETE'
 function DealMoveMenu({ deal: d, onPick }: { deal: Deal; onPick: (action: DealAction) => void }) {
   const current = dealColumnOf(d)
   return (
-    <MenuShell label="Move" height={420}>
+    <MenuShell label="Move" height={470}>
       {(close) => {
         const pick = (a: DealAction) => { close(); onPick(a) }
         return (
@@ -612,6 +664,7 @@ function DealMoveMenu({ deal: d, onPick }: { deal: Deal; onPick: (action: DealAc
             <p className={MENU_GROUP}>It did not work out</p>
             <MenuItem icon={<X className="h-4 w-4 text-amber-600" />} title="Not this property" hint="Kept on record. The client stays — back with the people if it was their only deal" onClick={() => pick('REJECTED')} />
             <MenuItem icon={<X className="h-4 w-4 text-red-600" />} title="Client not interested" hint="They said no to everything — off the board" onClick={() => pick('CLIENT_LOST')} />
+            <FlagItem flagged={Boolean(d.lead.flaggedAt)} onPick={pick} />
             <div className="mt-1 border-t border-slate-100 pt-1">
               <MenuItem icon={<X className="h-4 w-4 text-slate-400" />} title="Delete this deal" hint="Only if it was added by mistake — leaves no record" onClick={() => pick('DELETE')} />
             </div>
@@ -647,10 +700,11 @@ function DealCard({
       onDragStart={(e) => { e.dataTransfer.setData('text/plain', d.id); onDragStart() }}
       onClick={() => onOpenClient(d.lead.id)}
       data-lead={d.lead.id}
-      className={`bg-white border rounded-lg p-2.5 cursor-pointer hover:border-slate-300 hover:shadow-sm transition-all ${focused ? 'border-amber-400 ring-2 ring-amber-300' : 'border-slate-200'} ${
+      className={`border rounded-lg p-2.5 cursor-pointer hover:shadow-sm transition-all ${focused ? 'border-amber-400 ring-2 ring-amber-300' : d.lead.flaggedAt ? FLAGGED_CARD : 'bg-white border-slate-200 hover:border-slate-300'} ${
         busy ? 'opacity-50 pointer-events-none' : ''
       }`}
     >
+      {d.lead.flaggedAt && <FlagLine note={d.lead.flagNote} by={d.lead.flaggedBy} />}
       {/* The property is the subject of the deal, so it leads. */}
       <div className="flex items-start gap-1.5">
         {d.subject?.ref && (

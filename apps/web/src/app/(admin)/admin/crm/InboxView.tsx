@@ -31,6 +31,8 @@ interface ThreadLead {
   market?: string | null
   type?: LeadType | null
   intents?: LeadType[] | null
+  flaggedAt?: string | null
+  flagNote?: string | null
 }
 
 interface Thread {
@@ -925,6 +927,9 @@ export function InboxView({
                 <p className="font-semibold text-slate-900 truncate">{threadName(detail)}</p>
                 {detail.channel === 'WHATSAPP' && threadName(detail) !== `+${detail.externalId}` && (
                   <p className="text-xs text-slate-500 truncate">+{detail.externalId}</p>
+                )}
+                {detail.lead?.flaggedAt && (
+                  <p className="text-xs font-semibold text-red-700 truncate">Flagged{detail.lead.flagNote ? `: ${detail.lead.flagNote}` : ''}</p>
                 )}
                 {detail.adId && (
                   <p className="text-xs text-slate-500 truncate" title={detail.adLabel ?? undefined}>

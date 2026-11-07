@@ -18,7 +18,7 @@ import {
   ListFilter,
   ClipboardList,
   UserSearch,
-  X, MessagesSquare, Bot, Bell, Gauge,
+  X, MessagesSquare, Bot, Bell, Gauge, Wallet, Handshake, Percent,
 } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { canAccessAdminPath, isSuperAdmin, ROLE_LABELS, type Role } from '@/lib/permissions'
@@ -78,6 +78,16 @@ const GROUPS: NavGroup[] = [
     ],
   },
   {
+    // Admin only: CRM_MANAGER never sees commission, and canAccessAdminPath
+    // keeps these off their rail.
+    id: 'money',
+    label: 'Money',
+    items: [
+      { name: 'Accounting', href: '/admin/accounting', icon: Wallet },
+      { name: 'Brokers', href: '/admin/brokers', icon: Handshake },
+    ],
+  },
+  {
     id: 'system',
     label: 'Insights and setup',
     items: [
@@ -98,6 +108,7 @@ export const ADMIN_NAV_ITEMS = [
   { name: 'Chat assistant', href: '/admin/settings/assistant', icon: Bot },
   { name: 'Notifications', href: '/admin/settings/notifications', icon: Bell },
   { name: 'AI usage and budget', href: '/admin/settings/ai-usage', icon: Gauge },
+  { name: 'Commission', href: '/admin/settings/commission', icon: Percent },
   { name: 'Website content', href: '/admin/content', icon: FileText },
 ]
 

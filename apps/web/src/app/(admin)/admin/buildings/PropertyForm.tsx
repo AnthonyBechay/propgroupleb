@@ -26,6 +26,9 @@ import {
   type FirstListing, type FirstUnit,
 } from './FirstUnitSection'
 import { UnitsManager } from './UnitsManager'
+import { ProjectCommissionSection } from './ProjectCommissionSection'
+import { useAuth } from '@/contexts/AuthContext'
+import { canSeeMoney } from '@/lib/permissions'
 import { buildingPayload, emptyBuildingForm, type BuildingFormState } from './building-form-state'
 
 interface Props {
@@ -103,6 +106,7 @@ export function PropertyForm({ initialData, buildingId }: Props) {
   const showBuildingSpecs = kindsInPlay.some((k) => showsBuildingSpecs(k))
   const residential = kindsInPlay.some((k) => isResidential(k))
 
+  const { user } = useAuth()
   const sections: SectionLink[] = [
     { id: 'basics', label: 'The basics', icon: Building2 },
     { id: 'location', label: 'Where it is', icon: MapPin },
@@ -111,6 +115,7 @@ export function PropertyForm({ initialData, buildingId }: Props) {
     { id: 'media', label: 'Photos & video', icon: ImageIcon },
     { id: 'investment', label: 'Investment', icon: Coins },
     { id: 'payment', label: 'Payment plans', icon: Coins },
+    ...(isEdit && canSeeMoney(user?.role) ? [{ id: 'commission', label: 'Commission', icon: Coins }] : []),
     ...(isEdit ? [{ id: 'documents', label: 'Documents', icon: FileText }] : []),
     { id: 'seo', label: 'Search engines', icon: Search },
   ]
@@ -466,6 +471,8 @@ export function PropertyForm({ initialData, buildingId }: Props) {
           <InvestmentSection f={form} set={set} disabled={saving} />
 
           <PaymentPlansSection f={form} set={set} />
+
+          {isEdit && buildingId && <ProjectCommissionSection buildingId={buildingId} country={form.country} />}
 
           {isEdit && buildingId && (
             <DocumentsSection>

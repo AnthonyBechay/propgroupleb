@@ -499,6 +499,7 @@ model Building {
   reservations   PropertyReservation[]
   investmentData BuildingInvestmentData?
   priceHistory   BuildingPriceHistory[]
+  commission     ProjectCommission?
 
   @@index([ref])
   @@index([kind])
@@ -1596,6 +1597,12 @@ model Lead {
   // logged contact after this moment puts them back.
   quietAt             DateTime?
 
+  // Flagged red on the board for the team to look at, with why and by whom.
+  // Stays until someone clears it.
+  flaggedAt           DateTime?
+  flagNote            String?
+  flaggedBy           String?
+
   notes String?
 
   // When the relationship reached a terminal state (WON/LOST). Lets the board
@@ -2009,11 +2016,30 @@ model LeadOpportunity {
   commissionUsd Float?
   closedAt      DateTime?
 
+  // How the commission is worked out. Each percentage is of the sale price;
+  // null means "the project's terms, else the market's" (see
+  // services/commission.service.ts), so changing a default moves every deal
+  // that never set its own. commissionUsd is what that comes to, ours in full.
+  sellerPct Float?
+  buyerPct  Float?
+  // A broker who brought or shared the deal takes this share of OUR
+  // commission (a percentage of commissionUsd, not of the price).
+  brokerId     String?
+  brokerPct    Float?
+  brokerCutUsd Float?
+  // Payment plans abroad: we are paid once the client has paid payoutAtPct of
+  // the price (30% in Georgia), which can take months. paidPct is how far they
+  // have got. Null payoutAtPct = we are paid when the deal closes.
+  paidPct              Float?
+  payoutAtPct          Float?
+  commissionReceivedAt DateTime?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   createdBy String?
 
-  lead Lead @relation("LeadOpportunities", fields: [leadId], references: [id], onDelete: Cascade)
+  lead   Lead    @relation("LeadOpportunities", fields: [leadId], references: [id], onDelete: Cascade)
+  broker Broker? @relation(fields: [brokerId], references: [id], onDelete: SetNull)
 
   // One row per client × property so re-suggesting is impossible.
   @@unique([leadId, listingId])
@@ -2022,5 +2048,71 @@ model LeadOpportunity {
   @@index([leadId])
   @@index([stage])
   @@index([viewingAt])
+  @@index([brokerId])
   @@map("lead_opportunities")
+}
+
+// An outside broker or agent we split commission with.
+model Broker {
+  id       String  @id @default(cuid())
+  name     String
+  phone    String?
+  email    String?
+  company  String?
+  // Their usual share of our commission, in percent. Copied onto a deal when
+  // they are picked, so changing it later does not rewrite closed deals.
+  sharePct Float   @default(50)
+  notes    String?
+  active   Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  opportunities LeadOpportunity[]
+
+  @@map("brokers")
+}
+
+// A project's own commission terms (Georgia sets them per project). Kept off
+// Building on purpose: public endpoints return Building rows, and what a
+// developer pays us must never reach a storefront.
+model ProjectCommission {
+  buildingId  String   @id
+  sellerPct   Float?
+  buyerPct    Float?
+  payoutAtPct Float?
+  updatedAt   DateTime @updatedAt
+
+  building Building @relation(fields: [buildingId], references: [id], onDelete: Cascade)
+
+  @@map("project_commissions")
+}
+
+enum ExpenseCategory {
+  OFFICE // rent, utilities, supplies
+  SALARIES
+  MARKETING // ads, photos, printing
+  TRAVEL
+  FEES // bank, legal, accounting, software
+  TAX
+  OTHER
+}
+
+// Money going out, for the accounting page. Kept in USD so it adds up against
+// commission, which is USD too.
+model Expense {
+  id          String          @id @default(cuid())
+  date        DateTime
+  category    ExpenseCategory
+  amountUsd   Float
+  description String?
+  // Which office it belongs to; null = shared.
+  market      LeadMarket?
+  createdBy   String?
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  @@index([date])
+  @@index([category])
+  @@map("expenses")
 }

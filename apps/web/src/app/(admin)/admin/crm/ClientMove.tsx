@@ -9,6 +9,33 @@ import { type Lead, type LeadType, stageLabel } from './types'
 
 const SUPPLY: LeadType[] = ['SELLER', 'LANDLORD']
 
+/**
+ * Flag a client red for the team, or clear it. Asks why first — a red card
+ * nobody can explain gets ignored. Resolves to true when it saved.
+ */
+export async function flagClient(apiUrl: string, leadId: string, name: string, flag: boolean): Promise<boolean> {
+  let note: string | undefined
+  if (flag) {
+    const typed = window.prompt(`Flag ${name} for the team.\n\nWhat should they check? (optional)`, '')
+    if (typed === null) return false
+    note = typed.trim() || undefined
+  }
+  try {
+    const res = await fetch(`${apiUrl}/api/crm/pipeline/${leadId}/flag`, {
+      method: 'POST', credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(flag ? { note } : { clear: true }),
+      signal: AbortSignal.timeout(20_000),
+    })
+    if (!res.ok) throw new Error()
+  } catch {
+    alert('That did not save — nothing was changed. Try again.')
+    return false
+  }
+  toast({ title: flag ? `${name}: flagged` : `${name}: flag removed`, description: flag ? 'Their cards show red on the board until someone clears it.' : undefined })
+  return true
+}
+
 /** A move that needs no property: it waits, or it ends. */
 export const isPlainMove = (to: ClientMove) =>
   to === 'LOST' || to === 'NOISE' || to === 'QUIET' || to.startsWith('PING:')
@@ -24,7 +51,7 @@ export function plainMoveCopy(to: ClientMove, name: string) {
     confirm: to === 'NOISE'
       ? `Mark ${name} as noise?\n\nThey leave the board and the inbox, and come back by themselves if they ever write again.`
       : to === 'LOST'
-        ? `Mark ${name} as not interested? They leave the board and stay in the client list.`
+        ? `Mark ${name} as not interested?\n\nThey leave the board and stay in the client list. Their open deals close as "not this property", so what they were shown stays on record.`
         : null,
     body: to === 'NOISE' ? { action: 'noise' }
       : to === 'QUIET' ? { action: 'quiet' }
@@ -50,7 +77,7 @@ export function plainMoveCopy(to: ClientMove, name: string) {
 export function ClientMoveButton({
   lead, onMoved, buttonClassName,
 }: {
-  lead: { id: string; name: string; market?: string | null; type?: LeadType | null; intents?: LeadType[] | null }
+  lead: { id: string; name: string; market?: string | null; type?: LeadType | null; intents?: LeadType[] | null; flaggedAt?: string | null }
   /** After the move saved: refresh whatever shows this client. */
   onMoved?: (to: ClientMove) => void
   buttonClassName?: string
@@ -61,6 +88,10 @@ export function ClientMoveButton({
   const supplyOnly = intents.length > 0 && intents.every((t) => SUPPLY.includes(t))
 
   const pick = async (to: ClientMove) => {
+    if (to === 'FLAG' || to === 'UNFLAG') {
+      if (await flagClient(apiUrl, lead.id, lead.name, to === 'FLAG')) onMoved?.(to)
+      return
+    }
     if (isPlainMove(to)) {
       const copy = plainMoveCopy(to, lead.name)
       if (copy.confirm && !window.confirm(copy.confirm)) return
@@ -97,6 +128,7 @@ export function ClientMoveButton({
       <MoveMenu
         meeting={lead.market !== 'LEBANON'}
         supplyOnly={supplyOnly}
+        flagged={Boolean(lead.flaggedAt)}
         onPick={(to) => { void pick(to) }}
         buttonClassName={buttonClassName}
       />

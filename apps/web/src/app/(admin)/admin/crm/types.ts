@@ -60,6 +60,18 @@ export interface Opportunity {
   soldCurrency: 'USD' | 'LBP'
   commissionUsd: number | null
   closedAt: string | null
+  /** Commission terms — % of the price; null = the project's or market's default. */
+  sellerPct?: number | null
+  buyerPct?: number | null
+  brokerId?: string | null
+  /** The broker's share of OUR commission, in %. */
+  brokerPct?: number | null
+  brokerCutUsd?: number | null
+  /** How much of the price the client has paid so far (payment plans). */
+  paidPct?: number | null
+  /** We are paid once the client has paid this %; 0 = when the sale closes. */
+  payoutAtPct?: number | null
+  commissionReceivedAt?: string | null
   updatedAt: string
   /** Resolved by the API so ruled-out items still show their real name. */
   subject?: {
@@ -246,6 +258,9 @@ export interface Lead {
 
   /** Every intent this client has; `type` is always the first of them. */
   intents?: LeadType[]
+  flaggedAt?: string | null
+  flagNote?: string | null
+  flaggedBy?: string | null
 }
 
 /**
@@ -569,6 +584,9 @@ export interface Deal extends Opportunity {
     status?: LeadStatus
     nextContactAt?: string | null
     lastContactAt?: string | null
+    flaggedAt?: string | null
+    flagNote?: string | null
+    flaggedBy?: string | null
   }
 }
 
@@ -652,6 +670,8 @@ export interface PipelineClient {
     detailsToConfirm: boolean
   } | null
   lastActivity: string
+  /** Flagged red for the team. */
+  flag: { at: string; note: string | null; by: string | null } | null
 }
 
 export const CLIENT_COLUMNS: Array<{ key: PipelineClient['bucket']; label: string; hint: string; accent: string }> = [
@@ -708,6 +728,8 @@ export function isLiveDeal(d: Deal | Opportunity): boolean {
  * nothing and beats asking the team to type a number they don't have yet.
  */
 export const DEFAULT_COMMISSION_RATE = 0.025
+/** Standard terms for an estimate: 2.5% + 2.5% in Lebanon, 5.9% from the developer abroad. */
+const FORECAST_RATE = { LEBANON: 0.05, INTERNATIONAL: 0.059 } as const
 
 export function dealCommission(d: Deal | Opportunity): { usd: number; forecast: boolean } | null {
   if (d.commissionUsd != null) return { usd: d.commissionUsd, forecast: false }
@@ -716,7 +738,14 @@ export function dealCommission(d: Deal | Opportunity): { usd: number; forecast: 
   // LBP asking prices aren't converted here — a wrong number is worse than none.
   const currency = d.soldPrice != null ? d.soldCurrency : d.subject?.currency
   if (currency && currency !== 'USD') return null
-  return { usd: Math.round(price * DEFAULT_COMMISSION_RATE), forecast: true }
+  // The deal's own rates, else the standard terms for where the property is
+  // (Settings → Commission holds the real defaults; these mirror them).
+  const country = d.subject?.country ?? ('lead' in d ? d.lead.market : null)
+  const standard = country && country !== 'LEBANON' ? FORECAST_RATE.INTERNATIONAL : FORECAST_RATE.LEBANON
+  const rate = d.sellerPct != null || d.buyerPct != null
+    ? ((d.sellerPct ?? 0) + (d.buyerPct ?? 0)) / 100
+    : standard
+  return { usd: Math.round(price * rate), forecast: true }
 }
 
 /** Something that needs doing on this deal, or null when it's simply waiting. */
@@ -738,4 +767,13 @@ export function dealAlert(d: Deal): { text: string; tone: 'red' | 'amber' } | nu
   const idle = (now - new Date(d.updatedAt).getTime()) / 864e5
   if (isLiveDeal(d) && idle > 21) return { text: `Untouched ${Math.round(idle)} days`, tone: 'amber' }
   return null
+}
+
+/** Where our money on an agreed deal stands — mirrors payoutStatus() on the server. */
+export function payoutStatus(o: Pick<Opportunity, 'stage' | 'paidPct' | 'payoutAtPct' | 'commissionReceivedAt'>): 'WAITING' | 'DUE' | 'RECEIVED' | null {
+  if (o.stage !== 'WON' && o.stage !== 'RESERVED') return null
+  if (o.commissionReceivedAt) return 'RECEIVED'
+  const threshold = o.payoutAtPct ?? 0
+  if (threshold === 0) return o.stage === 'WON' ? 'DUE' : 'WAITING'
+  return (o.paidPct ?? 0) >= threshold ? 'DUE' : 'WAITING'
 }

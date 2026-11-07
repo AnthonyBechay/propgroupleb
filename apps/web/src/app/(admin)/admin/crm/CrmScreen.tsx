@@ -20,7 +20,7 @@ import { ClientDirectory } from './ClientDirectory'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { toast } from '@/components/ui/toast'
-import { isPlainMove, plainMoveCopy } from './ClientMove'
+import { flagClient, isPlainMove, plainMoveCopy } from './ClientMove'
 import {
   type Lead, type LeadMarket, type LeadType,
   type Deal, type OpportunityStage, type PipelineClient,
@@ -563,6 +563,11 @@ export function CrmScreen({ mode }: { mode: 'pipeline' | 'clients' }) {
           clients={boardClients}
           focusLeadId={focusLeadId}
           onBook={async (leadId, to) => {
+            if (to === 'FLAG' || to === 'UNFLAG') {
+              const name = pipeline.find((p) => p.id === leadId)?.name ?? deals.find((d) => d.lead.id === leadId)?.lead.name ?? 'this client'
+              if (await flagClient(apiUrl, leadId, name, to === 'FLAG')) refreshBoard()
+              return
+            }
             // Ping later / noise / not interested: no property involved.
             if (isPlainMove(to)) {
               const name = pipeline.find((p) => p.id === leadId)?.name ?? 'this client'
@@ -570,6 +575,7 @@ export function CrmScreen({ mode }: { mode: 'pipeline' | 'clients' }) {
               if (copy.confirm && !window.confirm(copy.confirm)) return
               const body = copy.body
               // Off the board at once; the refresh confirms it.
+              if (to === 'LOST') setDeals((prev) => prev.filter((d) => d.lead.id !== leadId || d.stage === 'WON'))
               setPipeline((prev) => to.startsWith('PING:')
                 ? prev.map((p) => (p.id === leadId ? { ...p, bucket: 'PING_LATER', pingAt: new Date(Date.now() + Number(to.slice(5)) * 86_400_000).toISOString() } : p))
                 : to === 'QUIET'

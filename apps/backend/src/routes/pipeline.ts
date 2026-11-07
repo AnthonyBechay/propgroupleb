@@ -85,6 +85,7 @@ router.get(
         id: true, name: true, market: true, type: true, intents: true, isInvestor: true, source: true,
         adLabel: true, adId: true, askingFor: true, budgetMax: true, lastContactAt: true, createdAt: true,
         nextContactAt: true, nextContactNote: true, snoozedAt: true, quietAt: true,
+        flaggedAt: true, flagNote: true, flaggedBy: true,
         opportunities: { select: { stage: true } },
         conversations: {
           where: { archivedAt: null },
@@ -241,6 +242,7 @@ router.get(
         pingAt,
         lastActivity,
         silentFor,
+        flag: l.flaggedAt ? { at: l.flaggedAt, note: l.flagNote, by: l.flaggedBy } : null,
       };
     })
       // A month of silence with nothing planned: off the board until they write.
@@ -267,6 +269,27 @@ router.get(
 //                    afterwards brings them back.
 //   ping_later     — snooze until a date; then they are back in "To answer".
 //   not_interested — said no. Lost; still in the client list.
+// POST /api/crm/pipeline/:id/flag — paint the client's cards red for the team
+// to look at, with a note; `{ clear: true }` takes it off.
+router.post(
+  '/:id/flag',
+  asyncHandler(async (req: Request, res: Response) => {
+    const body = z
+      .object({ clear: z.boolean().optional(), note: z.string().trim().max(200).optional() })
+      .parse(req.body ?? {});
+    const lead = await prisma.lead.findUnique({ where: { id: req.params.id }, select: { id: true } });
+    if (!lead) { sendNotFound(res, 'Lead'); return; }
+    const user = (req as AuthenticatedRequest).user;
+    const by = [user?.firstName, user?.lastName].filter(Boolean).join(' ') || user?.email || null;
+    const data = body.clear
+      ? { flaggedAt: null, flagNote: null, flaggedBy: null }
+      : { flaggedAt: new Date(), flagNote: body.note || null, flaggedBy: by };
+    await prisma.lead.update({ where: { id: lead.id }, data });
+    await logAdminAction(body.clear ? 'PIPELINE_UNFLAG' : 'PIPELINE_FLAG', 'lead', lead.id, { note: body.note }, req as AuthenticatedRequest);
+    sendSuccess(res, data);
+  })
+);
+
 router.post(
   '/:id/action',
   asyncHandler(async (req: Request, res: Response) => {
@@ -293,6 +316,13 @@ router.post(
       await prisma.lead.update({
         where: { id: lead.id },
         data: { status: 'LOST', nextContactAt: null, nextContactNote: null, closedAt: new Date() },
+      });
+      // "They said no to everything": their open deals end too. Left alone,
+      // a client marked not interested stayed on the board as a Negotiating
+      // card. Ruled out rather than deleted, so what they were shown is kept.
+      await prisma.leadOpportunity.updateMany({
+        where: { leadId: lead.id, stage: { notIn: ['WON', 'REJECTED'] as never } },
+        data: { stage: 'REJECTED' as never, rejectionReason: 'CHANGED_MIND' as never },
       });
     } else {
       const days = body.days ?? 7;

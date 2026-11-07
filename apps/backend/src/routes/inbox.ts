@@ -59,7 +59,7 @@ router.get(
         skip,
         take: limit,
         include: {
-          lead: { select: { id: true, name: true, status: true, market: true, type: true, intents: true } },
+          lead: { select: { id: true, name: true, status: true, market: true, type: true, intents: true, flaggedAt: true, flagNote: true } },
           // Only to know whether anybody has answered yet.
           messages: { where: { direction: 'OUT' }, select: { id: true }, take: 1 },
         },
@@ -81,7 +81,7 @@ router.get(
   asyncHandler(async (req: Request, res: Response) => {
     const conversation = await prisma.conversation.findUnique({
       where: { id: req.params.id },
-      include: { lead: { select: { id: true, name: true, status: true, market: true, type: true, intents: true } } },
+      include: { lead: { select: { id: true, name: true, status: true, market: true, type: true, intents: true, flaggedAt: true, flagNote: true } } },
     });
     if (!conversation) {
       sendNotFound(res, 'Conversation');

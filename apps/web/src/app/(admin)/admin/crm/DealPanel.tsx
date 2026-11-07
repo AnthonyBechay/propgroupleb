@@ -5,6 +5,7 @@ import { Loader2, DollarSign, Pencil, Check, X, Plus, Globe, Search } from 'luci
 import { normalizeApiUrl } from '@/lib/utils/api-url'
 import { countryFlag } from '@/lib/market'
 import { type Lead, type Opportunity, LIVE_STAGES } from './types'
+import { CommissionFields, PayoutLine, termsBody, termsFrom, type Terms } from './CommissionFields'
 
 /**
  * The money on a closed deal.
@@ -38,8 +39,10 @@ export function DealPanel({
   const opportunities = lead.opportunities ?? []
   // A deal is anything won, plus anything already carrying figures — so a
   // half-recorded deal can still be found and finished.
+  // Reserved counts: abroad that is a payment plan, and the commission on it
+  // is tracked from the day they reserve.
   const deals = opportunities.filter(
-    (o) => o.stage === 'WON' || o.soldPrice != null || o.commissionUsd != null
+    (o) => o.stage === 'WON' || o.stage === 'RESERVED' || o.soldPrice != null || o.commissionUsd != null
   )
   // Almost always they bought something you already shortlisted, so offer that
   // first. Typing the name of a property the CRM already knows about was busy
@@ -141,6 +144,7 @@ export function DealPanel({
           onCancel={() => setCreating(false)}
           onSave={(body) => createDeal(body)}
           allowSubject
+          market={lead.market}
         />
       )}
 
@@ -151,6 +155,7 @@ export function DealPanel({
               <DealForm
                 busy={busy}
                 initial={d}
+                market={lead.market}
                 onCancel={() => setEditingId(null)}
                 onSave={(body) => saveDeal(d.id, body)}
               />
@@ -178,9 +183,11 @@ export function DealPanel({
                       ? `Sold for ${d.soldCurrency} ${d.soldPrice.toLocaleString()}`
                       : 'Sale price not recorded'}
                     {d.commissionUsd != null
-                      ? ` · we made $${d.commissionUsd.toLocaleString()}`
+                      ? ` · commission $${d.commissionUsd.toLocaleString()}`
                       : ' · commission not recorded'}
+                    {d.brokerCutUsd ? ` · broker $${d.brokerCutUsd.toLocaleString()}` : ''}
                   </p>
+                  <PayoutLine deal={d} />
                   <p className="text-[11px] text-slate-500 mt-0.5">
                     {d.closedAt
                       ? `Closed ${new Date(d.closedAt).toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' })}`
@@ -257,8 +264,10 @@ const inp = 'w-full px-2 py-1.5 border border-slate-200 rounded-lg text-sm bg-wh
 
 /** Editable sale figures. Every field can be corrected later. */
 function DealForm({
-  leadId, initial, busy, onCancel, onSave, allowSubject = false, shortlist = [],
+  leadId, initial, busy, onCancel, onSave, allowSubject = false, shortlist = [], market,
 }: {
+  /** The client's market: whose default commission terms apply. */
+  market?: string | null
   /** Needed to search projects, which are looked up through the CRM. */
   leadId?: string
   initial?: Opportunity
@@ -368,11 +377,16 @@ function DealForm({
   const [url, setUrl] = useState(initial?.externalUrl ?? '')
   const [price, setPrice] = useState(initial?.soldPrice?.toString() ?? '')
   const [currency, setCurrency] = useState(initial?.soldCurrency ?? 'USD')
-  const [commission, setCommission] = useState(initial?.commissionUsd?.toString() ?? '')
+  const [terms, setTerms] = useState<Terms>(() => termsFrom(initial))
   const [unitRef, setUnitRef] = useState(initial?.soldUnitRef ?? '')
   const [closedAt, setClosedAt] = useState(
     initial?.closedAt ? initial.closedAt.slice(0, 10) : new Date().toISOString().slice(0, 10)
   )
+
+  // Which project's terms apply: the deal's own, or what was just picked.
+  const buildingId = initial?.buildingId
+    ?? (picked?.kind === 'project' ? picked.id : null)
+    ?? (picked?.kind === 'opportunity' ? shortlist.find((o) => o.id === picked.id)?.buildingId ?? null : null)
 
   return (
     <div className="space-y-2">
@@ -504,20 +518,19 @@ function DealForm({
         </label>
       </div>
 
-      <div className="grid grid-cols-2 gap-2">
-        <label className="block">
-          <span className="text-[11px] text-slate-500">Our profit (USD)</span>
-          <input type="number" min="0" value={commission} onChange={(e) => setCommission(e.target.value)} className={inp} />
-        </label>
-        <label className="block">
-          <span className="text-[11px] text-slate-500">Sale date</span>
-          <input type="date" value={closedAt} onChange={(e) => setClosedAt(e.target.value)} className={inp} />
-        </label>
-      </div>
+      <label className="block">
+        <span className="text-[11px] text-slate-500">Sale date</span>
+        <input type="date" value={closedAt} onChange={(e) => setClosedAt(e.target.value)} className={inp} />
+      </label>
 
-      <p className="text-[10px] text-slate-500">
-        Profit is kept in USD so totals across Lebanon and Georgia add up.
-      </p>
+      <CommissionFields
+        terms={terms}
+        setTerms={setTerms}
+        price={price ? Number(price) : null}
+        currency={currency}
+        buildingId={buildingId}
+        market={market}
+      />
 
       <div className="flex justify-end gap-2">
         <button onClick={onCancel} className="px-2.5 py-1 text-xs text-slate-500 rounded hover:bg-slate-100">
@@ -540,7 +553,7 @@ function DealForm({
               soldUnitRef: unitRef.trim() || null,
               soldPrice: price ? Number(price) : null,
               soldCurrency: currency,
-              commissionUsd: commission ? Number(commission) : null,
+              ...termsBody(terms),
               closedAt: closedAt ? new Date(closedAt).toISOString() : null,
             })
           }

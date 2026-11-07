@@ -314,6 +314,40 @@ so many closed deals had no figure against them. When none is recorded,
 and **labels it "est."** — never silently. It returns null rather than guess on
 a non-USD price.
 
+### Commission terms, brokers and accounting
+
+`services/commission.service.ts` owns the rules; `routes/finance.ts`
+(`/api/finance/*`, admin only) serves them.
+
+- **Commission = price × (seller % + buyer %).** Each % comes from the deal
+  (`LeadOpportunity.sellerPct`/`buyerPct`), else the project
+  (`ProjectCommission` — kept off `Building` so public endpoints can never
+  return it), else the market default in SystemSetting `commission_settings`
+  (Settings → Commission: Lebanon 2.5 + 2.5, abroad 5.9 + 0).
+- `commissionUsd` is worked out from those **only when the price or a rate
+  changes in that save** and nobody typed a figure. Editing a viewing note must
+  never overwrite a commission entered by hand. LBP prices are not converted.
+- **A broker takes `brokerPct` of OUR commission**, not of the price.
+  `brokerCutUsd` follows the commission. A broker on deals is deactivated, never
+  deleted.
+- **Payout threshold** (`payoutAtPct`, 0 = paid on closing): abroad we are paid
+  once the buyer has paid 30%. It is stamped on the deal *as it becomes
+  RESERVED/WON*, never onto older deals, so a changed default does not move a
+  deal being paid off. `payoutStatus()`: WAITING → DUE → RECEIVED
+  (`commissionReceivedAt`).
+- **Accounting is on money received**: commission counts on
+  `commissionReceivedAt`, net of the broker's cut; `Expense` rows (USD) on their
+  date; tax is its own category so profit shows before and after it. Owed and
+  waiting amounts are listed beside it and never counted as profit. Deals won
+  before this existed were backfilled as received on their close date.
+- The rates and the broker's cut are in `MONEY_FIELDS` with `commissionUsd`:
+  they reveal it just as well.
+
+**Flags.** `Lead.flaggedAt`/`flagNote`/`flaggedBy` paint every card of that
+client red on the board (`POST /api/crm/pipeline/:id/flag`), from any Move menu.
+**Not interested** also rules out the client's open deals (`CHANGED_MIND`); it
+used to leave them on the board.
+
 ### Commission and `CRM_MANAGER`
 
 `redactMoney` strips `commissionUsd` from every `/api/crm` response for a role

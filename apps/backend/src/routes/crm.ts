@@ -2,6 +2,7 @@ import express, { type Request, type Response, type Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '@propgroup/db';
 import { authenticateToken, requireAdmin, requireCrm, canSeeMoney, redactMoney, stripMoneyInput, logAdminAction } from '../middleware/auth.js';
+import { commissionFields } from '../services/commission.service.js';
 import { asyncHandler } from '../utils/errors.js';
 import { sendSuccess, sendCreated, sendPaginated, sendNotFound, sendError } from '../utils/response.js';
 import { parsePagination, buildPaginationResponse } from '../utils/pagination.js';
@@ -181,7 +182,7 @@ function scoreProject(lead: any, project: any): { listing: any; match: ReturnTyp
   return { ...best, listing: { ...best.listing, price: from.price ?? best.listing.price, currency: from.currency ?? best.listing.currency } };
 }
 
-async function hydrateOpportunities(opportunities: any[]): Promise<any[]> {
+export async function hydrateOpportunities(opportunities: any[]): Promise<any[]> {
   if (opportunities.length === 0) return [];
   const listingIds = opportunities.map((o) => o.listingId).filter(Boolean) as string[];
   const buildingIds = opportunities.map((o) => o.buildingId).filter(Boolean) as string[];
@@ -939,6 +940,7 @@ router.get(
             id: true, name: true, type: true, isInvestor: true, market: true,
             phone: true, whatsapp: true, email: true, status: true,
             nextContactAt: true, lastContactAt: true,
+            flaggedAt: true, flagNote: true, flaggedBy: true,
           },
         },
       },
@@ -1714,6 +1716,14 @@ const opportunitySchema = z.object({
   // is usually entered days later, so the date has to be settable.
   soldUnitRef: z.string().max(200).optional().nullable(),
   closedAt: z.string().optional().nullable(),
+  // Commission terms — percentages of the price; null = the project's/market's.
+  sellerPct: z.number().min(0).max(100).optional().nullable(),
+  buyerPct: z.number().min(0).max(100).optional().nullable(),
+  brokerId: z.string().optional().nullable(),
+  brokerPct: z.number().min(0).max(100).optional().nullable(),
+  paidPct: z.number().min(0).max(100).optional().nullable(),
+  payoutAtPct: z.number().min(0).max(100).optional().nullable(),
+  commissionReceivedAt: z.string().optional().nullable(),
 });
 
 // GET /:id/history — what happened to this client, newest first: every move on
@@ -1803,6 +1813,15 @@ router.post(
             commissionUsd: data.commissionUsd ?? existing.commissionUsd,
             soldUnitRef: data.soldUnitRef || existing.soldUnitRef,
             closedAt: data.closedAt ? new Date(data.closedAt) : (existing.closedAt ?? new Date()),
+            ...termsData({ ...data, brokerPct: await brokerShare(data.brokerId, data.brokerPct) }),
+            ...(await commissionFields({
+              ...existing, ...termsData(data), stage: 'WON', leadId: lead.id,
+              brokerPct: (await brokerShare(data.brokerId, data.brokerPct)) ?? existing.brokerPct,
+              soldPrice: data.soldPrice ?? existing.soldPrice,
+              soldCurrency: data.soldCurrency ?? existing.soldCurrency,
+              commissionUsd: data.commissionUsd ?? existing.commissionUsd,
+            } as never, data.commissionUsd != null || (data.soldPrice == null && data.sellerPct == null && data.buyerPct == null),
+              !AGREED.includes(existing.stage))),
           },
         });
         await syncLeadStatus(lead.id);
@@ -1814,8 +1833,17 @@ router.post(
       return;
     }
 
+    const terms = termsData({ ...data, brokerPct: await brokerShare(data.brokerId, data.brokerPct) });
+    const money = await commissionFields({
+      stage: data.stage, leadId: lead.id, buildingId: data.buildingId, listingId: data.listingId,
+      soldPrice: data.soldPrice ?? null, soldCurrency: data.soldCurrency ?? 'USD', commissionUsd: data.commissionUsd ?? null,
+      sellerPct: data.sellerPct ?? null, buyerPct: data.buyerPct ?? null,
+      brokerPct: (terms.brokerPct as number | null | undefined) ?? null, payoutAtPct: data.payoutAtPct ?? null,
+    }, data.commissionUsd != null);
     const opportunity = await prisma.leadOpportunity.create({
       data: {
+        ...terms,
+        ...money,
         leadId: lead.id,
         listingId: data.listingId || null,
         buildingId: data.buildingId || null,
@@ -1832,7 +1860,7 @@ router.post(
         feedback: data.feedback || null,
         soldPrice: data.soldPrice ?? null,
         soldCurrency: data.soldCurrency ?? 'USD',
-        commissionUsd: data.commissionUsd ?? null,
+        commissionUsd: money.commissionUsd !== undefined ? money.commissionUsd : (data.commissionUsd ?? null),
         soldUnitRef: data.soldUnitRef || null,
         // A closed deal always has a date: the one given, else today.
         closedAt: data.closedAt
@@ -1871,7 +1899,39 @@ const opportunityUpdateSchema = z.object({
   soldUnitRef: z.string().max(200).optional().nullable(),
   // Deals get recorded days after they close, so the date must be settable.
   closedAt: z.string().optional().nullable(),
+  // Commission terms — percentages of the price; null = the project's/market's.
+  sellerPct: z.number().min(0).max(100).optional().nullable(),
+  buyerPct: z.number().min(0).max(100).optional().nullable(),
+  brokerId: z.string().optional().nullable(),
+  brokerPct: z.number().min(0).max(100).optional().nullable(),
+  paidPct: z.number().min(0).max(100).optional().nullable(),
+  payoutAtPct: z.number().min(0).max(100).optional().nullable(),
+  commissionReceivedAt: z.string().optional().nullable(),
 });
+
+/** A price is agreed from here on: what the commission is worked from. */
+const AGREED: string[] = ['RESERVED', 'WON'];
+
+/** The broker's usual share, when a broker is picked without one. */
+async function brokerShare(brokerId: string | null | undefined, given: number | null | undefined) {
+  if (given !== undefined || !brokerId) return given;
+  const b = await prisma.broker.findUnique({ where: { id: brokerId }, select: { sharePct: true } });
+  return b?.sharePct ?? null;
+}
+
+/** The terms fields of a create/update body, as Prisma data. */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function termsData(data: any): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const k of ['sellerPct', 'buyerPct', 'brokerPct', 'paidPct', 'payoutAtPct'] as const) {
+    if (data[k] !== undefined) out[k] = data[k];
+  }
+  if (data.brokerId !== undefined) out.brokerId = data.brokerId || null;
+  if (data.commissionReceivedAt !== undefined) {
+    out.commissionReceivedAt = data.commissionReceivedAt ? new Date(data.commissionReceivedAt) : null;
+  }
+  return out;
+}
 
 router.patch(
   '/opportunities/:oid',
@@ -1903,6 +1963,15 @@ router.patch(
     if (data.closedAt !== undefined) patch.closedAt = data.closedAt ? new Date(data.closedAt) : null;
     else if (data.stage === 'WON' && !existing.closedAt) patch.closedAt = new Date();
     if (data.stage && data.stage !== 'WON') patch.closedAt = null;
+
+    Object.assign(patch, termsData({ ...data, brokerPct: await brokerShare(data.brokerId, data.brokerPct) }));
+    // Commission follows the price and the rates, unless a figure was typed in.
+    // Only when the price or the rates changed: editing a viewing note must not
+    // overwrite a commission somebody typed in before rates existed.
+    const termsMoved = (['soldPrice', 'soldCurrency', 'sellerPct', 'buyerPct'] as const).some((k) => data[k] !== undefined);
+    Object.assign(patch, await commissionFields({ ...existing, ...patch } as never, data.commissionUsd != null || !termsMoved,
+      Boolean(data.stage && AGREED.includes(data.stage) && !AGREED.includes(existing.stage))));
+    if (data.commissionUsd != null) patch.commissionUsd = data.commissionUsd;
 
     const opportunity = await prisma.leadOpportunity.update({ where: { id: req.params.oid }, data: patch });
 
