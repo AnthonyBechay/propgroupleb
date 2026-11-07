@@ -20,6 +20,7 @@ import { SellerProperties } from './SellerProperties'
 import { DealPanel } from './DealPanel'
 import { PipelineHistory } from './PipelineHistory'
 import { ShareShortlistModal } from './ShareShortlistModal'
+import { ClientMoveButton } from './ClientMove'
 import { useAuth } from '@/contexts/AuthContext'
 import { canSeeMoney as canSeeMoneyFor } from '@/lib/permissions'
 import { listingRef } from '@/lib/reference'
@@ -402,6 +403,24 @@ export function LeadDrawer({
                 <Send className="h-3.5 w-3.5" /> Send properties
               </button>
             )}
+            {/* The board's Move menu, here too. Open clients only: a closed one
+                goes back on the board first, with one tap. */}
+            {['WON', 'LOST', 'ARCHIVED'].includes(l.status) ? (
+              <button
+                onClick={() => setStatus('ACTIVE')}
+                disabled={busy}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-sm text-slate-700 hover:bg-slate-100 disabled:opacity-50"
+                title={l.status === 'WON' ? 'They are looking again' : 'Back on the board as an open client'}
+              >
+                <LayoutGrid className="h-3.5 w-3.5" /> Put back on the board
+              </button>
+            ) : (
+              <ClientMoveButton
+                lead={l}
+                buttonClassName="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-sm font-medium text-slate-700 hover:bg-slate-100"
+                onMoved={() => { void load(); onChanged() }}
+              />
+            )}
             <span
               className="ml-auto inline-flex items-center gap-1 text-xs font-medium px-2.5 py-1.5 rounded-lg bg-slate-100 text-slate-600"
               title={l.lastContactAt ? new Date(l.lastContactAt).toLocaleString() : 'No contact logged yet'}
@@ -542,21 +561,6 @@ export function LeadDrawer({
             {l.notes && <p className="text-sm text-slate-600 mt-3 whitespace-pre-wrap border-t border-slate-100 pt-3">{l.notes}</p>}
           </section>
 
-          {/* Status quick-set */}
-          <section className="flex flex-wrap gap-1.5">
-            {(['ACTIVE', 'VIEWING', 'NEGOTIATING', 'WON', 'LOST'] as const).map((s) => (
-              <button
-                key={s}
-                onClick={() => setStatus(s)}
-                disabled={busy || l.status === s}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors disabled:opacity-100 ${
-                  l.status === s ? `${STATUS_META[s].cls} border-transparent` : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-100'
-                }`}
-              >
-                {STATUS_META[s].label}
-              </button>
-            ))}
-          </section>
 
           </>
           )}

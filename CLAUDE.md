@@ -279,7 +279,7 @@ in the future). A "New" column existed and was always empty — the assistant
 answers in seconds. Person cards have a **Move to…** menu (start a deal at any
 stage via `BookViewingModal`, ping later, **noise** = `ARCHIVED` +
 `NO_RESPONSE` + chat archived, not interested = `LOST`) via
-`POST /api/crm/pipeline/:id/action`; an inbound message reactivates
+`POST /api/crm/pipeline/:id/action`. **The same Move menu is on the client card and the chat header** (`crm/ClientMove.tsx`, one wording for all three); the card's old Active/Viewing/Negotiating chips are gone — they set `lead.status`, which `syncLeadStatus` derives from deals and overwrote, and they never put a deal on the board. An inbound message reactivates
 `ARCHIVED`/`LOST` clients (`messaging-intake.service.ts`). Property deals start at
 **Viewing / meeting** (a viewing in Lebanon, an office meeting for abroad) →
 Viewed / met → Negotiating → Reserved / paying → Closed. Shortlisted properties

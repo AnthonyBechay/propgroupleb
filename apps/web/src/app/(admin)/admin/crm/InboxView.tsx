@@ -12,6 +12,8 @@ import { useAuth } from '@/contexts/AuthContext'
 import { canDeleteConversations } from '@/lib/permissions'
 import { ChatSuggestion, type Suggestion } from './ChatSuggestion'
 import { ListingPicker } from './ListingPicker'
+import { ClientMoveButton } from './ClientMove'
+import type { LeadType } from './types'
 import { PushToggle, registerInboxWorker } from './PushToggle'
 import { reportProblem, watchForProblems } from '@/lib/utils/client-problems'
 
@@ -26,6 +28,9 @@ import { reportProblem, watchForProblems } from '@/lib/utils/client-problems'
 interface ThreadLead {
   id: string
   name: string
+  market?: string | null
+  type?: LeadType | null
+  intents?: LeadType[] | null
 }
 
 interface Thread {
@@ -957,6 +962,24 @@ export function InboxView({
                 <button onClick={() => onOpenLead(detail.lead!.id)} aria-label="Open client" className="hidden sm:inline-flex shrink-0 min-h-11 px-3 rounded-lg text-sm font-medium items-center gap-1.5 border border-slate-200 text-slate-700 hover:bg-slate-50">
                   <User className="h-4 w-4" /> <span className="hidden xl:inline">Open client</span>
                 </button>
+              )}
+
+              {/* Where they stand, changed right here: reading the chat to remember
+                  what happened and then hunting for the card on the board was the
+                  whole round trip this saves. The same menu as the board's cards. */}
+              {detail.lead && (
+                <div className="shrink-0">
+                  <ClientMoveButton
+                    lead={detail.lead}
+                    buttonClassName="min-h-11 px-3 rounded-lg border border-slate-200 bg-white text-sm font-medium text-slate-700 hover:bg-slate-50 inline-flex items-center gap-1"
+                    onMoved={(to) => {
+                      // Noise also archives the chat: it leaves the inbox like Archive does.
+                      if (to === 'NOISE') { closeThread(); loadThreads() }
+                      else { void loadDetail(detail.id); loadThreads() }
+                      onChanged()
+                    }}
+                  />
+                </div>
               )}
 
               <div ref={menuRef} className="relative shrink-0">

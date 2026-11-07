@@ -20,6 +20,7 @@ import { ClientDirectory } from './ClientDirectory'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { toast } from '@/components/ui/toast'
+import { isPlainMove, plainMoveCopy } from './ClientMove'
 import {
   type Lead, type LeadMarket, type LeadType,
   type Deal, type OpportunityStage, type PipelineClient,
@@ -563,18 +564,11 @@ export function CrmScreen({ mode }: { mode: 'pipeline' | 'clients' }) {
           focusLeadId={focusLeadId}
           onBook={async (leadId, to) => {
             // Ping later / noise / not interested: no property involved.
-            if (to === 'LOST' || to === 'NOISE' || to === 'QUIET' || to.startsWith('PING:')) {
+            if (isPlainMove(to)) {
               const name = pipeline.find((p) => p.id === leadId)?.name ?? 'this client'
-              const sure = to === 'NOISE'
-                ? window.confirm(`Mark ${name} as noise?\n\nThey leave the board and the inbox, and come back by themselves if they ever write again.`)
-                : to === 'LOST'
-                  ? window.confirm(`Mark ${name} as not interested? They leave the board and stay in the client list.`)
-                  : true
-              if (!sure) return
-              const body = to === 'NOISE' ? { action: 'noise' }
-                : to === 'QUIET' ? { action: 'quiet' }
-                : to === 'LOST' ? { action: 'not_interested' }
-                : { action: 'ping_later', days: Number(to.slice(5)) }
+              const copy = plainMoveCopy(to, name)
+              if (copy.confirm && !window.confirm(copy.confirm)) return
+              const body = copy.body
               // Off the board at once; the refresh confirms it.
               setPipeline((prev) => to.startsWith('PING:')
                 ? prev.map((p) => (p.id === leadId ? { ...p, bucket: 'PING_LATER', pingAt: new Date(Date.now() + Number(to.slice(5)) * 86_400_000).toISOString() } : p))
@@ -587,13 +581,7 @@ export function CrmScreen({ mode }: { mode: 'pipeline' | 'clients' }) {
                 body: JSON.stringify(body),
               })
               if (!res.ok) alert('That did not save — nothing was changed. Try again.')
-              else toast({
-                title: to === 'NOISE' ? `${name}: noise` : to === 'QUIET' ? `${name}: gone quiet` : to === 'LOST' ? `${name}: not interested` : `${name}: ping in ${Number(to.slice(5)) === 30 ? 'a month' : `${to.slice(5)} days`}`,
-                description: to === 'NOISE'
-                  ? 'Off the board and out of the inbox until they write again.'
-                  : to === 'QUIET' ? 'They come back by themselves when they write or you log a call.'
-                  : to === 'LOST' ? 'Off the board. Find them under Lost on the Clients page.' : 'Back in "To answer" on the day.',
-              })
+              else toast({ title: copy.title, description: copy.description })
               refreshBoard()
               return
             }

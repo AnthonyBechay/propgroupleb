@@ -450,9 +450,11 @@ function ClientCard({
  * thumb could reach it.
  */
 function MenuShell({
-  label, height, children,
+  label, height, children, buttonClassName,
 }: {
   label: React.ReactNode
+  /** Replaces the small card-sized button, for a menu in a toolbar. */
+  buttonClassName?: string
   /** Roughly how tall the menu is, to open it upwards when it would not fit below. */
   height: number
   children: (close: () => void) => React.ReactNode
@@ -493,7 +495,7 @@ function MenuShell({
         ref={button}
         onClick={toggle}
         aria-expanded={open}
-        className="min-h-7 px-2 rounded-md border border-slate-200 bg-white text-[11px] font-semibold text-slate-700 hover:bg-slate-50 inline-flex items-center gap-1"
+        className={buttonClassName ?? 'min-h-7 px-2 rounded-md border border-slate-200 bg-white text-[11px] font-semibold text-slate-700 hover:bg-slate-50 inline-flex items-center gap-1'}
       >
         {label} <ChevronDown className="h-3 w-3" />
       </button>
@@ -534,16 +536,17 @@ function MenuItem({ icon, title, hint, onClick, disabled, current }: {
  * goes: it becomes a deal, it waits, or it ends. It replaced a dropdown of
  * eleven entries that put "Met / discussed" next to "In 2 weeks".
  */
-function MoveMenu({
-  meeting, supplyOnly, onPick,
+export function MoveMenu({
+  meeting, supplyOnly, onPick, buttonClassName,
 }: {
   /** Abroad the next step is a meeting at the office; in Lebanon, a viewing. */
   meeting: boolean
   supplyOnly: boolean
   onPick: (to: ClientMove) => void
+  buttonClassName?: string
 }) {
   return (
-    <MenuShell label="Move" height={supplyOnly ? 280 : 450}>
+    <MenuShell label="Move" height={supplyOnly ? 280 : 450} buttonClassName={buttonClassName}>
       {(close) => {
         const pick = (to: ClientMove) => { close(); onPick(to) }
         return (
