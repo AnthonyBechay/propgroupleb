@@ -90,6 +90,9 @@ function formatFileSize(bytes: number | null) {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
+/** Matches the backend's multer limit in routes/documents.ts. */
+const MAX_DOCUMENT_BYTES = 25 * 1024 * 1024
+
 export default function DocumentsPage() {
   const [documents, setDocuments] = useState<PropertyDocument[]>([])
   const [properties, setProperties] = useState<BuildingOption[]>([])
@@ -185,6 +188,17 @@ export default function DocumentsPage() {
     } catch (error) {
       console.error('Failed to fetch buildings:', error)
     }
+  }
+
+  // The server refuses anything over 25 MB, but only after the whole file has
+  // gone up — 42 seconds of waiting for a "too large". Say it at once instead.
+  function pickFile(file: File | null, set: (f: File | null) => void) {
+    if (file && file.size > MAX_DOCUMENT_BYTES) {
+      alert(`"${file.name}" is ${(file.size / 1024 / 1024).toFixed(1)} MB. Documents can be up to 25 MB, so compress the PDF or split it first.`)
+      set(null)
+      return
+    }
+    set(file)
   }
 
   async function handleUpload() {
@@ -662,7 +676,7 @@ export default function DocumentsPage() {
                         type="file"
                         className="hidden"
                         accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx,.xls,.xlsx"
-                        onChange={(e) => setEditReplaceFile(e.target.files?.[0] || null)}
+                        onChange={(e) => { pickFile(e.target.files?.[0] || null, setEditReplaceFile); e.target.value = '' }}
                       />
                     </label>
                   </div>
@@ -876,7 +890,7 @@ export default function DocumentsPage() {
                         type="file"
                         className="hidden"
                         accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx,.xls,.xlsx"
-                        onChange={(e) => setUploadFile(e.target.files?.[0] || null)}
+                        onChange={(e) => { pickFile(e.target.files?.[0] || null, setUploadFile); e.target.value = '' }}
                       />
                     </label>
                   )}

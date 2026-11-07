@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   Phone, MessageCircle, Calendar, AlertCircle, Handshake,
-  TrendingUp, Loader2, Check, Plus, X, ChevronRight, ChevronDown, MessagesSquare, Instagram, Clock, VolumeX,
+  TrendingUp, Loader2, Check, Plus, X, ChevronRight, ChevronDown, MessagesSquare, Instagram, Clock, VolumeX, Moon,
 } from 'lucide-react'
 import {
   type Deal, type OpportunityStage, BOARD_DEAL_COLUMNS, CLIENT_COLUMNS, type PipelineClient, dealColumnOf, stageLabel,
@@ -16,7 +16,7 @@ import type { StartStage } from './BookViewingModal'
  * Where a person card can go: onto a property deal at a stage (which asks for
  * the property), snoozed for some days, or off the board as noise / not interested.
  */
-export type ClientMove = StartStage | 'NOISE' | 'LOST' | `PING:${number}`
+export type ClientMove = StartStage | 'NOISE' | 'QUIET' | 'LOST' | `PING:${number}`
 
 /**
  * The pipeline, as deals.
@@ -221,8 +221,9 @@ export function DealBoard({
           return (
             <div
               key={col.key}
-              // A person dropped on "Ping later" is snoozed for a week.
-              {...(col.key === 'PING_LATER' ? {
+              // A person dropped on "Ping later" is snoozed for a week; on
+              // "Gone quiet", parked there until something happens.
+              {...(col.key === 'PING_LATER' || col.key === 'QUIET' ? {
                 onDragOver: (e: React.DragEvent) => { e.preventDefault(); setOver(col.key) },
                 onDragLeave: () => setOver((k) => (k === col.key ? null : k)),
                 onDrop: (e: React.DragEvent) => {
@@ -230,7 +231,7 @@ export function DealBoard({
                   setOver(null)
                   const id = e.dataTransfer.getData('text/plain') || dragging
                   setDragging(null)
-                  if (id?.startsWith('client:')) onBook(id.slice(7), 'PING:7')
+                  if (id?.startsWith('client:')) onBook(id.slice(7), col.key === 'QUIET' ? 'QUIET' : 'PING:7')
                 },
               } : {})}
               className={`rounded-xl border lg:pg-snap-start lg:w-[264px] lg:shrink-0 ${
@@ -542,7 +543,7 @@ function MoveMenu({
   onPick: (to: ClientMove) => void
 }) {
   return (
-    <MenuShell label="Move" height={supplyOnly ? 230 : 400}>
+    <MenuShell label="Move" height={supplyOnly ? 280 : 450}>
       {(close) => {
         const pick = (to: ClientMove) => { close(); onPick(to) }
         return (
@@ -566,6 +567,7 @@ function MoveMenu({
                 ))}
               </div>
             </div>
+            <MenuItem icon={<Moon className="h-4 w-4 text-slate-500" />} title="Gone quiet" hint="Not answering — park them until they write or you log a call" onClick={() => pick('QUIET')} />
             <p className={MENU_GROUP}>Close</p>
             <MenuItem icon={<VolumeX className="h-4 w-4 text-slate-500" />} title="Noise" hint="Never replied — hide until they write" onClick={() => pick('NOISE')} />
             <MenuItem icon={<X className="h-4 w-4 text-red-600" />} title="Not interested" hint="They said no" onClick={() => pick('LOST')} />

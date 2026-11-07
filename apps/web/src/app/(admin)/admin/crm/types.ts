@@ -658,7 +658,7 @@ export const CLIENT_COLUMNS: Array<{ key: PipelineClient['bucket']; label: strin
   { key: 'TO_ANSWER', label: 'To answer', hint: 'A person owes them a message: handed over, waiting, a lead to call, or a ping due', accent: 'bg-red-500' },
   { key: 'ASSISTANT', label: 'Assistant', hint: 'The assistant is talking to them', accent: 'bg-emerald-500' },
   { key: 'WITH_YOU', label: 'With you', hint: 'You are talking to them — the ball is in their court', accent: 'bg-amber-500' },
-  { key: 'QUIET', label: 'Gone quiet', hint: 'We spoke last, no reply for 3+ days. Ping later, or mark as noise', accent: 'bg-slate-400' },
+  { key: 'QUIET', label: 'Gone quiet', hint: 'Moved here by you — never by itself. A message or a logged call brings them back', accent: 'bg-slate-400' },
   { key: 'PING_LATER', label: 'Ping later', hint: 'Snoozed — back in "To answer" on the date', accent: 'bg-sky-500' },
 ]
 

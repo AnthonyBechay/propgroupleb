@@ -1591,6 +1591,10 @@ model Lead {
   // When someone pressed "Ping later". A snooze holds until the date even if
   // the client wrote last — unless they write again AFTER this moment.
   snoozedAt           DateTime?
+  // When someone moved them to "Gone quiet" on the board. Never set by itself:
+  // a chat going silent is often a client the team is phoning. Any message or
+  // logged contact after this moment puts them back.
+  quietAt             DateTime?
 
   notes String?
 

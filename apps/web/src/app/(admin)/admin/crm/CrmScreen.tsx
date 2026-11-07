@@ -563,7 +563,7 @@ export function CrmScreen({ mode }: { mode: 'pipeline' | 'clients' }) {
           focusLeadId={focusLeadId}
           onBook={async (leadId, to) => {
             // Ping later / noise / not interested: no property involved.
-            if (to === 'LOST' || to === 'NOISE' || to.startsWith('PING:')) {
+            if (to === 'LOST' || to === 'NOISE' || to === 'QUIET' || to.startsWith('PING:')) {
               const name = pipeline.find((p) => p.id === leadId)?.name ?? 'this client'
               const sure = to === 'NOISE'
                 ? window.confirm(`Mark ${name} as noise?\n\nThey leave the board and the inbox, and come back by themselves if they ever write again.`)
@@ -572,12 +572,15 @@ export function CrmScreen({ mode }: { mode: 'pipeline' | 'clients' }) {
                   : true
               if (!sure) return
               const body = to === 'NOISE' ? { action: 'noise' }
+                : to === 'QUIET' ? { action: 'quiet' }
                 : to === 'LOST' ? { action: 'not_interested' }
                 : { action: 'ping_later', days: Number(to.slice(5)) }
               // Off the board at once; the refresh confirms it.
               setPipeline((prev) => to.startsWith('PING:')
                 ? prev.map((p) => (p.id === leadId ? { ...p, bucket: 'PING_LATER', pingAt: new Date(Date.now() + Number(to.slice(5)) * 86_400_000).toISOString() } : p))
-                : prev.filter((p) => p.id !== leadId))
+                : to === 'QUIET'
+                  ? prev.map((p) => (p.id === leadId ? { ...p, bucket: 'QUIET' } : p))
+                  : prev.filter((p) => p.id !== leadId))
               const res = await fetch(`${apiUrl}/api/crm/pipeline/${leadId}/action`, {
                 method: 'POST', credentials: 'include',
                 headers: { 'Content-Type': 'application/json' },
@@ -585,9 +588,10 @@ export function CrmScreen({ mode }: { mode: 'pipeline' | 'clients' }) {
               })
               if (!res.ok) alert('That did not save — nothing was changed. Try again.')
               else toast({
-                title: to === 'NOISE' ? `${name}: noise` : to === 'LOST' ? `${name}: not interested` : `${name}: ping in ${Number(to.slice(5)) === 30 ? 'a month' : `${to.slice(5)} days`}`,
+                title: to === 'NOISE' ? `${name}: noise` : to === 'QUIET' ? `${name}: gone quiet` : to === 'LOST' ? `${name}: not interested` : `${name}: ping in ${Number(to.slice(5)) === 30 ? 'a month' : `${to.slice(5)} days`}`,
                 description: to === 'NOISE'
                   ? 'Off the board and out of the inbox until they write again.'
+                  : to === 'QUIET' ? 'They come back by themselves when they write or you log a call.'
                   : to === 'LOST' ? 'Off the board. Find them under Lost on the Clients page.' : 'Back in "To answer" on the day.',
               })
               refreshBoard()

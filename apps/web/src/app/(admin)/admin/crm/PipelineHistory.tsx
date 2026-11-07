@@ -50,6 +50,7 @@ function describe(e: Entry, market?: string | null): string | null {
       return `Deleted the deal${what}`
     case 'PIPELINE_ACTION':
       if (d.action === 'noise') return 'Marked as noise — never replied'
+      if (d.action === 'quiet') return 'Moved to gone quiet'
       if (d.action === 'not_interested') return 'Marked as not interested'
       if (d.action === 'ping_later') return `Snoozed — ping in ${d.days ?? 7} days`
       return null

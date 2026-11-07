@@ -17,8 +17,9 @@ import { autoReplyEnabled } from '../services/auto-reply.service.js';
 //                 a lead form nobody has called, or a "ping later" that is due
 //   Assistant   — the assistant is handling the conversation
 //   With you    — the team is talking to them and the ball is in their court
-//   Gone quiet  — we spoke last and they have said nothing for days. Where
-//                 "noise" (never answered) and "ping later" are decided
+//   Gone quiet  — only when someone moves them there. Silence alone never
+//                 does it: a quiet chat is often a client the team is phoning.
+//                 Where "noise" (never answered) and "ping later" are decided
 //   Ping later  — snoozed until a date, then back in "To answer"
 //
 // There used to be a "New" column for "nobody has answered yet". The assistant
@@ -42,7 +43,7 @@ const SHORTLISTED = ['SUGGESTED', 'SHARED'];
 /** Unanswered for this long and the assistant has not picked it up: a person is needed. */
 const WAITING_MS = 10 * 60 * 1000;
 const DAY_MS = 24 * 60 * 60 * 1000;
-/** We spoke last and they have been silent this long: gone quiet. */
+/** Silent this long: the card says so, but it stays where it is. */
 const QUIET_MS = 3 * DAY_MS;
 /** Silent this long and nothing planned: off the board (still in the client list). */
 const DROP_MS = 30 * DAY_MS;
@@ -83,7 +84,7 @@ router.get(
       select: {
         id: true, name: true, market: true, type: true, intents: true, isInvestor: true, source: true,
         adLabel: true, adId: true, askingFor: true, budgetMax: true, lastContactAt: true, createdAt: true,
-        nextContactAt: true, nextContactNote: true, snoozedAt: true,
+        nextContactAt: true, nextContactNote: true, snoozedAt: true, quietAt: true,
         opportunities: { select: { stage: true } },
         conversations: {
           where: { archivedAt: null },
@@ -146,7 +147,10 @@ router.get(
         : out
           ? out.origin === 'AI' ? 'assistant' : 'team'
           : null;
-      const lastActivity = chat?.lastMessageAt ?? l.lastContactAt ?? l.createdAt;
+      // The latest of the chat and any contact logged by hand — a phone call
+      // counts as much as a message.
+      const touched = [chat?.lastMessageAt, l.lastContactAt].filter((d): d is Date => Boolean(d));
+      const lastActivity = touched.length ? new Date(Math.max(...touched.map((d) => d.getTime()))) : l.createdAt;
       const silentFor = now - new Date(lastActivity).getTime();
       const pingAt = l.nextContactAt;
 
@@ -196,14 +200,16 @@ router.get(
         // colleague has. The client is not writing because they were told to wait.
         bucket = 'TO_ANSWER';
         reason = `Promised a colleague: ${chat.aiPausedReason ?? 'the assistant handed this to you'}`;
-      } else if (silentFor >= QUIET_MS) {
+      } else if (l.quietAt && lastActivity.getTime() <= l.quietAt.getTime()) {
+        // The team put them here, and nothing has happened since.
         bucket = 'QUIET';
         reason = `No reply for ${Math.floor(silentFor / DAY_MS)} days`;
-      } else if (out?.origin === 'AI') {
-        bucket = 'ASSISTANT';
       } else {
-        bucket = 'WITH_YOU';
-        reason = out ? null : 'Contacted outside the chat';
+        bucket = out?.origin === 'AI' ? 'ASSISTANT' : 'WITH_YOU';
+        // Long silence is shown, not acted on — moving them is the team's call.
+        reason = silentFor >= QUIET_MS
+          ? `No reply for ${Math.floor(silentFor / DAY_MS)} days`
+          : out || bucket === 'ASSISTANT' ? null : 'Contacted outside the chat';
       }
 
       return {
@@ -238,7 +244,7 @@ router.get(
       };
     })
       // A month of silence with nothing planned: off the board until they write.
-      .filter((c) => c.bucket !== 'QUIET' || c.silentFor < DROP_MS)
+      .filter((c) => !['QUIET', 'WITH_YOU', 'ASSISTANT'].includes(c.bucket) || c.silentFor < DROP_MS)
       .map(({ silentFor: _s, ...c }) => c);
 
     // Most urgent first within each column: waiting longest, then most recent.
@@ -257,6 +263,8 @@ router.get(
 // the board who is not becoming a deal (yet).
 //   noise          — never wrote back after our first replies. Parked (and the
 //                    chat archived) until they write again.
+//   quiet          — move to "Gone quiet". Any message or logged contact
+//                    afterwards brings them back.
 //   ping_later     — snooze until a date; then they are back in "To answer".
 //   not_interested — said no. Lost; still in the client list.
 router.post(
@@ -264,7 +272,7 @@ router.post(
   asyncHandler(async (req: Request, res: Response) => {
     const body = z
       .object({
-        action: z.enum(['noise', 'ping_later', 'not_interested']),
+        action: z.enum(['noise', 'quiet', 'ping_later', 'not_interested']),
         days: z.number().int().min(1).max(180).optional(),
         note: z.string().trim().max(200).optional(),
       })
@@ -279,6 +287,8 @@ router.post(
       });
       // Out of the inbox too. Both come back by themselves the moment they write.
       await prisma.conversation.updateMany({ where: { leadId: lead.id, archivedAt: null }, data: { archivedAt: new Date() } });
+    } else if (body.action === 'quiet') {
+      await prisma.lead.update({ where: { id: lead.id }, data: { quietAt: new Date() } });
     } else if (body.action === 'not_interested') {
       await prisma.lead.update({
         where: { id: lead.id },
@@ -291,6 +301,7 @@ router.post(
         data: {
           nextContactAt: new Date(Date.now() + days * DAY_MS),
           snoozedAt: new Date(),
+          quietAt: null,
           // Snoozing again keeps what you meant to do ("send new prices").
           ...(body.note ? { nextContactNote: body.note } : {}),
           subStatus: 'AWAITING_REPLY',
