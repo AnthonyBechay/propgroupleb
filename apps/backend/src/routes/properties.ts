@@ -200,10 +200,10 @@ router.get(
 router.get(
   '/slug/:slug',
   asyncHandler(async (req: Request, res: Response) => {
-    const building = await prisma.building.findUnique({
-      where: { slug: req.params.slug },
-      include: FLAT_PROPERTY_INCLUDE,
-    });
+    const building =
+      (await prisma.building.findUnique({ where: { slug: req.params.slug }, include: FLAT_PROPERTY_INCLUDE })) ??
+      // An address from before a rename (see Building.previousSlugs).
+      (await prisma.building.findFirst({ where: { previousSlugs: { has: req.params.slug } }, include: FLAT_PROPERTY_INCLUDE }));
 
     if (!building || building.visibility === 'HIDDEN') {
       sendNotFound(res, 'Property');
@@ -231,7 +231,8 @@ router.get(
       (await prisma.building.findUnique({
         where: { slug: idOrSlug },
         include: FLAT_PROPERTY_INCLUDE,
-      }));
+      })) ??
+      (await prisma.building.findFirst({ where: { previousSlugs: { has: idOrSlug } }, include: FLAT_PROPERTY_INCLUDE }));
 
     if (!building || building.visibility === 'HIDDEN') {
       sendNotFound(res, 'Property');
@@ -336,6 +337,12 @@ router.put(
       if (!existing.slug || (bd.title && bd.title !== existing.title)) {
         const title = (bd.title as string) || existing.title;
         bd.slug = await generateUniqueSlug(title, req.params.id, tx);
+        // Keep the old address working: links to it are already out there.
+        if (existing.slug && bd.slug !== existing.slug) {
+          bd.previousSlugs = [...new Set([existing.slug, ...existing.previousSlugs])]
+            .filter((s) => s !== bd.slug)
+            .slice(0, 20);
+        }
       }
 
       const building = await tx.building.update({

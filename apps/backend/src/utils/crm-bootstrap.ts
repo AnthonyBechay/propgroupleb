@@ -145,6 +145,20 @@ export async function normaliseCrmData(): Promise<void> {
     return `${moved} finish descriptions turned into a view`;
   });
 
+  // Addresses lost to renames before Building.previousSlugs existed, seen
+  // 404ing in the logs. Each is added only if nothing else uses it now.
+  await once('previous_slugs_v1', async () => {
+    const lost: Array<[string, string]> = [['tonino-lamborghini-tower-batumi', 'tonino-lamborghini-batumi']];
+    let added = 0;
+    for (const [current, old] of lost) {
+      const taken = await prisma.building.findUnique({ where: { slug: old }, select: { id: true } });
+      if (taken) continue;
+      const r = await prisma.building.updateMany({ where: { slug: current }, data: { previousSlugs: { push: old } } });
+      added += r.count;
+    }
+    return `${added} old addresses restored`;
+  });
+
   // A finish now has one view from a short list, with its own price per m².
   // Multi-view rows take the view that sets the price, and a note that only named
   // a view ("Side Sea View") becomes that view. Any other note is left alone, and

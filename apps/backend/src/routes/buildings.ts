@@ -281,10 +281,11 @@ router.get(
   '/slug/:slug',
   optionalAuthenticateToken,
   asyncHandler(async (req: Request, res: Response) => {
-    const building = await prisma.building.findUnique({
-      where: { slug: req.params.slug },
-      include: BUILDING_DETAIL_INCLUDE,
-    });
+    const building =
+      (await prisma.building.findUnique({ where: { slug: req.params.slug }, include: BUILDING_DETAIL_INCLUDE })) ??
+      // An address it had before a rename. The response carries the current
+      // slug, so the page can redirect to it.
+      (await prisma.building.findFirst({ where: { previousSlugs: { has: req.params.slug } }, include: BUILDING_DETAIL_INCLUDE }));
 
     // A hidden property does not exist as far as a visitor is concerned.
     if (!building || (building.visibility === 'HIDDEN' && !isStaff(req))) {
@@ -544,7 +545,7 @@ router.put(
 
     const existing = await prisma.building.findUnique({
       where: { id: req.params.id },
-      select: { id: true, title: true, slug: true },
+      select: { id: true, title: true, slug: true, previousSlugs: true },
     });
     if (!existing) { sendNotFound(res, 'Building'); return; }
 
@@ -567,6 +568,12 @@ router.put(
     // Regenerate slug if title changed
     if (data.title && data.title !== existing.title && !data.slug) {
       updateData.slug = await generateUniqueSlug(data.title, req.params.id);
+    }
+    // Keep the old address working: links to it are already out there.
+    if (updateData.slug && existing.slug && updateData.slug !== existing.slug) {
+      updateData.previousSlugs = [...new Set([existing.slug, ...existing.previousSlugs])]
+        .filter((s) => s !== updateData.slug)
+        .slice(0, 20);
     }
 
     const result = await prisma.building.update({

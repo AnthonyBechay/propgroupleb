@@ -458,6 +458,10 @@ model Building {
 
   // SEO
   slug            String? @unique
+  // Addresses this property had before a rename. Renaming the title changes
+  // the slug, and every link already in Google or a client's chat went dead
+  // ("tonino-lamborghini-batumi" → 404). Old slugs still find it.
+  previousSlugs   String[] @default([])
   metaTitle       String?
   metaDescription String?
 

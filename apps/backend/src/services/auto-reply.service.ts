@@ -343,7 +343,7 @@ const TOOLS: ChatTool[] = [
         minBeds: { type: 'integer' },
         budgetMax: { type: 'number', description: 'Plain number in USD.' },
         kind: { type: 'string', enum: UNIT_KINDS },
-        isInvestor: { type: 'boolean', description: 'True if they are buying for return rather than to live in.' },
+        isInvestor: { type: 'boolean', description: 'True only when the CLIENT says they are buying for rental income, resale or return. Never because you called it an investment; a monthly payment plan or a place to move into is not investing.' },
         summary: { type: 'string', description: 'One line in English: what they want and how soon.' },
         fullName: { type: 'string', description: 'The client\'s full name, exactly as they wrote it, once they have told you.' },
       },
@@ -1061,9 +1061,14 @@ async function reply(conversationId: string, trigger: 'message' | 'sweep' | 'man
   for (const c of preferredCards) offered.add(c.ref.toUpperCase());
   const pitchOf = new Map(settings.preferred.map((p) => [p.ref.toUpperCase(), p.pitch]));
   const priorityOrder = settings.preferred.map((p) => p.ref.toUpperCase());
+  // "Can I get more info on this?" from an ad, answered with budget, then
+  // bedrooms, then features — four questions and nothing to look at — is how
+  // ad leads stopped replying. An advert's client gets something concrete first.
   const preferred = preferredCards.length
     ? [
-        'The client has not named a project. Ask their budget and where they would like to be (one question at a time, skipping whatever you already know). Then recommend from the office\'s preferred list below, most wanted first, choosing those that fit their budget and location — you may attach them with send_listings without searching. If none of them fits, use search_listings instead; never push one that is clearly over their budget.',
+        (adText || fromAd) && !firstReply
+          ? 'The client has not named a project, but they came from the advert and asked about it. Do not make them answer questions first: in this reply attach the one or two projects from the office\'s preferred list below that best match the advert (most wanted first) with send_listings, say in a sentence what each offers and its starting price, then ask ONE question — their budget, or whatever is still missing. If they have already ignored a question, do not ask it again: send options instead. Never push one that is clearly over a budget they gave.'
+          : 'The client has not named a project. Ask their budget and where they would like to be (one question at a time, skipping whatever you already know). Then recommend from the office\'s preferred list below, most wanted first, choosing those that fit their budget and location — you may attach them with send_listings without searching. If none of them fits, use search_listings instead; never push one that is clearly over their budget.',
         ...preferredCards.map((c, i) => {
           const pitch = pitchOf.get(c.ref.toUpperCase());
           return `${i + 1}. ${c.title} (${c.ref}) — ${c.location || 'location on the page'}, ${formatPrice(c)}${pitch ? `. Why recommend it: ${pitch}` : ''}`;
