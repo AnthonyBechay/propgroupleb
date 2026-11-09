@@ -22,6 +22,15 @@ import {
 
 const router: Router = express.Router();
 
+// A listing is public only while the property it sells is. Building visibility
+// is what the admin's Hide sets; the listing row keeps its own flag.
+const PROPERTY_NOT_HIDDEN = {
+  OR: [
+    { building: { visibility: { not: 'HIDDEN' as const } } },
+    { buildingId: null, unit: { building: { visibility: { not: 'HIDDEN' as const } } } },
+  ],
+};
+
 // ── Slug helper ───────────────────────────────────────────────────────────────
 
 async function generateListingSlug(
@@ -165,6 +174,12 @@ router.get(
       where.visibility = 'PUBLIC';
       // Public callers never lift this — a sold listing is not public stock.
       where.status = q.status && q.status !== 'all' ? q.status : 'ACTIVE';
+      // Hiding a property must hide what it sells. The listing keeps its own
+      // visibility, so without this a Hidden building stayed on the site.
+      where.AND = [
+        ...(Array.isArray(where.AND) ? where.AND : []),
+        PROPERTY_NOT_HIDDEN,
+      ];
     } else {
       if (q.status && q.status !== 'all') where.status = q.status;
     }
@@ -304,7 +319,7 @@ router.get(
   '/facets',
   asyncHandler(async (_req: Request, res: Response) => {
     const rows = await prisma.listing.findMany({
-      where: { status: 'ACTIVE', visibility: 'PUBLIC' },
+      where: { status: 'ACTIVE', visibility: 'PUBLIC', AND: [PROPERTY_NOT_HIDDEN] },
       select: {
         intent: true,
         price: true,
@@ -387,7 +402,9 @@ router.get(
     // (don't leak existence of hidden/draft records).
     if (!isAdmin) {
       const viewableStatus = ['ACTIVE', 'UNDER_OFFER', 'CLOSED'].includes(listing.status);
-      if (listing.visibility !== 'PUBLIC' || !viewableStatus) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const property = (listing.building ?? (listing.unit as any)?.building) as { visibility?: string } | null;
+      if (listing.visibility !== 'PUBLIC' || !viewableStatus || property?.visibility === 'HIDDEN') {
         sendNotFound(res, 'Listing');
         return;
       }
@@ -408,7 +425,10 @@ router.get(
 
 router.get(
   '/:id',
+  optionalAuthenticateToken,
   asyncHandler(async (req: Request, res: Response) => {
+    const authReq = req as AuthenticatedRequest;
+    const isStaffUser = authReq.user && ['ADMIN', 'SUPER_ADMIN', 'CRM_MANAGER'].includes(authReq.user.role);
     const listing = await prisma.listing.findUnique({
       where: { id: req.params.id },
       include: {
@@ -424,6 +444,17 @@ router.get(
     });
 
     if (!listing) { sendNotFound(res, 'Listing'); return; }
+
+    // Same rule as the slug route: the public never reaches a hidden listing,
+    // or a listing whose property is hidden.
+    if (!isStaffUser) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const property = (listing.building ?? (listing.unit as any)?.building) as { visibility?: string } | null;
+      if (listing.visibility !== 'PUBLIC' || property?.visibility === 'HIDDEN') {
+        sendNotFound(res, 'Listing');
+        return;
+      }
+    }
 
     const buildingId = listing.buildingId ?? (listing.unit as { buildingId?: string } | null)?.buildingId;
     if (buildingId && shouldCountView(req)) {
