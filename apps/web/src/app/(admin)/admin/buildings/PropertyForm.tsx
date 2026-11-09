@@ -61,7 +61,6 @@ export function PropertyForm({ initialData, buildingId }: Props) {
     () => (Array.isArray(initialData?.units) ? initialData.units : []),
     [initialData],
   )
-  const soleUnit = units.length === 1 ? units[0] : null
 
   const [form, setForm] = useState<BuildingFormState>(() => emptyBuildingForm(initialData))
   const [owner, setOwner] = useState<OwnerRef | null>(
@@ -231,11 +230,20 @@ export function PropertyForm({ initialData, buildingId }: Props) {
    * unit yet gets one, which also repairs older records saved without one.
    */
   async function syncSoleUnitKind() {
-    if (units.length > 1 || !form.unitKind) return
+    if (!form.unitKind) return
     try {
-      if (soleUnit) {
-        if (form.unitKind !== soleUnit.kind) {
-          await fetch(`${apiUrl}/api/units/${soleUnit.id}`, {
+      // Ask the API, not the page-load snapshot. The snapshot goes stale the
+      // moment a unit is added below, and it was empty whenever the page failed
+      // to load the property, so every save added another blank unit.
+      const res = await fetch(`${apiUrl}/api/buildings/${buildingId}/units`, { credentials: 'include', cache: 'no-store' })
+      if (!res.ok) return
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const current: any[] = (await res.json()).data ?? []
+      if (current.length > 1) return
+      const sole = current[0]
+      if (sole) {
+        if (form.unitKind !== sole.kind) {
+          await fetch(`${apiUrl}/api/units/${sole.id}`, {
             method: 'PUT',
             credentials: 'include',
             headers: { 'Content-Type': 'application/json' },

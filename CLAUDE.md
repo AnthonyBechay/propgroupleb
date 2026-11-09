@@ -225,6 +225,97 @@ search. The one exception since then is chat auto-reply (see Known deferred work
 `createMessage()` and stays admin-gated.
 ---
 
+## Properties, units and listings — how stock reaches the site
+
+Three records, three jobs. Keep them apart:
+
+| Record | Is | Owns |
+|---|---|---|
+| `Building` ("property" in the UI) | the place | title, location, photos, description, SEO, **visibility** |
+| `Unit` | one thing inside it you could sell or rent | type (`kind`), bedrooms, area, floor, `lifecycle` |
+| `Listing` | an offer on a unit (or a whole building) | price, currency, sale/rent, `status`, its own `visibility` |
+
+A property with no live listing is on the site with no price. The property
+type lives on the **unit**, not the building.
+
+### Who can see what
+
+- **`Building.visibility = HIDDEN` hides everything under it.** Public reads
+  check it: `/api/buildings`, `/api/properties` and, since 2026-11-09,
+  `/api/listings` (list, facets, `/slug/:slug`, `/:id`) through
+  `PROPERTY_NOT_HIDDEN` in `routes/listings.ts`. Before that a listing kept
+  its own `PUBLIC` flag and stayed on the site after its property was hidden.
+- A listing is public only if it is `PUBLIC`, `ACTIVE` (detail pages also
+  allow `UNDER_OFFER`/`CLOSED` for old links) **and** its property is not hidden.
+- Staff see everything, but only if the request carries the login cookie. See
+  the next section.
+
+### Admin pages load their data in the browser
+
+The `token` cookie is set by `api.propgrouplb.com` with **no `Domain`**, so it
+belongs to the API host only. The browser sends it (`credentials: 'include'`);
+the website's Next server **never receives it**. A server component that reads
+`cookies()` and forwards `token` sends nothing, and the API answers as if to the
+public.
+
+That is what broke the property flow: hidden properties were missing from
+`/admin/buildings`, and `/admin/buildings/:id` got a 404, opened an **empty
+form**, and each save added a blank `VACANT` unit (`syncSoleUnitKind` saw "no
+units" in the empty payload).
+
+So every admin page that needs staff data is a client page using
+`lib/api/use-admin-data.ts` (`adminGet`, `adminGetAllBuildings`,
+`useAdminData`) and `components/admin/ui/LoadState.tsx`. **An edit form is
+never rendered without its record.** Do not reintroduce a server-side
+`cookies()` forward for staff data. (`/api/buildings` caps a page at 100;
+`adminGetAllBuildings` walks the pages.)
+
+### The ways stock gets created
+
+1. **Admin, new property** — `/admin/buildings/new` → `PropertyForm`:
+   `POST /api/buildings`, then `POST /api/buildings/:id/units` (the first unit),
+   then optionally `POST /api/listings` ("Put it on the market now").
+2. **Admin, existing property** — `/admin/buildings/:id` → `PropertyForm`
+   (building fields, `PUT /api/buildings/:id`) + `UnitsManager` (units,
+   options, and per-unit listings via `ListingPanels`). Saving re-reads the
+   units from the API before syncing the sole unit's type; it never trusts the
+   page-load snapshot.
+3. **Admin, listings screen** — `/admin/listings/new` and `/admin/listings/:id`
+   → `ListingForm`. Same `POST/PUT /api/listings`. Listings has no menu entry;
+   it is reached from each property's row (tag icon) and from Units & pricing.
+4. **Owner submission** — the public form (`/list-your-property`) or the chat
+   assistant (`savePropertyOffer`, `source=CHAT`) creates a
+   `PropertySubmission`. In `/admin/submissions` an admin reviews it, sets a
+   price, and presses **Publish as hidden** (`POST /api/submissions/:id/approve`):
+   one transaction creates `Building` (`source=OWNER`, **`HIDDEN`**) + `Unit` +
+   `Listing` (`ACTIVE`). Nothing is public yet. The card then offers **Preview
+   listing** (`/preview/listings/:slug`), **Show on website** /
+   **Hide from website** (`POST /api/submissions/:id/visibility`), and **Edit
+   property**.
+
+`/api/properties` is **read-only** — the Georgia storefront's flat contract. It
+used to carry a parallel set of create/update/delete routes for buildings,
+units and options with no caller anywhere; they were removed, with the shared
+`buildingSchema`/`unitSchema`/`unitOptionSchema` they used.
+
+### Taking stock off the site
+
+| Action | Where | Does |
+|---|---|---|
+| Hide / show | eye icon on the Properties row, Visibility in the form, Submissions card | `Building.visibility` only; listings untouched, so showing it again restores everything |
+| Archive | row menu | hides the property **and** archives its open listings |
+| Mark sold | row menu | units `SOLD`, open listings `CLOSED` |
+| Delete | row menu | gone |
+
+### Preview
+
+`/preview/listings/:slug` renders `components/listing/ListingDetailView.tsx`,
+the same component as the public `/listings/:slug`, with a banner saying
+whether it is live. It loads in the browser with the staff cookie, does not
+count a view, and is disallowed in `robots.ts`. A visitor gets "not found".
+
+---
+
 ## Reference codes
 
 Human codes clients quote back over WhatsApp. `apps/backend/src/utils/reference.ts`.
@@ -642,7 +733,10 @@ When generating new share links, always go through the `ShareToken` table. Don't
   'include'` does nothing on the server — the request goes out with no cookie.
 - ❌ Add a fifth client "type". The four intents are fixed; anything else is a flag on the client.
 - ❌ Put a deal stage on the client. Viewing/negotiating belong to the opportunity — a client can be at different stages on different properties.
-- ❌ Assume a `Building`'s local `buildingSchema` in `routes/buildings.ts` is the shared one in `schemas/index.ts`. It shadows it; adding a field to the wrong one fails silently.
+- ❌ Add a shared `buildingSchema`/`unitSchema` to `schemas/index.ts`. The bodies are validated by the schemas local to `routes/buildings.ts` and `routes/units.ts`; a shared copy shadowed them once and fields added to it went nowhere.
+- ❌ Fetch staff data in a server component by forwarding `cookies()`. The cookie belongs to the API host and never reaches the Next server — use `lib/api/use-admin-data.ts`.
+- ❌ Render an edit form before its record has loaded. An empty form saves blanks over the record.
+- ❌ Add a public listing read without `PROPERTY_NOT_HIDDEN`. Hiding a property must hide what it sells.
 - ❌ Add a public read route without `publicCountryFilter(req)` — that is exactly how `/api/properties` leaked both markets.
 - ❌ Rename `ref`, or repurpose `Building.kind` — `propgroup/apps/backend/src/utils/shared-mappers.ts` reads both, and breaking them breaks the Georgia storefront silently.
 - ❌ Hardcode a country or market in a prompt, label or query — `marketFor()` / `publicCountryFilter()` exist so adding a country never needs a code change. The AI SEO prompt hardcoded Lebanon and silently produced unusable copy for Georgia.

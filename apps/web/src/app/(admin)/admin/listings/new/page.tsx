@@ -1,33 +1,22 @@
+'use client'
+
+import { useSearchParams } from 'next/navigation'
+import { adminGetAllBuildings, useAdminData } from '@/lib/api/use-admin-data'
+import { LoadState } from '@/components/admin/ui/LoadState'
 import { ListingForm } from '../ListingForm'
-import { normalizeApiUrl } from '@/lib/utils/api-url'
-import { cookies } from 'next/headers'
 
-interface Props {
-  searchParams: Promise<Record<string, string>>
-}
+// Loaded in the browser so the staff cookie goes with it — see use-admin-data.ts.
+// Without it, hidden properties were missing from the property picker.
+export default function NewListingPage() {
+  const sp = useSearchParams()
+  const { data: buildings, error, loading, reload } = useAdminData(adminGetAllBuildings, [])
+  if (loading || error || !buildings) return <LoadState error={error} onRetry={reload} />
 
-export default async function NewListingPage({ searchParams }: Props) {
-  const sp = await searchParams
-  const apiUrl = normalizeApiUrl(process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001')
-  const cookieStore = await cookies()
-  const token = cookieStore.get('token')?.value
-  const headers: Record<string, string> = {}
-  if (token) headers['Cookie'] = `token=${token}`
-
-  let buildings: any[] = []
-  try {
-    const res = await fetch(`${apiUrl}/api/buildings?limit=200&visibility=all&country=all`, { headers, cache: 'no-store' })
-    if (res.ok) {
-      const data = await res.json()
-      buildings = data.data ?? []
-    }
-  } catch { /* leave empty */ }
-
+  const subjectType = sp.get('subjectType')
   const preselect = {
-    buildingId: sp.buildingId ?? '',
-    unitId: sp.unitId ?? '',
-    subjectType: (sp.subjectType === 'UNIT' ? 'UNIT' : sp.subjectType === 'BUILDING' ? 'BUILDING' : '') as 'UNIT' | 'BUILDING' | '',
+    buildingId: sp.get('buildingId') ?? '',
+    unitId: sp.get('unitId') ?? '',
+    subjectType: (subjectType === 'UNIT' || subjectType === 'BUILDING' ? subjectType : '') as 'UNIT' | 'BUILDING' | '',
   }
-
   return <ListingForm buildings={buildings} preselect={preselect} />
 }

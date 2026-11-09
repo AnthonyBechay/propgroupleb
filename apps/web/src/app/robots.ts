@@ -16,6 +16,7 @@ export default function robots(): MetadataRoute.Robots {
           '/api/',
           '/auth/',
           '/share/', // scoped share links should not be indexed
+          '/preview/', // staff previews of hidden listings
         ],
         // Polite throttle for crawlers that honour it (Bing, Yandex,
         // OAI-SearchBot, ClaudeBot — Googlebot ignores). With the
@@ -28,7 +29,7 @@ export default function robots(): MetadataRoute.Robots {
       {
         userAgent: ['Googlebot', 'Bingbot'],
         allow: '/',
-        disallow: ['/admin', '/portal', '/api/', '/auth/', '/share/'],
+        disallow: ['/admin', '/portal', '/api/', '/auth/', '/share/', '/preview/'],
       },
     ],
     sitemap: `${SITE_URL}/sitemap.xml`,

@@ -1,43 +1,22 @@
-import { notFound } from 'next/navigation'
-import { cookies } from 'next/headers'
-import { normalizeApiUrl } from '@/lib/utils/api-url'
+'use client'
+
+import { useParams, useSearchParams } from 'next/navigation'
+import { adminGet, useAdminData } from '@/lib/api/use-admin-data'
+import { LoadState } from '@/components/admin/ui/LoadState'
 import { PageHeader } from '@/components/admin/ui/layout'
 import { ProposalView } from '@/components/proposal/ProposalView'
 
-interface Props {
-  params: Promise<{ id: string }>
-  searchParams: Promise<Record<string, string | undefined>>
-}
-
 /**
- * The export screen for one property.
- *
- * Server-rendered from the building detail payload — which already carries
- * units, options, listings, investment data and the public documents in one
- * query, so the document has everything it needs without a second round trip.
+ * The export screen for one property, from the building detail payload — which
+ * carries units, options, listings, investment data and the public documents in
+ * one query. Loaded in the browser so the staff cookie goes with it.
  */
-export default async function ProposalPage({ params, searchParams }: Props) {
-  const { id } = await params
-  const sp = await searchParams
-  const apiUrl = normalizeApiUrl(process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001')
-  const cookieStore = await cookies()
-  const token = cookieStore.get('token')?.value
-
-  let building = null
-  try {
-    const res = await fetch(`${apiUrl}/api/buildings/${id}`, {
-      headers: token ? { Cookie: `token=${token}` } : {},
-      cache: 'no-store',
-    })
-    if (res.ok) {
-      const data = await res.json()
-      building = data.data ?? data
-    }
-  } catch {
-    // Fall through to notFound — an export screen with no property is nothing.
-  }
-
-  if (!building) notFound()
+export default function ProposalPage() {
+  const { id } = useParams<{ id: string }>()
+  const unitId = useSearchParams().get('unitId')
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: building, error, loading, reload } = useAdminData(() => adminGet<any>(`/api/buildings/${id}`), [id])
+  if (loading || error || !building) return <LoadState error={error} onRetry={reload} label="Loading property…" />
 
   return (
     <div>
@@ -53,7 +32,7 @@ export default async function ProposalPage({ params, searchParams }: Props) {
           ]}
         />
       </div>
-      <ProposalView building={building} initialUnitId={sp.unitId ?? null} />
+      <ProposalView building={building} initialUnitId={unitId} />
     </div>
   )
 }

@@ -157,10 +157,33 @@ router.get(
       : undefined;
     const where = status ? { status: status as never } : {};
 
-    const [items, total] = await Promise.all([
+    const [rows, total] = await Promise.all([
       prisma.propertySubmission.findMany({ where, orderBy: { createdAt: 'desc' }, skip, take: limit }),
       prisma.propertySubmission.count({ where }),
     ]);
+
+    // What each approved submission became: whether it is live, and the
+    // listing slug the review screen previews.
+    const buildingIds = rows.map((r: { buildingId: string | null }) => r.buildingId).filter(Boolean) as string[];
+    const buildings = buildingIds.length
+      ? await prisma.building.findMany({
+          where: { id: { in: buildingIds } },
+          select: {
+            id: true, ref: true, visibility: true,
+            listings: { select: { slug: true }, orderBy: { createdAt: 'asc' }, take: 1 },
+          },
+        })
+      : [];
+    const byId = new Map(buildings.map((b: { id: string }) => [b.id, b]));
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const items = rows.map((r: any) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const b = r.buildingId ? (byId.get(r.buildingId) as any) : null;
+      return {
+        ...r,
+        published: b ? { ref: b.ref, visibility: b.visibility, listingSlug: b.listings?.[0]?.slug ?? null } : null,
+      };
+    });
     sendPaginated(res, items, buildPaginationResponse(page, limit, total));
   })
 );
@@ -267,7 +290,9 @@ router.post(
           title: submission.title,
           description,
           status: 'RESALE',
-          visibility: 'PUBLIC',
+          // Published hidden: it lands in Properties for a check and a preview,
+          // and goes on the website only when someone presses "Show on website".
+          visibility: 'HIDDEN',
           mohafazat: submission.mohafazat,
           caza: submission.caza,
           city: submission.city,
@@ -325,7 +350,38 @@ router.post(
       listingId: result.listing.id,
     }, authReq);
 
-    sendSuccess(res, result, 'Submission approved and published');
+    sendSuccess(res, result, 'Published as hidden. Preview it, then show it on the website when ready.');
+  })
+);
+
+// ── POST /:id/visibility — admin: show the published property on the website, or hide it ──
+
+const visibilitySchema = z.object({ visible: z.boolean() });
+
+router.post(
+  '/:id/visibility',
+  authenticateToken,
+  requireAdmin,
+  asyncHandler(async (req: Request, res: Response) => {
+    const authReq = req as AuthenticatedRequest;
+    const { visible } = visibilitySchema.parse(req.body);
+    const submission = await prisma.propertySubmission.findUnique({
+      where: { id: req.params.id },
+      select: { id: true, buildingId: true },
+    });
+    if (!submission) { sendNotFound(res, 'Submission'); return; }
+    if (!submission.buildingId) { sendError(res, 400, 'This submission has not been published yet'); return; }
+
+    const visibility = visible ? 'PUBLIC' : 'HIDDEN';
+    const building = await prisma.building.update({
+      where: { id: submission.buildingId },
+      data: { visibility },
+      select: { id: true, ref: true, visibility: true },
+    });
+    await logAdminAction(visible ? 'SHOW_BUILDING' : 'HIDE_BUILDING', 'building', building.id, {
+      submissionId: submission.id,
+    }, authReq);
+    sendSuccess(res, building, visible ? 'Now on the website' : 'Hidden from the website');
   })
 );
 

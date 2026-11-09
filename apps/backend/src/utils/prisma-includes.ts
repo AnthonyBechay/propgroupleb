@@ -263,16 +263,3 @@ export const PROPERTY_LIST_INCLUDE = BUILDING_LIST_INCLUDE;
 
 /** @deprecated Use BUILDING_DETAIL_INCLUDE. Kept for legacy /api/properties route. */
 export const PROPERTY_DETAIL_INCLUDE = BUILDING_DETAIL_INCLUDE;
-
-/** @deprecated No replacement needed. Kept for legacy portfolio route. */
-export const PROPERTY_WITH_STATS_INCLUDE = {
-  developer: true,
-  locationGuide: true,
-  investmentData: true,
-  _count: {
-    select: {
-      favorites: true,
-      inquiries: true,
-    },
-  },
-} as const;

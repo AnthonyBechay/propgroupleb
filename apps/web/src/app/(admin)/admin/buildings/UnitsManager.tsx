@@ -546,7 +546,10 @@ export function UnitsManager({
               const editOpen = panelUnit && expanded?.mode === 'unit-edit'
               const createOpen = panelUnit && expanded?.mode === 'listing-create'
               const editListingId = panelUnit && expanded?.mode === 'listing-edit' ? expanded.listingId : null
-              const label = unit.name || (unit.unitNumber ? `Unit ${unit.unitNumber}` : null) || `Unit ${unit.id.slice(0, 6)}`
+              // Never a database id: "Unit cmw90t" told nobody anything.
+              const label = unit.name
+                || (unit.unitNumber ? `Unit ${unit.unitNumber}` : null)
+                || (unit.bedrooms != null ? `${unit.bedrooms}-bedroom ${typeLabel(unit.kind).toLowerCase()}` : typeLabel(unit.kind))
               // eslint-disable-next-line @typescript-eslint/no-explicit-any
               const listings: any[] = unit.listings ?? []
               const ref = unitRef(unit, units.length, unit.ref ? buildingRefOf(unit.ref) : null)

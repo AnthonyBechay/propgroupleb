@@ -42,85 +42,10 @@ export const changePasswordSchema = z.object({
 });
 
 // ─── Building ─────────────────────────────────────────────────────────────────
-
-const buildingInvestmentFields = {
-  expectedROI: z.number().nullish(),
-  rentalYield: z.number().nullish(),
-  capitalGrowth: z.number().nullish(),
-  annualAppreciation: z.number().nullish(),
-  minInvestment: z.number().nullish(),
-  maxInvestment: z.number().nullish(),
-  downPaymentPercentage: z.number().nullish(),
-  paymentPlan: z.string().nullish(),
-  paymentPlanDetails: z.any().nullish(),
-  installmentYears: z.number().nullish(),
-  completionDate: z.string().nullish(),
-  handoverDate: z.string().nullish(),
-  expectedRentalStart: z.string().nullish(),
-  averageRentPerMonth: z.number().nullish(),
-  mortgageAvailable: z.boolean().nullish(),
-  serviceFee: z.number().nullish(),
-  propertyTax: z.number().nullish(),
-};
-
-export const INVESTMENT_FIELD_KEYS = Object.keys(buildingInvestmentFields) as (keyof typeof buildingInvestmentFields)[];
-
-export const buildingSchema = z.object({
-  kind: z.enum(['STANDALONE', 'PROJECT', 'COMMUNITY', 'MIXED_USE']).default('STANDALONE'),
-  title: z.string().min(1, 'Title is required'),
-  description: z.string().optional().nullable(),
-  shortDescription: z.string().optional().nullable(),
-
-  mohafazat: z.string().optional().nullable(),
-  caza: z.string().optional().nullable(),
-  city: z.string().optional().nullable(),
-  neighborhood: z.string().optional().nullable(),
-  address: z.string().optional().nullable(),
-  zipCode: z.string().optional().nullable(),
-  latitude: z.number().optional().nullable(),
-  distanceToSea: z.number().int().min(0).optional().nullable(),
-  longitude: z.number().optional().nullable(),
-  locationUrl: z.string().optional().nullable(),
-
-  builtYear: z.number().optional().nullable(),
-  totalFloors: z.number().optional().nullable(),
-  parkingSpaces: z.number().optional().nullable(),
-  hasConcierge: z.boolean().optional(),
-  hasGenerator: z.boolean().optional(),
-  hasSolarPower: z.boolean().optional(),
-  hasElevator: z.boolean().optional(),
-  hasPool: z.boolean().optional(),
-  hasGym: z.boolean().optional(),
-  hasGarden: z.boolean().optional(),
-  hasSecurity: z.boolean().optional(),
-  hasRooftop: z.boolean().optional(),
-  // International stock (imported from the Georgia system) uses these.
-  hasCentralAC: z.boolean().optional(),
-  availableFrom: z.string().optional().nullable(),
-  reservedUntil: z.string().optional().nullable(),
-  soldAt: z.string().optional().nullable(),
-
-  status: z.enum(['OFF_PLAN', 'NEW_BUILD', 'RESALE']).default('RESALE'),
-  visibility: z.enum(['PUBLIC', 'ELITE_ONLY', 'HIDDEN']).default('PUBLIC'),
-  featured: z.boolean().optional(),
-  featuredUntil: z.string().optional().nullable(),
-
-  images: z.array(z.string()).optional(),
-  videoUrl: z.string().optional().nullable(),
-  youtubeUrls: z.array(z.string()).optional(),
-  virtualTourUrl: z.string().optional().nullable(),
-
-  slug: z.string().optional().nullable(),
-  metaTitle: z.string().optional().nullable(),
-  metaDescription: z.string().optional().nullable(),
-  highlightedFeatures: z.array(z.string()).optional(),
-
-  developerId: z.string().optional().nullable(),
-  locationGuideId: z.string().optional().nullable(),
-  agentId: z.string().optional().nullable(),
-
-  ...buildingInvestmentFields,
-});
+// Building, unit and option bodies are validated by the schemas local to
+// routes/buildings.ts and routes/units.ts. Shared copies used to live here too
+// and silently shadowed them; they were removed with the dead /api/properties
+// write routes.
 
 export const buildingQuerySchema = z.object({
   page: z.string().optional().transform(v => v ? parseInt(v) : 1),
@@ -134,47 +59,6 @@ export const buildingQuerySchema = z.object({
   search: z.string().optional(),
   sortBy: z.string().optional(),
   sortOrder: z.enum(['asc', 'desc']).optional(),
-});
-
-// ─── Unit ─────────────────────────────────────────────────────────────────────
-
-export const unitSchema = z.object({
-  name: z.string().optional().nullable(),
-  unitNumber: z.string().optional().nullable(),
-  kind: z.enum(['APARTMENT', 'STUDIO', 'DUPLEX', 'PENTHOUSE', 'VILLA', 'TOWNHOUSE', 'SHOP', 'OFFICE', 'SHOWROOM', 'WAREHOUSE', 'RESTAURANT', 'CLINIC', 'WHOLE_BUILDING', 'LAND_PARCEL', 'STORAGE', 'PARKING']).default('APARTMENT'),
-  bedrooms: z.number().optional().nullable(),
-  bathrooms: z.number().optional().nullable(),
-  areaSqm: z.number().optional().nullable(),
-  floor: z.number().optional().nullable(),
-  parkingSpaces: z.number().optional().nullable(),
-  furnishing: z.enum(['UNFURNISHED', 'SEMI_FURNISHED', 'FULLY_FURNISHED']).optional().nullable(),
-  ownership: z.enum(['FREEHOLD', 'LEASEHOLD']).optional().nullable(),
-  views: z.array(z.string()).optional(),
-  features: z.array(z.string()).optional(),
-  lifecycle: z.enum(['DRAFT', 'FOR_SALE', 'RESERVED', 'SOLD', 'OWNER_OCCUPIED', 'FOR_RENT', 'RENTED', 'VACANT', 'OFF_MARKET']).optional(),
-  ownershipSource: z.enum(['PLATFORM_SOLD', 'EXTERNAL']).optional(),
-  ownerName: z.string().optional().nullable(),
-  ownerPhone: z.string().optional().nullable(),
-  ownerUserId: z.string().optional().nullable(),
-  managedByUserId: z.string().optional().nullable(),
-  managementNote: z.string().optional().nullable(),
-  askingPrice: z.number().optional().nullable(),
-  askingCurrency: z.enum(['USD', 'LBP']).optional().nullable(),
-  rentAmount: z.number().optional().nullable(),
-  rentCurrency: z.enum(['USD', 'LBP']).optional().nullable(),
-  rentPeriod: z.enum(['MONTHLY', 'QUARTERLY', 'YEARLY']).optional().nullable(),
-  generatorAmpere: z.number().optional().nullable(),
-  images: z.array(z.string()).optional(),
-  notes: z.string().optional().nullable(),
-});
-
-export const unitOptionSchema = z.object({
-  name: z.string().min(1, 'Option name is required'),
-  pricePerSqm: z.number().min(0),
-  currency: z.enum(['USD', 'LBP']).default('USD'),
-  initialPayment: z.number().optional().nullable(),
-  paymentPlanDetails: z.any().optional().nullable(),
-  description: z.string().optional().nullable(),
 });
 
 // ─── Listing ──────────────────────────────────────────────────────────────────
@@ -194,28 +78,6 @@ export const listingSchema = z.object({
   headline: z.string().optional().nullable(),
   description: z.string().optional().nullable(),
   highlights: z.array(z.string()).optional(),
-});
-
-export const listingQuerySchema = z.object({
-  page: z.string().optional().transform(v => v ? parseInt(v) : 1),
-  limit: z.string().optional().transform(v => v ? parseInt(v) : 12),
-  intent: z.string().optional(),
-  subjectType: z.string().optional(),
-  mohafazat: z.string().optional(),
-  caza: z.string().optional(),
-  city: z.string().optional(),
-  kind: z.string().optional(),
-  minPrice: z.string().optional().transform(v => v ? parseFloat(v) : undefined),
-  maxPrice: z.string().optional().transform(v => v ? parseFloat(v) : undefined),
-  currency: z.string().optional(),
-  minBeds: z.string().optional().transform(v => v ? parseInt(v) : undefined),
-  maxBeds: z.string().optional().transform(v => v ? parseInt(v) : undefined),
-  minArea: z.string().optional().transform(v => v ? parseFloat(v) : undefined),
-  maxArea: z.string().optional().transform(v => v ? parseFloat(v) : undefined),
-  status: z.string().optional(),
-  search: z.string().optional(),
-  sortBy: z.string().optional(),
-  sortOrder: z.enum(['asc', 'desc']).optional(),
 });
 
 // ─── FX Rate ──────────────────────────────────────────────────────────────────
@@ -297,31 +159,3 @@ export const ownedPropertySchema = z.object({
 });
 
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-export function extractInvestmentData(
-  data: Record<string, unknown>
-): { investmentData: Record<string, unknown>; buildingData: Record<string, unknown> } {
-  const investmentData: Record<string, unknown> = {};
-  const buildingData: Record<string, unknown> = {};
-
-  for (const [key, value] of Object.entries(data)) {
-    if (INVESTMENT_FIELD_KEYS.includes(key as keyof typeof buildingInvestmentFields)) {
-      investmentData[key] = value;
-    } else {
-      buildingData[key] = value;
-    }
-  }
-
-  return { investmentData, buildingData };
-}
-
-export function buildInvestmentDataPayload(fields: Record<string, unknown>): Record<string, unknown> {
-  const result: Record<string, unknown> = {};
-  const dateFields = ['completionDate', 'handoverDate', 'expectedRentalStart'];
-  for (const [key, value] of Object.entries(fields)) {
-    if (value === undefined) continue;
-    result[key] = dateFields.includes(key) ? (value ? new Date(value as string) : null) : (value ?? null);
-  }
-  return result;
-}

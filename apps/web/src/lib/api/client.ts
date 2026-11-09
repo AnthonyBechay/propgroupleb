@@ -141,66 +141,6 @@ class ApiClient {
     });
   }
 
-  // Properties endpoints
-  async getProperties(params?: {
-    page?: number;
-    limit?: number;
-    country?: string;
-    city?: string;
-    propertyType?: string;
-    status?: string;
-    availabilityStatus?: string;
-    visibility?: string;
-    minPrice?: number;
-    maxPrice?: number;
-    bedrooms?: number;
-    minBedrooms?: number;
-    maxBedrooms?: number;
-    isGoldenVisaEligible?: boolean;
-    featured?: boolean;
-    hasPool?: boolean;
-    furnishingStatus?: string;
-    search?: string;
-    sortBy?: string;
-    sortOrder?: 'asc' | 'desc';
-  }) {
-    const searchParams = new URLSearchParams();
-    if (params) {
-      Object.entries(params).forEach(([key, value]) => {
-        if (value !== undefined) {
-          searchParams.append(key, value.toString());
-        }
-      });
-    }
-
-    const queryString = searchParams.toString();
-    return this.request(`/api/properties${queryString ? `?${queryString}` : ''}`);
-  }
-
-  async getProperty(id: string) {
-    return this.request(`/api/properties/${id}`);
-  }
-
-  async createProperty(data: any) {
-    return this.request('/api/properties', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    });
-  }
-
-  async updateProperty(id: string, data: any) {
-    return this.request(`/api/properties/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(data),
-    });
-  }
-
-  async deleteProperty(id: string) {
-    return this.request(`/api/properties/${id}`, {
-      method: 'DELETE',
-    });
-  }
-
   // Favorites endpoints
   async getFavorites() {
     return this.request('/api/favorites');

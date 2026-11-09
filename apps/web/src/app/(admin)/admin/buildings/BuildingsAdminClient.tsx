@@ -97,6 +97,10 @@ export function BuildingsAdminClient({ initialBuildings }: Props) {
   const [kindFilter, setKindFilter] = useState('all')
   const [statusFilter, setStatusFilter] = useState('all')
   const [sourceFilter, setSourceFilter] = useState('all')
+  // On the website or not: a property set to Hidden stays here to be fixed and shown.
+  const [visibilityFilter, setVisibilityFilter] = useState<'all' | 'live' | 'HIDDEN'>('all')
+  const [listedFilter, setListedFilter] = useState<'all' | 'listed' | 'unlisted'>('all')
+  const [togglingId, setTogglingId] = useState<string | null>(null)
   // One back office holds both markets, so it needs a way to look at one.
   const [market, setMarket] = useState<MarketScope>('all')
   const [sort, setSort] = useState<SortKey>('newest')
@@ -111,10 +115,12 @@ export function BuildingsAdminClient({ initialBuildings }: Props) {
     listed: buildings.filter((b) => (b._count?.listings ?? 0) > 0).length,
     units: buildings.reduce((s, b) => s + (b._count?.units ?? b.units?.length ?? 0), 0),
     views: buildings.reduce((s, b) => s + (b.views ?? 0), 0),
+    hidden: buildings.filter((b) => b.visibility === 'HIDDEN').length,
   }), [buildings])
 
   const activeFilters = [
     market !== 'all', sourceFilter !== 'all', kindFilter !== 'all', statusFilter !== 'all',
+    visibilityFilter !== 'all', listedFilter !== 'all',
   ].filter(Boolean).length
 
   const filtered = useMemo(() => {
@@ -131,6 +137,10 @@ export function BuildingsAdminClient({ initialBuildings }: Props) {
         && (statusFilter === 'all' || b.status === statusFilter)
         && (sourceFilter === 'all' || (b.source ?? 'ADMIN') === sourceFilter)
         && inMarket(b.country, market)
+        && (visibilityFilter === 'all'
+          || (visibilityFilter === 'HIDDEN' ? b.visibility === 'HIDDEN' : b.visibility !== 'HIDDEN'))
+        && (listedFilter === 'all'
+          || (listedFilter === 'listed') === ((b._count?.listings ?? 0) > 0 && !b._sold))
     })
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const time = (b: any) => new Date(b.createdAt ?? 0).getTime()
@@ -144,7 +154,7 @@ export function BuildingsAdminClient({ initialBuildings }: Props) {
       }
     })
     return out
-  }, [buildings, search, kindFilter, statusFilter, sourceFilter, market, sort])
+  }, [buildings, search, kindFilter, statusFilter, sourceFilter, visibilityFilter, listedFilter, market, sort])
 
   // Only keep selections that are still visible under the current filters —
   // acting on a row you can't see is how the wrong property gets archived.
@@ -172,9 +182,25 @@ export function BuildingsAdminClient({ initialBuildings }: Props) {
 
   function clearFilters() {
     setSearch(''); setMarket('all'); setSourceFilter('all'); setKindFilter('all'); setStatusFilter('all')
+    setVisibilityFilter('all'); setListedFilter('all')
   }
 
   // ── Actions ─────────────────────────────────────────────────────────────────
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  async function toggleVisibility(b: any) {
+    const next = b.visibility === 'HIDDEN' ? 'PUBLIC' : 'HIDDEN'
+    setTogglingId(b.id)
+    try {
+      await apiClient.updateBuilding(b.id, { visibility: next } as never)
+      setBuildings((prev) => prev.map((x) => (x.id === b.id ? { ...x, visibility: next } : x)))
+      toast({ title: next === 'HIDDEN' ? `${b.title} is hidden from the website` : `${b.title} is on the website` })
+    } catch {
+      toast({ title: 'Could not change visibility', description: 'Try again.', variant: 'destructive' })
+    } finally {
+      setTogglingId(null)
+    }
+  }
 
   async function applyAction(ids: string[], action: BulkAction) {
     setBusy(true)
@@ -227,7 +253,12 @@ export function BuildingsAdminClient({ initialBuildings }: Props) {
       />
 
       <div className="grid grid-cols-2 gap-2.5 lg:grid-cols-4">
-        <StatCard icon={<Building2 className="h-4 w-4" />} label="Properties" value={stats.total} />
+        <StatCard
+          icon={<Building2 className="h-4 w-4" />}
+          label="Properties"
+          value={stats.total}
+          hint={stats.hidden ? `${stats.hidden} hidden from the website` : undefined}
+        />
         <StatCard
           icon={<ListChecks className="h-4 w-4" />}
           label="On the market"
@@ -249,6 +280,16 @@ export function BuildingsAdminClient({ initialBuildings }: Props) {
           <option value="all">Any source</option>
           <option value="ADMIN">Posted by us</option>
           <option value="OWNER">Owner submitted</option>
+        </SelectInput>
+        <SelectInput value={visibilityFilter} onChange={(e) => setVisibilityFilter(e.target.value as typeof visibilityFilter)}>
+          <option value="all">On website or hidden</option>
+          <option value="live">On the website</option>
+          <option value="HIDDEN">Hidden</option>
+        </SelectInput>
+        <SelectInput value={listedFilter} onChange={(e) => setListedFilter(e.target.value as typeof listedFilter)}>
+          <option value="all">Listed or not</option>
+          <option value="listed">Listed for sale / rent</option>
+          <option value="unlisted">Not listed</option>
         </SelectInput>
         <SelectInput value={kindFilter} onChange={(e) => setKindFilter(e.target.value)}>
           <option value="all">Any structure</option>
@@ -408,7 +449,7 @@ export function BuildingsAdminClient({ initialBuildings }: Props) {
                         {relativeDate(b.createdAt)}
                       </td>
                       <td className="px-3 py-2.5" onClick={(e) => e.stopPropagation()}>
-                        <RowActions b={b} onRemove={() => setActionTarget(b)} />
+                        <RowActions b={b} onRemove={() => setActionTarget(b)} onToggleVisibility={() => toggleVisibility(b)} toggling={togglingId === b.id} />
                       </td>
                     </tr>
                   )
@@ -455,7 +496,7 @@ export function BuildingsAdminClient({ initialBuildings }: Props) {
                         <span>{relativeDate(b.createdAt)}</span>
                       </div>
                     </Link>
-                    <RowActions b={b} onRemove={() => setActionTarget(b)} />
+                    <RowActions b={b} onRemove={() => setActionTarget(b)} onToggleVisibility={() => toggleVisibility(b)} toggling={togglingId === b.id} />
                   </div>
                 </li>
               )
@@ -527,7 +568,11 @@ function PropertyCell({ b, hidden }: { b: any; hidden: boolean }) {
           )}
           <p className="truncate text-sm font-medium text-slate-900">{b.title}</p>
           {b.featured && <Star className="h-3.5 w-3.5 shrink-0 fill-amber-400 text-amber-400" />}
-          {hidden && <EyeOff className="h-3.5 w-3.5 shrink-0 text-slate-400" />}
+          {hidden && (
+            <span className="inline-flex shrink-0 items-center gap-1 rounded border border-slate-300 bg-slate-100 px-1.5 text-[10px] font-semibold text-slate-600">
+              <EyeOff className="h-3 w-3" /> Hidden
+            </span>
+          )}
           {b.source === 'OWNER' && (
             <span
               className="shrink-0 rounded border border-teal-200 bg-teal-50 px-1.5 text-[10px] font-semibold text-teal-700"
@@ -558,9 +603,23 @@ function ListedHint({ b }: { b: any }) {
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function RowActions({ b, onRemove }: { b: any; onRemove: () => void }) {
+function RowActions({ b, onRemove, onToggleVisibility, toggling }: { b: any; onRemove: () => void; onToggleVisibility: () => void; toggling: boolean }) {
+  const hidden = b.visibility === 'HIDDEN'
   return (
     <div className="flex shrink-0 items-center justify-end gap-0.5" onClick={(e) => e.stopPropagation()}>
+      <button
+        type="button"
+        onClick={onToggleVisibility}
+        disabled={toggling}
+        title={hidden ? 'Show on the website' : 'Hide from the website'}
+        aria-label={hidden ? 'Show on the website' : 'Hide from the website'}
+        className={cn(
+          'flex h-9 w-9 items-center justify-center rounded-lg transition-colors hover:bg-slate-100 disabled:opacity-50',
+          hidden ? 'text-amber-600 hover:text-emerald-600' : 'text-slate-400 hover:text-slate-700',
+        )}
+      >
+        {hidden ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+      </button>
       <Link
         href={`/admin/listings?buildingId=${b.id}`}
         title="Its listings"

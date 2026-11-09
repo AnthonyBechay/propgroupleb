@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import {
   ClipboardList, Loader2, Phone, Mail, MessageCircle, MapPin, ChevronDown, ChevronUp,
-  CheckCircle2, XCircle, Eye, Trash2, BedDouble, Bath, Ruler, Building2, ExternalLink, Save, Camera, Check,
+  CheckCircle2, XCircle, Eye, EyeOff, Globe, Trash2, BedDouble, Bath, Ruler, Building2, ExternalLink, Save, Camera, Check,
 } from 'lucide-react'
 import { normalizeApiUrl, normalizeFileUrl } from '@/lib/utils/api-url'
 import { MOHAFAZAT_LABEL } from '@/lib/lebanon-locations'
@@ -45,6 +45,8 @@ interface Submission {
   dataCollected: boolean
   adminNotes: string | null
   buildingId: string | null
+  /** What the approval created: live or hidden, and the listing to preview. */
+  published?: { ref: string | null; visibility: 'PUBLIC' | 'ELITE_ONLY' | 'HIDDEN'; listingSlug: string | null } | null
   createdAt: string
 }
 
@@ -134,13 +136,33 @@ export default function AdminSubmissionsPage() {
     if (priceDraft[s.id] !== undefined && Number(priceDraft[s.id]) !== s.price) {
       await patch(s.id, { price: Number(priceDraft[s.id]) })
     }
-    if (!confirm(`Publish "${s.title}" for ${s.currency} ${price.toLocaleString()}? This creates a live listing.`)) return
+    if (!confirm(
+      `Publish "${s.title}" for ${s.currency} ${price.toLocaleString()}?\n\n` +
+      `It will be published HIDDEN: it goes into Properties but nobody sees it on the website. ` +
+      `You can preview it, then press "Show on website" when you're ready.`,
+    )) return
     setBusy(s.id)
     try {
       const res = await fetch(`${apiUrl}/api/submissions/${s.id}/approve`, { method: 'POST', credentials: 'include' })
       const j = await res.json().catch(() => ({}))
       if (!res.ok) { alert(j.message || 'Approve failed'); return }
       await load()
+    } finally { setBusy(null) }
+  }
+
+  async function setLive(s: Submission, visible: boolean) {
+    if (!visible && !confirm(`Hide "${s.title}" from the website?`)) return
+    setBusy(s.id)
+    try {
+      const res = await fetch(`${apiUrl}/api/submissions/${s.id}/visibility`, {
+        method: 'POST', credentials: 'include',
+        headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ visible }),
+      })
+      const j = await res.json().catch(() => ({}))
+      if (!res.ok) { alert(j.message || 'Could not change visibility'); return }
+      setItems(prev => prev.map(x => (x.id === s.id && x.published
+        ? { ...x, published: { ...x.published, visibility: j.data?.visibility ?? (visible ? 'PUBLIC' : 'HIDDEN') } }
+        : x)))
     } finally { setBusy(null) }
   }
 
@@ -226,6 +248,11 @@ export default function AdminSubmissionsPage() {
                         <span className="font-semibold text-slate-900 truncate">{s.title}</span>
                         <span className={`px-2 py-0.5 rounded text-xs font-medium ${meta.cls}`}>{meta.label}</span>
                         <span className="text-xs text-slate-500">{typeLabel(s.unitKind)} · {s.intent === 'FOR_RENT' ? 'Rent' : 'Sale'}</span>
+                        {s.status === 'APPROVED' && s.published && (
+                          s.published.visibility === 'HIDDEN'
+                            ? <span className="px-2 py-0.5 rounded text-xs font-medium bg-slate-100 text-slate-600 ring-1 ring-slate-200 inline-flex items-center gap-1"><EyeOff className="h-3 w-3" /> Hidden from website</span>
+                            : <span className="px-2 py-0.5 rounded text-xs font-medium bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200 inline-flex items-center gap-1"><Globe className="h-3 w-3" /> On the website</span>
+                        )}
                         {s.source === 'CHAT' && <span className="px-2 py-0.5 rounded text-xs font-medium bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200">From chat</span>}
                       </div>
                       <div className="flex items-center gap-3 mt-1 text-sm text-slate-500 flex-wrap">
@@ -385,9 +412,28 @@ export default function AdminSubmissionsPage() {
                     {/* Actions */}
                     <div className="flex flex-wrap items-center gap-2 pt-1">
                       {s.status === 'APPROVED' && s.buildingId ? (
-                        <Link href={`/admin/buildings/${s.buildingId}`} className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-emerald-600 text-white text-sm font-medium hover:bg-emerald-700">
-                          <Building2 className="h-4 w-4" /> Open published property
-                        </Link>
+                        <>
+                          {s.published?.listingSlug && (
+                            <a href={`/preview/listings/${s.published.listingSlug}`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-white border border-slate-200 text-slate-700 text-sm font-medium hover:bg-slate-50">
+                              <Eye className="h-4 w-4" /> Preview listing
+                            </a>
+                          )}
+                          {s.published?.visibility === 'HIDDEN' ? (
+                            <button type="button" disabled={busy === s.id} onClick={() => setLive(s, true)} className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-emerald-600 text-white text-sm font-medium hover:bg-emerald-700 disabled:opacity-50">
+                              {busy === s.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Globe className="h-4 w-4" />} Show on website
+                            </button>
+                          ) : s.published ? (
+                            <button type="button" disabled={busy === s.id} onClick={() => setLive(s, false)} className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-white border border-slate-200 text-slate-700 text-sm font-medium hover:bg-slate-50 disabled:opacity-50">
+                              {busy === s.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <EyeOff className="h-4 w-4" />} Hide from website
+                            </button>
+                          ) : null}
+                          <Link href={`/admin/buildings/${s.buildingId}`} className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-white border border-slate-200 text-slate-700 text-sm font-medium hover:bg-slate-50">
+                            <Building2 className="h-4 w-4" /> Edit property
+                          </Link>
+                          {s.published?.visibility === 'HIDDEN' && (
+                            <p className="basis-full text-xs text-slate-500">Hidden: nobody sees it on the website yet. Preview it, edit anything that needs fixing, then press Show on website.</p>
+                          )}
+                        </>
                       ) : (
                         <>
                           {s.status !== 'IN_REVIEW' && (
@@ -396,8 +442,9 @@ export default function AdminSubmissionsPage() {
                             </button>
                           )}
                           <button type="button" disabled={busy === s.id} onClick={() => approve(s)} className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-emerald-600 text-white text-sm font-medium hover:bg-emerald-700 disabled:opacity-50">
-                            {busy === s.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />} Approve & publish
+                            {busy === s.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />} Publish as hidden
                           </button>
+                          <p className="basis-full text-xs text-slate-500 order-last">Publishing puts it in Properties hidden from the website. Nothing goes public until you press Show on website.</p>
                           {s.status !== 'REJECTED' && (
                             <button type="button" disabled={busy === s.id} onClick={() => patch(s.id, { status: 'REJECTED' })} className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-white border border-red-200 text-red-600 text-sm font-medium hover:bg-red-50 disabled:opacity-50">
                               <XCircle className="h-4 w-4" /> Reject
