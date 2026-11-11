@@ -352,7 +352,7 @@ export function CrmScreen({ mode }: { mode: 'pipeline' | 'clients' }) {
       if (typeFilter === 'all' || d.lead.type === typeFilter) onBoard.set(d.lead.id, d.lead.market)
     }
     const markets = [...onBoard.values()]
-    return { all: markets.length, LEBANON: markets.filter((m) => m === 'LEBANON').length, GEORGIA: markets.filter((m) => m === 'GEORGIA').length }
+    return { all: markets.length, LEBANON: markets.filter((m) => m === 'LEBANON').length, INTERNATIONAL: markets.filter((m) => m === 'INTERNATIONAL').length }
   }, [onBoardPeople, deals, typeFilter])
   const toAnswer = boardClients.filter((p) => p.bucket === 'TO_ANSWER').length
 
@@ -441,7 +441,7 @@ export function CrmScreen({ mode }: { mode: 'pipeline' | 'clients' }) {
         </select>
 
         <div className="flex gap-1 bg-slate-100 rounded-lg p-1">
-          {(['all', 'LEBANON', 'GEORGIA'] as const).map((m) => (
+          {(['all', 'LEBANON', 'INTERNATIONAL'] as const).map((m) => (
             <button
               key={m}
               onClick={() => setMarket(m)}

@@ -70,7 +70,9 @@ export function canDeleteConversations(role: string | null | undefined): boolean
  * which is the failure direction we want. Every other admin endpoint answers
  * 403 to this role anyway, so the pages would render empty at best.
  */
-const CRM_MANAGER_PATHS = ['/admin/crm', '/admin/inbox', '/admin/clients']
+// City maps are sales knowledge with no money and no client data in them, and
+// the people selling are the ones who need them.
+const CRM_MANAGER_PATHS = ['/admin/crm', '/admin/inbox', '/admin/clients', '/admin/city-maps']
 
 /** Single pages (not prefixes) a CRM_MANAGER may also open: their own settings. */
 const CRM_MANAGER_PAGES = ['/admin/settings', '/admin/settings/profile', '/admin/settings/security', '/admin/settings/notifications']

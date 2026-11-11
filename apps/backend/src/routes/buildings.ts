@@ -12,6 +12,7 @@ import { deleteFile, extractKeyFromUrl } from '../services/upload.service.js';
 import type { AuthenticatedRequest } from '../types/index.js';
 import { nextBuildingRef, nextUnitRef, normalizeRef, looksLikeRef, buildingRefOf } from '../utils/reference.js';
 import { publicCountryFilter } from '../utils/market.js';
+import { countrySchema } from '../utils/market.js';
 
 /** Best-effort delete a batch of file URLs from R2. Failures are logged but do not throw. */
 async function purgeFileUrls(urls: string[]): Promise<void> {
@@ -106,7 +107,7 @@ const buildingSchema = z.object({
   description: z.string().optional().nullable(),
   shortDescription: z.string().optional().nullable(),
   // Which market the property belongs to — decides which website shows it.
-  country: z.enum(['LEBANON', 'GEORGIA', 'CYPRUS', 'GREECE']).optional(),
+  country: countrySchema.optional(),
   // Whose property this is, as a CRM client. Empty string clears it.
   ownerLeadId: z.string().optional().nullable(),
   mohafazat: z.string().optional().nullable(),

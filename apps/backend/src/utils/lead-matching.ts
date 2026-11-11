@@ -1,3 +1,4 @@
+import { countryLabel } from './market.js';
 /**
  * Weighted matching between what a client wants and what's available.
  *
@@ -80,12 +81,12 @@ function scoreLocation(
 }
 
 /**
- * Georgian projects store a city but no region, while a client can pick just
- * "Adjara (Batumi)" — so the region is inferred from the city, or a Batumi
- * project would miss a client looking in Adjara. Keys match the CRM's region
+ * Projects abroad store a city but no region, while a client can pick just a
+ * region — so the region is inferred from the city, or a project would miss a
+ * client looking in its region. A city missing here simply has no region. Keys match the CRM's region
  * values in apps/web/src/lib/crm-locations.ts.
  */
-const GEORGIA_CITY_REGION: Record<string, string> = {
+const CITY_REGION: Record<string, string> = {
   batumi: 'GE_ADJARA', gonio: 'GE_ADJARA', kvariati: 'GE_ADJARA', sarpi: 'GE_ADJARA',
   makhinjauri: 'GE_ADJARA', chakvi: 'GE_ADJARA', kobuleti: 'GE_ADJARA', 'green cape': 'GE_ADJARA',
   tbilisi: 'GE_TBILISI', kutaisi: 'GE_IMERETI', telavi: 'GE_KAKHETI', sighnaghi: 'GE_KAKHETI',
@@ -96,7 +97,7 @@ const GEORGIA_CITY_REGION: Record<string, string> = {
 function regionOf(building: any): string | null {
   if (building?.mohafazat) return building.mohafazat;
   if (!building?.country || building.country === 'LEBANON') return null;
-  return GEORGIA_CITY_REGION[norm(building.city)] ?? null;
+  return CITY_REGION[norm(building.city)] ?? null;
 }
 
 /**
@@ -291,7 +292,7 @@ export function matchListingToLead(lead: any, listing: any): MatchResult {
     location = {
       ...location,
       fatal: true,
-      detail: `In ${inLebanon ? 'Lebanon' : 'Georgia'} — they're looking in ${lead.market === 'LEBANON' ? 'Lebanon' : 'Georgia'}`,
+      detail: `In ${inLebanon ? 'Lebanon' : countryLabel(building?.country) || 'another country'} — they're looking ${lead.market === 'LEBANON' ? 'in Lebanon' : 'abroad'}`,
     };
   }
 

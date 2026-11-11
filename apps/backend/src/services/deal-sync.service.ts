@@ -45,6 +45,11 @@ export function recordListingsShared(leadId: string, buildingIds: string[], crea
   return ensureDeals(leadId, buildingIds, 'SHARED', createdBy);
 }
 
+/** A visitor asked about one property on a website form: an "Enquiry" on it. */
+export function recordWebsiteEnquiry(leadId: string, buildingId: string): Promise<void> {
+  return ensureDeals(leadId, [buildingId], 'SUGGESTED');
+}
+
 /** A client arrived from an ad that names a project: that is an "Enquiry" on it. */
 export async function recordAdEnquiry(leadId: string, adText: string | null | undefined, market: Market): Promise<void> {
   try {

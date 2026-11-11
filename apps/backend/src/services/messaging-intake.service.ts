@@ -6,6 +6,7 @@ import { recordAdEnquiry } from './deal-sync.service.js';
 import { describeAd } from './meta-ads.service.js';
 import { reportLeadStage } from './meta-conversions.service.js';
 import { instagramToken } from './instagram-token.service.js';
+import { normaliseMarket, type Market } from '../utils/market.js';
 
 /**
  * Turning Meta webhook deliveries into inbox threads and CRM clients.
@@ -45,7 +46,7 @@ function phoneMatches(stored: string | null, e164: string): boolean {
  * missed every number written with a space or a dash. The suffix match only
  * narrows the candidates; the real comparison happens in memory.
  */
-async function findLeadByPhone(digits: string): Promise<any | null> {
+export async function findLeadByPhone(digits: string): Promise<any | null> {
   const tail = `%${digits.slice(-7)}`;
   const rows = await prisma.$queryRaw<Array<{ id: string }>>`
     SELECT id FROM leads
@@ -84,9 +85,8 @@ async function findLeadForSender(channel: Channel, externalId: string): Promise<
  * (`LEAD_MARKET_WHATSAPP`). It is only a starting point — editable on the
  * client, and never applied to someone already in the CRM.
  */
-function marketFor(source: 'META' | 'WHATSAPP'): 'LEBANON' | 'GEORGIA' {
-  const value = (process.env[`LEAD_MARKET_${source}`] ?? '').toUpperCase();
-  return value === 'GEORGIA' ? 'GEORGIA' : 'LEBANON';
+function marketFor(source: 'META' | 'WHATSAPP'): Market {
+  return normaliseMarket(process.env[`LEAD_MARKET_${source}`]) ?? 'LEBANON';
 }
 
 export interface AdReferral {

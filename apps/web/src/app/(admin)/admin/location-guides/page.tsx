@@ -1,5 +1,7 @@
 'use client'
 
+import { CountryPicker } from '@/components/admin/CountryPicker'
+import { countryWithFlag } from '@/lib/market'
 import { useEffect, useState } from 'react'
 import { normalizeApiUrl } from '@/lib/utils/api-url'
 import {
@@ -23,15 +25,6 @@ interface LocationGuide {
   updatedAt: string
   _count?: { properties: number }
 }
-
-// Both websites are managed from here, so guides exist for both markets.
-// Lebanon guides show on propgrouplb.com; the rest on propgrp.com.
-const COUNTRIES = [
-  { value: 'LEBANON', label: '🇱🇧 Lebanon' },
-  { value: 'GEORGIA', label: '🇬🇪 Georgia' },
-  { value: 'CYPRUS', label: '🇨🇾 Cyprus' },
-  { value: 'GREECE', label: '🇬🇷 Greece' },
-]
 
 const EMPTY_FORM = {
   title: '',
@@ -63,7 +56,8 @@ export default function LocationGuidesPage() {
     try {
       setLoading(true)
       const base = await apiBase()
-      const res = await fetch(`${base}/api/location-guides`, {
+      // Every market: the list is scoped to one site for the public.
+      const res = await fetch(`${base}/api/location-guides?country=all`, {
         credentials: 'include',
       })
       if (res.ok) {
@@ -204,10 +198,8 @@ export default function LocationGuidesPage() {
           className="text-sm rounded-lg border border-slate-300 px-3 py-1.5 bg-white"
         >
           <option value="">All</option>
-          {COUNTRIES.map((c) => (
-            <option key={c.value} value={c.value}>
-              {c.label}
-            </option>
+          {Array.from(new Set(guides.map((g) => g.country))).sort().map((c) => (
+            <option key={c} value={c}>{countryWithFlag(c)}</option>
           ))}
         </select>
         <span className="text-xs text-slate-500 ml-2">
@@ -321,17 +313,11 @@ export default function LocationGuidesPage() {
                 <label className="block text-sm font-medium text-slate-700 mb-1">
                   Country <span className="text-red-500">*</span>
                 </label>
-                <select
+                <CountryPicker
                   value={form.country}
-                  onChange={(e) => setForm({ ...form, country: e.target.value })}
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-slate-800"
-                >
-                  {COUNTRIES.map((c) => (
-                    <option key={c.value} value={c.value}>
-                      {c.label}
-                    </option>
-                  ))}
-                </select>
+                  onChange={(country) => setForm({ ...form, country })}
+                  className="w-full min-h-11 rounded-lg border border-slate-300 px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-slate-800"
+                />
               </div>
 
               <div>

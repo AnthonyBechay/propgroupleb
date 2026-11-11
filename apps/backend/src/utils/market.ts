@@ -1,4 +1,5 @@
 import type { Request } from 'express';
+import { z } from 'zod';
 
 /**
  * Which market a request is about.
@@ -6,7 +7,7 @@ import type { Request } from 'express';
  * One backend and one database serve two public websites:
  *
  *   propgrouplb.com   Lebanese real estate
- *   propgrp.com       everything else — Georgia today, Cyprus/Greece if they come back
+ *   propgrp.com       everything else, whichever countries that is
  *
  * A property belongs to a site by its `country`. Visibility only says whether
  * it is live at all; `country` says where it appears.
@@ -16,8 +17,74 @@ import type { Request } from 'express';
  * other site would be served the wrong market's stock.
  */
 
-export const COUNTRIES = ['LEBANON', 'GEORGIA', 'CYPRUS', 'GREECE'] as const;
-export type MarketCountry = (typeof COUNTRIES)[number];
+/**
+ * A country, as stored: upper-case, words joined by underscores — "LEBANON",
+ * "GEORGIA", "UNITED_ARAB_EMIRATES".
+ *
+ * There is no list of countries anywhere in the code. There used to be an enum
+ * of four, so listing a project in a fifth needed a schema change and a deploy.
+ * The only country the code ever names is LEBANON; every other value is simply
+ * "international" and appears on propgrp.com the moment it is saved.
+ */
+export function normaliseCountry(input: unknown): string | null {
+  if (typeof input !== 'string') return null;
+  const cleaned = input
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toUpperCase()
+    .replace(/[^A-Z]+/g, '_')
+    .replace(/^_+|_+$/g, '');
+  return cleaned.length >= 2 && cleaned.length <= 60 ? cleaned : null;
+}
+
+/** "UNITED_ARAB_EMIRATES" → "United Arab Emirates". */
+export function countryLabel(country: unknown): string {
+  const code = normaliseCountry(country);
+  if (!code) return '';
+  return code
+    .split('_')
+    .map((w) => (['OF', 'AND', 'THE'].includes(w) ? w.toLowerCase() : w.charAt(0) + w.slice(1).toLowerCase()))
+    .join(' ');
+}
+
+/** A country on a request body: any name, stored normalised. */
+export const countrySchema = z
+  .string()
+  .max(80)
+  .transform((v, ctx) => {
+    const code = normaliseCountry(v);
+    if (!code) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Enter a country name' });
+      return z.NEVER;
+    }
+    return code;
+  });
+
+/**
+ * Which side of the business a CLIENT belongs to. Two values, not a country:
+ * Lebanon is local sale and rent, international is everything sold abroad.
+ */
+export const MARKETS = ['LEBANON', 'INTERNATIONAL'] as const;
+export type Market = (typeof MARKETS)[number];
+
+/**
+ * A market from outside the code: a request, an env var, a saved setting.
+ * Anything written before "international" existed named the one country sold
+ * abroad at the time; it means the same thing, so it is read as such.
+ */
+export function normaliseMarket(value: unknown): Market | null {
+  const v = String(value ?? '').trim().toUpperCase();
+  if (v === 'LEBANON') return 'LEBANON';
+  if (v === 'INTERNATIONAL' || v === LEGACY_INTERNATIONAL) return 'INTERNATIONAL';
+  return null;
+}
+/** The pre-rename name of the international market, in old env vars and saved settings. */
+const LEGACY_INTERNATIONAL = 'GEORGIA';
+
+/** The market a property's country puts it in. */
+export function marketOfCountry(country: unknown): Market {
+  return normaliseCountry(country) === 'LEBANON' || !country ? 'LEBANON' : 'INTERNATIONAL';
+}
 
 /** The two audiences. International is "not Lebanon", never a fixed list, so
  *  adding a country never needs a deploy. */
@@ -73,15 +140,17 @@ export function requestScope(req: Request): SiteScope {
  */
 export function publicCountryFilter(
   req: Request
-): MarketCountry | { not: 'LEBANON' } | undefined {
-  const asked = String(req.query.country ?? '').toUpperCase();
-  if (asked === 'ALL') return undefined;
-  if ((COUNTRIES as readonly string[]).includes(asked)) return asked as MarketCountry;
+): string | { not: 'LEBANON' } | undefined {
+  const asked = String(req.query.country ?? '').trim();
+  if (asked.toUpperCase() === 'ALL') return undefined;
+  // One named country, whichever it is.
+  const one = asked ? normaliseCountry(asked) : null;
+  if (one) return one;
 
   // One back office for both markets: a signed-in admin sees everything unless
   // they narrow it themselves. Scoping the admin to a single country is what
-  // hid imported Georgian stock from /admin/buildings, and every future admin
-  // screen would have had to remember to opt out.
+  // hid imported international stock from /admin/buildings, and every future
+  // admin screen would have had to remember to opt out.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const role = (req as any).user?.role;
   if (role && ['ADMIN', 'SUPER_ADMIN', 'CRM_MANAGER'].includes(role)) return undefined;

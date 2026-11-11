@@ -16,11 +16,14 @@ enum Currency {
   LBP
 }
 
+// LEGACY. The type of the old `country` columns, kept only so the deploy-time
+// `prisma db push --accept-data-loss` does not drop them: it rewrites an
+// enum→text change as DROP COLUMN + ADD COLUMN, which would have reset every
+// project abroad to LEBANON. Nothing reads these any more — `country` is free
+// text in `country_name`, copied across once at boot (utils/country-backfill.ts).
+// Remove the enum and the three `legacyCountry` fields in a later release.
 enum Country {
   LEBANON
-  // The group also sells Georgian stock (propgrp.com) and has listed Cypriot
-  // and Greek units in the past. Kept in step with the Georgia system so its
-  // rows can be imported without losing where the property actually is.
   GEORGIA
   CYPRUS
   GREECE
@@ -351,7 +354,12 @@ model Developer {
   description String?
   website     String?
   logo        String?
-  country     Country  @default(LEBANON)
+  // Free text, upper-case with underscores ("LEBANON", "UNITED_ARAB_EMIRATES").
+  // It was an enum of four countries, so listing a project anywhere else needed
+  // a code change and a deploy. The only value the code ever tests is LEBANON:
+  // everything else is "international" and shows on propgrp.com.
+  country     String   @default("LEBANON") @map("country_name")
+  legacyCountry Country @default(LEBANON) @map("country") // see enum Country
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -364,7 +372,8 @@ model LocationGuide {
   id        String   @id @default(cuid())
   title     String
   content   String
-  country   Country  @default(LEBANON)
+  country   String   @default("LEBANON") @map("country_name")
+  legacyCountry Country @default(LEBANON) @map("country") // see enum Country
   city      String?
   caza      String?
   imageUrl  String?
@@ -403,7 +412,11 @@ model Building {
   shortDescription String?
 
   // Location — Lebanon hierarchy
-  country      Country @default(LEBANON)
+  // Free text, upper-case with underscores ("LEBANON", "UNITED_ARAB_EMIRATES").
+  // The only value the code ever tests is LEBANON: everything else is
+  // international and shows on propgrp.com.
+  country      String  @default("LEBANON") @map("country_name")
+  legacyCountry Country @default(LEBANON) @map("country") // see enum Country
   mohafazat    String? // governorate: Beirut, Mount Lebanon, North, South, Bekaa, Akkar, Baalbek-Hermel, Nabatieh
   caza         String? // district within mohafazat
   city         String?
@@ -1529,7 +1542,10 @@ enum LeadSource {
 // Which side of the business the lead belongs to.
 enum LeadMarket {
   LEBANON // propgrouplb.com — local sale/rent
-  GEORGIA // propgrp.com — Batumi/Tbilisi investment
+  // propgrp.com — every market outside Lebanon. Stored as "GEORGIA", the only
+  // country sold abroad when this was written; the name in the database is
+  // kept so no row has to be rewritten on deploy.
+  INTERNATIONAL @map("GEORGIA")
 }
 
 enum ContactChannel {

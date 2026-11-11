@@ -230,7 +230,7 @@ export function LeadFormModal({
                   className={inp}
                 >
                   <option value="LEBANON">🇱🇧 Lebanon</option>
-                  <option value="GEORGIA">🇬🇪 Georgia</option>
+                  <option value="INTERNATIONAL">🌍 International</option>
                 </select>
                 {/* It ranks matches; it never hides the other market's stock. */}
                 <p className="text-[11px] text-slate-500 mt-1">

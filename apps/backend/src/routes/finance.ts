@@ -141,7 +141,7 @@ const expenseSchema = z.object({
   category: z.enum(CATEGORIES),
   amountUsd: z.number().min(0),
   description: z.string().trim().max(500).optional().nullable(),
-  market: z.enum(['LEBANON', 'GEORGIA']).optional().nullable(),
+  market: z.enum(['LEBANON', 'INTERNATIONAL']).optional().nullable(),
 });
 
 const monthOf = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
@@ -188,7 +188,7 @@ const recurringSchema = z.object({
   category: z.enum(['OFFICE', 'SALARIES', 'MARKETING', 'TRAVEL', 'FEES', 'TAX', 'OTHER']),
   amountUsd: z.number().min(0),
   description: z.string().trim().max(500).optional().nullable(),
-  market: z.enum(['LEBANON', 'GEORGIA']).optional().nullable(),
+  market: z.enum(['LEBANON', 'INTERNATIONAL']).optional().nullable(),
   dayOfMonth: z.number().int().min(0).max(31),
   startsOn: z.string(),
   endsOn: z.string().optional().nullable(),
@@ -249,7 +249,7 @@ function period(req: Request) {
   const now = new Date();
   const from = q.from ? new Date(`${q.from}T00:00:00`) : new Date(now.getFullYear(), 0, 1);
   const to = q.to ? new Date(`${q.to}T23:59:59.999`) : new Date(now.getFullYear(), 11, 31, 23, 59, 59, 999);
-  const market = q.market === 'LEBANON' || q.market === 'GEORGIA' ? (q.market as 'LEBANON' | 'GEORGIA') : null;
+  const market = q.market === 'LEBANON' || q.market === 'INTERNATIONAL' ? (q.market as 'LEBANON' | 'INTERNATIONAL') : null;
   return { from, to, market };
 }
 
@@ -312,7 +312,7 @@ const incomeSchema = z.object({
   date: z.string(),
   amountUsd: z.number().min(0),
   description: z.string().trim().max(500).optional().nullable(),
-  market: z.enum(['LEBANON', 'GEORGIA']).optional().nullable(),
+  market: z.enum(['LEBANON', 'INTERNATIONAL']).optional().nullable(),
 });
 
 router.get('/income', asyncHandler(async (req: Request, res: Response) => {

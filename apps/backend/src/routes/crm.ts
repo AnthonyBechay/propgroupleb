@@ -11,6 +11,7 @@ import type { AuthenticatedRequest } from '../types/index.js';
 import { matchListingToLead, matchLeadToLead, SUPPLY_TYPES, DEMAND_TYPES, MATCH_MIN_SCORE, STRONG_MATCH_SCORE, PAIRABLE_STATUSES } from '../utils/lead-matching.js';
 import { deriveLeadStatus, needsNewOptions, rejectionInsights } from '../utils/lead-pipeline.js';
 import { reportLeadStage } from '../services/meta-conversions.service.js';
+import { normaliseCountry } from '../utils/market.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // CRM — the team's buyer/seller pipeline (replaces the follow-up spreadsheet).
@@ -40,7 +41,7 @@ const LEAD_TYPES = ['BUYER', 'SELLER', 'RENTER', 'LANDLORD', 'INVESTOR'] as cons
 const LEAD_STATUSES = ['NEW', 'ACTIVE', 'VIEWING', 'NEGOTIATING', 'WON', 'LOST', 'ARCHIVED'] as const;
 const LEAD_SOURCES = ['MANUAL', 'INQUIRY', 'FAVORITE', 'SUBMISSION', 'REFERRAL', 'WHATSAPP', 'PHONE', 'WALK_IN', 'FACEBOOK_AD'] as const;
 const SUB_STATUSES = ['SEARCHING', 'AWAITING_REPLY', 'NEEDS_OPTIONS', 'BUDGET_MISMATCH', 'FINANCING', 'PAUSED', 'DOCS_PENDING', 'PRICE_REVIEW', 'NO_RESPONSE'] as const;
-const MARKETS = ['LEBANON', 'GEORGIA'] as const;
+const MARKETS = ['LEBANON', 'INTERNATIONAL'] as const;
 const CHANNELS = ['CALL', 'WHATSAPP', 'EMAIL', 'MEETING', 'VIEWING', 'NOTE'] as const;
 
 const leadSchema = z.object({
@@ -1133,10 +1134,8 @@ router.get(
     // to show it because of a field on their record is the CRM getting in the
     // way. `?country=` narrows deliberately; otherwise everything is eligible
     // and their own market simply ranks first.
-    const askedCountry = String(req.query.country ?? '').toUpperCase();
-    const narrowTo = ['LEBANON', 'GEORGIA', 'CYPRUS', 'GREECE'].includes(askedCountry)
-      ? askedCountry
-      : null;
+    const askedCountry = normaliseCountry(req.query.country);
+    const narrowTo = askedCountry && askedCountry !== 'ALL' ? askedCountry : null;
 
     // `?q=` is the broker looking for something specific by name ("Orbi City",
     // PG-1059, Gonio). Suggestions are only the top of a scored list, so a
@@ -1238,7 +1237,7 @@ router.get(
 
     const MIN_SCORE = Number(req.query.minScore ?? MATCH_MIN_SCORE);
     // Their own market ranks first on a tie, but never excludes the other.
-    const homeCountry = lead.market === 'GEORGIA' ? null : 'LEBANON';
+    const homeCountry = lead.market === 'INTERNATIONAL' ? null : 'LEBANON';
     const sameMarket = (l: any) => {
       const c = l.building?.country ?? l.unit?.building?.country ?? 'LEBANON';
       return homeCountry ? c === homeCountry : c !== 'LEBANON';
@@ -1628,7 +1627,7 @@ router.post(
     const inquiry = await prisma.propertyInquiry.findUnique({
       where: { id: req.params.inquiryId },
       include: {
-        building: { select: { title: true, city: true, caza: true, mohafazat: true } },
+        building: { select: { title: true, city: true, caza: true, mohafazat: true, country: true } },
       },
     });
     if (!inquiry) { sendNotFound(res, 'Inquiry'); return; }
@@ -1647,7 +1646,8 @@ router.post(
     const now = new Date();
     const lead = await prisma.lead.create({
       data: {
-        market: 'LEBANON',
+        // A Georgian project's enquiry was filed under Lebanon.
+        market: inquiry.building && inquiry.building.country !== 'LEBANON' ? 'INTERNATIONAL' : 'LEBANON',
         type: 'BUYER',
         status: 'ACTIVE',
         subStatus: 'AWAITING_REPLY',

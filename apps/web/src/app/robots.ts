@@ -31,6 +31,20 @@ export default function robots(): MetadataRoute.Robots {
         allow: '/',
         disallow: ['/admin', '/portal', '/api/', '/auth/', '/share/', '/preview/'],
       },
+      // AI search and answer engines, by name. They were already allowed by
+      // "*", but several only treat a site as opted-in when their own agent is
+      // listed, and "*" also hands them the 2 s crawl delay. /llms.txt is the
+      // page written for them.
+      {
+        userAgent: [
+          'GPTBot', 'OAI-SearchBot', 'ChatGPT-User',
+          'ClaudeBot', 'Claude-SearchBot', 'Claude-User',
+          'PerplexityBot', 'Perplexity-User',
+          'Google-Extended', 'Applebot-Extended', 'CCBot',
+        ],
+        allow: '/',
+        disallow: ['/admin', '/portal', '/api/', '/auth/', '/share/', '/preview/'],
+      },
     ],
     sitemap: `${SITE_URL}/sitemap.xml`,
     host: SITE_URL,

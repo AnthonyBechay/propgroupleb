@@ -213,7 +213,7 @@ function ClientRow({
                 Investor
               </span>
             )}
-            <span className="text-[11px]">{countryFlag(l.market === 'GEORGIA' ? 'GEORGIA' : 'LEBANON')}</span>
+            <span className="text-[11px]">{l.market === 'LEBANON' ? '🇱🇧' : '🌍'}</span>
             <span className={`text-[10px] px-1.5 py-0.5 rounded ${STATUS_META[l.status].cls}`}>
               {STATUS_META[l.status].label}
             </span>

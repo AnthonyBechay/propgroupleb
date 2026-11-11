@@ -13,6 +13,7 @@ import { logger } from './utils/logger.js';
 import { validateEnv } from './utils/validate-env.js';
 import { ensureReferenceCodes } from './utils/reference.js';
 import { normaliseCrmData } from './utils/crm-bootstrap.js';
+import { backfillCountryNames } from './utils/country-backfill.js';
 import { startInstagramTokenRefresh } from './services/instagram-token.service.js';
 import { startQuietSweep } from './services/auto-reply.service.js';
 import { startFollowUpSweep } from './services/follow-up.service.js';
@@ -50,8 +51,10 @@ import financeRoutes from './routes/finance.js';
 import faqRoutes from './routes/faq.js';
 import pushRoutes from './routes/push.js';
 import webhookRoutes from './routes/webhooks.js';
+import marketRoutes from './routes/markets.js';
 import { privateFieldGuard } from './middleware/auth.js';
 import { realClientIp } from './utils/client-ip.js';
+import { trustedStorefront } from './utils/storefront.js';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -287,6 +290,8 @@ const expensiveLimiter = rateLimit({
   max: 30,
   standardHeaders: true,
   legacyHeaders: false,
+  // propgrp.com forwards its leads from one server; see utils/storefront.ts.
+  skip: (req) => trustedStorefront(req),
 });
 
 /**
@@ -399,6 +404,7 @@ app.use('/api/crm', crmRoutes);
 app.use('/api/webhooks', webhookRoutes);
 
 app.use('/api/fx-rates', fxRateRoutes);
+app.use('/api/markets', marketRoutes);
 
 // Legacy alias — keep /api/properties working during transition
 app.use('/api/properties', privateFieldGuard, propertyRoutes);
@@ -450,6 +456,11 @@ async function startServer() {
     // Each step gets its own guard on purpose: sharing one meant a failure in
     // the first silently skipped the second, and reported the wrong thing as
     // broken. Neither blocks startup — the site works without either.
+    // Not guarded like the two below: until this has run, every project reads
+    // as Lebanese. A failure stops the boot (the outer catch exits) so the
+    // previous container keeps serving instead.
+    await backfillCountryNames();
+
     try {
       await ensureReferenceCodes();
       logger.info('Reference codes ready');

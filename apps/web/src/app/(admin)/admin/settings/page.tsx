@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import {
-  Bell, Bot, ChevronRight, FileText, Gauge, Handshake, KeyRound, Megaphone, Palette, Percent, User, Users,
+  Bell, Bot, ChevronRight, FileText, Gauge, Globe, Handshake, KeyRound, Megaphone, Palette, Percent, User, Users,
 } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { canAccessAdminPath } from '@/lib/permissions'
@@ -50,6 +50,7 @@ const GROUPS: Array<{ label: string; cards: Card[] }> = [
   {
     label: 'Websites',
     cards: [
+      { href: '/admin/settings/markets', title: 'Markets', description: 'The countries and cities we sell in outside Lebanon. Add one and it becomes a choice on every property.', icon: Globe },
       { href: '/admin/content', title: 'Website content', description: 'Text and images on the public pages.', icon: FileText },
       { href: '/admin/settings/branding', title: 'Branding', description: 'The logo on exported property sheets and investor documents.', icon: Palette },
     ],

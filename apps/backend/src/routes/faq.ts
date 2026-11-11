@@ -2,6 +2,7 @@ import express, { type Request, type Response, type Router } from 'express';
 import { asyncHandler } from '../utils/errors.js';
 import { sendSuccess } from '../utils/response.js';
 import { getChatAiSettings } from '../services/ai-settings.service.js';
+import { normaliseMarket } from '../utils/market.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GET /api/faq?market=GEORGIA — the questions and answers the office chose to
@@ -17,7 +18,7 @@ const router: Router = express.Router();
 router.get(
   '/',
   asyncHandler(async (req: Request, res: Response) => {
-    const market = req.query.market === 'LEBANON' ? 'LEBANON' : 'GEORGIA';
+    const market = normaliseMarket(req.query.market) ?? 'INTERNATIONAL';
     const { knowledge } = await getChatAiSettings();
     sendSuccess(
       res,

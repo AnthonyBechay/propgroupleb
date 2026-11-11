@@ -9,6 +9,8 @@ import { sendSuccess, sendPaginated } from '../utils/response.js';
 import { parsePagination, buildPaginationResponse } from '../utils/pagination.js';
 import rateLimit from 'express-rate-limit';
 import { sendContactConfirmation, notifyAdminOfInquiry } from '../services/email.service.js';
+import { upsertLeadFromWebsite } from '../services/website-intake.service.js';
+import { trustedStorefront } from '../utils/storefront.js';
 
 const router: Router = express.Router();
 
@@ -16,6 +18,12 @@ const contactLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 5,
   message: { error: 'Too many contact submissions. Please try again later.' },
+  // propgrp.com forwards every one of its leads from ONE server, so to this
+  // limiter the whole Georgia site was a single visitor: the sixth enquiry in
+  // fifteen minutes — a good hour of an ad campaign — was refused. It applies
+  // its own per-visitor limit before forwarding; a forward that proves itself
+  // is not counted twice.
+  skip: (req) => trustedStorefront(req),
 });
 
 const contactSchema = z.object({
@@ -41,6 +49,17 @@ router.post('/', contactLimiter, asyncHandler(async (req: Request, res: Response
       // Georgian enquiry was indistinguishable from a Beirut one.
       site: requestScope(req),
     },
+  });
+
+  // Into the pipeline as a client, not only into the messages screen.
+  void upsertLeadFromWebsite({
+    name: data.name,
+    email: data.email,
+    phone: data.phone,
+    subject: data.subject,
+    message: data.message,
+    site: requestScope(req),
+    kind: 'contact form',
   });
 
   // Send email notifications (fire and forget)

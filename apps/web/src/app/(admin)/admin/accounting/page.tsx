@@ -27,7 +27,7 @@ interface Expense {
   category: Category
   amountUsd: number
   description: string | null
-  market: 'LEBANON' | 'GEORGIA' | null
+  market: 'LEBANON' | 'INTERNATIONAL' | null
 }
 
 interface DealRow {
@@ -64,7 +64,7 @@ interface Recurring {
   category: Category
   amountUsd: number
   description: string | null
-  market: 'LEBANON' | 'GEORGIA' | null
+  market: 'LEBANON' | 'INTERNATIONAL' | null
   dayOfMonth: number
   startsOn: string
   endsOn: string | null
@@ -76,7 +76,7 @@ interface OtherIncome {
   date: string
   amountUsd: number
   description: string | null
-  market: 'LEBANON' | 'GEORGIA' | null
+  market: 'LEBANON' | 'INTERNATIONAL' | null
 }
 
 interface Summary {
@@ -126,8 +126,8 @@ const monthLabel = (key: string) => {
   return new Date(y, m - 1, 1).toLocaleDateString(undefined, { month: 'short', year: 'numeric' })
 }
 
-type Office = 'all' | 'LEBANON' | 'GEORGIA'
-const OFFICE_LABEL: Record<Office, string> = { all: 'Both offices', LEBANON: '🇱🇧 Lebanon', GEORGIA: '🇬🇪 Georgia' }
+type Office = 'all' | 'LEBANON' | 'INTERNATIONAL'
+const OFFICE_LABEL: Record<Office, string> = { all: 'Both offices', LEBANON: '🇱🇧 Lebanon', INTERNATIONAL: '🌍 International' }
 
 /** Months, or the same figures added up by quarter. */
 function byQuarter(months: Summary['months']): Summary['months'] {
@@ -147,7 +147,7 @@ const csvCell = (v: string | number) => {
   return /[",\n]/.test(t) ? `"${t.replace(/"/g, '""')}"` : t
 }
 
-type Draft = { date: string; category: Category; amount: string; description: string; market: '' | 'LEBANON' | 'GEORGIA' }
+type Draft = { date: string; category: Category; amount: string; description: string; market: '' | 'LEBANON' | 'INTERNATIONAL' }
 const newDraft = (): Draft => ({ date: iso(new Date()), category: 'OFFICE', amount: '', description: '', market: '' })
 
 /**
@@ -197,7 +197,7 @@ export default function AccountingPage() {
   function exportCsv() {
     if (!summary) return
     const lines: Array<[string, string, string, string, number]> = []
-    const officeOf = (m?: string | null) => (m === 'LEBANON' ? 'Lebanon' : m === 'GEORGIA' ? 'Georgia' : 'Shared')
+    const officeOf = (m?: string | null) => (m === 'LEBANON' ? 'Lebanon' : m === 'INTERNATIONAL' ? 'International' : 'Shared')
     for (const d of summary.received) {
       lines.push([(d.commissionReceivedAt ?? '').slice(0, 10), 'Commission', `${d.lead.name} — ${d.title}`, officeOf(d.lead.market), d.commissionUsd ?? 0])
       if (d.brokerCutUsd) lines.push([(d.commissionReceivedAt ?? '').slice(0, 10), 'Broker share', `${d.broker?.name ?? 'Broker'} — ${d.title}`, officeOf(d.lead.market), -d.brokerCutUsd])
@@ -295,7 +295,7 @@ export default function AccountingPage() {
           <select value={draft.market} onChange={(e) => setDraft({ ...draft, market: e.target.value as Draft['market'] })} className={inp}>
             <option value="">Shared</option>
             <option value="LEBANON">Lebanon</option>
-            <option value="GEORGIA">Georgia</option>
+            <option value="INTERNATIONAL">International</option>
           </select>
         </label>
       </div>
@@ -456,7 +456,7 @@ export default function AccountingPage() {
                         <span className="w-20 shrink-0 text-xs text-slate-500">{new Date(e.date).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}</span>
                         <div className="min-w-0 flex-1">
                           <p className="truncate text-sm text-slate-900">{e.description || SHORT_LABEL[e.category]}</p>
-                          <p className="text-xs text-slate-500">{SHORT_LABEL[e.category]}{e.market ? ` · ${e.market === 'LEBANON' ? 'Lebanon' : 'Georgia'}` : ''}</p>
+                          <p className="text-xs text-slate-500">{SHORT_LABEL[e.category]}{e.market ? ` · ${e.market === 'LEBANON' ? 'Lebanon' : 'International'}` : ''}</p>
                         </div>
                         <span className="shrink-0 text-sm font-semibold text-slate-900">{money(e.amountUsd)}</span>
                         <button onClick={() => startEdit(e)} aria-label="Edit expense" className="flex min-h-11 min-w-11 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100"><Pencil className="h-4 w-4" /></button>
@@ -637,7 +637,7 @@ function DealEditor({ apiUrl, deal, onClose, onSaved }: { apiUrl: string; deal: 
   )
 }
 
-type IDraft = { date: string; amount: string; description: string; market: '' | 'LEBANON' | 'GEORGIA' }
+type IDraft = { date: string; amount: string; description: string; market: '' | 'LEBANON' | 'INTERNATIONAL' }
 const newIDraft = (): IDraft => ({ date: iso(new Date()), amount: '', description: '', market: '' })
 
 /**
@@ -694,7 +694,7 @@ function OtherIncomeSection({ apiUrl, rows, onChanged }: { apiUrl: string; rows:
           <select value={draft.market} onChange={(e) => setDraft({ ...draft, market: e.target.value as IDraft['market'] })} className={inp}>
             <option value="">Shared</option>
             <option value="LEBANON">Lebanon</option>
-            <option value="GEORGIA">Georgia</option>
+            <option value="INTERNATIONAL">International</option>
           </select>
         </label>
         <label className="col-span-2 block text-sm text-slate-700 sm:col-span-4">What for<input value={draft.description} onChange={(e) => setDraft({ ...draft, description: e.target.value })} placeholder="Consulting fee, rental management for…" className={inp} /></label>
@@ -732,7 +732,7 @@ function OtherIncomeSection({ apiUrl, rows, onChanged }: { apiUrl: string; rows:
                   <span className="w-20 shrink-0 text-xs text-slate-500">{new Date(r.date).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}</span>
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm text-slate-900">{r.description || 'Income'}</p>
-                    {r.market && <p className="text-xs text-slate-500">{r.market === 'LEBANON' ? 'Lebanon' : 'Georgia'}</p>}
+                    {r.market && <p className="text-xs text-slate-500">{r.market === 'LEBANON' ? 'Lebanon' : 'International'}</p>}
                   </div>
                   <span className="shrink-0 text-sm font-semibold text-emerald-700">{money(r.amountUsd)}</span>
                   <button onClick={() => start(r)} aria-label="Edit income" className="flex min-h-11 min-w-11 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100"><Pencil className="h-4 w-4" /></button>
@@ -808,7 +808,7 @@ function PlansSection({ plans, busy, onReceived, onEdit }: { plans: PlanRow[]; b
   )
 }
 
-type RDraft = { description: string; category: Category; amount: string; day: string; startsOn: string; endsOn: string; market: '' | 'LEBANON' | 'GEORGIA' }
+type RDraft = { description: string; category: Category; amount: string; day: string; startsOn: string; endsOn: string; market: '' | 'LEBANON' | 'INTERNATIONAL' }
 const firstOfMonth = () => { const d = new Date(); return iso(new Date(d.getFullYear(), d.getMonth(), 1)) }
 const newRDraft = (): RDraft => ({ description: '', category: 'OFFICE', amount: '', day: '0', startsOn: firstOfMonth(), endsOn: '', market: '' })
 const dayLabel = (n: number) => (n <= 0 ? 'last day of the month' : `the ${n}${n % 10 === 1 && n !== 11 ? 'st' : n % 10 === 2 && n !== 12 ? 'nd' : n % 10 === 3 && n !== 13 ? 'rd' : 'th'}`)
@@ -904,7 +904,7 @@ function RecurringSection({ apiUrl, onChanged }: { apiUrl: string; onChanged: ()
           <select value={draft.market} onChange={(e) => setDraft({ ...draft, market: e.target.value as RDraft['market'] })} className={inp}>
             <option value="">Shared</option>
             <option value="LEBANON">Lebanon</option>
-            <option value="GEORGIA">Georgia</option>
+            <option value="INTERNATIONAL">International</option>
           </select>
         </label>
       </div>
@@ -943,7 +943,7 @@ function RecurringSection({ apiUrl, onChanged }: { apiUrl: string; onChanged: ()
                     <p className="truncate text-sm text-slate-900">{r.description || SHORT_LABEL[r.category]}{!r.active && <span className="ml-2 rounded bg-slate-100 px-1.5 py-0.5 text-[11px] text-slate-500">Paused</span>}</p>
                     <p className="text-xs text-slate-500">
                       {SHORT_LABEL[r.category]} · on {dayLabel(r.dayOfMonth)} · from {monthYear(r.startsOn)}{r.endsOn ? ` to ${monthYear(r.endsOn)}` : ''}
-                      {r.market ? ` · ${r.market === 'LEBANON' ? 'Lebanon' : 'Georgia'}` : ''}
+                      {r.market ? ` · ${r.market === 'LEBANON' ? 'Lebanon' : 'International'}` : ''}
                     </p>
                   </div>
                   <span className="shrink-0 text-sm font-semibold text-slate-900">{money(r.amountUsd)}<span className="text-xs font-normal text-slate-500">/mo</span></span>

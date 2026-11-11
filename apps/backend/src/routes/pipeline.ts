@@ -73,7 +73,7 @@ router.get(
     const leads = await prisma.lead.findMany({
       where: {
         status: { notIn: ['WON', 'LOST', 'ARCHIVED'] },
-        ...(market === 'LEBANON' || market === 'GEORGIA' ? { market } : {}),
+        ...(market === 'LEBANON' || market === 'INTERNATIONAL' ? { market } : {}),
         opportunities: { none: { stage: { in: ADVANCED as never } } },
         // Someone in a live conversation, or a lead that came in on its own in
         // the last month (an ad form, a website enquiry). Everybody else is in

@@ -3,7 +3,8 @@
 import { useState } from 'react'
 import { Search, MapPin, X, Check, AlertTriangle } from 'lucide-react'
 import { searchLocations, isKnownLocation, MOHAFAZAT_LABEL, type LebanonLocation } from '@/lib/lebanon-locations'
-import { GEORGIA_AREAS, GEORGIA_REGION_LABEL, type AreaOption } from '@/lib/crm-locations'
+import { INTERNATIONAL_AREAS_BY_COUNTRY, regionLabel, type AreaOption } from '@/lib/crm-locations'
+import { countryLabel } from '@/lib/market'
 
 export interface LocationValue {
   mohafazat: string
@@ -145,9 +146,9 @@ function InternationalLocation({
 }) {
   const [q, setQ] = useState('')
 
-  // Only Georgia is catalogued today. Another country falls back to free text
-  // rather than blocking the save on a list that doesn't exist yet.
-  const catalogue: AreaOption[] = country === 'GEORGIA' ? GEORGIA_AREAS : []
+  // A country with a curated area list gets the search; any other falls back
+  // to free text rather than blocking the save on a list that doesn't exist.
+  const catalogue: AreaOption[] = INTERNATIONAL_AREAS_BY_COUNTRY[country] ?? []
   const hasCatalogue = catalogue.length > 0
 
   const results = q.trim().length < 2 ? [] : catalogue
@@ -174,7 +175,7 @@ function InternationalLocation({
       <div className="flex items-start gap-2 rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 text-xs text-sky-800">
         <MapPin className="w-4 h-4 mt-0.5 shrink-0" />
         <p>
-          In <strong>{country.charAt(0) + country.slice(1).toLowerCase()}</strong>, so it appears on
+          In <strong>{countryLabel(country)}</strong>, so it appears on
           propgrp.com. {hasCatalogue
             ? 'Pick the area from the list — the same one the CRM uses, so buyers looking here get matched.'
             : 'No curated list for this country yet, so type the city and district.'}
@@ -211,7 +212,7 @@ function InternationalLocation({
                       )}
                     </span>
                     <span className="text-xs text-slate-500 shrink-0">
-                      {GEORGIA_REGION_LABEL[a.region] ?? a.region}
+                      {regionLabel(a.region)}
                     </span>
                   </button>
                 ))}
@@ -225,7 +226,7 @@ function InternationalLocation({
                 <Check className="w-3.5 h-3.5" /> {summary}
                 {value.caza && (
                   <span className="text-emerald-600/80">
-                    · {GEORGIA_REGION_LABEL[value.caza] ?? value.caza}
+                    · {regionLabel(value.caza)}
                   </span>
                 )}
               </span>

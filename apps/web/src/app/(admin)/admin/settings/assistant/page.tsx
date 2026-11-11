@@ -21,13 +21,13 @@ interface Knowledge {
   answer: string
   /** Also published on the website, for visitors, search engines and AI assistants. */
   publish?: boolean
-  market?: 'GEORGIA' | 'LEBANON' | 'ALL'
+  market?: 'INTERNATIONAL' | 'LEBANON' | 'ALL'
 }
 
 interface Settings {
   enabled: boolean
   audience: 'ads' | 'all'
-  marketWhenUnknown: 'ask' | 'LEBANON' | 'GEORGIA'
+  marketWhenUnknown: 'ask' | 'LEBANON' | 'INTERNATIONAL'
   handover: 'step_aside' | 'return_after_quiet' | 'always'
   quietHours: 1 | 3 | 6 | 12 | 20
   preferred: Preferred[]
@@ -292,7 +292,7 @@ export default function AiSettingsPage() {
           onChange={(v) => update({ marketWhenUnknown: v })}
           options={[
             ['ask', 'Ask the client first', 'Lebanon or abroad — one short question before it searches anything. Someone from an ad is always taken to mean the ad\'s country.'],
-            ['GEORGIA', 'Assume Georgia', 'Investment property abroad, without asking.'],
+            ['INTERNATIONAL', 'Assume abroad', 'Investment property abroad, without asking.'],
             ['LEBANON', 'Assume Lebanon', 'Homes in Lebanon, without asking.'],
           ] as const}
         />
@@ -461,10 +461,10 @@ export default function AiSettingsPage() {
                   Show on the website
                 </label>
                 {k.publish && (
-                  <select value={k.market ?? 'GEORGIA'} aria-label="Which website"
+                  <select value={k.market ?? 'INTERNATIONAL'} aria-label="Which website"
                     onChange={(e) => update({ knowledge: settings.knowledge.map((x, j) => (j === i ? { ...x, market: e.target.value as Knowledge['market'] } : x)) })}
                     className="min-h-11 rounded-lg border border-slate-300 px-2 text-sm">
-                    <option value="GEORGIA">propgrp.com (abroad)</option>
+                    <option value="INTERNATIONAL">propgrp.com (abroad)</option>
                     <option value="LEBANON">propgrouplb.com (Lebanon)</option>
                     <option value="ALL">Both websites</option>
                   </select>
@@ -474,7 +474,7 @@ export default function AiSettingsPage() {
           ))}
         </ul>
         {settings.knowledge.length < 40 && (
-          <button onClick={() => update({ knowledge: [...settings.knowledge, { question: '', answer: '', publish: false, market: 'GEORGIA' }] })}
+          <button onClick={() => update({ knowledge: [...settings.knowledge, { question: '', answer: '', publish: false, market: 'INTERNATIONAL' }] })}
             className="mt-3 min-h-11 px-3 rounded-lg border border-slate-300 text-sm font-medium text-slate-800 inline-flex items-center gap-1.5 hover:bg-slate-50">
             <Plus className="h-4 w-4" /> Add a question
           </button>

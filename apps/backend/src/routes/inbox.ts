@@ -15,6 +15,7 @@ import { PAUSED_BY_TEAM, autoReplyEnabled, autoReplyStatus, runAutoReplyNow } fr
 import { cardCaption, cardsByRef, searchCatalogue, type Market } from '../services/catalogue.service.js';
 import { AppError } from '../utils/errors.js';
 import { recordListingsShared } from '../services/deal-sync.service.js';
+import { normaliseMarket } from '../utils/market.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // CRM inbox — WhatsApp and Instagram threads mirrored from Meta's webhooks
@@ -177,8 +178,9 @@ router.post(
       data.intents = Array.from(new Set([patch.intent, ...(lead.intents ?? [])]));
       note('Looking to', lead.type, patch.intent);
     }
-    if ((patch.market === 'LEBANON' || patch.market === 'GEORGIA') && patch.market !== lead.market) {
-      data.market = patch.market;
+    const patchMarket = normaliseMarket(patch.market);
+    if (patchMarket && patchMarket !== lead.market) {
+      data.market = patchMarket;
       note('Market', lead.market, patch.market);
     }
     if (Number.isFinite(patch.budgetMax) && patch.budgetMax !== lead.budgetMax) {
@@ -271,7 +273,7 @@ router.get(
     const lead = conversation.lead;
     const market: Market =
       said.market ?? lead?.market ??
-      ((process.env.LEAD_MARKET_WHATSAPP ?? '').toUpperCase() === 'LEBANON' ? 'LEBANON' : 'GEORGIA');
+      (normaliseMarket(process.env.LEAD_MARKET_WHATSAPP) ?? 'INTERNATIONAL');
 
     // Selling or renting out is not a search for stock; only a renter rents.
     const intent = said.intent ?? lead?.type;

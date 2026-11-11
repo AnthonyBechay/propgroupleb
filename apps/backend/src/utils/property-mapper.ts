@@ -308,7 +308,7 @@ export function mapBuildingToProperty(
     floors: toNumber(pick(building, 'totalFloors', 'floors')) ?? null,
     parkingSpaces: toNumber(pick(building, 'parkingSpaces')) ?? 0,
 
-    country: normaliseEnum(pick(building, 'country')) ?? 'GEORGIA',
+    country: normaliseEnum(pick(building, 'country')) ?? 'LEBANON',
     city: pick<string>(building, 'city') ?? null,
     district: pick<string>(building, 'neighborhood', 'neighbourhood', 'district') ?? null,
     address: pick<string>(building, 'address') ?? null,

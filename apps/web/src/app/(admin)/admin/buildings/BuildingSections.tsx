@@ -1,5 +1,6 @@
 'use client'
 
+import { CountryPicker } from '@/components/admin/CountryPicker'
 /**
  * The property form, in sections — the single source both create and edit render.
  *
@@ -37,15 +38,6 @@ interface SectionProps {
   set: Patch
   disabled?: boolean
 }
-
-// ── Markets ───────────────────────────────────────────────────────────────────
-
-const MARKETS = [
-  { value: 'LEBANON', label: '🇱🇧 Lebanon' },
-  { value: 'GEORGIA', label: '🇬🇪 Georgia' },
-  { value: 'CYPRUS', label: '🇨🇾 Cyprus' },
-  { value: 'GREECE', label: '🇬🇷 Greece' },
-]
 
 // ── Amenities ─────────────────────────────────────────────────────────────────
 
@@ -307,21 +299,20 @@ export function LocationSection({ f, set, disabled, errors }: SectionProps & { e
     >
       <div className="space-y-4">
         <Field
-          label="Market"
-          hint={<>This property will appear on <strong>{siteFor(f.country)}</strong>.</>}
-          className="max-w-xs"
+          label="Country"
+          hint={<>This property will appear on <strong>{siteFor(f.country)}</strong>{f.country !== 'LEBANON' && <>, with the other international projects</>}.</>}
+          className="max-w-md"
         >
-          <SelectInput
+          <CountryPicker
             value={f.country}
-            onChange={(e) => set({
-              country: e.target.value,
+            onChange={(country) => set({
+              country,
               // Lebanese administrative divisions don't survive a market change.
               mohafazat: '', caza: '',
             })}
             disabled={disabled}
-          >
-            {MARKETS.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
-          </SelectInput>
+            className="w-full min-h-11 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900/15"
+          />
         </Field>
 
         <LocationFields

@@ -20,7 +20,8 @@ import { mapBuildingToProperty } from '../utils/property-mapper.js';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-export type Market = 'LEBANON' | 'GEORGIA';
+export type { Market } from '../utils/market.js';
+import { countryLabel, type Market } from '../utils/market.js';
 export type Deal = 'SALE' | 'RENT';
 
 export interface CatalogueQuery {
@@ -87,7 +88,7 @@ function toCard(building: any): CatalogueCard | null {
   if (p.availabilityStatus !== 'AVAILABLE') return null;
   if (!p.referenceCode || !p.slug || !(p.price > 0)) return null;
 
-  const market: Market = p.country === 'LEBANON' ? 'LEBANON' : 'GEORGIA';
+  const market: Market = p.country === 'LEBANON' ? 'LEBANON' : 'INTERNATIONAL';
   // The price on the card is the cheapest live listing's when there is one, so
   // the card's sale-or-rent has to come from that same listing.
   const listings = liveListings(building);
@@ -205,6 +206,20 @@ export async function searchCatalogue(query: CatalogueQuery): Promise<CatalogueC
   if (budget) matches.sort((a, b) => Math.abs(budget - a.price) - Math.abs(budget - b.price));
 
   return matches.slice(0, query.limit ?? 6);
+}
+
+/**
+ * The countries we have live stock in outside Lebanon, as names: ["Georgia"],
+ * then ["Bulgaria", "Georgia"] the day a Bulgarian project is published. The
+ * chat assistant says these instead of a country written into its prompt.
+ */
+export async function internationalCountries(): Promise<string[]> {
+  const rows = await prisma.building.findMany({
+    where: { visibility: 'PUBLIC', country: { not: 'LEBANON' } },
+    distinct: ['country'],
+    select: { country: true },
+  });
+  return rows.map((r) => countryLabel(r.country)).filter(Boolean).sort();
 }
 
 /**

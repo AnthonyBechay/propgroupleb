@@ -55,8 +55,12 @@ export const metadata: Metadata = {
   creator: "PropGroup",
   publisher: "PropGroup",
   category: "real estate",
+  // "./" resolves against each page's own path. This used to be SITE_URL,
+  // which every page without its own canonical inherited — so /contact,
+  // /get-started, /terms and the rest all told Google "the real page is the
+  // homepage" and were dropped as duplicates of it.
   alternates: {
-    canonical: SITE_URL,
+    canonical: './',
   },
   openGraph: {
     type: "website",

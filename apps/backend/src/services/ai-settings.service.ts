@@ -1,4 +1,5 @@
 import { prisma } from '@propgroup/db';
+import { normaliseMarket } from '../utils/market.js';
 
 /**
  * How the chat assistant should behave, as the office sets it — kept in
@@ -30,7 +31,7 @@ export interface KnowledgeItem {
    */
   publish?: boolean;
   /** Which site it belongs on when published. */
-  market?: 'GEORGIA' | 'LEBANON' | 'ALL';
+  market?: 'INTERNATIONAL' | 'LEBANON' | 'ALL';
 }
 
 /**
@@ -92,7 +93,7 @@ export interface ChatAiSettings {
    * to them before anything is searched; otherwise that market is assumed.
    * (Someone from an ad is always taken to mean the ad's market.)
    */
-  marketWhenUnknown: 'ask' | 'LEBANON' | 'GEORGIA';
+  marketWhenUnknown: 'ask' | 'LEBANON' | 'INTERNATIONAL';
   /**
    * The projects the office most wants to sell, most wanted first. They are
    * recommended first whenever they fit what the client asked for.
@@ -163,7 +164,8 @@ export async function getChatAiSettings(): Promise<ChatAiSettings> {
     enabled: typeof saved.enabled === 'boolean' ? saved.enabled : d.enabled,
     switchedOnAt: typeof saved.switchedOnAt === 'string' ? saved.switchedOnAt : null,
     audience: oneOf(saved.audience, ['ads', 'all'] as const, d.audience),
-    marketWhenUnknown: oneOf(saved.marketWhenUnknown, ['ask', 'LEBANON', 'GEORGIA'] as const, d.marketWhenUnknown),
+    // A setting saved before the rename names the old market; it means international.
+    marketWhenUnknown: normaliseMarket(saved.marketWhenUnknown) ?? oneOf(saved.marketWhenUnknown, ['ask'] as const, d.marketWhenUnknown),
     handover: oneOf(saved.handover, ['step_aside', 'return_after_quiet', 'always'] as const, d.handover),
     quietHours: oneOf(saved.quietHours, [1, 3, 6, 12, 20] as const, d.quietHours),
     preferred: Array.isArray(saved.preferred)
@@ -184,7 +186,7 @@ export async function getChatAiSettings(): Promise<ChatAiSettings> {
             question: k.question,
             answer: k.answer,
             publish: k.publish === true,
-            market: k.market === 'LEBANON' || k.market === 'ALL' ? k.market : ('GEORGIA' as const),
+            market: k.market === 'LEBANON' || k.market === 'ALL' ? k.market : ('INTERNATIONAL' as const),
           }))
       : [],
     guidance: typeof saved.guidance === 'string' ? saved.guidance : '',

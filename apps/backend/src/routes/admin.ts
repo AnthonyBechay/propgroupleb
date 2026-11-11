@@ -13,10 +13,10 @@ type MarketScope = 'LEBANON' | 'INTERNATIONAL' | null;
 
 const OPEN_LEAD_STATUSES = ['NEW', 'ACTIVE', 'VIEWING', 'NEGOTIATING'] as const;
 
-/** A lead's market is GEORGIA where a building's is "not Lebanon". */
+/** A lead's market is INTERNATIONAL where a building's is "not Lebanon". */
 const leadMarketWhere = (market: MarketScope) =>
   market === 'LEBANON' ? { market: 'LEBANON' as const }
-  : market === 'INTERNATIONAL' ? { market: 'GEORGIA' as const }
+  : market === 'INTERNATIONAL' ? { market: 'INTERNATIONAL' as const }
   : {};
 
 /** A listing hangs off a building directly, or through one of its units. */

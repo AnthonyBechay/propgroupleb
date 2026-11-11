@@ -7,7 +7,8 @@
 
 import { LEBANON_LOCATIONS, MOHAFAZAT_LABEL } from './lebanon-locations'
 
-export type Market = 'LEBANON' | 'GEORGIA'
+export type Market = 'LEBANON' | 'INTERNATIONAL'
+
 
 export interface AreaOption {
   /** Value stored on the lead (`areas[]`). */
@@ -59,6 +60,18 @@ export const GEORGIA_AREAS: AreaOption[] = [
   ...ge(['Mtskheta', 'Gudauri', 'Stepantsminda (Kazbegi)', 'Bakuriani'], 'Mtskheta', 'GE_MTSKHETA'),
 ]
 
+/**
+ * Curated area lists for countries abroad, keyed by `Building.country`. A
+ * country with no entry here still works everywhere — its projects just take a
+ * typed city and district instead of a search. Add a list when a market grows.
+ */
+export const INTERNATIONAL_AREAS_BY_COUNTRY: Record<string, AreaOption[]> = {
+  GEORGIA: GEORGIA_AREAS,
+}
+
+/** Every curated area abroad — what a client looking internationally picks from. */
+export const INTERNATIONAL_AREAS: AreaOption[] = Object.values(INTERNATIONAL_AREAS_BY_COUNTRY).flat()
+
 // ── Lebanon (derived from the property gazetteer, so the two never drift) ────
 export const LEBANON_AREAS: AreaOption[] = LEBANON_LOCATIONS.map((l) => ({
   name: l.name,
@@ -69,7 +82,7 @@ export const LEBANON_AREAS: AreaOption[] = LEBANON_LOCATIONS.map((l) => ({
 
 /** Every area option for a market, de-duplicated by name and sorted. */
 export function areasFor(market: Market): AreaOption[] {
-  const src = market === 'GEORGIA' ? GEORGIA_AREAS : LEBANON_AREAS
+  const src = market === 'INTERNATIONAL' ? INTERNATIONAL_AREAS : LEBANON_AREAS
   const seen = new Set<string>()
   return src
     .filter((a) => {
@@ -83,7 +96,7 @@ export function areasFor(market: Market): AreaOption[] {
 
 /** Region options (value + label) for a market. */
 export function regionsFor(market: Market): Array<{ value: string; label: string }> {
-  const labels = market === 'GEORGIA' ? GEORGIA_REGION_LABEL : MOHAFAZAT_LABEL
+  const labels = market === 'INTERNATIONAL' ? GEORGIA_REGION_LABEL : MOHAFAZAT_LABEL
   return Object.entries(labels).map(([value, label]) => ({ value, label }))
 }
 
@@ -95,7 +108,7 @@ export function regionLabel(value?: string | null): string {
 
 /** Districts (cazas) available in a market, optionally narrowed to regions. */
 export function cazasFor(market: Market, regions: string[] = []): string[] {
-  const src = market === 'GEORGIA' ? GEORGIA_AREAS : LEBANON_AREAS
+  const src = market === 'INTERNATIONAL' ? INTERNATIONAL_AREAS : LEBANON_AREAS
   const pool = regions.length ? src.filter((a) => regions.includes(a.region)) : src
   return Array.from(new Set(pool.map((a) => a.caza))).sort()
 }
@@ -115,6 +128,6 @@ export function searchAreas(market: Market, query: string, regions: string[] = [
 
 /** The region an area belongs to (used to auto-fill region from a picked area). */
 export function regionOfArea(market: Market, areaName: string): string | undefined {
-  const src = market === 'GEORGIA' ? GEORGIA_AREAS : LEBANON_AREAS
+  const src = market === 'INTERNATIONAL' ? INTERNATIONAL_AREAS : LEBANON_AREAS
   return src.find((a) => a.name.toLowerCase() === areaName.toLowerCase())?.region
 }

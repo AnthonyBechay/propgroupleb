@@ -1,14 +1,20 @@
 import express, { type Request, type Response, type Router } from 'express';
+import crypto from 'node:crypto';
 import { z } from 'zod';
 import { prisma } from '@propgroup/db';
 import { authenticateToken, requireAdmin, logAdminAction } from '../middleware/auth.js';
 import { asyncHandler } from '../utils/errors.js';
 import { AI_MODEL, aiFailureMessage, checkAiAccess, createText, isAiEnabled } from '../config/ai.js';
 import { logger } from '../utils/logger.js';
+import { countryLabel } from '../utils/market.js';
 import { sendSuccess, sendError } from '../utils/response.js';
 import type { AuthenticatedRequest } from '../types/index.js';
 
 const router: Router = express.Router();
+
+/** Replies by prompt hash. In memory on purpose: it is a saving, not a record. */
+const seoCache = new Map<string, { text: string; at: number }>();
+const SEO_CACHE_MS = 24 * 60 * 60 * 1000;
 
 
 
@@ -72,13 +78,27 @@ const AMENITY_LABELS: Array<[string, string]> = [
   ['hasGarden', 'garden'], ['hasRooftop', 'rooftop'], ['hasSolarPower', 'solar power'],
 ];
 
+/**
+ * "District, City, Country". The country used to be the literal word
+ * "Lebanon" here, so a project abroad was described to the model as being in
+ * Lebanon two lines under an instruction to write for its real country.
+ * No country on the record → none is stated, rather than a guess.
+ */
+function locationLine(b: Record<string, unknown>): string {
+  const country = countryLabel(b.country);
+  return [b.neighborhood, b.city, b.caza, MOHAFAZAT_LABELS[b.mohafazat as string] ?? b.mohafazat, country]
+    .filter(Boolean)
+    // "Batumi, Batumi" when the district and the city are the same word.
+    .filter((part, i, all) => all.indexOf(part) === i)
+    .join(', ');
+}
+
 function buildingFacts(b: Record<string, unknown>): string {
-  const loc = [b.neighborhood, b.city, b.caza, MOHAFAZAT_LABELS[b.mohafazat as string] ?? b.mohafazat]
-    .filter(Boolean).join(', ');
+  const loc = locationLine(b);
   const amenities = AMENITY_LABELS.filter(([k]) => b[k]).map(([, label]) => label);
   return [
     `Name: ${b.title}`,
-    loc && `Location: ${loc}, Lebanon`,
+    loc && `Location: ${loc}`,
     b.kind && `Kind: ${String(b.kind).toLowerCase()}`,
     b.status && `Status: ${String(b.status).replace(/_/g, ' ').toLowerCase()}`,
     b.totalFloors && `Floors: ${b.totalFloors}`,
@@ -87,16 +107,15 @@ function buildingFacts(b: Record<string, unknown>): string {
     amenities.length && `Amenities: ${amenities.join(', ')}`,
     Array.isArray(b.highlightedFeatures) && b.highlightedFeatures.length &&
       `Highlights: ${(b.highlightedFeatures as string[]).join(', ')}`,
-    b.description && `Existing description: ${String(b.description).slice(0, 600)}`,
+    b.description && `Existing description: ${String(b.description).replace(/\s+/g, ' ').slice(0, 400)}`,
   ].filter(Boolean).join('\n');
 }
 
 function unitFacts(u: Record<string, unknown>, b: Record<string, unknown>): string {
-  const loc = [b.neighborhood, b.city, b.caza, MOHAFAZAT_LABELS[b.mohafazat as string] ?? b.mohafazat]
-    .filter(Boolean).join(', ');
+  const loc = locationLine(b);
   return [
     `Building: ${b.title}`,
-    loc && `Location: ${loc}, Lebanon`,
+    loc && `Location: ${loc}`,
     u.name && `Unit name: ${u.name}`,
     u.unitNumber && `Unit number: ${u.unitNumber}`,
     u.kind && `Type: ${String(u.kind).toLowerCase()}`,
@@ -141,19 +160,10 @@ router.post(
      * for it (all 18 Georgian buildings still have null metaTitle).
      */
     const marketFor = (country?: unknown): { platform: string; place: string } => {
-      switch (String(country ?? '').toUpperCase()) {
-        case 'GEORGIA':
-          return { platform: 'a Georgian property platform', place: 'Georgia' };
-        case 'CYPRUS':
-          return { platform: 'a Cypriot property platform', place: 'Cyprus' };
-        case 'GREECE':
-          return { platform: 'a Greek property platform', place: 'Greece' };
-        case 'LEBANON':
-          return { platform: 'a Lebanese property platform', place: 'Lebanon' };
-        default:
-          // No country on the record: omit the country cue rather than guess.
-          return { platform: 'an international property platform', place: '' };
-      }
+      // Whatever country is on the record; there is no list to keep up.
+      const place = countryLabel(country);
+      // No country on the record: omit the country cue rather than guess.
+      return { platform: place ? `a property platform for ${place}` : 'an international property platform', place };
     };
 
     if (type === 'building') {
@@ -173,7 +183,7 @@ router.post(
 Return ONLY JSON with exactly these keys:
 {
   "metaTitle": "<=60 chars, compelling, include the location${market.place ? ` and '${market.place}'` : ''}",
-  "metaDescription": "<=155 chars, persuasive search snippet with location, type and a key selling point",
+  "metaDescription": "<=155 chars: a plain factual sentence an AI answer could quote (what it is, where, one concrete fact), then one selling point",
   "shortDescription": "<=120 chars, a punchy one-liner for listing cards"
 }`;
     } else {
@@ -190,7 +200,7 @@ Return ONLY JSON with exactly these keys:
   "description": "2-3 sentences (<=320 chars), warm and specific, highlighting the best features",
   "highlights": ["3 to 5 very short selling points, each <=4 words"],
   "metaTitle": "<=60 chars including location${market.place ? ` and '${market.place}'` : ''}",
-  "metaDescription": "<=155 chars persuasive search snippet"
+  "metaDescription": "<=155 chars: a plain factual sentence an AI answer could quote (type, beds, size, where), then one selling point"
 }`;
     }
 
@@ -206,12 +216,30 @@ Rules: be accurate to the facts (never invent amenities, prices or sizes), write
       // Routed through config/ai.ts, which pins the model to the cheap-tier
       // allowlist, caps output tokens, logs per-call cost, and refuses to run
       // unless AI_ENABLED=true. There is deliberately no way to pass a model.
-      const text = await createText({
-        messages: [{ role: 'user', content: prompt }],
-        maxTokens: 600,
-      });
+      // The same facts give the same copy: a second press of "Auto-write" on
+      // an unchanged record is answered from memory and costs nothing.
+      const cacheKey = crypto.createHash('sha256').update(prompt).digest('hex');
+      const cached = seoCache.get(cacheKey);
+      let text: string;
+      if (cached && Date.now() - cached.at < SEO_CACHE_MS && req.query.fresh !== '1') {
+        text = cached.text;
+      } else {
+        const reply = await createText({
+          // Starting the reply at "{" means no ```json fence and no preamble to
+          // pay for, and nothing for the parser to strip.
+          messages: [{ role: 'user', content: prompt }, { role: 'assistant', content: '{' }],
+          // What the JSON can actually need: three short fields for a
+          // building (~110 tokens), five for a unit (~220). The ceiling was 600
+          // for both, which only ever paid for a reply that had gone wrong.
+          maxTokens: type === 'building' ? 220 : 360,
+        });
+        text = reply.trimStart().startsWith('{') ? reply : `{${reply}`;
+      }
       const parsed = parseJsonReply(text);
       if (!parsed) { sendError(res, 502, 'AI returned an unparseable response. Try again.'); return; }
+      // Only a reply that parsed is worth keeping.
+      if (seoCache.size >= 200) seoCache.delete(seoCache.keys().next().value as string);
+      seoCache.set(cacheKey, { text, at: Date.now() });
 
       let result: Record<string, unknown>;
       if (type === 'building') {

@@ -8,6 +8,8 @@ import { sendSuccess, sendCreated, sendPaginated, sendNotFound } from '../utils/
 import { parsePagination, buildPaginationResponse } from '../utils/pagination.js';
 import { inquirySchema } from '../schemas/index.js';
 import { sendInquiryConfirmation, notifyAdminOfInquiry } from '../services/email.service.js';
+import { upsertLeadFromWebsite } from '../services/website-intake.service.js';
+import { requestScope } from '../utils/market.js';
 import type { AuthenticatedRequest, MaybeAuthRequest } from '../types/index.js';
 
 const router: Router = express.Router();
@@ -39,6 +41,17 @@ router.post(
         building: { select: { id: true, title: true } },
         user: { select: { id: true, email: true, firstName: true, lastName: true } },
       },
+    });
+
+    // Into the pipeline as a client with an enquiry on this property.
+    void upsertLeadFromWebsite({
+      name: validatedData.name,
+      email: validatedData.email,
+      phone: validatedData.phone,
+      message: validatedData.message,
+      site: requestScope(req),
+      buildingId: building.id,
+      kind: 'property enquiry',
     });
 
     // Send email notifications (fire and forget)

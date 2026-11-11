@@ -4,17 +4,17 @@ import { prisma } from '@propgroup/db';
 import { authenticateToken, requireAdmin, logAdminAction } from '../middleware/auth.js';
 import { asyncHandler } from '../utils/errors.js';
 import { sendSuccess, sendCreated, sendNotFound } from '../utils/response.js';
+import { countrySchema, publicCountryFilter } from '../utils/market.js';
 import type { AuthenticatedRequest } from '../types/index.js';
 
 const router: Router = express.Router();
 
 // One back office, two websites — guides exist for every market we sell.
-const COUNTRIES = ['LEBANON', 'GEORGIA', 'CYPRUS', 'GREECE'] as const;
 
 const locationGuideSchema = z.object({
   title: z.string().min(1, 'Title is required').max(200),
   content: z.string().min(1, 'Content is required'),
-  country: z.enum(COUNTRIES),
+  country: countrySchema,
   imageUrl: z.string().url().nullish().or(z.literal('')),
 });
 
@@ -24,11 +24,12 @@ const updateSchema = locationGuideSchema.partial();
 router.get(
   '/',
   asyncHandler(async (req: Request, res: Response) => {
-    const { country } = req.query;
     const where: Record<string, unknown> = {};
-    if (country && typeof country === 'string' && COUNTRIES.includes(country as any)) {
-      where.country = country;
-    }
+    // Scoped like every other public read: one named country, else the
+    // asking site's market. Unscoped, propgrp.com asking for "all" guides was
+    // handed the Lebanese ones too.
+    const scope = publicCountryFilter(req);
+    if (scope) where.country = scope;
 
     const guides = await prisma.locationGuide.findMany({
       where,

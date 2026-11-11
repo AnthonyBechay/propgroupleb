@@ -1,6 +1,6 @@
 import { ALL_PROPERTY_KINDS, typeLabel } from '@/lib/property-types'
 
-export type LeadMarket = 'LEBANON' | 'GEORGIA'
+export type LeadMarket = 'LEBANON' | 'INTERNATIONAL'
 export type LeadType = 'BUYER' | 'SELLER' | 'RENTER' | 'LANDLORD' | 'INVESTOR'
 export type LeadStatus = 'NEW' | 'ACTIVE' | 'VIEWING' | 'NEGOTIATING' | 'WON' | 'LOST' | 'ARCHIVED'
 export type LeadSource = 'MANUAL' | 'INQUIRY' | 'FAVORITE' | 'SUBMISSION' | 'REFERRAL' | 'WHATSAPP' | 'PHONE' | 'WALK_IN' | 'FACEBOOK_AD'
@@ -477,7 +477,7 @@ export const TYPE_META: Record<LeadType, {
 
 export const MARKET_META: Record<LeadMarket, { label: string; cls: string }> = {
   LEBANON: { label: '🇱🇧 Lebanon', cls: 'bg-slate-100 text-slate-700' },
-  GEORGIA: { label: '🇬🇪 Georgia', cls: 'bg-teal-100 text-teal-800' },
+  INTERNATIONAL: { label: '🌍 International', cls: 'bg-teal-100 text-teal-800' },
 }
 
 // Clients can be looking for anything we sell — including commercial — so this

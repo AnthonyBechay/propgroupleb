@@ -3,7 +3,8 @@ import { ChatModelUnavailableError, ChatSession, chatAiEnabled, chatModelOrder, 
 import { createText, isAiEnabled } from '../config/ai.js';
 import { aiBudget } from '../utils/ai-budget.js';
 import { logger } from '../utils/logger.js';
-import { cardCaption, cardsByRef, formatPrice, marketNames, projectsNamedIn, propertyDetails, searchCatalogue, type Market } from './catalogue.service.js';
+import { normaliseMarket } from '../utils/market.js';
+import { cardCaption, cardsByRef, formatPrice, internationalCountries, marketNames, projectsNamedIn, propertyDetails, searchCatalogue, type Market } from './catalogue.service.js';
 import { recordListingsShared } from './deal-sync.service.js';
 import { getChatAiSettings, type ChatAiSettings } from './ai-settings.service.js';
 import { linkConversationToLead } from './messaging-intake.service.js';
@@ -300,7 +301,7 @@ const TOOLS: ChatTool[] = [
     parameters: {
       type: 'object',
       properties: {
-        market: { type: 'string', enum: ['LEBANON', 'GEORGIA'], description: 'Country the client wants. GEORGIA covers all stock outside Lebanon.' },
+        market: { type: 'string', enum: ['LEBANON', 'INTERNATIONAL'], description: 'LEBANON, or INTERNATIONAL for all stock outside Lebanon.' },
         deal: { type: 'string', enum: ['SALE', 'RENT'], description: 'Buying or renting. Only Lebanon has rentals; abroad is always SALE.' },
         area: { type: 'string', description: 'City, district or project name in English, e.g. "Batumi", "Achrafieh". Omit to search the whole market.' },
         minBeds: { type: 'integer', description: 'Minimum bedrooms. 0 for a studio.' },
@@ -338,7 +339,7 @@ const TOOLS: ChatTool[] = [
       type: 'object',
       properties: {
         intent: { type: 'string', enum: ['BUYER', 'RENTER', 'SELLER', 'LANDLORD'] },
-        market: { type: 'string', enum: ['LEBANON', 'GEORGIA'] },
+        market: { type: 'string', enum: ['LEBANON', 'INTERNATIONAL'] },
         area: { type: 'string', description: 'Areas they named, in English.' },
         minBeds: { type: 'integer' },
         budgetMax: { type: 'number', description: 'Plain number in USD.' },
@@ -670,8 +671,8 @@ export function internalNote(text: string, written: string[] = []): boolean {
   });
 }
 
-function systemPrompt(context: string, replyStyle: ChatAiSettings['replyStyle'], thisReply: string): string {
-  return `You are the assistant for PropGroup, a real estate brokerage, replying to a client on WhatsApp or Instagram. PropGroup sells and rents property in Lebanon and sells investment property abroad, mainly in Georgia.
+function systemPrompt(context: string, replyStyle: ChatAiSettings['replyStyle'], thisReply: string, abroad: string): string {
+  return `You are the assistant for PropGroup, a real estate brokerage, replying to a client on WhatsApp or Instagram. PropGroup sells and rents property in Lebanon and sells investment property abroad${abroad === 'abroad' ? '' : `, currently in ${abroad}`}.
 
 How to write:
 ${LANGUAGE_RULE[replyStyle]}${thisReply ? `\n- ${thisReply}` : ''}
@@ -693,7 +694,7 @@ What to do:
 - Photos, floor plans, the location and the full details of every property are on its own page, and send_listings puts the link to that page in your message. So when a client asks for pictures, more details, the location or "more info" about a property, attach it with send_listings and tell them everything is at the link. That is an answer you can give yourself — never hand off, and never promise that a colleague will send photos or details.
 
 How the two markets work:
-- Abroad (Georgia) PropGroup sells PROJECTS: developments with several unit types and a "from" price. It is always a purchase, usually for investment. Never ask a Georgia client whether they want to buy or rent, never offer rentals, and do not bring up Lebanon unless they do. Useful questions there are budget, unit size, and when they want to buy.
+- Abroad PropGroup sells PROJECTS: developments with several unit types and a "from" price. It is always a purchase, usually for investment. Never ask a client buying abroad whether they want to buy or rent, never offer rentals, and do not bring up Lebanon unless they do. Useful questions there are budget, unit size, and when they want to buy.
 - Lebanon is sold property by property, and a property is either for sale or for rent — ask which if it is not clear, and pass it to search_listings.
 - A project's "from" price is one unit in its cheapest finish, not the project. When a client names a price or asks what it includes (is it furnished, which view), call get_property_details and say exactly what that price gets them, from its priceNote: the unit, the finish and the view. If they want something it does not include, give the finish that has it and that finish's price. Never answer yes from the project's general description.
 - Furnishing goes by the finish, shown as "furnished" on each option: Black Frame and White Frame are not furnished, Turnkey is.
@@ -733,7 +734,7 @@ async function fallbackReply(
   return (
     await createText({
       maxTokens: 250,
-      system: `You are the assistant for PropGroup, a real estate brokerage, replying to a client on WhatsApp. This conversation is about property in ${market === 'LEBANON' ? 'Lebanon' : 'Georgia'}.
+      system: `You are the assistant for PropGroup, a real estate brokerage, replying to a client on WhatsApp. This conversation is about property ${market === 'LEBANON' ? 'in Lebanon' : 'abroad'}.
 
 ${LANGUAGE_RULE[replyStyle]}
 - One or two short sentences, at most one question. No lists, no markdown.
@@ -1004,10 +1005,13 @@ async function reply(conversationId: string, trigger: 'message' | 'sweep' | 'man
     select: { patch: true },
   });
   const said = Object.assign({}, ...learned.map((x) => x.patch ?? {})) as { market?: string; fullName?: string };
-  const adMarket: Market = (process.env.LEAD_MARKET_META ?? 'GEORGIA').toUpperCase() === 'LEBANON' ? 'LEBANON' : 'GEORGIA';
+  const adMarket: Market = normaliseMarket(process.env.LEAD_MARKET_META) ?? 'INTERNATIONAL';
+  // Where "abroad" is today, from the stock itself: "Georgia", "Bulgaria or Georgia".
+  const abroadCountries = await internationalCountries();
+  const abroad = abroadCountries.length ? abroadCountries.join(' or ') : 'abroad';
   const knownMarket: Market | null =
-    said.market === 'LEBANON' || said.market === 'GEORGIA'
-      ? said.market
+    normaliseMarket(said.market)
+      ? (normaliseMarket(said.market) as Market)
       // An opening WhatsApp hid is almost always the advert's greeting (see openingUnreadable).
       : fromAd || trace.openingUnreadable
         ? adMarket
@@ -1015,9 +1019,11 @@ async function reply(conversationId: string, trigger: 'message' | 'sweep' | 'man
           ? null
           : settings.marketWhenUnknown;
   // A client asked this once and answered something else was asked twice more.
-  const askedMarket = recent.some((m) => m.origin === 'AI' && /georgia|جورجيا/i.test(m.body) && /lebanon|lebnen|لبنان/i.test(m.body));
+  // The question names Lebanon and either "abroad" or a country we sell in.
+  const abroadWords = new RegExp(['abroad', 'الخارج', 'barra', 'جورجيا', ...abroadCountries].join('|'), 'i');
+  const askedMarket = recent.some((m) => m.origin === 'AI' && abroadWords.test(m.body) && /lebanon|lebnen|لبنان/i.test(m.body));
   // For the ad's project and the preferred list when nothing is known yet.
-  const defaultMarket: Market = knownMarket ?? 'GEORGIA';
+  const defaultMarket: Market = knownMarket ?? 'INTERNATIONAL';
 
   // A client an ad created is named after their WhatsApp profile — "Bilal",
   // "rimoncharro7" — and listing that as their name, "do not ask again", is
@@ -1118,10 +1124,10 @@ async function reply(conversationId: string, trigger: 'message' | 'sweep' | 'man
       : null,
     settings.guidance ? `Keep in mind (from the office):\n${settings.guidance}` : null,
     knownMarket
-      ? `This is about ${knownMarket === 'LEBANON' ? 'Lebanon' : 'Georgia'} — do not ask which country unless they bring up another.`
+      ? `This is about ${knownMarket === 'LEBANON' ? 'Lebanon' : `property abroad (${abroad})`} — do not ask which market unless they bring up the other.`
       : askedMarket
-        ? 'You already asked whether they want Lebanon or Georgia. Do not ask again. Unless they named one, take it as open to both ("both", "I don\'t mind", or answering something else): search Georgia, and Lebanon too if it fits what they said, and show them what you have.'
-      : 'You do not know yet whether they want property in Lebanon or an investment abroad. Before searching or suggesting anything, ask exactly that, in one short question — in substance: "Are you looking for an investment abroad in Georgia, or for a property in Lebanon?" (in the client\'s language style). Do not ask which area of Lebanon until they have chosen Lebanon.',
+        ? 'You already asked whether they want Lebanon or abroad. Do not ask again. Unless they named one, take it as open to both ("both", "I don\'t mind", or answering something else): search abroad, and Lebanon too if it fits what they said, and show them what you have.'
+      : `You do not know yet whether they want property in Lebanon or an investment abroad. Before searching or suggesting anything, ask exactly that, in one short question — in substance: "Are you looking for an investment abroad (${abroad}), or for a property in Lebanon?" (in the client's language style). Do not ask which area of Lebanon until they have chosen Lebanon.`,
     `Offer at most ${settings.maxListings} propert${settings.maxListings === 1 ? 'y' : 'ies'} in one reply.`,
     office.address
       ? `If they ask where you are, for the address, or to visit or meet: the office is ${office.name || 'PropGroup'}, ${office.address}.${office.mapsUrl ? ` Map: ${office.mapsUrl}` : ''} Give the map link exactly as it is.`
@@ -1190,7 +1196,7 @@ async function reply(conversationId: string, trigger: 'message' | 'sweep' | 'man
     reply = '';
     toolLog = [];
     turns = 0;
-    const session = new ChatSession(systemPrompt(context, settings.replyStyle, language.rule), tools, { feature: 'chat-reply', conversationId }, model);
+    const session = new ChatSession(systemPrompt(context, settings.replyStyle, language.rule, abroad), tools, { feature: 'chat-reply', conversationId }, model);
     sessions.push(session);
     try {
   for (let turn = 0; turn < MAX_MODEL_TURNS; turn++) {
@@ -1218,7 +1224,7 @@ async function reply(conversationId: string, trigger: 'message' | 'sweep' | 'man
 
       if (call.name === 'search_listings') {
         const cards = await searchCatalogue({
-          market: args.market === 'LEBANON' ? 'LEBANON' : 'GEORGIA',
+          market: args.market === 'LEBANON' ? 'LEBANON' : 'INTERNATIONAL',
           deal: args.deal === 'RENT' ? 'RENT' : 'SALE',
           area: typeof args.area === 'string' ? args.area : null,
           minBeds: Number.isFinite(args.minBeds) ? Number(args.minBeds) : null,
@@ -1496,7 +1502,7 @@ function nameWasGiven(name: string, said: string[]): boolean {
 async function saveSuggestion(conversationId: string, leadId: string | null, args: Record<string, any>): Promise<void> {
   const patch: Record<string, unknown> = {};
   if (['BUYER', 'RENTER', 'SELLER', 'LANDLORD'].includes(args.intent)) patch.intent = args.intent;
-  if (args.market === 'LEBANON' || args.market === 'GEORGIA') patch.market = args.market;
+  { const m = normaliseMarket(args.market); if (m) patch.market = m; }
   if (typeof args.area === 'string' && args.area.trim()) patch.area = args.area.trim().slice(0, 120);
   if (Number.isFinite(args.minBeds) && args.minBeds >= 0 && args.minBeds <= 20) patch.minBeds = Math.round(args.minBeds);
   if (Number.isFinite(args.budgetMax) && args.budgetMax > 0) patch.budgetMax = Number(args.budgetMax);

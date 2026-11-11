@@ -156,7 +156,7 @@ export function ImportModal({ onClose, onImported }: { onClose: () => void; onIm
       headers.forEach((field, i) => { if (field) rec[field] = cells[i] ?? '' })
       if (!rec.name?.trim()) continue
 
-      const market: Market = (rec.market || '').toLowerCase().includes('georg') ? 'GEORGIA' : 'LEBANON'
+      const market: Market = (rec.market || '').toLowerCase().match(/georg|internat|abroad/) ? 'INTERNATIONAL' : 'LEBANON'
       const askingFor = (rec.askingFor || '').trim()
       const notes = [rec.notes, rec.areas ? `Areas from sheet: ${rec.areas}` : ''].filter(Boolean).join('\n').trim()
       // Areas are free text in the sheet — resolve what we can against the
@@ -278,7 +278,7 @@ export function ImportModal({ onClose, onImported }: { onClose: () => void; onIm
                       <div key={i} className="px-3 py-2 text-sm flex items-center justify-between gap-2">
                         <span className="font-medium text-slate-800 truncate">{r.name}</span>
                         <span className="text-xs text-slate-500 shrink-0">
-                          {r.type} · {r.market === 'GEORGIA' ? '🇬🇪' : '🇱🇧'} · {r.phone || 'no phone'}
+                          {r.type} · {r.market === 'INTERNATIONAL' ? '🌍' : '🇱🇧'} · {r.phone || 'no phone'}
                           {r.unitKinds.length > 0 && ` · ${r.unitKinds.join('/')}`}
                           {r.areas.length > 0 && ` · ${r.areas.slice(0, 2).join(', ')}`}
                         </span>

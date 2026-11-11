@@ -20,8 +20,9 @@ import {
   ListFilter,
   ClipboardList,
   UserSearch,
-  X, MessageCircle, Bot, Bell, Gauge, Wallet, Handshake, Percent, Megaphone,
+  X, MessageCircle, Bot, Bell, Gauge, Wallet, Handshake, Percent, Megaphone, Map as MapIcon,
 } from 'lucide-react'
+import { CITY_MAPS } from '@/lib/city-maps'
 import { useAuth } from '@/contexts/AuthContext'
 import { canAccessAdminPath, isSuperAdmin, ROLE_LABELS, type Role } from '@/lib/permissions'
 import { cn } from '@/lib/utils'
@@ -83,6 +84,8 @@ const GROUPS: NavGroup[] = [
       // place to look.
       { name: 'Properties', href: '/admin/buildings', icon: Building2, match: ['/admin/listings'] },
       { name: 'Location guides', href: '/admin/location-guides', icon: MapPin },
+      // One entry per city in lib/city-maps — a new city adds itself here.
+      ...CITY_MAPS.map((c) => ({ name: `Understand ${c.city}`, href: `/admin/city-maps/${c.slug}`, icon: MapIcon })),
       { name: 'Documents', href: '/admin/documents', icon: FileText },
     ],
   },
@@ -120,6 +123,7 @@ export const ADMIN_NAV_ITEMS = [
   { name: 'Notifications', href: '/admin/settings/notifications', icon: Bell },
   { name: 'AI usage and budget', href: '/admin/settings/ai-usage', icon: Gauge },
   { name: 'Commission', href: '/admin/settings/commission', icon: Percent },
+  { name: 'Markets', href: '/admin/settings/markets', icon: MapPin },
   { name: 'Website content', href: '/admin/content', icon: FileText },
 ]
 

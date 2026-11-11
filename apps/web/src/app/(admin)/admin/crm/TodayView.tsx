@@ -77,7 +77,7 @@ export function TodayView({
   onHold?: PipelineClient[]
   /** Clients under Gone quiet — no column on the board any more. */
   quietCount?: number
-  market: 'all' | 'LEBANON' | 'GEORGIA'
+  market: 'all' | 'LEBANON' | 'INTERNATIONAL'
   onOpen: (id: string) => void
   /** People in the board's "To answer" column. */
   toAnswer: number
@@ -329,7 +329,7 @@ function Row({
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1.5">
             <span className="text-sm font-medium text-slate-900 truncate">{lead.name}</span>
-            <span className="text-[10px] shrink-0">{lead.market === 'GEORGIA' ? '🇬🇪' : '🇱🇧'}</span>
+            <span className="text-[10px] shrink-0">{lead.market === 'INTERNATIONAL' ? '🌍' : '🇱🇧'}</span>
           </div>
           {(meta || detail) && (
             <p className="text-[11px] text-slate-500 truncate">

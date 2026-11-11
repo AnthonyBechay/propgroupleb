@@ -72,7 +72,7 @@ export function OverviewView({ onFocus }: { onFocus: (view: 'today' | 'board' | 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <Stat
           label="Active clients" value={openClients}
-          hint={`${d.byMarket.LEBANON ?? 0} 🇱🇧 · ${d.byMarket.GEORGIA ?? 0} 🇬🇪${d.dormantClients ? ` · ${d.dormantClients} dormant` : ''}`}
+          hint={`${d.byMarket.LEBANON ?? 0} 🇱🇧 · ${d.byMarket.INTERNATIONAL ?? 0} 🌍${d.dormantClients ? ` · ${d.dormantClients} dormant` : ''}`}
           icon={<Users className="h-4 w-4" />} tone="slate"
           onClick={() => onFocus('list')}
         />

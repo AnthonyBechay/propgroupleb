@@ -26,7 +26,7 @@ router.get(
     const [settings, budget, georgia, lebanon] = await Promise.all([
       getChatAiSettings(),
       aiBudget(),
-      searchCatalogue({ market: 'GEORGIA', limit: 200 }),
+      searchCatalogue({ market: 'INTERNATIONAL', limit: 200 }),
       searchCatalogue({ market: 'LEBANON', limit: 200 }),
     ]);
     const option = (c: Awaited<ReturnType<typeof searchCatalogue>>[number], market: string) => ({
@@ -48,7 +48,7 @@ router.get(
         instagramToken: instagramTokenStatus(),
         budget,
       },
-      catalogue: [...georgia.map((c) => option(c, 'GEORGIA')), ...lebanon.map((c) => option(c, 'LEBANON'))],
+      catalogue: [...georgia.map((c) => option(c, 'INTERNATIONAL')), ...lebanon.map((c) => option(c, 'LEBANON'))],
     });
   })
 );
@@ -59,7 +59,7 @@ const settingsSchema = z.object({
   preferred: z
     .array(z.object({ ref: z.string().trim().min(1).max(40), pitch: z.string().trim().max(300).default('') }))
     .max(10),
-  marketWhenUnknown: z.enum(['ask', 'LEBANON', 'GEORGIA']).default('ask'),
+  marketWhenUnknown: z.enum(['ask', 'LEBANON', 'INTERNATIONAL']).default('ask'),
   handover: z.enum(['step_aside', 'return_after_quiet', 'always']).default('return_after_quiet'),
   quietHours: z.union([z.literal(1), z.literal(3), z.literal(6), z.literal(12), z.literal(20)]).default(6),
   maxListings: z.union([z.literal(1), z.literal(2), z.literal(3)]).default(3),
@@ -76,7 +76,7 @@ const settingsSchema = z.object({
         question: z.string().trim().min(1).max(300),
         answer: z.string().trim().min(1).max(1000),
         publish: z.boolean().default(false),
-        market: z.enum(['GEORGIA', 'LEBANON', 'ALL']).default('GEORGIA'),
+        market: z.enum(['INTERNATIONAL', 'LEBANON', 'ALL']).default('INTERNATIONAL'),
       })
     )
     .max(40)

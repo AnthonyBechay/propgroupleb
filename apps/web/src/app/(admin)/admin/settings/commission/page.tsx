@@ -11,7 +11,7 @@ interface Terms { sellerPct: number; buyerPct: number; payoutAtPct: number }
 
 const MARKETS: Array<{ key: Market; title: string; hint: string }> = [
   { key: 'LEBANON', title: 'Lebanon', hint: 'propgrouplb.com — usually 2.5% from each side, paid when the sale closes.' },
-  { key: 'INTERNATIONAL', title: 'Georgia and abroad', hint: 'propgrp.com — usually 5.9% from the developer, nothing from the buyer, paid once the buyer has paid 30%.' },
+  { key: 'INTERNATIONAL', title: 'International', hint: 'propgrp.com — usually 5.9% from the developer, nothing from the buyer, paid once the buyer has paid 30%.' },
 ]
 
 const inp = 'mt-1 w-full min-h-11 rounded-lg border border-slate-200 bg-white px-3 text-sm focus:outline-none focus:ring-2 focus:ring-slate-300'

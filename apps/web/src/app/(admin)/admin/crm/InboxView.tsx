@@ -224,6 +224,46 @@ export function InboxView({
   openRef.current = openId
   const backTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
+  const shellRef = useRef<HTMLDivElement>(null)
+  // After Back, the list must be what is on screen. A white page that ignores
+  // taps reported no error and no reload, so look for it: what sits under the
+  // middle of the screen, and where iOS left the page. If it is not the list,
+  // say what the page looked like, then load the list afresh rather than leave
+  // the app stuck until it is closed.
+  const healthTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const checkAfterBack = useCallback((how: string) => {
+    if (healthTimer.current) clearTimeout(healthTimer.current)
+    healthTimer.current = setTimeout(() => {
+      healthTimer.current = null
+      if (!window.matchMedia('(max-width: 1023px)').matches) return
+      if (new URL(window.location.href).searchParams.get('c')) return // a chat again, on purpose
+      const vv = window.visualViewport
+      const hit = document.elementFromPoint(window.innerWidth / 2, window.innerHeight / 2)
+      const shell = shellRef.current
+      const onList = Boolean(hit && shell && shell.contains(hit) && !paneRef.current?.contains(hit))
+      const shifted = window.scrollY !== 0 || (vv ? Math.abs(vv.offsetTop) > 2 : false)
+      if (onList && !shifted) return
+      const describe = (el: Element | null) =>
+        el ? `${el.tagName.toLowerCase()}${el.id ? '#' + el.id : ''}.${String(el.getAttribute('class') ?? '').split(' ').slice(0, 3).join('.')}` : 'nothing'
+      reportProblem(
+        'blank-after-back',
+        `${how}: under the middle ${describe(hit)}; list on screen ${onList}; scrollY ${Math.round(window.scrollY)}; ` +
+          `viewport ${vv ? `${Math.round(vv.width)}x${Math.round(vv.height)} top ${Math.round(vv.offsetTop)} scale ${vv.scale.toFixed(2)}` : 'n/a'}; ` +
+          `window ${window.innerWidth}x${window.innerHeight}; history ${window.history.length}; state ${JSON.stringify(window.history.state ?? null).slice(0, 60)}; ` +
+          `shell ${shell ? Math.round(shell.getBoundingClientRect().top) + '/' + Math.round(shell.getBoundingClientRect().height) : 'gone'}`,
+      )
+      window.scrollTo({ top: 0, behavior: 'instant' })
+      // Moving the page back is enough when that was all that was wrong.
+      if (onList) return
+      // Give the report a moment to leave, then start the list over.
+      setTimeout(() => {
+        const list = new URL(window.location.href)
+        list.searchParams.delete('c')
+        window.location.replace(list.toString())
+      }, 300)
+    }, 700)
+  }, [])
+  useEffect(() => () => { if (healthTimer.current) clearTimeout(healthTimer.current) }, [])
   // An open conversation is a step in the browser's history (?c=<id>), so the
   // phone's Back — the swipe, Android's button, the browser arrow — closes the
   // chat instead of leaving the inbox, and a reload stays on the same chat.
@@ -246,6 +286,7 @@ export function InboxView({
       url.searchParams.delete('c')
       window.history.replaceState(null, '', url)
       setOpenId(null)
+      checkAfterBack('Back with nothing behind')
     }
     if (window.history.state?.inboxThread) {
       window.history.back() // popstate below clears it
@@ -255,8 +296,7 @@ export function InboxView({
       return
     }
     leaveChat()
-  }, [])
-  const shellRef = useRef<HTMLDivElement>(null)
+  }, [checkAfterBack])
   useEffect(() => {
     const fromUrl = () => {
       if (backTimer.current) { clearTimeout(backTimer.current); backTimer.current = null }
@@ -289,10 +329,11 @@ export function InboxView({
         shell.style.opacity = '0.999'
         requestAnimationFrame(() => requestAnimationFrame(() => { shell.style.opacity = '' }))
       }
+      checkAfterBack('swipe or Back')
     }
     window.addEventListener('popstate', onBack)
     return () => window.removeEventListener('popstate', onBack)
-  }, [])
+  }, [checkAfterBack])
   useEffect(() => watchForProblems(), [])
   const [detail, setDetail] = useState<ThreadDetail | null>(null)
   // The open chat could not be loaded, as opposed to still being on its way.
