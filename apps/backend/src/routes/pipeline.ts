@@ -88,7 +88,7 @@ router.get(
         adLabel: true, adId: true, askingFor: true, budgetMax: true, lastContactAt: true, createdAt: true,
         nextContactAt: true, nextContactNote: true, snoozedAt: true, quietAt: true,
         flaggedAt: true, flagNote: true, flaggedBy: true,
-        holdAt: true, holdKind: true, holdNote: true,
+        holdAt: true, holdKind: true, holdNote: true, assignees: true,
         opportunities: { select: { stage: true } },
         conversations: {
           where: { archivedAt: null },
@@ -229,6 +229,7 @@ router.get(
       return {
         id: l.id,
         name: l.name,
+        assignees: l.assignees,
         market: l.market,
         type: l.type,
         isInvestor: l.isInvestor,

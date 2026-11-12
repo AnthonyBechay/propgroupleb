@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { X, Loader2, Save } from 'lucide-react'
+import { X, Loader2, Save, ChevronDown } from 'lucide-react'
 import { normalizeApiUrl } from '@/lib/utils/api-url'
 import {
   type Lead, type LeadType, UNIT_KINDS, UNIT_KIND_LABELS, TYPE_LABELS, TYPE_META,
@@ -31,6 +31,8 @@ export function LeadFormModal({
   const isEdit = !!lead
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // Adding somebody: the short form. Editing: everything, since that is what they came for.
+  const [more, setMore] = useState(isEdit)
 
   const [f, setF] = useState({
     market: lead?.market ?? 'LEBANON',
@@ -143,36 +145,22 @@ export function LeadFormModal({
         <div className="p-5 space-y-4 overflow-y-auto flex-1">
           {error && <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-3 py-2">{error}</div>}
 
-          <Section title="Who they are">
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <div className="sm:col-span-1">
-                <label className={lbl}>Client name *</label>
-                <input value={f.name} onChange={(e) => set('name', e.target.value)} className={inp} placeholder="e.g. Pierre Bassil" required />
-              </div>
-              <div>
-                <label className={lbl}>Phone</label>
-                <input value={f.phone} onChange={(e) => set('phone', e.target.value)} className={inp} placeholder="03212385" />
-              </div>
-              <div>
-                <label className={lbl}>Email</label>
-                <input type="email" value={f.email} onChange={(e) => set('email', e.target.value)} className={inp} placeholder="optional" />
-              </div>
+          {/* The five things you know after one phone call. Everything else is
+              under "More details" — it used to be one screen of twenty fields,
+              all of them in the way of adding somebody quickly. */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className={lbl}>Name *</label>
+              <input value={f.name} onChange={(e) => set('name', e.target.value)} className={inp} placeholder="e.g. Pierre Bassil" required autoFocus={!isEdit} />
             </div>
             <div>
-              <label className={lbl}>WhatsApp</label>
-              <input
-                value={f.whatsapp}
-                onChange={(e) => set('whatsapp', e.target.value)}
-                className={inp}
-                placeholder="Leave blank to use the phone number"
-              />
+              <label className={lbl}>Phone / WhatsApp</label>
+              <input value={f.phone} onChange={(e) => set('phone', e.target.value)} className={inp} placeholder="03212385 or +961…" inputMode="tel" />
             </div>
-          </Section>
+          </div>
 
-          {/* Who is this? — the two choices that reshape the rest of the form */}
-          <Section title="What they're after">
             <div>
-              <label className={lbl}>Client type</label>
+              <label className={lbl}>They want to</label>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
                 {INTENT_TYPES.map((t) => {
                   const on = f.intents.includes(t)
@@ -221,45 +209,70 @@ export function LeadFormModal({
               </label>
             )}
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <div>
-                <label className={lbl}>Mainly looking in</label>
-                <select
-                  value={f.market}
-                  onChange={(e) => setF((p) => ({ ...p, market: e.target.value as Market, regions: [], areas: [] }))}
-                  className={inp}
-                >
-                  <option value="LEBANON">🇱🇧 Lebanon</option>
-                  <option value="INTERNATIONAL">🌍 International</option>
-                </select>
-                {/* It ranks matches; it never hides the other market's stock. */}
-                <p className="text-[11px] text-slate-500 mt-1">
-                  Ranks their matches first — you can still show them either market.
-                </p>
-              </div>
-              <div className="sm:col-span-2">
-                <label className={lbl}>Where they came from</label>
-                <select value={f.source} onChange={(e) => set('source', e.target.value)} className={inp}>
-                  <option value="MANUAL">Manual</option>
-                  <option value="PHONE">Phone</option>
-                  <option value="WHATSAPP">WhatsApp</option>
-                  <option value="REFERRAL">Referral</option>
-                  <option value="FACEBOOK_AD">Facebook ads</option>
-                  <option value="INQUIRY">Website inquiry</option>
-                  <option value="FAVORITE">Saved property</option>
-                  <option value="SUBMISSION">Owner submission</option>
-                  <option value="WALK_IN">Walk-in</option>
-                </select>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className={lbl}>Mainly looking in</label>
+              <div className="grid grid-cols-2 gap-1.5">
+                {([['LEBANON', '🇱🇧 Lebanon'], ['INTERNATIONAL', '🌍 International']] as const).map(([value, label]) => (
+                  <button
+                    key={value}
+                    type="button"
+                    aria-pressed={f.market === value}
+                    onClick={() => setF((p) => (p.market === value ? p : { ...p, market: value as Market, regions: [], areas: [] }))}
+                    className={`min-h-11 rounded-lg border px-2 text-sm font-medium transition-colors ${
+                      f.market === value ? 'border-slate-900 bg-slate-900 text-white' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
               </div>
             </div>
+            <div>
+              <label className={lbl}>{isSupply ? 'Asking price' : 'Budget up to'}</label>
+              <MoneyInput
+                value={isSupply ? f.budgetMin : f.budgetMax}
+                onChange={(v) => set(isSupply ? 'budgetMin' : 'budgetMax', v)}
+                currency={f.currency}
+                className={inp}
+              />
+            </div>
+          </div>
 
           <div>
-            <label className={lbl}>Asking for</label>
-            <input
-              value={f.askingFor}
-              onChange={(e) => set('askingFor', e.target.value)}
-              className={inp}
-              placeholder={isSupply ? 'e.g. 3-bed apartment in Achrafieh, 180m², 5th floor' : 'e.g. Land · Apartment · Studio for investment'}
+            <label className={lbl}>{isSupply ? 'What they have' : 'What they asked for'}</label>
+            <textarea
+              value={f.notes}
+              onChange={(e) => set('notes', e.target.value)}
+              rows={2}
+              className={inp + ' resize-y'}
+              placeholder={isSupply ? 'e.g. 3-bed in Achrafieh, 180 m², 5th floor, wants a quick sale' : 'e.g. 2-bed in Achrafieh, ready to move, or a studio in Batumi for rental'}
+            />
+          </div>
+
+          <button
+            type="button"
+            aria-expanded={more}
+            onClick={() => setMore((m) => !m)}
+            className="flex min-h-11 w-full items-center justify-between rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-700 hover:bg-slate-50"
+          >
+            <span>More details <span className="font-normal text-slate-400">· areas, property types, follow-up, source</span></span>
+            <ChevronDown className={`h-4 w-4 text-slate-400 transition-transform ${more ? 'rotate-180' : ''}`} />
+          </button>
+
+          {more && (
+            <div className="space-y-4">
+          <Section title="For matching">
+          <div className="rounded-xl border border-slate-200 p-3.5 bg-slate-50/50">
+            <p className="text-xs font-semibold text-slate-600 mb-2">
+              {isSupply ? 'Where is the property?' : 'Where are they looking?'}
+            </p>
+            <LocationPicker
+              market={f.market as Market}
+              regions={f.regions}
+              areas={f.areas}
+              onChange={(patch) => setF((p) => ({ ...p, ...patch }))}
             />
           </div>
 
@@ -283,56 +296,14 @@ export function LeadFormModal({
             </div>
           </div>
 
-          <div className="rounded-xl border border-slate-200 p-3.5 bg-slate-50/50">
-            <p className="text-xs font-semibold text-slate-600 mb-2">
-              {isSupply ? 'Where is the property?' : 'Where are they looking?'}
-            </p>
-            <LocationPicker
-              market={f.market as Market}
-              regions={f.regions}
-              areas={f.areas}
-              onChange={(patch) => setF((p) => ({ ...p, ...patch }))}
-            />
-          </div>
 
-          {isSupply ? (
-            /* Supply side: one asking price + what the property actually has */
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-              <div>
-                <label className={lbl}>Asking price</label>
-                <input
-                  type="number" value={f.budgetMin}
-                  onChange={(e) => set('budgetMin', e.target.value)}
-                  className={inp} placeholder="What they want for it"
-                />
-              </div>
-              <div>
-                <label className={lbl}>Currency</label>
-                <select value={f.currency} onChange={(e) => set('currency', e.target.value)} className={inp}>
-                  <option value="USD">USD</option>
-                  <option value="LBP">LBP</option>
-                </select>
-              </div>
-              <div>
-                <label className={lbl}>Bedrooms</label>
-                <input
-                  type="number" min="0" value={f.minBeds}
-                  onChange={(e) => set('minBeds', e.target.value)}
-                  className={inp} placeholder="How many it has"
-                />
-              </div>
-            </div>
-          ) : (
-            /* Demand side: a budget range + minimum requirements */
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              <div>
-                <label className={lbl}>Budget min</label>
-                <input type="number" value={f.budgetMin} onChange={(e) => set('budgetMin', e.target.value)} className={inp} />
-              </div>
-              <div>
-                <label className={lbl}>Budget max</label>
-                <input type="number" value={f.budgetMax} onChange={(e) => set('budgetMax', e.target.value)} className={inp} />
-              </div>
+              {!isSupply && (
+                <div>
+                  <label className={lbl}>Budget from</label>
+                  <MoneyInput value={f.budgetMin} onChange={(v) => set('budgetMin', v)} currency={f.currency} className={inp} />
+                </div>
+              )}
               <div>
                 <label className={lbl}>Currency</label>
                 <select value={f.currency} onChange={(e) => set('currency', e.target.value)} className={inp}>
@@ -341,42 +312,52 @@ export function LeadFormModal({
                 </select>
               </div>
               <div>
-                <label className={lbl}>Min beds</label>
-                <input type="number" min="0" value={f.minBeds} onChange={(e) => set('minBeds', e.target.value)} className={inp} />
+                <label className={lbl}>{isSupply ? 'Bedrooms' : 'Bedrooms, at least'}</label>
+                <select value={f.minBeds} onChange={(e) => set('minBeds', e.target.value)} className={inp}>
+                  <option value="">Any</option>
+                  {[0, 1, 2, 3, 4, 5, 6].map((n) => <option key={n} value={String(n)}>{n === 0 ? 'Studio' : n}</option>)}
+                </select>
               </div>
             </div>
-          )}
-
+            <div>
+              <label className={lbl}>Short label</label>
+              <input
+                value={f.askingFor}
+                onChange={(e) => set('askingFor', e.target.value)}
+                className={inp}
+                placeholder="Shown on their card, e.g. Studio for investment"
+              />
+            </div>
           </Section>
 
-          <Section title="Where things stand">
-            <div>
-              <label className={lbl}>Relationship</label>
-              <select value={f.status} onChange={(e) => set('status', e.target.value)} className={inp}>
-                <option value="ACTIVE">Active — working with them</option>
-                <option value="VIEWING">Viewing</option>
-                <option value="NEGOTIATING">Negotiating</option>
-                <option value="WON">Past client — has bought or sold with us</option>
-                <option value="LOST">Went elsewhere</option>
-                <option value="ARCHIVED">Parked — don't surface them for now</option>
-              </select>
-              {/* The board derives this from live deals; setting it by hand is
-                  the exception, so say what it actually means. */}
-              <p className="text-[11px] text-slate-500 mt-1">
-                Usually set for you by their deals. A live deal makes them Active again.
-              </p>
+          <Section title="Contact">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className={lbl}>Email</label>
+                <input type="email" value={f.email} onChange={(e) => set('email', e.target.value)} className={inp} />
+              </div>
+              <div>
+                <label className={lbl}>WhatsApp, if different from the phone</label>
+                <input value={f.whatsapp} onChange={(e) => set('whatsapp', e.target.value)} className={inp} inputMode="tel" />
+              </div>
+              <div>
+                <label className={lbl}>Where they came from</label>
+                <select value={f.source} onChange={(e) => set('source', e.target.value)} className={inp}>
+                  <option value="MANUAL">Manual</option>
+                  <option value="PHONE">Phone</option>
+                  <option value="WHATSAPP">WhatsApp</option>
+                  <option value="REFERRAL">Referral</option>
+                  <option value="FACEBOOK_AD">Facebook ads</option>
+                  <option value="INQUIRY">Website inquiry</option>
+                  <option value="FAVORITE">Saved property</option>
+                  <option value="SUBMISSION">Owner submission</option>
+                  <option value="WALK_IN">Walk-in</option>
+                </select>
+              </div>
             </div>
+          </Section>
 
-            <div>
-              <label className={lbl}>Waiting on</label>
-              <select value={f.subStatus} onChange={(e) => set('subStatus', e.target.value)} className={inp}>
-                <option value="">Not set</option>
-                {subStatusesFor(f.type as LeadType).map((k) => (
-                  <option key={k} value={k}>{SUB_STATUS_META[k].label}</option>
-                ))}
-              </select>
-            </div>
-
+          <Section title="Follow-up">
             <div className="grid grid-cols-2 gap-3">
             <div>
               <label className={lbl}>Last contact</label>
@@ -395,17 +376,37 @@ export function LeadFormModal({
             </div>
           </div>
 
-          <div>
-            <label className={lbl}>Notes / actions</label>
-            <textarea
-              value={f.notes}
-              onChange={(e) => set('notes', e.target.value)}
-              rows={3}
-              className={inp + ' resize-y'}
-              placeholder="e.g. Need an apartment in Achrafieh, max $250k, ready to move fast"
-            />
-          </div>
+            <div>
+              <label className={lbl}>Waiting on</label>
+              <select value={f.subStatus} onChange={(e) => set('subStatus', e.target.value)} className={inp}>
+                <option value="">Not set</option>
+                {subStatusesFor(f.type as LeadType).map((k) => (
+                  <option key={k} value={k}>{SUB_STATUS_META[k].label}</option>
+                ))}
+              </select>
+            </div>
+
+            {isEdit && (
+            <div>
+              <label className={lbl}>Relationship</label>
+              <select value={f.status} onChange={(e) => set('status', e.target.value)} className={inp}>
+                <option value="ACTIVE">Active — working with them</option>
+                <option value="VIEWING">Viewing</option>
+                <option value="NEGOTIATING">Negotiating</option>
+                <option value="WON">Past client — has bought or sold with us</option>
+                <option value="LOST">Went elsewhere</option>
+                <option value="ARCHIVED">Parked — don't surface them for now</option>
+              </select>
+              {/* The board derives this from live deals; setting it by hand is
+                  the exception, so say what it actually means. */}
+              <p className="text-[11px] text-slate-500 mt-1">
+                Usually set for you by their deals. A live deal makes them Active again.
+              </p>
+            </div>
+            )}
           </Section>
+            </div>
+          )}
         </div>
 
         <div className="px-5 py-4 border-t border-slate-100 flex justify-end gap-2 shrink-0">
@@ -431,6 +432,44 @@ export function LeadFormModal({
  * every render, so React remounted every input in it on each keystroke and
  * focus was lost after one letter.
  */
+/**
+ * A money field you can type the way you say it: "5k", "250k", "1.2m".
+ *
+ * A plain text field on purpose. As a number field the browser stepped the
+ * value whenever the mouse wheel passed over it, so a budget typed as 5000 was
+ * saved as 4999 without anyone seeing it change. Shown with thousands
+ * separators once you leave it, so 250000 and 2500000 cannot be mistaken.
+ */
+function parseMoney(text: string): string {
+  const t = text.trim().toLowerCase().replace(/[,\s$]/g, '')
+  const m = t.match(/^(\d+(?:\.\d+)?)(k|m)?$/)
+  if (!m) return t.replace(/[^\d.]/g, '')
+  const n = Number(m[1]) * (m[2] === 'k' ? 1_000 : m[2] === 'm' ? 1_000_000 : 1)
+  return String(Math.round(n))
+}
+
+function MoneyInput({
+  value, onChange, currency, className,
+}: { value: string; onChange: (v: string) => void; currency: string; className?: string }) {
+  const [draft, setDraft] = useState<string | null>(null)
+  const shown = draft ?? (value && Number.isFinite(Number(value)) ? Number(value).toLocaleString('en-US') : value)
+  return (
+    <div className="relative">
+      <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-slate-400">{currency === 'LBP' ? 'LBP' : '$'}</span>
+      <input
+        value={shown}
+        inputMode="decimal"
+        autoComplete="off"
+        onFocus={() => setDraft(value)}
+        onChange={(e) => { setDraft(e.target.value); onChange(parseMoney(e.target.value)) }}
+        onBlur={() => setDraft(null)}
+        placeholder="e.g. 250k"
+        className={`${className ?? ''} ${currency === 'LBP' ? 'pl-12' : 'pl-7'}`}
+      />
+    </div>
+  )
+}
+
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section className="space-y-3">

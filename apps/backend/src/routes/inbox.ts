@@ -16,6 +16,7 @@ import { cardCaption, cardsByRef, searchCatalogue, type Market } from '../servic
 import { AppError } from '../utils/errors.js';
 import { recordListingsShared } from '../services/deal-sync.service.js';
 import { normaliseMarket } from '../utils/market.js';
+import { claimIfUnassigned } from '../services/assignment.service.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // CRM inbox — WhatsApp and Instagram threads mirrored from Meta's webhooks
@@ -333,6 +334,9 @@ router.post(
   asyncHandler(async (req: Request, res: Response) => {
     const { text } = z.object({ text: z.string().trim().min(1).max(4000) }).parse(req.body);
     await sendReply(req.params.id, text, 'CRM');
+    // Whoever answers a client nobody had picked up is now looking after them.
+    const thread = await prisma.conversation.findUnique({ where: { id: req.params.id }, select: { leadId: true } });
+    await claimIfUnassigned(thread?.leadId, (req as AuthenticatedRequest).user?.id);
     await logAdminAction('INBOX_REPLY', 'Conversation', req.params.id, {}, req as AuthenticatedRequest);
     sendSuccess(res, null);
   })

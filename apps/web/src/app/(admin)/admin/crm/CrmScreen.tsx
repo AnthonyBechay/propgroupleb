@@ -71,7 +71,19 @@ export function CrmScreen({ mode }: { mode: 'pipeline' | 'clients' }) {
   const [loading, setLoading] = useState(true)
   const [view, setView] = useState<View>(mode === 'clients' ? 'list' : 'board')
   const router = useRouter()
-  const [market, setMarket] = useState<'all' | LeadMarket>('all')
+  const [market, setMarketState] = useState<'all' | LeadMarket>('all')
+  // The market is the board's main switch — Lebanon and abroad are different
+  // work — so the last one chosen is where the page opens next time.
+  useEffect(() => {
+    try {
+      const saved = window.localStorage.getItem('crm-market')
+      if (saved === 'LEBANON' || saved === 'INTERNATIONAL') setMarketState(saved)
+    } catch { /* not remembered, still works */ }
+  }, [])
+  const setMarket = (m: 'all' | LeadMarket) => {
+    setMarketState(m)
+    try { window.localStorage.setItem('crm-market', m) } catch { /* fine */ }
+  }
   const [search, setSearch] = useState('')
   // Where the Clients page opens: ?show=quiet from the board's Gone quiet link,
   // ?status=LOST / ARCHIVED from the older links. Read once.
@@ -507,6 +519,8 @@ export function CrmScreen({ mode }: { mode: 'pipeline' | 'clients' }) {
       ) : view === 'board' ? (
         <DealBoard
           deals={boardDeals}
+          market={market}
+          onAssigned={refreshBoard}
           canSeeMoney={canSeeMoney}
           busyId={movingDeal}
           onMove={moveDeal}

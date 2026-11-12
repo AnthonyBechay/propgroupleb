@@ -1,5 +1,6 @@
 import { prisma } from '@propgroup/db';
 import { logger } from './logger.js';
+import { team } from '../services/assignment.service.js';
 
 /**
  * One-time CRM data normalisations.
@@ -240,5 +241,38 @@ export async function normaliseCrmData(): Promise<void> {
       await prisma.leadOpportunity.update({ where: { id: o.id }, data: { commissionReceivedAt: o.closedAt ?? o.updatedAt } });
     }
     return `${won.length} closed deals marked as paid on their closing date`;
+  });
+  // Clients had no owner before "assigned to" existed. Give each one to the
+  // person who added them, or failing that whoever last logged a call or note
+  // on them — so the board does not open with every card saying "Nobody".
+  // Clients that arrived by themselves and nobody has touched stay unassigned:
+  // that is true, and the "Nobody" filter is how they get picked up.
+  await once('assign_existing_clients_v1', async () => {
+    const people = (await team()).map((t) => t.id);
+    if (people.length === 0) return 'no team members to assign to';
+
+    let byCreator = 0;
+    for (const id of people) {
+      const { count } = await prisma.lead.updateMany({
+        where: { assignees: { isEmpty: true }, createdBy: id },
+        data: { assignees: [id] },
+      });
+      byCreator += count;
+    }
+
+    // Newest first, so the first row seen for a client is their latest contact.
+    const logged = await prisma.leadContact.findMany({
+      where: { createdBy: { in: people }, lead: { assignees: { isEmpty: true } } },
+      orderBy: { contactedAt: 'desc' },
+      select: { leadId: true, createdBy: true },
+    });
+    const latest = new Map<string, string>();
+    for (const c of logged) if (c.createdBy && !latest.has(c.leadId)) latest.set(c.leadId, c.createdBy);
+    for (const [leadId, userId] of latest) {
+      await prisma.lead.updateMany({ where: { id: leadId, assignees: { isEmpty: true } }, data: { assignees: [userId] } });
+    }
+
+    const left = await prisma.lead.count({ where: { assignees: { isEmpty: true } } });
+    return `${byCreator} assigned to who added them, ${latest.size} to who last contacted them, ${left} left unassigned`;
   });
 }

@@ -12,6 +12,7 @@ import { matchListingToLead, matchLeadToLead, SUPPLY_TYPES, DEMAND_TYPES, MATCH_
 import { deriveLeadStatus, needsNewOptions, rejectionInsights } from '../utils/lead-pipeline.js';
 import { reportLeadStage } from '../services/meta-conversions.service.js';
 import { normaliseCountry } from '../utils/market.js';
+import { team, validAssignees } from '../services/assignment.service.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // CRM — the team's buyer/seller pipeline (replaces the follow-up spreadsheet).
@@ -74,6 +75,8 @@ const leadSchema = z.object({
   notes: z.string().max(5000).optional().nullable(),
   userId: z.string().optional().nullable(),
   listingId: z.string().optional().nullable(),
+  // Who looks after them (user ids). Left out = unchanged.
+  assignees: z.array(z.string().max(60)).max(10).optional(),
 });
 
 /**
@@ -425,6 +428,34 @@ router.get(
 );
 
 // ── GET /stats — pipeline counters for the dashboard header ───────────────────
+
+// ── GET /team — who a client can be assigned to ──────────────────────────────
+router.get(
+  '/team',
+  authenticateToken,
+  requireCrm,
+  asyncHandler(async (_req: Request, res: Response) => {
+    sendSuccess(res, await team());
+  })
+);
+
+// ── POST /:id/assign — set who looks after a client ──────────────────────────
+// Its own small route so a card can change it in one tap, without sending the
+// whole client form back.
+router.post(
+  '/:id/assign',
+  authenticateToken,
+  requireCrm,
+  asyncHandler(async (req: Request, res: Response) => {
+    const { userIds } = z.object({ userIds: z.array(z.string().max(60)).max(10) }).parse(req.body);
+    const existing = await prisma.lead.findUnique({ where: { id: req.params.id }, select: { id: true, name: true } });
+    if (!existing) { sendNotFound(res, 'Lead'); return; }
+    const assignees = await validAssignees(userIds);
+    await prisma.lead.update({ where: { id: existing.id }, data: { assignees } });
+    await logAdminAction('ASSIGN_LEAD', 'lead', existing.id, { name: existing.name, assignees }, req as AuthenticatedRequest);
+    sendSuccess(res, { id: existing.id, assignees });
+  })
+);
 
 router.get(
   '/stats',
@@ -975,6 +1006,7 @@ router.get(
             phone: true, whatsapp: true, email: true, status: true,
             nextContactAt: true, lastContactAt: true,
             flaggedAt: true, flagNote: true, flaggedBy: true,
+            assignees: true,
           },
         },
       },
@@ -1340,7 +1372,12 @@ router.post(
 
     const lead = await prisma.lead.create({
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      data: { ...toLeadData(data), createdBy: authReq.user?.id ?? null } as any,
+      data: {
+        ...toLeadData(data),
+        createdBy: authReq.user?.id ?? null,
+        // Whoever typed them in looks after them, unless they said otherwise.
+        assignees: data.assignees ? await validAssignees(data.assignees) : authReq.user?.id ? [authReq.user.id] : [],
+      } as any,
     });
 
     await logAdminAction('CREATE_LEAD', 'lead', lead.id, { name: lead.name, market: lead.market }, authReq);
@@ -1363,6 +1400,7 @@ router.put(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const patch: Record<string, any> = { ...data };
     if (data.email === '') patch.email = null;
+    if (data.assignees) patch.assignees = await validAssignees(data.assignees);
     // Stamp when the relationship closed, and clear it if it reopens — the
     // board uses this to show only recent wins.
     if (data.status) {

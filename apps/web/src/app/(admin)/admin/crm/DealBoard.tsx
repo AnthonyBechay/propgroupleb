@@ -7,10 +7,11 @@ import {
   TrendingUp, Loader2, Check, Plus, X, ChevronRight, ChevronDown, MessagesSquare, Instagram, Clock, VolumeX, Moon, Flag, Search, PauseCircle, PlayCircle,
 } from 'lucide-react'
 import {
-  type Deal, type OpportunityStage, BOARD_DEAL_COLUMNS, CLIENT_COLUMNS, type PipelineClient, dealColumnOf, stageLabel,
+  type Deal, type OpportunityStage, type LeadMarket, BOARD_DEAL_COLUMNS, PEOPLE_GROUPS, BUCKET_TAG, type PipelineClient, dealColumnOf, stageLabel,
   dealCommission, dealAlert, isLiveDeal, TYPE_LABELS,
 } from './types'
 import { countryFlag } from '@/lib/market'
+import { AssigneePicker, Bubble, useTeam, type TeamMember } from './Assignees'
 import type { StartStage } from './BookViewingModal'
 
 /**
@@ -48,7 +49,13 @@ export function DealBoard({
   clients,
   onBook,
   focusLeadId,
+  market,
+  onAssigned,
 }: {
+  /** The market picked in the toolbar. One market at a time gets its own wording and only the columns it uses. */
+  market: 'all' | LeadMarket
+  /** Somebody changed who looks after a client. */
+  onAssigned: () => void
   /** Highlight and scroll to this client's cards (arriving from the Inbox). */
   focusLeadId?: string | null
   /** People at the front of the pipeline, before any viewing or meeting. */
@@ -82,14 +89,44 @@ export function DealBoard({
   // horizontal scroller is a kanban on paper and a swipe-hunt in practice: on a
   // 390px screen you can see one and a half of them and you cannot tell where
   // the pipeline is without scrolling the whole way across.
-  const [mobileColumn, setMobileColumn] = useState<string>(CLIENT_COLUMNS[0].key)
+  const [mobileColumn, setMobileColumn] = useState<string>(PEOPLE_GROUPS[0].key)
+  const team = useTeam()
+  // Whose clients to show. Everyone by default: three people in one room need
+  // to see the whole board; this is for "what is on my plate" at a glance.
+  const [who, setWho] = useState<string>('all')
+  const mine = (ids?: string[]) => who === 'all' || (who === 'none' ? !(ids?.length) : Boolean(ids?.includes(who)))
+  // Desktop: which half of the board is on screen. All ten columns side by
+  // side is over 2,600px — on any normal monitor that meant scrolling sideways
+  // all day, with the scrollbar sitting below the longest column. One half at
+  // a time fits the screen with nothing to scroll; "Both" is still there for a
+  // wide monitor and for dragging a person onto a deal stage.
+  const [side, setSideState] = useState<'people' | 'deals' | 'both'>('people')
+  useEffect(() => {
+    try {
+      const saved = window.localStorage.getItem('crm-board-side')
+      if (saved === 'people' || saved === 'deals' || saved === 'both') setSideState(saved)
+      // A wide screen holds the whole board; a laptop gets one half at a time.
+      else if (window.innerWidth >= 1500) setSideState('both')
+    } catch { /* private window: the default is fine */ }
+  }, [])
+  const setSide = (next: 'people' | 'deals' | 'both') => {
+    setSideState(next)
+    try { window.localStorage.setItem('crm-board-side', next) } catch { /* not remembered, still works */ }
+  }
+  const fit = side !== 'both'
+  // One market at a time: its own words, and only the stages it uses. "Reserved
+  // / paying" is a payment plan abroad; a sale in Lebanon closes, so that
+  // column is left out there unless something is actually in it.
+  const dealCols = BOARD_DEAL_COLUMNS
+    .filter((col) => !(market === 'LEBANON' && col.key === 'RESERVED' && !deals.some((d) => d.stage === 'RESERVED')))
+    .map((col) => (market === 'all' || (col.key !== 'VIEWING_BOOKED' && col.key !== 'VIEWED') ? col : { ...col, label: stageLabel(col.stage, market) }))
 
   // Arriving from the Inbox: open the column they are in and bring the card into view.
   useEffect(() => {
     if (!focusLeadId) return
     const person = clients.find((c) => c.id === focusLeadId)
     const deal = deals.find((d) => d.lead.id === focusLeadId && BOARD_DEAL_COLUMNS.some((c) => c.stages.includes(d.stage)))
-    const column = person?.bucket ?? (deal ? dealColumnOf(deal) : null)
+    const column = (person ? PEOPLE_GROUPS.find((g) => g.buckets.includes(person.bucket))?.key : null) ?? (deal ? dealColumnOf(deal) : null)
     if (!column) return
     setMobileColumn(column)
     const t = setTimeout(() => {
@@ -100,14 +137,15 @@ export function DealBoard({
 
   const visibleClients = useMemo(() => {
     const needle = q.trim().toLowerCase()
-    let out = onlyFlagged ? clients.filter((c) => c.flag) : clients
+    let out = (onlyFlagged ? clients.filter((c) => c.flag) : clients).filter((c) => mine(c.assignees))
     if (needle) {
       out = out.filter((c) =>
         [c.name, c.askingFor, c.adLabel, c.chat?.lastPreview].filter(Boolean).some((v) => String(v).toLowerCase().includes(needle))
       )
     }
     return out
-  }, [clients, q, onlyFlagged])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [clients, q, onlyFlagged, who])
 
   const filtered = useMemo(() => {
     const needle = q.trim().toLowerCase()
@@ -123,8 +161,10 @@ export function DealBoard({
     // The one filter a deal board actually needs: what is going wrong.
     if (onlyAlerts) out = out.filter((d) => dealAlert(d) !== null)
     if (onlyFlagged) out = out.filter((d) => d.lead.flaggedAt)
+    out = out.filter((d) => mine(d.lead.assignees))
     return out
-  }, [deals, q, onlyAlerts, onlyFlagged])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [deals, q, onlyAlerts, onlyFlagged, who])
 
   // Flagged people, counted once however many deals they have.
   const flaggedCount = useMemo(() => new Set([
@@ -172,6 +212,40 @@ export function DealBoard({
           Flagged {flaggedCount > 0 && <span className="opacity-70">{flaggedCount}</span>}
         </button>
 
+        {team.length > 1 && (
+          <div className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white p-0.5" role="group" aria-label="Whose clients">
+            <button
+              type="button"
+              aria-pressed={who === 'all'}
+              onClick={() => setWho('all')}
+              className={`h-8 rounded-md px-2.5 text-sm font-medium ${who === 'all' ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-50'}`}
+            >
+              Everyone
+            </button>
+            {team.map((t) => (
+              <button
+                key={t.id}
+                type="button"
+                aria-pressed={who === t.id}
+                title={`${t.name}'s clients`}
+                onClick={() => setWho(who === t.id ? 'all' : t.id)}
+                className={`inline-flex h-8 items-center gap-1.5 rounded-md px-1.5 text-sm font-medium ${who === t.id ? 'bg-slate-100 text-slate-900 ring-1 ring-slate-300' : 'text-slate-600 hover:bg-slate-50'}`}
+              >
+                <Bubble member={t} team={team} size={20} />
+                <span className="max-w-20 truncate pr-1">{t.name.split(' ')[0]}</span>
+              </button>
+            ))}
+            <button
+              type="button"
+              aria-pressed={who === 'none'}
+              onClick={() => setWho(who === 'none' ? 'all' : 'none')}
+              className={`h-8 rounded-md px-2.5 text-sm font-medium ${who === 'none' ? 'bg-amber-500 text-white' : 'text-slate-600 hover:bg-slate-50'}`}
+            >
+              Nobody
+            </button>
+          </div>
+        )}
+
         <div className="flex-1" />
 
         <button
@@ -204,13 +278,13 @@ export function DealBoard({
       {/* Phone: pick a column, then read it full width. The chips double as the
           pipeline summary you'd otherwise have to scroll sideways to get. */}
       <div className="lg:hidden pg-scroll-x -mx-1 flex gap-1.5 px-1 pb-1">
-        {([['People', CLIENT_COLUMNS], ['Deals', BOARD_DEAL_COLUMNS]] as const).map(([group, cols]) => (
+        {([['People', PEOPLE_GROUPS], ['Deals', dealCols]] as const).map(([group, cols]) => (
           <span key={group} className="contents">
             <span className="self-center shrink-0 px-1 text-[10px] font-semibold uppercase tracking-wide text-slate-400">{group}</span>
             {cols.map((col) => {
               const count = 'stages' in col
                 ? filtered.filter((d) => dealColumnOf(d) === col.key).length
-                : visibleClients.filter((c) => c.bucket === col.key).length
+                : visibleClients.filter((c) => col.buckets.includes(c.bucket)).length
               const active = mobileColumn === col.key
               return (
                 <button
@@ -232,23 +306,47 @@ export function DealBoard({
         ))}
       </div>
 
-      <div className="flex gap-2.5 pb-3 max-lg:flex-col lg:pg-scroll-x">
+      {/* Desktop: People / Deals / Both */}
+      <div className="max-lg:hidden mb-2 inline-flex rounded-lg border border-slate-200 bg-white p-0.5" role="group" aria-label="Which part of the board">
+        {([
+          ['people', 'People', visibleClients.length],
+          ['deals', 'Deals', filtered.length],
+          ['both', 'Both', null],
+        ] as const).map(([key, label, n]) => (
+          <button
+            key={key}
+            type="button"
+            aria-pressed={side === key}
+            onClick={() => setSide(key)}
+            className={`inline-flex h-9 items-center gap-1.5 rounded-md px-3.5 text-sm font-medium transition-colors ${
+              side === key ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-50'
+            }`}
+          >
+            {label}
+            {n !== null && <span className={side === key ? 'text-white/70' : 'text-slate-400'}>{n}</span>}
+          </button>
+        ))}
+      </div>
+
+      {/* The board is as tall as the window and each column scrolls inside it,
+          so a long column never pushes the sideways scrollbar off the screen. */}
+      <div className={`flex gap-2.5 pb-3 max-lg:flex-col lg:h-[calc(100dvh-17rem)] lg:min-h-[420px] lg:pg-scroll-x`}>
         {/* Two halves, said on screen: people (before any property is in play)
             and deals (one card per property). They used to run together as one
             row of ten columns, with nothing saying where one became the other. */}
-        <section className="contents lg:flex lg:flex-col lg:gap-1.5 lg:shrink-0">
+        <section className={`contents lg:flex-col lg:gap-1.5 lg:min-h-0 ${side === 'deals' ? 'lg:hidden' : 'lg:flex'}`} style={{ flex: `${PEOPLE_GROUPS.length} 0 ${PEOPLE_GROUPS.length * 182}px` }}>
           <p className="max-lg:hidden px-1 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
             People <span className="font-normal normal-case tracking-normal text-slate-400">· who owes the next message</span>
           </p>
-          <div className="contents lg:flex lg:gap-2.5">
-        {CLIENT_COLUMNS.map((col) => {
-          const cards = visibleClients.filter((c) => c.bucket === col.key)
+          <div className="contents lg:flex lg:min-h-0 lg:flex-1 lg:gap-2.5">
+        {PEOPLE_GROUPS.map((col) => {
+          const cards = visibleClients.filter((c) => col.buckets.includes(c.bucket))
           return (
             <div
               key={col.key}
-              // A person dropped on "Ping later" is snoozed for a week; on
-              // "On hold", asked what is being checked.
-              {...(col.key === 'PING_LATER' || col.key === 'ON_HOLD' ? {
+              // A person dropped on "Waiting" is put on hold, which asks what
+              // is being checked. "Ping later" with a date is in the Move menu.
+              {...(col.key === 'WAITING' ? {
                 onDragOver: (e: React.DragEvent) => { e.preventDefault(); setOver(col.key) },
                 onDragLeave: () => setOver((k) => (k === col.key ? null : k)),
                 onDrop: (e: React.DragEvent) => {
@@ -256,10 +354,10 @@ export function DealBoard({
                   setOver(null)
                   const id = e.dataTransfer.getData('text/plain') || dragging
                   setDragging(null)
-                  if (id?.startsWith('client:')) onBook(id.slice(7), col.key === 'ON_HOLD' ? 'HOLD:CHECKING' : 'PING:7')
+                  if (id?.startsWith('client:')) onBook(id.slice(7), 'HOLD:CHECKING')
                 },
               } : {})}
-              className={`rounded-xl border lg:pg-snap-start lg:w-[264px] lg:shrink-0 ${
+              className={`rounded-xl border lg:flex lg:min-h-0 lg:flex-col lg:min-w-0 lg:flex-1 lg:basis-0 ${
                 over === col.key ? 'border-slate-900 bg-slate-50' : 'border-slate-200 bg-slate-50/60'
               } ${
                 mobileColumn === col.key ? 'max-lg:block' : 'max-lg:hidden'
@@ -274,9 +372,9 @@ export function DealBoard({
                 <p className="text-[11px] text-slate-500 mt-0.5">{col.hint}</p>
               </div>
               <p className="px-2.5 pt-2 text-[11px] text-slate-500 lg:hidden">{col.hint}</p>
-              <div className="p-1.5 space-y-1.5 min-h-[120px]">
+              <div className="p-1.5 space-y-1.5 min-h-[120px] lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:overscroll-contain">
                 {cards.map((c) => (
-                  <ClientCard key={c.id} client={c} focused={c.id === focusLeadId} onOpenClient={onOpenClient} onOpenChat={onOpenChat} onBook={onBook} onDragStart={() => setDragging(`client:${c.id}`)} />
+                  <ClientCard key={c.id} client={c} team={team} onAssigned={onAssigned} tag={col.buckets.length > 1 ? BUCKET_TAG[c.bucket] : undefined} focused={c.id === focusLeadId} onOpenClient={onOpenClient} onOpenChat={onOpenChat} onBook={onBook} onDragStart={() => setDragging(`client:${c.id}`)} />
                 ))}
                 {cards.length === 0 && <p className="text-[11px] text-slate-400 text-center py-6">Nobody here</p>}
               </div>
@@ -287,14 +385,14 @@ export function DealBoard({
           </div>
         </section>
 
-        <div className="max-lg:hidden w-px shrink-0 self-stretch bg-slate-300 my-1" aria-hidden />
+        <div className={`max-lg:hidden w-px shrink-0 self-stretch bg-slate-300 my-1 ${fit ? 'lg:hidden' : ''}`} aria-hidden />
 
-        <section className="contents lg:flex lg:flex-col lg:gap-1.5 lg:shrink-0">
+        <section className={`contents lg:flex-col lg:gap-1.5 lg:min-h-0 ${side === 'people' ? 'lg:hidden' : 'lg:flex'}`} style={{ flex: `${dealCols.length} 0 ${dealCols.length * 182}px` }}>
           <p className="max-lg:hidden px-1 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
             Deals <span className="font-normal normal-case tracking-normal text-slate-400">· one card per property</span>
           </p>
-          <div className="contents lg:flex lg:gap-2.5">
-        {BOARD_DEAL_COLUMNS.map((col) => {
+          <div className="contents lg:flex lg:min-h-0 lg:flex-1 lg:gap-2.5">
+        {dealCols.map((col) => {
           const cards = filtered.filter((d) => dealColumnOf(d) === col.key)
           const value = cards.reduce((t, d) => t + (dealCommission(d)?.usd ?? 0), 0)
 
@@ -318,7 +416,7 @@ export function DealBoard({
                 if (!deal || dealColumnOf(deal) === col.key) return
                 onMove(id, col.stage)
               }}
-              className={`rounded-xl border transition-colors lg:pg-snap-start lg:w-[264px] lg:shrink-0 ${
+              className={`rounded-xl border transition-colors lg:flex lg:min-h-0 lg:flex-col lg:min-w-0 lg:flex-1 lg:basis-0 ${
                 mobileColumn === col.key ? 'max-lg:block' : 'max-lg:hidden'
               } ${
                 over === col.key ? 'border-slate-900 bg-slate-50' : 'border-slate-200 bg-slate-50/60'
@@ -340,11 +438,13 @@ export function DealBoard({
 
               <p className="px-2.5 pt-2 text-[11px] text-slate-500 lg:hidden">{col.hint}</p>
 
-              <div className="p-1.5 space-y-1.5 min-h-[120px]">
+              <div className="p-1.5 space-y-1.5 min-h-[120px] lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:overscroll-contain">
                 {cards.map((d) => (
                   <DealCard
                     key={d.id}
                     deal={d}
+                    team={team}
+                    onAssigned={onAssigned}
                     focused={d.lead.id === focusLeadId}
                     canSeeMoney={canSeeMoney}
                     busy={busyId === d.id}
@@ -396,8 +496,12 @@ const sinceLabel = (iso: string) => {
 
 /** A person at the front of the pipeline — before any viewing or meeting. */
 function ClientCard({
-  client: c, onOpenClient, onOpenChat, onBook, onDragStart, focused = false,
+  client: c, onOpenClient, onOpenChat, onBook, onDragStart, focused = false, team, onAssigned, tag,
 }: {
+  team: TeamMember[]
+  onAssigned: () => void
+  /** Which bucket it is in, when its column holds more than one. */
+  tag?: { label: string; cls: string }
   client: PipelineClient
   focused?: boolean
   onOpenClient: (leadId: string) => void
@@ -468,7 +572,9 @@ function ClientCard({
         {c.chat?.detailsToConfirm && (
           <span className="text-[10px] font-medium text-amber-800 bg-amber-50 rounded px-1.5 py-0.5">Details to confirm</span>
         )}
+        {tag && <span className={`text-[10px] font-semibold rounded px-1.5 py-0.5 ${tag.cls}`}>{tag.label}</span>}
         <span className="flex-1" />
+        <AssigneePicker leadId={c.id} value={c.assignees ?? []} team={team} onChanged={onAssigned} />
         {c.chat && (
           <button
             onClick={(e) => { e.stopPropagation(); onOpenChat(c.id) }}
@@ -709,8 +815,10 @@ function DealMoveMenu({ deal: d, onPick }: { deal: Deal; onPick: (action: DealAc
 }
 
 function DealCard({
-  deal: d, canSeeMoney, busy, onDragStart, onOpenClient, onOpenChat, onSetCommission, onAction, focused = false,
+  deal: d, canSeeMoney, busy, onDragStart, onOpenClient, onOpenChat, onSetCommission, onAction, focused = false, team, onAssigned,
 }: {
+  team: TeamMember[]
+  onAssigned: () => void
   focused?: boolean
   onOpenChat: (leadId: string) => void
   deal: Deal
@@ -762,6 +870,7 @@ function DealCard({
       <div className="flex items-center gap-1.5 mt-1.5 pt-1.5 border-t border-slate-100">
         <span className="text-xs font-medium text-slate-700 truncate flex-1">{d.lead.name}</span>
         <span className="text-[10px] text-slate-500 shrink-0">{TYPE_LABELS[d.lead.type]}</span>
+        <AssigneePicker leadId={d.lead.id} value={d.lead.assignees ?? []} team={team} onChanged={onAssigned} size={18} />
         {d.chat && (
           // Their conversation — green with a count when they are waiting on us.
           <button

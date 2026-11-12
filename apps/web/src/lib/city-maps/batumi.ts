@@ -20,8 +20,9 @@ export const BATUMI: CityMap = {
   country: 'Georgia',
   countryCode: 'GEORGIA',
   cityMatches: ['batumi', 'gonio', 'kvariati', 'makhinjauri', 'chakvi'],
-  centre: [41.632, 41.628],
-  zoom: 12,
+  centre: [41.636, 41.625],
+  zoom: 13,
+  reachKm: 30,
   reviewed: '2026-11-11',
   intro:
     'Batumi is a Black Sea resort city of low-rise old streets at the tip of a cape and a long line of new towers running south-west along the beach towards the airport. Almost everything sold to foreign investors is a new-build apartment bought to rent to tourists, so two questions decide a purchase: how far it is from the sea and the Old Town, and who will manage it when the season ends.',
@@ -255,6 +256,34 @@ export const BATUMI: CityMap = {
         [41.64, 41.659], [41.638, 41.652], [41.644, 41.654],
       ],
       matches: ['tamar', 'tamar district'],
+    },
+    {
+      id: 'batumi-island',
+      name: 'Batumi Island',
+      alsoCalled: ['Ambassadori Island', 'The new island'],
+      type: 'emerging',
+      verdict: 'selective',
+      summary: 'A new master-planned island district being built off the east shore.',
+      about:
+        'A large reclaimed-land development off the bay, east of the port: residential towers, hotels, a marina and a beach, planned and sold as one branded district. It is the most ambitious new address in the city and is being built in phases over years.',
+      bestFor: ['Buyers who want a flagship, branded address', 'Investors buying early on a long payment plan'],
+      strengths: [
+        'Master-planned: marina, beach and hotels in one district',
+        'Branded residences with international names',
+        'Sea on every side; new infrastructure throughout',
+      ],
+      watchOuts: [
+        'Off-plan and phased: years of construction ahead',
+        'One master developer — the whole district depends on its delivery',
+        'The port and industrial shore are the mainland neighbours today',
+        'Premium pricing for a place that is not finished yet',
+      ],
+      stock: 'Off-plan branded towers and hotel residences.',
+      rental: 'Untested — it will depend on the operators once it opens.',
+      outline: [
+        [41.6478, 41.659], [41.6552, 41.659], [41.6568, 41.67], [41.6505, 41.6735], [41.6478, 41.667],
+      ],
+      matches: ['batumi island', 'ambassadori island', 'ambassadori'],
     },
     {
       id: 'industrial',

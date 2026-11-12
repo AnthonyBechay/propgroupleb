@@ -13,6 +13,7 @@ import type { AuthenticatedRequest } from '../types/index.js';
 import { nextBuildingRef, nextUnitRef, normalizeRef, looksLikeRef, buildingRefOf } from '../utils/reference.js';
 import { publicCountryFilter } from '../utils/market.js';
 import { countrySchema } from '../utils/market.js';
+import { syncPinFromLink } from '../utils/maps-pin.js';
 
 /** Best-effort delete a batch of file URLs from R2. Failures are logged but do not throw. */
 async function purgeFileUrls(urls: string[]): Promise<void> {
@@ -408,6 +409,7 @@ router.post(
       return created;
     });
 
+    void syncPinFromLink(result.id);
     await logAdminAction('CREATE_BUILDING', 'building', result.id, { title: result.title }, authReq);
     sendCreated(res, result, 'Building created successfully');
   })
@@ -581,6 +583,8 @@ router.put(
       where: { id: req.params.id },
       data: updateData,
     });
+    // The pin follows the Google Maps link, whenever the property is saved.
+    void syncPinFromLink(req.params.id);
 
     // Upsert rather than update: most buildings have no investment row yet, and
     // the form has no way to tell the difference.

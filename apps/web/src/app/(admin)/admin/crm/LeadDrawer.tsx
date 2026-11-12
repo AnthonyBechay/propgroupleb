@@ -1,5 +1,6 @@
 'use client'
 
+import { AssigneePicker, useTeam } from './Assignees'
 import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { ChatSuggestion, type Suggestion } from './ChatSuggestion'
@@ -123,6 +124,7 @@ export function LeadDrawer({
   const [loading, setLoading] = useState(true)
   const [editing, setEditing] = useState(false)
   const [busy, setBusy] = useState(false)
+  const team = useTeam()
 
   // Quick contact-log form
   const [channel, setChannel] = useState<typeof CHANNELS[number]>('CALL')
@@ -333,7 +335,10 @@ export function LeadDrawer({
         <div className="sticky top-0 bg-white border-b border-slate-200 px-5 py-4 z-10">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
-              <h2 className="text-lg font-bold text-slate-900 truncate">{l.name}</h2>
+              <div className="flex items-center gap-2">
+                <h2 className="text-lg font-bold text-slate-900 truncate">{l.name}</h2>
+                <AssigneePicker leadId={l.id} value={l.assignees ?? []} team={team} onChanged={onChanged} size={24} />
+              </div>
               <div className="flex items-center gap-1.5 mt-1 flex-wrap">
                 <span className={`px-2 py-0.5 rounded text-xs font-medium ${STATUS_META[l.status].cls}`}>{STATUS_META[l.status].label}</span>
                 <span className={`px-2 py-0.5 rounded text-xs font-medium ${MARKET_META[l.market].cls}`}>{MARKET_META[l.market].label}</span>

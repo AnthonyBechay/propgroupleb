@@ -10,6 +10,7 @@ import { ConditionalScrollToTop } from "@/components/layout/ConditionalScrollToT
 import { AnalyticsTracker } from "@/components/analytics/AnalyticsTracker";
 import { ComparatorBar } from "@/components/ComparatorBar";
 import { MetaPixel } from "@/components/analytics/MetaPixel";
+import { NumberWheelGuard } from "@/components/NumberWheelGuard";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -185,6 +186,7 @@ export default function RootLayout({
         />
       </head>
       <body className="font-plus-jakarta antialiased min-h-screen flex flex-col bg-slate-50 overflow-x-clip">
+        <NumberWheelGuard />
         <AuthProvider>
           <ComparatorProvider>
             <ConditionalNavbar />

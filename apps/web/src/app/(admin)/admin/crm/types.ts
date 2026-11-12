@@ -186,6 +186,8 @@ export const LIVE_STAGES: OpportunityStage[] = [
 
 export interface Lead {
   id: string
+  /** Who in the office looks after them (user ids). */
+  assignees?: string[]
   /** Set once the client has a mirrored WhatsApp / Instagram thread. */
   waId?: string | null
   igId?: string | null
@@ -599,6 +601,7 @@ export interface Deal extends Opportunity {
     flaggedAt?: string | null
     flagNote?: string | null
     flaggedBy?: string | null
+    assignees?: string[]
   }
 }
 
@@ -656,6 +659,8 @@ export const BOARD_DEAL_COLUMNS = DEAL_COLUMNS.filter((c) => c.key !== 'SUGGESTE
 export interface PipelineClient {
   id: string
   name: string
+  /** Who in the office looks after them (user ids). */
+  assignees?: string[]
   market: LeadMarket
   type: LeadType
   isInvestor: boolean
@@ -695,6 +700,35 @@ export const CLIENT_COLUMNS: Array<{ key: PipelineClient['bucket']; label: strin
   { key: 'ON_HOLD', label: 'On hold', hint: 'Checking something for them, or parked until something happens. A new message from them still goes to "To answer"', accent: 'bg-violet-500' },
   { key: 'PING_LATER', label: 'Ping later', hint: 'Snoozed — back in "To answer" on the date', accent: 'bg-sky-500' },
 ]
+
+/**
+ * The people half of the board, as three columns.
+ *
+ * It was five, one per bucket — which with five deal stages made a board ten
+ * columns wide that nobody could see at once. The question a column answers is
+ * "do I have to do something?", and that has three answers: yes, no (someone
+ * is talking to them), not yet. Which bucket a card is in is still said on the
+ * card, and every move is still in its Move menu.
+ */
+export const PEOPLE_GROUPS: Array<{
+  key: 'TO_ANSWER' | 'TALKING' | 'WAITING'
+  buckets: PipelineClient['bucket'][]
+  label: string
+  hint: string
+  accent: string
+}> = [
+  { key: 'TO_ANSWER', buckets: ['TO_ANSWER'], label: 'To answer', hint: 'A person owes them a message', accent: 'bg-red-500' },
+  { key: 'TALKING', buckets: ['ASSISTANT', 'WITH_YOU'], label: 'Talking', hint: 'With the assistant or with one of us — nothing owed', accent: 'bg-emerald-500' },
+  { key: 'WAITING', buckets: ['ON_HOLD', 'PING_LATER'], label: 'Waiting', hint: 'On hold or to ping later — back in To answer when due', accent: 'bg-sky-500' },
+]
+
+/** What a card in a shared column says about itself. */
+export const BUCKET_TAG: Partial<Record<PipelineClient['bucket'], { label: string; cls: string }>> = {
+  ASSISTANT: { label: 'Assistant', cls: 'bg-emerald-50 text-emerald-800' },
+  WITH_YOU: { label: 'With us', cls: 'bg-amber-50 text-amber-800' },
+  ON_HOLD: { label: 'On hold', cls: 'bg-violet-50 text-violet-800' },
+  PING_LATER: { label: 'Ping later', cls: 'bg-sky-50 text-sky-800' },
+}
 
 /** Which column a deal sits in. */
 export function dealColumnOf(deal: Deal): string {

@@ -1633,6 +1633,11 @@ model Lead {
 
   notes String?
 
+  // Who in the office looks after this client: user ids, usually one, more
+  // when two people work them together. Empty = nobody yet. Never a wall —
+  // everyone still sees every client; this only says whose they are.
+  assignees String[] @default([])
+
   // When the relationship reached a terminal state (WON/LOST). Lets the board
   // show only recent wins instead of accumulating closed deals forever.
   closedAt DateTime?

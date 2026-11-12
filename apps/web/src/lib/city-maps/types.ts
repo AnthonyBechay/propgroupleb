@@ -72,6 +72,8 @@ export interface CityMap {
   cityMatches: string[]
   centre: LatLng
   zoom: number
+  /** How far from the centre a pinned project still counts as this city's. */
+  reachKm: number
   /** Two or three sentences: the city as an investment, before any detail. */
   intro: string
   /** How to read the city in one go — the mental model. */
