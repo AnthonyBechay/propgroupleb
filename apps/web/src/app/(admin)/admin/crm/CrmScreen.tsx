@@ -396,36 +396,10 @@ export function CrmScreen({ mode }: { mode: 'pipeline' | 'clients' }) {
   const openLead = leads.find((l) => l.id === openId) ?? null
 
   return (
-    <div className="space-y-3">
-      {/* One row: what needs attention on the left, actions on the right. The
-          page title used to eat a whole row saying what the sidebar says. */}
-      <div className="flex items-center justify-between gap-3 flex-wrap">
-        <div className="flex flex-wrap items-center gap-2 ml-auto">
-          <button
-            onClick={exportCsv}
-            disabled={exporting}
-            className="inline-flex min-h-11 items-center gap-1.5 px-3 rounded-lg border border-slate-200 bg-white text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
-          >
-            {exporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />} Export
-          </button>
-          <button
-            onClick={() => setImporting(true)}
-            className="inline-flex min-h-11 items-center gap-1.5 px-3 rounded-lg border border-slate-200 bg-white text-sm font-medium text-slate-700 hover:bg-slate-50"
-          >
-            <Upload className="h-4 w-4" /> Import
-          </button>
-          <button
-            onClick={() => setCreating(true)}
-            className="inline-flex min-h-11 flex-1 items-center justify-center gap-2 px-4 rounded-lg bg-slate-800 text-white text-sm font-medium hover:bg-slate-700 sm:flex-none"
-          >
-            <Plus className="h-4 w-4" /> Add Client
-          </button>
-        </div>
-      </div>
-
+    <div className="space-y-2">
       {/* Toolbar: search · type · market · view */}
-      <div className="flex gap-2 flex-wrap items-center bg-white border border-slate-200 rounded-xl p-2">
-        <div className="relative w-full min-w-[220px] sm:w-auto sm:flex-1">
+      <div className="flex gap-2 flex-wrap items-center bg-white border border-slate-200 rounded-xl p-1.5">
+        <div className="relative w-full min-w-[180px] sm:w-auto sm:flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
           <input
             value={search}
@@ -504,6 +478,34 @@ export function CrmScreen({ mode }: { mode: 'pipeline' | 'clients' }) {
           </button>
         </div>
         )}
+
+        {/* The page's actions sit on the same bar as its filters. They had a
+            row to themselves above it. */}
+        <div className="flex items-center gap-1 max-sm:w-full">
+          <button
+            onClick={exportCsv}
+            disabled={exporting}
+            title="Export clients to a spreadsheet"
+            aria-label="Export clients"
+            className="inline-flex h-11 w-11 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 disabled:opacity-50 sm:h-9 sm:w-9"
+          >
+            {exporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+          </button>
+          <button
+            onClick={() => setImporting(true)}
+            title="Import clients from a spreadsheet"
+            aria-label="Import clients"
+            className="inline-flex h-11 w-11 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 sm:h-9 sm:w-9"
+          >
+            <Upload className="h-4 w-4" />
+          </button>
+          <button
+            onClick={() => setCreating(true)}
+            className="inline-flex h-11 flex-1 items-center justify-center gap-1.5 rounded-lg bg-slate-900 px-3.5 text-sm font-medium text-white hover:bg-slate-800 sm:h-9 sm:flex-none"
+          >
+            <Plus className="h-4 w-4" /> Add client
+          </button>
+        </div>
       </div>
 
       {/* Content */}

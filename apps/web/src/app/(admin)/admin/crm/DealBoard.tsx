@@ -185,8 +185,30 @@ export function DealBoard({
   }, [filtered])
 
   return (
-    <div className="space-y-3">
-      <div className="flex gap-2 flex-wrap items-center bg-white border border-slate-200 rounded-xl p-2">
+    <div className="space-y-2">
+      {/* One row for everything about the board: which half, whose clients,
+          what is wrong, the totals. It used to be three rows stacked. */}
+      <div className="flex gap-2 flex-wrap items-center bg-white border border-slate-200 rounded-xl p-1.5">
+        <div className="max-lg:hidden inline-flex rounded-lg border border-slate-200 bg-white p-0.5" role="group" aria-label="Which part of the board">
+          {([
+            ['people', 'People', visibleClients.length],
+            ['deals', 'Deals', filtered.length],
+            ['both', 'Both', null],
+          ] as const).map(([key, label, n]) => (
+            <button
+              key={key}
+              type="button"
+              aria-pressed={side === key}
+              onClick={() => setSide(key)}
+              className={`inline-flex h-9 items-center gap-1.5 rounded-md px-3.5 text-sm font-medium transition-colors ${
+                side === key ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-50'
+              }`}
+            >
+              {label}
+              {n !== null && <span className={side === key ? 'text-white/70' : 'text-slate-400'}>{n}</span>}
+            </button>
+          ))}
+        </div>
         <button
           onClick={() => setOnlyAlerts((v) => !v)}
           disabled={alertCount === 0}
@@ -306,39 +328,17 @@ export function DealBoard({
         ))}
       </div>
 
-      {/* Desktop: People / Deals / Both */}
-      <div className="max-lg:hidden mb-2 inline-flex rounded-lg border border-slate-200 bg-white p-0.5" role="group" aria-label="Which part of the board">
-        {([
-          ['people', 'People', visibleClients.length],
-          ['deals', 'Deals', filtered.length],
-          ['both', 'Both', null],
-        ] as const).map(([key, label, n]) => (
-          <button
-            key={key}
-            type="button"
-            aria-pressed={side === key}
-            onClick={() => setSide(key)}
-            className={`inline-flex h-9 items-center gap-1.5 rounded-md px-3.5 text-sm font-medium transition-colors ${
-              side === key ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-50'
-            }`}
-          >
-            {label}
-            {n !== null && <span className={side === key ? 'text-white/70' : 'text-slate-400'}>{n}</span>}
-          </button>
-        ))}
-      </div>
-
       {/* The board is as tall as the window and each column scrolls inside it,
           so a long column never pushes the sideways scrollbar off the screen. */}
-      <div className={`flex gap-2.5 pb-3 max-lg:flex-col lg:h-[calc(100dvh-17rem)] lg:min-h-[420px] lg:pg-scroll-x`}>
+      <div className={`flex gap-2.5 pb-3 max-lg:flex-col lg:h-[calc(100dvh-12.5rem)] lg:min-h-[420px] lg:pg-scroll-x`}>
         {/* Two halves, said on screen: people (before any property is in play)
             and deals (one card per property). They used to run together as one
             row of ten columns, with nothing saying where one became the other. */}
-        <section className={`contents lg:flex-col lg:gap-1.5 lg:min-h-0 ${side === 'deals' ? 'lg:hidden' : 'lg:flex'}`} style={{ flex: `${PEOPLE_GROUPS.length} 0 ${PEOPLE_GROUPS.length * 182}px` }}>
-          <p className="max-lg:hidden px-1 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+        <section className={`contents lg:flex-col lg:gap-1.5 lg:min-h-0 ${side === 'deals' ? 'lg:hidden' : 'lg:flex'}`} style={{ flex: `${PEOPLE_GROUPS.length} 0 ${PEOPLE_GROUPS.length * 182}px`, minWidth: 0 }}>
+          <p className={`max-lg:hidden px-1 text-[11px] font-semibold uppercase tracking-wide text-slate-500 ${fit ? 'lg:hidden' : ''}`}>
             People <span className="font-normal normal-case tracking-normal text-slate-400">· who owes the next message</span>
           </p>
-          <div className="contents lg:flex lg:min-h-0 lg:flex-1 lg:gap-2.5">
+          <div className="contents lg:flex lg:min-h-0 lg:min-w-0 lg:flex-1 lg:gap-2.5">
         {PEOPLE_GROUPS.map((col) => {
           const cards = visibleClients.filter((c) => col.buckets.includes(c.bucket))
           return (
@@ -363,16 +363,15 @@ export function DealBoard({
                 mobileColumn === col.key ? 'max-lg:block' : 'max-lg:hidden'
               }`}
             >
-              <div className="p-2.5 border-b border-slate-200 max-lg:hidden">
+              <div className="px-2.5 py-2 border-b border-slate-200 max-lg:hidden" title={col.hint}>
                 <div className="flex items-center gap-1.5">
                   <span className={`h-2 w-2 rounded-full ${col.accent}`} />
                   <span className="text-sm font-semibold text-slate-900">{col.label}</span>
                   <span className="text-xs text-slate-500">{cards.length}</span>
                 </div>
-                <p className="text-[11px] text-slate-500 mt-0.5">{col.hint}</p>
               </div>
               <p className="px-2.5 pt-2 text-[11px] text-slate-500 lg:hidden">{col.hint}</p>
-              <div className="p-1.5 space-y-1.5 min-h-[120px] lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:overscroll-contain">
+              <div className="p-1.5 space-y-1.5 min-h-[120px] lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:overflow-x-hidden lg:overscroll-contain">
                 {cards.map((c) => (
                   <ClientCard key={c.id} client={c} team={team} onAssigned={onAssigned} tag={col.buckets.length > 1 ? BUCKET_TAG[c.bucket] : undefined} focused={c.id === focusLeadId} onOpenClient={onOpenClient} onOpenChat={onOpenChat} onBook={onBook} onDragStart={() => setDragging(`client:${c.id}`)} />
                 ))}
@@ -387,11 +386,11 @@ export function DealBoard({
 
         <div className={`max-lg:hidden w-px shrink-0 self-stretch bg-slate-300 my-1 ${fit ? 'lg:hidden' : ''}`} aria-hidden />
 
-        <section className={`contents lg:flex-col lg:gap-1.5 lg:min-h-0 ${side === 'people' ? 'lg:hidden' : 'lg:flex'}`} style={{ flex: `${dealCols.length} 0 ${dealCols.length * 182}px` }}>
-          <p className="max-lg:hidden px-1 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+        <section className={`contents lg:flex-col lg:gap-1.5 lg:min-h-0 ${side === 'people' ? 'lg:hidden' : 'lg:flex'}`} style={{ flex: `${dealCols.length} 0 ${dealCols.length * 182}px`, minWidth: 0 }}>
+          <p className={`max-lg:hidden px-1 text-[11px] font-semibold uppercase tracking-wide text-slate-500 ${fit ? 'lg:hidden' : ''}`}>
             Deals <span className="font-normal normal-case tracking-normal text-slate-400">· one card per property</span>
           </p>
-          <div className="contents lg:flex lg:min-h-0 lg:flex-1 lg:gap-2.5">
+          <div className="contents lg:flex lg:min-h-0 lg:min-w-0 lg:flex-1 lg:gap-2.5">
         {dealCols.map((col) => {
           const cards = filtered.filter((d) => dealColumnOf(d) === col.key)
           const value = cards.reduce((t, d) => t + (dealCommission(d)?.usd ?? 0), 0)
@@ -422,7 +421,7 @@ export function DealBoard({
                 over === col.key ? 'border-slate-900 bg-slate-50' : 'border-slate-200 bg-slate-50/60'
               }`}
             >
-              <div className="p-2.5 border-b border-slate-200 max-lg:hidden">
+              <div className="px-2.5 py-2 border-b border-slate-200 max-lg:hidden" title={col.hint}>
                 <div className="flex items-center gap-1.5">
                   <span className={`h-2 w-2 rounded-full ${col.accent}`} />
                   <span className="text-sm font-semibold text-slate-900">{col.label}</span>
@@ -433,12 +432,11 @@ export function DealBoard({
                     </span>
                   )}
                 </div>
-                <p className="text-[11px] text-slate-500 mt-0.5">{col.hint}</p>
               </div>
 
               <p className="px-2.5 pt-2 text-[11px] text-slate-500 lg:hidden">{col.hint}</p>
 
-              <div className="p-1.5 space-y-1.5 min-h-[120px] lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:overscroll-contain">
+              <div className="p-1.5 space-y-1.5 min-h-[120px] lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:overflow-x-hidden lg:overscroll-contain">
                 {cards.map((d) => (
                   <DealCard
                     key={d.id}
