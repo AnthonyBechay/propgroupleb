@@ -763,7 +763,7 @@ When generating new share links, always go through the `ShareToken` table. Don't
 - **Off means off for the chat assistant.** Automatic replies never answer a message that arrived before the assistant was last switched on (`switchedOnAt` in the settings, `aiResumedAt` on a chat); "Step aside" also skips the quiet sweep and has no 24-hour limit on a team reply; and every off switch is re-checked just before sending. Only a person pressing "Reply now" gets past them.
 - **A finish has one view** from a short list (`FINISH_VIEW_OPTIONS`: sea, mountain, road, prime), and each finish-and-view is its own row with its own price per m². `views` stays an array in the API so the storefronts did not change. Free-text notes can no longer be added; old ones show until removed. **`Building.distanceToSea`** is in metres and is the only distance the assistant may quote.
 - **A renamed property keeps its old address.** Changing a title changes the slug; the old one goes into `Building.previousSlugs`, both slug lookups (`/api/buildings/slug/:slug`, `/api/properties/:id`) fall back to it, and propgrp.com's property page redirects to the current slug.
-- **An ad lead gets something to look at by the second reply.** When the advert names no project, the assistant sends the best one or two from the preferred list with its first answer after the name instead of asking budget, bedrooms and features first. `isInvestor` is set only when the client says they are investing.
+- **An ad lead gets something to look at by the second reply.** When the advert names no project, the assistant sends the best one or two from the preferred list with its first answer after the name instead of asking budget, bedrooms and features first. `isInvestor` is set only when the client's own words say investing (`INVEST_WORDS`, checked in code, because the prompt rule alone was ignored). A properties list the model types out instead of calling `send_listings` is still attached (`stripToolText` returns its refs), and markdown in a reply is turned into WhatsApp text (`whatsappText`). The answer to "what is your full name?" is saved by `noteNameFromReply` on every message, not only when the assistant stays out. WhatsApp's ready-made ad greeting (`AD_GREETING`) counts as an ad even when Meta sends no referral.
 - **Every word the assistant writes goes to the client.** `internalNote()` in `auto-reply.service.ts` and `stripToolText()` keep its notes off their phone. The model sometimes types a tool call as text (`update_conversation_summary(summary="…")`); only that part is cut and the reply still goes. Otherwise: text about "the client", a status or summary, or words copied from what it just recorded is not a reply. It is asked again once, then held back and the team is told. **A colleague's words win:** what the team told this client is passed in as fact over the catalogue. A project's "from" price is one unit in one finish (`priceNote` in `propertyDetails`), and furnishing goes by the finish. Accepting a chat suggestion ("Update client") sends nothing.
 - **Meta ad spend** is read (never written) by `services/meta-ads.service.ts` for the Overview's ads panel; needs `META_AD_ACCOUNT_ID`. Ad leads that reach a viewing or close are reported back by `services/meta-conversions.service.ts` (needs `META_DATASET_ID`; untested against a real dataset), once per stage, tracked in `Lead.metaStage`.
 - **Follow-up after silence** (`services/follow-up.service.ts`): past 24h since the client's last message WhatsApp accepts only Meta-approved templates, each billed. One template, named in Chat assistant settings (off by default), goes hourly in Beirut business hours to WhatsApp *clients* silent `afterDays`–`afterDays+7` days, once per silence (`Conversation.followUpSentAt`), capped per day; never to WON/LOST/ARCHIVED, chats switched off by the team, or "stop". The window bound is what stops switching it on from pinging six months of imported history — keep it. Stored with origin `AI` so the assistant, not "a team reply", picks up the answer. The inbox's "Send follow-up" button sends it by hand.
@@ -782,9 +782,17 @@ When generating new share links, always go through the `ShareToken` table. Don't
 
 This is the single most important thing to know before changing the schema.
 
-- `db push --accept-data-loss` syncs columns to `schema.prisma` on every boot. It
-  **drops anything the schema no longer declares**, and it **never runs a
+- `db push` syncs columns to `schema.prisma` on every boot
+  (`scripts/boot-backend.sh`, the compose `command`). It **never runs a
   migration file**.
+- **It does not pass `--accept-data-loss` by default** (since 2026-11-22). A
+  change that would drop data is refused, the database is left untouched, and
+  the API still starts on the old schema with a loud `ERROR` block in the log.
+  The flag used to be on, so any boot — including Coolify's unattended
+  auto-update restart at 04:00 — could silently drop columns. To apply a
+  destructive change on purpose: preview it (below), set
+  `PRISMA_ACCEPT_DATA_LOSS=true` in Coolify for **one** deploy, then unset it.
+  Do not put the flag back in the boot command.
 - So every sequence, backfill or data change lives in a boot routine instead:
   `utils/reference.ts` (`ensureReferenceCodes`) and `utils/crm-bootstrap.ts`
   (`normaliseCrmData`). Each step is guarded by a `SystemSetting` marker so it

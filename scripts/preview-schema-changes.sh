@@ -1,9 +1,10 @@
 #!/usr/bin/env sh
 # Show exactly what `prisma db push` would do to the database — without doing it.
 #
-# `db push --accept-data-loss` drops anything the schema no longer has. That is
-# usually intended, but on production you want to read the list first. This
-# prints the SQL and changes nothing.
+# Boot runs `db push` WITHOUT --accept-data-loss, so a destructive change is
+# refused (see scripts/boot-backend.sh). Run this to read exactly what would be
+# dropped before setting PRISMA_ACCEPT_DATA_LOSS=true for one deploy. It prints
+# the SQL and changes nothing.
 #
 #   docker exec $BE sh -c 'cd /app/apps/backend && sh scripts/preview-schema-changes.sh'
 

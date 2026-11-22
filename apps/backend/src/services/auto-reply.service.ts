@@ -618,6 +618,12 @@ const NOTE_WORDS = new RegExp(
   'iu'
 );
 
+/** The ready-made first message of a click-to-WhatsApp ad, as phones word it in each language. */
+const AD_GREETING = /can i get more info(?:rmation)? on this|i'?d like info on|مزيد من المعلومات حول هذا|quiero más información|plus d'informations sur|daha fazla bilgi/i;
+
+/** A client saying they buy to invest, in the languages they write to us in. */
+const INVEST_WORDS = /invest|rental|rent (?:it )?out|income|\broi\b|yield|return|profit|resale|resell|placement|rentab|استثمار|استثمر|مستثمر|ايجار|إيجار|تأجير|مردود|عائد|ربح|esti?thmar|tejir|ijar|yatırım|\bkira\b|investis/i;
+
 const TOOL_TEXT = /(?:print\(\s*)?(?:default_api\.)?\b(save_client_requirements|update_conversation_summary|hand_off_to_team|search_listings|get_property_details|send_listings|save_property_offer|save_voice_transcripts)\s*\(/;
 
 /**
@@ -626,9 +632,11 @@ const TOOL_TEXT = /(?:print\(\s*)?(?:default_api\.)?\b(save_client_requirements|
  * clients. Cut out only the call, so the reply itself still goes, and hand back
  * the summary it was trying to save.
  */
-export function stripToolText(text: string): { text: string; summary: string | null } {
+export function stripToolText(text: string): { text: string; summary: string | null; refs: string[] } {
   let rest = text;
   let summary: string | null = null;
+  // A typed send_listings still says which properties it meant to attach.
+  const refs: string[] = [];
   for (let found = TOOL_TEXT.exec(rest); found; found = TOOL_TEXT.exec(rest)) {
     // To the bracket that closes it, ignoring brackets inside quotes. One never closed runs to the end.
     let depth = 0;
@@ -648,11 +656,26 @@ export function stripToolText(text: string): { text: string; summary: string | n
       const said = /summary\s*=\s*(["'])((?:\\.|(?!\1)[\s\S])*)\1/.exec(call);
       if (said) summary = said[2].replace(/\\(["'])/g, '$1');
     }
+    if (found[1] === 'send_listings') refs.push(...(call.match(/PG-\d+(?:-\d+)?/gi) ?? []).map((r) => r.toUpperCase()));
     rest = rest.slice(0, found.index) + rest.slice(end);
   }
-  if (rest === text) return { text, summary };
+  if (rest === text) return { text, summary, refs };
   // What wrapped the call: a code fence and its label.
-  return { text: rest.replace(/```(?:tool_code|python|tool_call)?/g, '').replace(/\n{3,}/g, '\n\n').trim(), summary };
+  return { text: rest.replace(/```(?:tool_code|python|tool_call)?/g, '').replace(/\n{3,}/g, '\n\n').trim(), summary, refs };
+}
+
+/**
+ * WhatsApp shows markdown as typed: "[PHIROSMANI RESIDENCE](https://…)" and
+ * "**from $39,520**" reached a client like that. Links become "name: url",
+ * bold becomes WhatsApp's single asterisks, headings and list stars go.
+ */
+export function whatsappText(text: string): string {
+  return text
+    .replace(/\[([^\]\n]+)\]\((https?:\/\/[^\s)]+)\)/g, (_m, label: string, url: string) => (label.trim() === url ? url : `${label.trim()}: ${url}`))
+    .replace(/\*\*([^*\n]+)\*\*/g, '*$1*')
+    .replace(/__([^_\n]+)__/g, '_$1_')
+    .replace(/^#{1,6}\s+/gm, '')
+    .replace(/^\s*[*-]\s+/gm, '• ');
 }
 
 /**
@@ -685,6 +708,7 @@ ${LANGUAGE_RULE[replyStyle]}${thisReply ? `\n- ${thisReply}` : ''}
 
 What to do:
 - Work out what they need from what you already know, and ask only for what is genuinely missing, one question at a time. Never ask something the ad they came from, their earlier messages or the notes below already answer.
+- If they ask for a video, more photos, a call or a visit, do not just send the same property again: the team has videos and can call. Say a colleague will send it shortly, and call hand_off_to_team with what they asked for.
 - Each reply is one message and costs money to send. Say everything for this turn in that one reply; never plan a follow-up message.
 - As soon as you know the country and either a budget, an area or a project, call search_listings and attach the best matches with send_listings. Two or three well-matched options beat many. If nothing fits, say so plainly and ask what they could flex on.
 - Each time the client tells you a requirement, call save_client_requirements.
@@ -821,14 +845,14 @@ async function reply(conversationId: string, trigger: 'message' | 'sweep' | 'man
   });
   if (!conversation) return skip('Conversation not found.');
 
+  // The answer to "what is your full name?" goes on the card whatever happens
+  // next: the model does not always record it ("Bernard sakr" was left off).
+  if (trigger === 'message') {
+    await noteNameFromReply(conversationId).catch((err) => logger.error('Could not note the name from a reply', err, { conversationId }));
+  }
   const settings = await getChatAiSettings();
   const blocked = await standingBlock(conversation, settings, manual);
-  if (blocked) {
-    if (trigger === 'message') {
-      await noteNameFromReply(conversationId).catch((err) => logger.error('Could not note the name from a reply', err, { conversationId }));
-    }
-    return skip(blocked);
-  }
+  if (blocked) return skip(blocked);
 
   const since = new Date(Date.now() - DAY_MS);
   const loadRecent = () =>
@@ -1006,6 +1030,9 @@ async function reply(conversationId: string, trigger: 'message' | 'sweep' | 'man
   });
   const said = Object.assign({}, ...learned.map((x) => x.patch ?? {})) as { market?: string; fullName?: string };
   const adMarket: Market = normaliseMarket(process.env.LEAD_MARKET_META) ?? 'INTERNATIONAL';
+  // WhatsApp's ready-made ad greeting, when Meta did not say which ad: it is
+  // still an ad, so "Georgia or Lebanon?" is a question the ad answered.
+  const adGreeting = recent.some((m) => m.direction === 'IN' && AD_GREETING.test(m.body));
   // Where "abroad" is today, from the stock itself: "Georgia", "Bulgaria or Georgia".
   const abroadCountries = await internationalCountries();
   const abroad = abroadCountries.length ? abroadCountries.join(' or ') : 'abroad';
@@ -1013,7 +1040,7 @@ async function reply(conversationId: string, trigger: 'message' | 'sweep' | 'man
     normaliseMarket(said.market)
       ? (normaliseMarket(said.market) as Market)
       // An opening WhatsApp hid is almost always the advert's greeting (see openingUnreadable).
-      : fromAd || trace.openingUnreadable
+      : fromAd || trace.openingUnreadable || adGreeting
         ? adMarket
         : settings.marketWhenUnknown === 'ask'
           ? null
@@ -1178,6 +1205,12 @@ async function reply(conversationId: string, trigger: 'message' | 'sweep' | 'man
     if (clean.text === text) return text;
     trace.toolTextRemoved = true;
     logger.warn('Auto-reply: removed a tool call typed into the reply', { conversationId });
+    // It typed the properties instead of attaching them: attach them anyway.
+    const typed = clean.refs.filter((r) => offered.has(r));
+    if (typed.length) {
+      toSend = [...new Set([...toSend, ...typed])].slice(0, settings.maxListings);
+      toolLog.push(`send-typed(${typed.join(' ')})`);
+    }
     if (clean.summary) {
       notes.push(clean.summary);
       await prisma.conversation.update({ where: { id: conversationId }, data: { summary: clean.summary.slice(0, 1200) } });
@@ -1275,6 +1308,11 @@ async function reply(conversationId: string, trigger: 'message' | 'sweep' | 'man
         // "record" the WhatsApp profile name, and the next reply took it as known.
         if (typeof args.fullName === 'string' && !nameWasGiven(args.fullName, [...recent.filter((m) => m.direction === 'IN').map((m) => m.body), ...heard])) {
           delete args.fullName;
+        }
+        // The rule in the tool's description was not enough: every ad lead was
+        // filed as an investor the moment they gave their name. Only their words count.
+        if (args.isInvestor === true && !INVEST_WORDS.test([...recent.filter((m) => m.direction === 'IN').map((m) => m.body), ...heard].join(' '))) {
+          delete args.isInvestor;
         }
         await saveSuggestion(conversationId, leadId, args);
       } else if (call.name === 'save_property_offer') {
@@ -1438,6 +1476,7 @@ async function reply(conversationId: string, trigger: 'message' | 'sweep' | 'man
     toSend = [];
   }
   const cards = await cardsByRef(toSend);
+  reply = whatsappText(reply);
   const message = [reply, ...cards.map(cardCaption)].join('\n\n');
   const photo = cards.find((c) => c.image)?.image ?? undefined;
   await sendReply(conversationId, message, 'AI', message.length <= CAPTION_LIMIT ? photo : undefined);
