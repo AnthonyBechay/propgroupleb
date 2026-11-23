@@ -505,6 +505,92 @@ class ApiClient {
     return this.request(`/api/listings/${id}`, { method: 'DELETE' });
   }
 
+  // ── Viewing agreements (signed on site before a viewing) ──────────────────
+  async getViewingTerms(): Promise<ApiResponse<ViewingTerms>> {
+    return this.request('/api/viewing-agreements/terms');
+  }
+
+  async listViewingAgreements(params: { search?: string; leadId?: string; page?: number; limit?: number } = {}): Promise<ApiResponse<ViewingAgreementRow[]> & { pagination?: { page: number; pages: number; total: number } }> {
+    const q = new URLSearchParams();
+    Object.entries(params).forEach(([k, v]) => { if (v !== undefined && v !== '') q.set(k, String(v)); });
+    return this.request(`/api/viewing-agreements?${q.toString()}`);
+  }
+
+  async getViewingAgreement(id: string): Promise<ApiResponse<ViewingAgreement>> {
+    return this.request(`/api/viewing-agreements/${encodeURIComponent(id)}`);
+  }
+
+  async signViewingAgreement(data: SignViewingAgreementInput): Promise<ApiResponse<{ id: string; ref: string; leadId: string | null }>> {
+    return this.request('/api/viewing-agreements', { method: 'POST', body: JSON.stringify(data) });
+  }
+
+  async voidViewingAgreement(id: string, reason: string): Promise<ApiResponse<{ id: string; status: string }>> {
+    return this.request(`/api/viewing-agreements/${id}/void`, { method: 'POST', body: JSON.stringify({ reason }) });
+  }
+
+}
+
+export interface ViewingTerms {
+  version: string;
+  feePercent: number;
+  protectionMonths: number;
+  sections: { title: string; body: string }[];
+}
+
+export interface ViewingAgreementProperty {
+  buildingId: string;
+  ref: string | null;
+  title: string;
+  city: string | null;
+  country: string | null;
+}
+
+export interface ViewingAgreementRow {
+  id: string;
+  ref: string;
+  status: 'SIGNED' | 'VOID';
+  clientName: string;
+  clientPhone: string | null;
+  leadId: string | null;
+  properties: ViewingAgreementProperty[];
+  propertyNote: string | null;
+  viewingAt: string;
+  signedAt: string;
+  agentName: string | null;
+  feePercent: string | number;
+}
+
+export interface ViewingAgreement extends ViewingAgreementRow {
+  clientEmail: string | null;
+  clientIdNumber: string | null;
+  termsVersion: string;
+  termsText: string;
+  protectionMonths: number;
+  noPriorIntroduction: boolean;
+  signatureData: string;
+  signedIp: string | null;
+  signedUserAgent: string | null;
+  documentHash: string;
+  notes: string | null;
+  voidedAt: string | null;
+  voidReason: string | null;
+  lead: { id: string; name: string } | null;
+}
+
+export interface SignViewingAgreementInput {
+  clientName: string;
+  clientPhone?: string;
+  clientEmail?: string;
+  clientIdNumber?: string;
+  leadId?: string;
+  buildingIds: string[];
+  propertyNote?: string;
+  viewingAt?: string;
+  notes?: string;
+  termsVersion: string;
+  acceptedTerms: true;
+  noPriorIntroduction: boolean;
+  signatureData: string;
 }
 
 // Export singleton instance

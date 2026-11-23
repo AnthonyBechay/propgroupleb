@@ -5,7 +5,7 @@ import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { ChatSuggestion, type Suggestion } from './ChatSuggestion'
 import {
-  X, Phone, MessageCircle, Mail, Loader2, Send, Pencil, Trash2, Building2, Clock, CalendarPlus, ExternalLink, History, Handshake, ClipboardCheck, Lightbulb, Sparkles, Plus, StickyNote, Globe, Home, MessagesSquare, Megaphone, LayoutGrid,
+  X, Phone, MessageCircle, Mail, Loader2, Send, Pencil, Trash2, Building2, Clock, CalendarPlus, ExternalLink, History, Handshake, ClipboardCheck, Lightbulb, Sparkles, Plus, StickyNote, Globe, Home, MessagesSquare, Megaphone, LayoutGrid, FileSignature,
 } from 'lucide-react'
 import { normalizeApiUrl, normalizeFileUrl } from '@/lib/utils/api-url'
 import { regionLabel } from '@/lib/crm-locations'
@@ -408,6 +408,14 @@ export function LeadDrawer({
                 <Send className="h-3.5 w-3.5" /> Send properties
               </button>
             )}
+            {/* Before a viewing: the client signs the showing rules on this device. */}
+            <Link
+              href={`/admin/agreements/new?leadId=${l.id}`}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-sm text-slate-700 hover:bg-slate-100"
+              title="Open a viewing agreement for this client to sign"
+            >
+              <FileSignature className="h-3.5 w-3.5" /> Viewing agreement
+            </Link>
             {/* The board's Move menu, here too. Open clients only: a closed one
                 goes back on the board first, with one tap. */}
             {['WON', 'LOST', 'ARCHIVED'].includes(l.status) ? (

@@ -63,6 +63,15 @@ export function canDeleteConversations(role: string | null | undefined): boolean
 }
 
 /**
+ * May this user void a signed viewing agreement? Mirrors `requireAdmin` on
+ * POST /api/viewing-agreements/:id/void — anyone who shows properties can
+ * collect one, only the office can cancel one.
+ */
+export function canVoidAgreements(role: string | null | undefined): boolean {
+  return role === 'ADMIN' || role === 'SUPER_ADMIN'
+}
+
+/**
  * The admin routes a CRM_MANAGER may open.
  *
  * Deliberately a prefix allow-list rather than a deny-list: a page added next
@@ -72,7 +81,8 @@ export function canDeleteConversations(role: string | null | undefined): boolean
  */
 // City maps are sales knowledge with no money and no client data in them, and
 // the people selling are the ones who need them.
-const CRM_MANAGER_PATHS = ['/admin/crm', '/admin/inbox', '/admin/clients', '/admin/city-maps']
+// Viewing agreements are collected by whoever shows the property.
+const CRM_MANAGER_PATHS = ['/admin/crm', '/admin/inbox', '/admin/clients', '/admin/city-maps', '/admin/agreements']
 
 /** Single pages (not prefixes) a CRM_MANAGER may also open: their own settings. */
 const CRM_MANAGER_PAGES = ['/admin/settings', '/admin/settings/profile', '/admin/settings/security', '/admin/settings/notifications']

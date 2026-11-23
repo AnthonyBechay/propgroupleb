@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
-import { Building2, ChevronDown, Menu, Plus, Tag, UserPlus } from 'lucide-react'
+import { Building2, ChevronDown, FileSignature, Menu, Plus, Tag, UserPlus } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { canAccessAdminPath, ROLE_LABELS, type Role } from '@/lib/permissions'
 import { cn } from '@/lib/utils'
@@ -17,13 +17,14 @@ interface QuickAction {
 
 /**
  * Creating something was always a two-step journey: get to the right list
- * page, then find its "Add" button. These are the three things this back office
+ * page, then find its "Add" button. These are the things this back office
  * exists to create, reachable from anywhere.
  */
 const QUICK_ACTIONS: QuickAction[] = [
   { label: 'Property', href: '/admin/buildings/new', icon: Building2, description: 'A building, villa or land plot' },
   { label: 'Listing', href: '/admin/listings/new', icon: Tag, description: 'Put existing stock on the market' },
   { label: 'Client', href: '/admin/crm?new=1', icon: UserPlus, description: 'A buyer, seller or tenant' },
+  { label: 'Viewing agreement', href: '/admin/agreements/new', icon: FileSignature, description: 'Client signs before a viewing' },
 ]
 
 /**

@@ -832,6 +832,27 @@ npx prisma migrate resolve --applied <timestamp>_baseline
 Worth doing when there's a quiet week. Until then, the boot routines above are
 the only reliable way to change data.
 
+## Viewing agreements (`/admin/agreements`)
+
+Before a viewing, the agent opens **New → Viewing agreement** (or the button on
+a client's card, which prefills them via `?leadId=`), fills in the client and the
+properties, and hands the phone/tablet over. The client reads the terms, ticks,
+and signs with a finger (`components/admin/SignaturePad.tsx`, no library).
+
+- **The terms live in one file**: `apps/backend/src/config/viewing-terms.ts`
+  (fee 2.5%, 12-month protection). The server renders them itself at signing
+  and stores the text on the row; it never trusts text sent by the browser.
+  **Bump `VIEWING_TERMS_VERSION` on any wording change** — a form opened on the
+  old version gets a 409 and must reload.
+- `ViewingAgreement` snapshots everything (properties, terms, fee) and stores a
+  SHA-256 `documentHash`, so later edits to a building or the terms never change
+  what was signed.
+- **The signature is a data URL in the row, not in R2** — `/api/files/*` is a
+  public proxy.
+- Agents (`AGENT`) may create and see their own; `CRM_MANAGER`+ see all; only
+  `ADMIN`+ can void (the row is kept, marked `VOID`). Linked to a CRM client by
+  `leadId` or, failing that, by phone (`findLeadByPhone`).
+
 ## Chat notifications (web push)
 
 The installed Inbox app (`/inbox.webmanifest`, start `/admin/inbox`) gets push

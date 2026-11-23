@@ -52,6 +52,7 @@ import faqRoutes from './routes/faq.js';
 import pushRoutes from './routes/push.js';
 import webhookRoutes from './routes/webhooks.js';
 import marketRoutes from './routes/markets.js';
+import viewingAgreementRoutes from './routes/viewing-agreements.js';
 import { privateFieldGuard } from './middleware/auth.js';
 import { realClientIp } from './utils/client-ip.js';
 import { trustedStorefront } from './utils/storefront.js';
@@ -405,6 +406,7 @@ app.use('/api/webhooks', webhookRoutes);
 
 app.use('/api/fx-rates', fxRateRoutes);
 app.use('/api/markets', marketRoutes);
+app.use('/api/viewing-agreements', viewingAgreementRoutes);
 
 // Legacy alias — keep /api/properties working during transition
 app.use('/api/properties', privateFieldGuard, propertyRoutes);

@@ -349,19 +349,19 @@ model User {
 }
 
 model Developer {
-  id          String   @id @default(cuid())
-  name        String
-  description String?
-  website     String?
-  logo        String?
+  id            String   @id @default(cuid())
+  name          String
+  description   String?
+  website       String?
+  logo          String?
   // Free text, upper-case with underscores ("LEBANON", "UNITED_ARAB_EMIRATES").
   // It was an enum of four countries, so listing a project anywhere else needed
   // a code change and a deploy. The only value the code ever tests is LEBANON:
   // everything else is "international" and shows on propgrp.com.
-  country     String   @default("LEBANON") @map("country_name")
-  legacyCountry Country @default(LEBANON) @map("country") // see enum Country
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  country       String   @default("LEBANON") @map("country_name")
+  legacyCountry Country  @default(LEBANON) @map("country") // see enum Country
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
   buildings Building[]
 
@@ -369,16 +369,16 @@ model Developer {
 }
 
 model LocationGuide {
-  id        String   @id @default(cuid())
-  title     String
-  content   String
-  country   String   @default("LEBANON") @map("country_name")
-  legacyCountry Country @default(LEBANON) @map("country") // see enum Country
-  city      String?
-  caza      String?
-  imageUrl  String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id            String   @id @default(cuid())
+  title         String
+  content       String
+  country       String   @default("LEBANON") @map("country_name")
+  legacyCountry Country  @default(LEBANON) @map("country") // see enum Country
+  city          String?
+  caza          String?
+  imageUrl      String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
   buildings Building[]
 
@@ -415,19 +415,19 @@ model Building {
   // Free text, upper-case with underscores ("LEBANON", "UNITED_ARAB_EMIRATES").
   // The only value the code ever tests is LEBANON: everything else is
   // international and shows on propgrp.com.
-  country      String  @default("LEBANON") @map("country_name")
+  country       String  @default("LEBANON") @map("country_name")
   legacyCountry Country @default(LEBANON) @map("country") // see enum Country
-  mohafazat    String? // governorate: Beirut, Mount Lebanon, North, South, Bekaa, Akkar, Baalbek-Hermel, Nabatieh
-  caza         String? // district within mohafazat
-  city         String?
-  neighborhood String?
-  address      String?
-  zipCode      String?
-  latitude     Float?
+  mohafazat     String? // governorate: Beirut, Mount Lebanon, North, South, Bekaa, Akkar, Baalbek-Hermel, Nabatieh
+  caza          String? // district within mohafazat
+  city          String?
+  neighborhood  String?
+  address       String?
+  zipCode       String?
+  latitude      Float?
   /// Metres from the sea, as a buyer asks it. The chat assistant quotes only this.
   distanceToSea Int?
-  longitude    Float?
-  locationUrl  String? // Google Maps embed URL
+  longitude     Float?
+  locationUrl   String? // Google Maps embed URL
 
   // Building specs
   builtYear     Int?
@@ -470,7 +470,7 @@ model Building {
   paymentPlans Json?
 
   // SEO
-  slug            String? @unique
+  slug            String?  @unique
   // Addresses this property had before a rename. Renaming the title changes
   // the slug, and every link already in Google or a client's chat went dead
   // ("tonino-lamborghini-batumi" → 404). Old slugs still find it.
@@ -819,13 +819,13 @@ model PropertyInquiry {
 }
 
 model ContactMessage {
-  id        String   @id @default(cuid())
-  name      String
-  email     String
-  phone     String?
-  subject   String?
-  message   String
-  isRead    Boolean  @default(false)
+  id      String  @id @default(cuid())
+  name    String
+  email   String
+  phone   String?
+  subject String?
+  message String
+  isRead  Boolean @default(false)
 
   // Which website the message came from: LEBANON | INTERNATIONAL.
   //
@@ -836,7 +836,7 @@ model ContactMessage {
   //
   // Nullable for the same reason as AnalyticsEvent.site — messages that predate
   // the column don't know where they came from.
-  site      String?
+  site String?
 
   createdAt DateTime @default(now())
 
@@ -1380,7 +1380,7 @@ model ShareToken {
 // so events survive entity deletion and inserts stay cheap. No PII beyond an
 // anonymous client session id + user agent.
 model AnalyticsEvent {
-  id         String   @id @default(cuid())
+  id         String  @id @default(cuid())
   type       String // page_view | listing_view | listing_click | inquiry_click | phone_click | whatsapp_click | search | favorite
   path       String?
   listingId  String?
@@ -1404,9 +1404,9 @@ model AnalyticsEvent {
   // Nullable on purpose: events recorded before this column existed genuinely
   // do not know, and reporting them as Lebanese would be a guess dressed as a
   // fact. They are counted and labelled "unknown".
-  site       String?
+  site String?
 
-  createdAt  DateTime @default(now())
+  createdAt DateTime @default(now())
 
   @@index([type])
   @@index([createdAt])
@@ -1619,17 +1619,17 @@ model Lead {
 
   // Flagged red on the board for the team to look at, with why and by whom.
   // Stays until someone clears it.
-  flaggedAt           DateTime?
-  flagNote            String?
-  flaggedBy           String?
+  flaggedAt DateTime?
+  flagNote  String?
+  flaggedBy String?
 
   // "On hold" on the board: we are checking something for them (CHECKING) or
   // waiting on something before the next step (PARKED). Set only by a person,
   // kept until someone moves them on. A message from them still puts them in
   // "To answer" first.
-  holdAt              DateTime?
-  holdKind            String?
-  holdNote            String?
+  holdAt   DateTime?
+  holdKind String?
+  holdNote String?
 
   notes String?
 
@@ -1652,16 +1652,16 @@ model Lead {
   igId           String? @unique // Instagram-scoped user id
   externalLeadId String? @unique // Facebook leadgen id
   // Which Meta ad brought them in, when the platform tells us.
-  adId    String?
-  adLabel String? // ad headline or form name — what the team recognises
+  adId           String?
+  adLabel        String? // ad headline or form name — what the team recognises
   // The furthest stage already reported back to Meta ("Qualified",
   // "Converted"), so each is sent once and never backwards.
-  metaStage String?
+  metaStage      String?
   // Click-to-WhatsApp: the ad click that started their chat, and the WhatsApp
   // Business Account it came in on. With these Meta can tie a sale back to the
   // exact ad click — the only way a WhatsApp ad's results are counted.
-  ctwaClid String?
-  wabaId   String?
+  ctwaClid       String?
+  wabaId         String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1675,6 +1675,9 @@ model Lead {
   // Catalogue stock this client owns — the real link, as opposed to the
   // free-text LeadProperty shadow record.
   ownedBuildings Building[] @relation("BuildingOwner")
+
+  // Viewing agreements this client signed in front of an agent.
+  viewingAgreements ViewingAgreement[]
 
   @@index([market])
   @@index([status])
@@ -1805,7 +1808,7 @@ model Conversation {
   leadId String?
   lead   Lead?   @relation(fields: [leadId], references: [id], onDelete: SetNull)
 
-  lastMessageAt DateTime @default(now())
+  lastMessageAt DateTime  @default(now())
   lastPreview   String?
   // Meta only allows free-form replies within 24h of the customer's last
   // message, so the inbox needs this to know whether a reply can be sent.
@@ -1814,20 +1817,20 @@ model Conversation {
 
   // Automatic replies are off for this thread — a person took it over, the
   // client asked for one, or the team switched it off.
-  aiPaused Boolean @default(false)
+  aiPaused       Boolean   @default(false)
   // Why, in words — so "paused" on a thread explains itself.
   aiPausedReason String?
   aiPausedAt     DateTime?
   // "Keep the assistant on": it answers this thread whatever happens — after
   // the team replies, after it hands over. Only an explicit pause stops it.
-  aiAlways Boolean @default(false)
+  aiAlways       Boolean   @default(false)
   // A few sentences on where the conversation stands, rewritten by the
   // assistant after each reply. It is what lets it pick a thread back up days
   // later, after the team has been talking, without rereading everything.
-  summary String?
+  summary        String?
   // When somebody last pressed "Resume auto-reply". For 24 hours from then the
   // assistant keeps answering even though a person has replied on the thread.
-  aiResumedAt DateTime?
+  aiResumedAt    DateTime?
 
   // Hidden from the inbox list. Comes back by itself the moment they write again.
   archivedAt DateTime?
@@ -1915,7 +1918,7 @@ model PushSubscription {
   mode String @default("all")
 
   userAgent  String?
-  createdAt  DateTime @default(now())
+  createdAt  DateTime  @default(now())
   lastSentAt DateTime?
 
   @@index([userId])
@@ -1932,18 +1935,18 @@ model ChatMessage {
   // until it gets a 200 and a retry must not duplicate the message.
   externalId String @unique
 
-  type    String  @default("text") // text, image, audio, document, …
-  body    String
-  mediaId String? // platform media id
+  type       String  @default("text") // text, image, audio, document, …
+  body       String
+  mediaId    String? // platform media id
   // Our own copy of the attachment. Platform links expire within days, so the
   // file is copied to storage when the message arrives.
-  mediaUrl String?
+  mediaUrl   String?
   // What a voice note says, written out by the chat AI so it can be read and
   // searched without playing it.
   transcript String?
   // Outbound only: where it was typed — the phone app, the CRM, or automation.
-  origin  String?
-  status  String? // sent, delivered, read, failed
+  origin     String?
+  status     String? // sent, delivered, read, failed
 
   sentAt    DateTime @default(now())
   createdAt DateTime @default(now())
@@ -2053,15 +2056,15 @@ model LeadOpportunity {
   // null means "the project's terms, else the market's" (see
   // services/commission.service.ts), so changing a default moves every deal
   // that never set its own. commissionUsd is what that comes to, ours in full.
-  sellerPct Float?
-  buyerPct  Float?
+  sellerPct            Float?
+  buyerPct             Float?
   // A broker on the deal. Either takes brokerPct of OUR commission, or takes
   // one side outright — he brought the seller, we brought the buyer, so the
   // seller's part is his (brokerTakes).
-  brokerId     String?
-  brokerTakes  BrokerTakes?
-  brokerPct    Float?
-  brokerCutUsd Float?
+  brokerId             String?
+  brokerTakes          BrokerTakes?
+  brokerPct            Float?
+  brokerCutUsd         Float?
   // Payment plans abroad: we are paid once the client has paid payoutAtPct of
   // the price (30% in Georgia), which can take months. paidPct is how far they
   // have got. Null payoutAtPct = we are paid when the deal closes.
@@ -2071,9 +2074,9 @@ model LeadOpportunity {
   // The client's payment plan: a down payment, then the rest in equal monthly
   // instalments from planStartAt. With payoutAtPct it gives the month the
   // commission falls due — when to ping the developer.
-  downPaymentPct Float?
-  planMonths     Int?
-  planStartAt    DateTime?
+  downPaymentPct       Float?
+  planMonths           Int?
+  planStartAt          DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -2101,18 +2104,18 @@ enum BrokerTakes {
 
 // An outside broker or agent we split commission with.
 model Broker {
-  id       String  @id @default(cuid())
+  id       String      @id @default(cuid())
   name     String
   phone    String?
   email    String?
   company  String?
   // Their usual share of our commission, in percent. Copied onto a deal when
   // they are picked, so changing it later does not rewrite closed deals.
-  sharePct Float   @default(50)
+  sharePct Float       @default(50)
   // How he is usually paid; copied onto a deal when picked, changeable there.
   takes    BrokerTakes @default(SHARE)
   notes    String?
-  active   Boolean @default(true)
+  active   Boolean     @default(true)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -2210,4 +2213,76 @@ model RecurringExpense {
   expenses Expense[]
 
   @@map("recurring_expenses")
+}
+
+// ============================================
+// VIEWING AGREEMENTS (signed on site, on a phone or tablet)
+// ============================================
+
+enum ViewingAgreementStatus {
+  SIGNED
+  VOID
+}
+
+// What a client signs before an agent shows them a property: no dealing with
+// the owner behind PropGroup's back, and the fee if they buy. Everything the
+// client saw and agreed to is snapshotted here — the terms text, the
+// properties, the fee — so a later edit to the terms or to a building can
+// never change what this client signed. `documentHash` is a SHA-256 over that
+// snapshot plus the signature, so tampering with the row is detectable.
+//
+// The signature PNG is kept in the row (a data URL, ~10-40 KB), not in R2:
+// /api/files/* is a public proxy and a client's signature must not be.
+model ViewingAgreement {
+  id     String                 @id @default(cuid())
+  ref    String                 @unique // VA-20261123-7K3Q, quoted to the client
+  status ViewingAgreementStatus @default(SIGNED)
+
+  // The client
+  clientName     String
+  clientPhone    String?
+  clientEmail    String?
+  clientIdNumber String? // passport / ID, optional
+  leadId         String?
+  lead           Lead?   @relation(fields: [leadId], references: [id], onDelete: SetNull)
+
+  // What was shown. Snapshot: [{ buildingId, ref, title, city, country }]
+  properties   Json
+  buildingIds  String[]
+  // Free text for anything not in the catalogue ("Villa in Faqra, owner X")
+  propertyNote String?
+  viewingAt    DateTime @default(now())
+
+  // The terms as signed
+  termsVersion        String
+  termsText           String  @db.Text
+  feePercent          Decimal @db.Decimal(5, 2)
+  protectionMonths    Int
+  language            String  @default("en")
+  noPriorIntroduction Boolean @default(true)
+
+  // Signature and evidence
+  signatureData   String   @db.Text // data:image/png;base64,…
+  signedAt        DateTime @default(now())
+  signedIp        String?
+  signedUserAgent String?
+  documentHash    String
+
+  // The agent who held the tablet (no FK — the record must outlive the user)
+  agentId   String?
+  agentName String?
+  notes     String?
+
+  voidedAt   DateTime?
+  voidedBy   String?
+  voidReason String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([leadId])
+  @@index([agentId])
+  @@index([signedAt])
+  @@index([status])
+  @@map("viewing_agreements")
 }

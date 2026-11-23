@@ -20,7 +20,7 @@ import {
   ListFilter,
   ClipboardList,
   UserSearch,
-  X, MessageCircle, Bot, Bell, Gauge, Wallet, Handshake, Percent, Megaphone, Map as MapIcon,
+  X, MessageCircle, Bot, Bell, Gauge, Wallet, Handshake, Percent, Megaphone, Map as MapIcon, FileSignature,
 } from 'lucide-react'
 import { CITY_MAPS } from '@/lib/city-maps'
 import { useAuth } from '@/contexts/AuthContext'
@@ -70,6 +70,7 @@ const GROUPS: NavGroup[] = [
       { name: 'WhatsApp', href: '/admin/inbox', icon: MessageCircle, badge: 'inbox' },
       { name: 'Pipeline', href: '/admin/crm', icon: UserSearch },
       { name: 'Clients', href: '/admin/clients', icon: Users },
+      { name: 'Viewing agreements', href: '/admin/agreements', icon: FileSignature },
       { name: 'Inquiries', href: '/admin/inquiries', icon: MessageSquare, badge: 'inquiries' },
       { name: 'Contact messages', href: '/admin/contacts', icon: Inbox, badge: 'contacts' },
       { name: 'Owner submissions', href: '/admin/submissions', icon: ClipboardList, badge: 'submissions' },
