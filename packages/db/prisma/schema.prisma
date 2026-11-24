@@ -2224,6 +2224,12 @@ enum ViewingAgreementStatus {
   VOID
 }
 
+// PropGroup's fee on a viewing agreement: a share of the price, or a set sum.
+enum ViewingFeeType {
+  PERCENT
+  FIXED
+}
+
 // What a client signs before an agent shows them a property: no dealing with
 // the owner behind PropGroup's back, and the fee if they buy. Everything the
 // client saw and agreed to is snapshotted here — the terms text, the
@@ -2254,12 +2260,19 @@ model ViewingAgreement {
   viewingAt    DateTime @default(now())
 
   // The terms as signed
-  termsVersion        String
-  termsText           String  @db.Text
-  feePercent          Decimal @db.Decimal(5, 2)
-  protectionMonths    Int
-  language            String  @default("en")
-  noPriorIntroduction Boolean @default(true)
+  termsVersion          String
+  termsText             String         @db.Text
+  // The fee as agreed with this client. Default 2.5%; the agent may set
+  // another percentage or a fixed amount before the client signs.
+  feeType               ViewingFeeType @default(PERCENT)
+  feePercent            Decimal?       @db.Decimal(5, 2)
+  feeAmount             Decimal?       @db.Decimal(14, 2)
+  feeCurrency           String?
+  protectionMonths      Int
+  language              String         @default("en")
+  noPriorIntroduction   Boolean        @default(true)
+  // When the client says someone else introduced them first: who, and to what.
+  priorIntroductionNote String?
 
   // Signature and evidence
   signatureData   String   @db.Text // data:image/png;base64,…

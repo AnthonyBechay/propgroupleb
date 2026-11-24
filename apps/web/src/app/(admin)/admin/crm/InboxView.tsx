@@ -16,6 +16,7 @@ import { ClientMoveButton } from './ClientMove'
 import type { LeadType } from './types'
 import { PushToggle, registerInboxWorker } from './PushToggle'
 import { reportProblem, watchForProblems } from '@/lib/utils/client-problems'
+import { isIosHomeScreenApp } from '@/lib/utils/ios-app'
 
 /**
  * WhatsApp and Instagram threads, mirrored from the phone.
@@ -271,8 +272,10 @@ export function InboxView({
     const url = new URL(window.location.href)
     url.searchParams.set('c', id)
     const state = { inboxThread: id }
+    // The iPhone app gets no history step: its Back is the edge swipe below.
+    if (isIosHomeScreenApp()) window.history.replaceState(null, '', url)
     // Switching chats side by side on a desktop replaces; opening one pushes.
-    if (window.history.state?.inboxThread) window.history.replaceState(state, '', url)
+    else if (window.history.state?.inboxThread) window.history.replaceState(state, '', url)
     else window.history.pushState(state, '', url)
     setOpenId(id)
   }, [])
@@ -288,7 +291,7 @@ export function InboxView({
       setOpenId(null)
       checkAfterBack('Back with nothing behind')
     }
-    if (window.history.state?.inboxThread) {
+    if (window.history.state?.inboxThread && !isIosHomeScreenApp()) {
       window.history.back() // popstate below clears it
       // An app reopened by iOS can keep this step but not the one before it, and
       // Back then goes nowhere. The chat still has to close.
@@ -307,7 +310,7 @@ export function InboxView({
     // go nowhere. Put the list behind it, so Back always lands on the list.
     const here = new URL(window.location.href)
     const direct = here.searchParams.get('c')
-    if (direct && !window.history.state?.inboxThread) {
+    if (direct && !window.history.state?.inboxThread && !isIosHomeScreenApp()) {
       const list = new URL(here)
       list.searchParams.delete('c')
       window.history.replaceState(window.history.state, '', list)
@@ -570,6 +573,78 @@ export function InboxView({
   // well, so both the height and the top have to follow. Written straight to the
   // element, because this fires on every frame of the keyboard moving.
   const paneRef = useRef<HTMLDivElement>(null)
+
+  // The iPhone Home Screen app's Back: a swipe from the left edge that drags the
+  // chat off the list underneath, like the system gesture. The app adds no
+  // history steps (see isIosHomeScreenApp), so WebKit has no back gesture of its
+  // own to run — its snapshot of the list is what stayed white and frozen.
+  useEffect(() => {
+    const pane = paneRef.current
+    if (!openId || !isPhone || !pane || !isIosHomeScreenApp()) return
+    const EDGE = 32
+    let tracking = false
+    let decided = false
+    let startX = 0
+    let startY = 0
+    let dx = 0
+    const reset = () => {
+      pane.style.transition = ''
+      pane.style.transform = ''
+      pane.style.boxShadow = ''
+    }
+    const onStart = (e: TouchEvent) => {
+      const t = e.touches[0]
+      if (e.touches.length !== 1 || !t || t.clientX > EDGE) return
+      tracking = true
+      decided = false
+      startX = t.clientX
+      startY = t.clientY
+      dx = 0
+      pane.style.transition = 'none'
+    }
+    const onMove = (e: TouchEvent) => {
+      if (!tracking) return
+      const t = e.touches[0]
+      if (!t) return
+      const mx = t.clientX - startX
+      const my = t.clientY - startY
+      if (!decided) {
+        if (Math.abs(mx) < 8 && Math.abs(my) < 8) return
+        decided = true
+        // Scrolling the chat, or a swipe the other way: not ours.
+        if (Math.abs(my) > Math.abs(mx) || mx < 0) { tracking = false; reset(); return }
+        if (document.activeElement instanceof HTMLElement) document.activeElement.blur()
+        pane.style.boxShadow = '-8px 0 24px rgba(15, 23, 42, 0.18)'
+      }
+      e.preventDefault()
+      dx = Math.max(0, mx)
+      pane.style.transform = `translateX(${dx}px)`
+    }
+    const onEnd = () => {
+      if (!tracking) return
+      tracking = false
+      if (!decided) { reset(); return }
+      const done = dx > Math.min(120, window.innerWidth * 0.3)
+      pane.style.transition = 'transform 180ms ease-out'
+      pane.style.transform = done ? 'translateX(100%)' : 'translateX(0)'
+      setTimeout(() => {
+        if (done) closeThread()
+        // Once closed the pane is hidden, so putting it back is not seen.
+        requestAnimationFrame(reset)
+      }, 180)
+    }
+    pane.addEventListener('touchstart', onStart, { passive: true })
+    pane.addEventListener('touchmove', onMove, { passive: false })
+    pane.addEventListener('touchend', onEnd)
+    pane.addEventListener('touchcancel', onEnd)
+    return () => {
+      pane.removeEventListener('touchstart', onStart)
+      pane.removeEventListener('touchmove', onMove)
+      pane.removeEventListener('touchend', onEnd)
+      pane.removeEventListener('touchcancel', onEnd)
+      reset()
+    }
+  }, [openId, isPhone, closeThread])
   const [keyboardOpen, setKeyboardOpen] = useState(false)
   const shellReady = threads !== null
   useEffect(() => {

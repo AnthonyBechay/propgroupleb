@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { normalizeApiUrl } from '@/lib/utils/api-url'
 import { InboxView } from '../crm/InboxView'
+import { isIosHomeScreenApp } from '@/lib/utils/ios-app'
 import { LeadDrawer } from '../crm/LeadDrawer'
 import type { Lead } from '../crm/types'
 
@@ -29,7 +30,7 @@ export default function InboxPage() {
   // A step in the history, so the phone's Back closes the card and not the chat
   // underneath it, which would leave the card floating over the conversation list.
   const openClient = useCallback(async (leadId: string) => {
-    if (await loadClient(leadId)) {
+    if (await loadClient(leadId) && !isIosHomeScreenApp()) {
       window.history.pushState({ ...window.history.state, inboxClient: true }, '', window.location.href)
     }
   }, [loadClient])

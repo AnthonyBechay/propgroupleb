@@ -834,24 +834,43 @@ the only reliable way to change data.
 
 ## Viewing agreements (`/admin/agreements`)
 
-Before a viewing, the agent opens **New → Viewing agreement** (or the button on
-a client's card, which prefills them via `?leadId=`), fills in the client and the
-properties, and hands the phone/tablet over. The client reads the terms, ticks,
-and signs with a finger (`components/admin/SignaturePad.tsx`, no library).
+Before a viewing, the agent opens **New → Viewing agreement** (or **Viewing
+agreement** on a client's card, which prefills them via `?leadId=`), picks the
+client, the properties and the fee, and hands the phone/tablet over. The client
+reads the terms addressed to them by name, ticks, and signs with a finger
+(`components/admin/SignaturePad.tsx`, no library).
 
+- **The client**: picked from the CRM (`GET /api/viewing-agreements/clients`,
+  narrow lookup), or typed in — then by default added to the CRM as a new
+  `WALK_IN` client. A typed phone that already belongs to a client links to
+  them instead (`findLeadByPhone`): never a duplicate. Untick "Add to the CRM"
+  and the client exists only on the agreement. Signing writes a `VIEWING` line
+  on the client's history; their card lists their agreements
+  (`crm/ClientAgreements.tsx`).
+- **The fee**: 2.5% standard, another % (0.1–15) or a fixed amount
+  (USD/EUR/GEL/LBP). Stored as `feeType` + `feePercent` | `feeAmount` +
+  `feeCurrency`. The server writes the terms for that fee
+  (`GET /terms?feeType=&feeValue=&feeCurrency=`), so the client reads exactly
+  the text that is stored.
 - **The terms live in one file**: `apps/backend/src/config/viewing-terms.ts`
-  (fee 2.5%, 12-month protection). The server renders them itself at signing
-  and stores the text on the row; it never trusts text sent by the browser.
-  **Bump `VIEWING_TERMS_VERSION` on any wording change** — a form opened on the
-  old version gets a 409 and must reload.
+  (12-month protection). The server renders them itself at signing and never
+  trusts text sent by the browser. **Bump `VIEWING_TERMS_VERSION` on any
+  wording change** — a form opened on the old version gets a 409.
+- **The copy to the client is a server-rendered PDF**
+  (`GET /:id/pdf`, `services/viewing-agreement-pdf.service.ts`, `pdf-lib`).
+  `window.print()` does nothing in an iPhone Home Screen app, which is how the
+  first version's Print button failed. "Send on WhatsApp" opens the share sheet
+  with the PDF (`lib/share-agreement.ts`); the PDF is **preloaded on page
+  open** because Safari refuses `navigator.share()` after an `await` in the tap.
+  Desktop falls back to download + a `wa.me` chat with the message ready.
+  Helvetica only: non-Latin names (Arabic, Georgian) print as `?` in the PDF;
+  the on-screen copy and the signature are unaffected.
 - `ViewingAgreement` snapshots everything (properties, terms, fee) and stores a
   SHA-256 `documentHash`, so later edits to a building or the terms never change
-  what was signed.
-- **The signature is a data URL in the row, not in R2** — `/api/files/*` is a
-  public proxy.
-- Agents (`AGENT`) may create and see their own; `CRM_MANAGER`+ see all; only
-  `ADMIN`+ can void (the row is kept, marked `VOID`). Linked to a CRM client by
-  `leadId` or, failing that, by phone (`findLeadByPhone`).
+  what was signed. **The signature is a data URL in the row, not in R2** —
+  `/api/files/*` is a public proxy.
+- Agents (`AGENT`) may create and see their own; `CRM_MANAGER`+ see all and can
+  add clients; only `ADMIN`+ can void (the row is kept, marked `VOID`).
 
 ## Chat notifications (web push)
 
@@ -874,6 +893,12 @@ iPhone receives them only from the Home Screen app (iOS 16.4+).
 - **An open chat, and a client card over it, are history steps** (`?c=`), so the
   phone's Back closes one step at a time. A chat opened directly gets the list put
   behind it on load.
+- **Except in the iPhone Home Screen app** (`lib/utils/ios-app.ts`,
+  `isIosHomeScreenApp`): there the inbox adds no history steps and closes a chat
+  with its own left-edge swipe (in `InboxView.tsx`). WebKit's back swipe over a
+  pushed step showed a snapshot that stayed white and ignored taps until the app
+  was closed; every fix that repaired the page after the swipe failed, so the
+  swipe is no longer WebKit's. Do not add `pushState` for the inbox there.
 - **The chat follows `visualViewport`** (height and top): iOS does not shrink
   100dvh for the keyboard.
 - **Messages being sent live in `pending`, apart from the thread**, so a poll cannot

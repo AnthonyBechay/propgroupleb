@@ -3,6 +3,7 @@
 import { AssigneePicker, useTeam } from './Assignees'
 import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
+import { ClientAgreements } from './ClientAgreements'
 import { ChatSuggestion, type Suggestion } from './ChatSuggestion'
 import {
   X, Phone, MessageCircle, Mail, Loader2, Send, Pencil, Trash2, Building2, Clock, CalendarPlus, ExternalLink, History, Handshake, ClipboardCheck, Lightbulb, Sparkles, Plus, StickyNote, Globe, Home, MessagesSquare, Megaphone, LayoutGrid, FileSignature,
@@ -732,6 +733,8 @@ export function LeadDrawer({
               </ul>
             </section>
           )}
+
+          <ClientAgreements leadId={l.id} />
 
           {/* What we've shown them, and how it went */}
           <section className="bg-white border border-slate-200 rounded-xl p-4">

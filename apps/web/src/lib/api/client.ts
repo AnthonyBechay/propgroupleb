@@ -506,8 +506,29 @@ class ApiClient {
   }
 
   // ── Viewing agreements (signed on site before a viewing) ──────────────────
-  async getViewingTerms(): Promise<ApiResponse<ViewingTerms>> {
-    return this.request('/api/viewing-agreements/terms');
+  async getViewingTerms(fee?: ViewingFeeInput): Promise<ApiResponse<ViewingTerms>> {
+    const q = new URLSearchParams();
+    if (fee) {
+      q.set('feeType', fee.feeType);
+      if (fee.feeValue !== undefined) q.set('feeValue', String(fee.feeValue));
+      if (fee.feeCurrency) q.set('feeCurrency', fee.feeCurrency);
+    }
+    return this.request(`/api/viewing-agreements/terms?${q.toString()}`);
+  }
+
+  async searchCrmClients(search: string): Promise<ApiResponse<CrmClientHit[]>> {
+    return this.request(`/api/viewing-agreements/clients?search=${encodeURIComponent(search)}`);
+  }
+
+  /** The signed PDF as a Blob, dated in this device's time zone. */
+  async getViewingAgreementPdf(id: string): Promise<Blob> {
+    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+    const res = await fetch(`${this.baseURL}/api/viewing-agreements/${encodeURIComponent(id)}/pdf?tz=${encodeURIComponent(tz)}`, {
+      credentials: 'include',
+      cache: 'no-store',
+    });
+    if (!res.ok) throw new Error(res.status === 404 ? 'Agreement not found' : `Could not create the PDF (HTTP ${res.status})`);
+    return res.blob();
   }
 
   async listViewingAgreements(params: { search?: string; leadId?: string; page?: number; limit?: number } = {}): Promise<ApiResponse<ViewingAgreementRow[]> & { pagination?: { page: number; pages: number; total: number } }> {
@@ -520,7 +541,7 @@ class ApiClient {
     return this.request(`/api/viewing-agreements/${encodeURIComponent(id)}`);
   }
 
-  async signViewingAgreement(data: SignViewingAgreementInput): Promise<ApiResponse<{ id: string; ref: string; leadId: string | null }>> {
+  async signViewingAgreement(data: SignViewingAgreementInput): Promise<ApiResponse<{ id: string; ref: string; leadId: string | null; leadCreated: boolean }>> {
     return this.request('/api/viewing-agreements', { method: 'POST', body: JSON.stringify(data) });
   }
 
@@ -530,11 +551,34 @@ class ApiClient {
 
 }
 
+export type ViewingFee =
+  | { type: 'PERCENT'; percent: number }
+  | { type: 'FIXED'; amount: number; currency: string };
+
 export interface ViewingTerms {
   version: string;
-  feePercent: number;
+  fee: ViewingFee;
+  feeLabel: string;
+  defaultFee: ViewingFee;
+  currencies: string[];
   protectionMonths: number;
   sections: { title: string; body: string }[];
+}
+
+export interface ViewingFeeInput {
+  feeType: 'PERCENT' | 'FIXED';
+  feeValue?: number;
+  feeCurrency?: string;
+}
+
+export interface CrmClientHit {
+  id: string;
+  name: string;
+  phone: string | null;
+  whatsapp: string | null;
+  email: string | null;
+  market: string;
+  status: string;
 }
 
 export interface ViewingAgreementProperty {
@@ -557,7 +601,7 @@ export interface ViewingAgreementRow {
   viewingAt: string;
   signedAt: string;
   agentName: string | null;
-  feePercent: string | number;
+  feeLabel: string;
 }
 
 export interface ViewingAgreement extends ViewingAgreementRow {
@@ -567,6 +611,7 @@ export interface ViewingAgreement extends ViewingAgreementRow {
   termsText: string;
   protectionMonths: number;
   noPriorIntroduction: boolean;
+  priorIntroductionNote: string | null;
   signatureData: string;
   signedIp: string | null;
   signedUserAgent: string | null;
@@ -577,12 +622,13 @@ export interface ViewingAgreement extends ViewingAgreementRow {
   lead: { id: string; name: string } | null;
 }
 
-export interface SignViewingAgreementInput {
+export interface SignViewingAgreementInput extends ViewingFeeInput {
+  leadId?: string;
+  createLead: boolean;
   clientName: string;
   clientPhone?: string;
   clientEmail?: string;
   clientIdNumber?: string;
-  leadId?: string;
   buildingIds: string[];
   propertyNote?: string;
   viewingAt?: string;
@@ -590,6 +636,7 @@ export interface SignViewingAgreementInput {
   termsVersion: string;
   acceptedTerms: true;
   noPriorIntroduction: boolean;
+  priorIntroductionNote?: string;
   signatureData: string;
 }
 

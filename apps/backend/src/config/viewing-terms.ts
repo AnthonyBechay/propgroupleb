@@ -15,10 +15,59 @@
  * market before relying on it in a dispute.
  */
 
-export const VIEWING_TERMS_VERSION = '2026-11-23.2';
+export const VIEWING_TERMS_VERSION = '2026-11-24.1';
 
-/** PropGroup's fee on a purchase, as a percent of the final price. */
+/** PropGroup's default fee on a purchase, as a percent of the final price. */
 export const VIEWING_FEE_PERCENT = 2.5;
+
+/** Currencies a fixed fee may be stated in. */
+export const VIEWING_FEE_CURRENCIES = ['USD', 'EUR', 'GEL', 'LBP'] as const;
+export type ViewingFeeCurrency = (typeof VIEWING_FEE_CURRENCIES)[number];
+
+/**
+ * The fee on one agreement. The default is 2.5%; the agent may agree another
+ * percentage or a fixed sum with the client before handing over the tablet.
+ */
+export type ViewingFee =
+  | { type: 'PERCENT'; percent: number }
+  | { type: 'FIXED'; amount: number; currency: ViewingFeeCurrency };
+
+export const DEFAULT_VIEWING_FEE: ViewingFee = { type: 'PERCENT', percent: VIEWING_FEE_PERCENT };
+
+/** Bounds a typo can't get past: 25 instead of 2.5, or a stray zero. */
+export const FEE_PERCENT_MIN = 0.1;
+export const FEE_PERCENT_MAX = 15;
+export const FEE_AMOUNT_MAX = 10_000_000;
+
+/**
+ * Read a fee from loose input (query string or JSON). Returns null when it is
+ * out of bounds, so the caller can answer 400 instead of signing nonsense.
+ */
+export function parseViewingFee(input: { feeType?: unknown; feeValue?: unknown; feeCurrency?: unknown }): ViewingFee | null {
+  const type = input.feeType ?? 'PERCENT';
+  if (input.feeValue === undefined || input.feeValue === null || input.feeValue === '') {
+    return type === 'PERCENT' ? DEFAULT_VIEWING_FEE : null;
+  }
+  const value = Number(input.feeValue);
+  if (!Number.isFinite(value)) return null;
+  if (type === 'PERCENT') {
+    if (value < FEE_PERCENT_MIN || value > FEE_PERCENT_MAX) return null;
+    return { type: 'PERCENT', percent: Math.round(value * 100) / 100 };
+  }
+  if (type === 'FIXED') {
+    const currency = String(input.feeCurrency || 'USD').toUpperCase();
+    if (!VIEWING_FEE_CURRENCIES.includes(currency as ViewingFeeCurrency)) return null;
+    if (value < 1 || value > FEE_AMOUNT_MAX) return null;
+    return { type: 'FIXED', amount: Math.round(value * 100) / 100, currency: currency as ViewingFeeCurrency };
+  }
+  return null;
+}
+
+/** "2.5%" or "USD 5,000" — how the fee reads on screen and in the terms. */
+export function feeLabel(fee: ViewingFee): string {
+  if (fee.type === 'PERCENT') return `${fee.percent}%`;
+  return `${fee.currency} ${fee.amount.toLocaleString('en-US', { maximumFractionDigits: 2 })}`;
+}
 
 /** How long after the viewing the introduction stays protected. */
 export const VIEWING_PROTECTION_MONTHS = 12;
@@ -29,10 +78,14 @@ export interface TermsSection {
 }
 
 export function viewingTermsSections(
-  feePercent = VIEWING_FEE_PERCENT,
+  feeTerms: ViewingFee = DEFAULT_VIEWING_FEE,
   months = VIEWING_PROTECTION_MONTHS
 ): TermsSection[] {
-  const fee = `${feePercent}%`;
+  const fee = feeLabel(feeTerms);
+  const feeSentence =
+    feeTerms.type === 'PERCENT'
+      ? `a fee of ${fee} of the final purchase price`
+      : `a fixed fee of ${fee}, whatever the final purchase price`;
   return [
     {
       title: 'Introduction by PropGroup',
@@ -47,7 +100,7 @@ export function viewingTermsSections(
     {
       title: `PropGroup's fee: ${fee}`,
       body:
-        `If the client buys any property listed here within that period, the client pays PropGroup a fee of ${fee} of the final purchase price. The fee is due on the signing of the first reservation, deposit, promise-of-sale or sale contract, whichever comes first.`,
+        `If the client buys any property listed here within that period, the client pays PropGroup ${feeSentence}. The fee is due on the signing of the first reservation, deposit, promise-of-sale or sale contract, whichever comes first.`,
     },
     {
       title: 'Purchases by related parties',
@@ -57,7 +110,7 @@ export function viewingTermsSections(
     {
       title: 'Going around PropGroup',
       body:
-        `If the client buys a listed property in breach of the no-direct-dealing rule, the full ${fee} fee is still owed, together with any reasonable costs PropGroup incurs to recover it.`,
+        `If the client buys a listed property in breach of the no-direct-dealing rule, the full fee of ${fee} is still owed, together with any reasonable costs PropGroup incurs to recover it.`,
     },
     {
       title: 'Earlier introductions',
@@ -99,10 +152,10 @@ export function viewingTermsSections(
 
 /** The terms as one plain-text block — what is stored on the signed record. */
 export function renderViewingTerms(
-  feePercent = VIEWING_FEE_PERCENT,
+  feeTerms: ViewingFee = DEFAULT_VIEWING_FEE,
   months = VIEWING_PROTECTION_MONTHS
 ): string {
-  return viewingTermsSections(feePercent, months)
+  return viewingTermsSections(feeTerms, months)
     .map((s, i) => `${i + 1}. ${s.title}\n${s.body}`)
     .join('\n\n');
 }

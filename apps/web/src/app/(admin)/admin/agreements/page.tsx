@@ -26,13 +26,13 @@ export default function AgreementsPage() {
   const pages = data?.pagination?.pages ?? 1
 
   return (
-    <div className="mx-auto max-w-4xl px-4 py-6">
+    <div className="mx-auto max-w-4xl py-2 sm:py-4">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold text-slate-900">Viewing agreements</h1>
           <p className="mt-1 text-sm text-slate-600">Signed by clients before a viewing: no direct dealing, and PropGroup&apos;s fee if they buy.</p>
         </div>
-        <Link href="/admin/agreements/new" className="inline-flex min-h-12 items-center gap-2 rounded-xl bg-slate-900 px-5 font-medium text-white hover:bg-slate-800">
+        <Link href="/admin/agreements/new" className="inline-flex w-full justify-center sm:w-auto min-h-12 items-center gap-2 rounded-xl bg-slate-900 px-5 font-medium text-white hover:bg-slate-800">
           <Plus className="h-4 w-4" /> New agreement
         </Link>
       </div>
@@ -72,6 +72,7 @@ export default function AgreementsPage() {
                     <p className="truncate text-xs text-slate-500">{props.join(' · ') || '—'}</p>
                     <p className="mt-0.5 text-xs text-slate-400">
                       <span className="font-mono">{r.ref}</span> · {new Date(r.signedAt).toLocaleDateString([], { dateStyle: 'medium' })}
+                      {r.feeLabel ? ` · fee ${r.feeLabel}` : ''}
                       {r.agentName ? ` · ${r.agentName}` : ''}
                     </p>
                   </div>
