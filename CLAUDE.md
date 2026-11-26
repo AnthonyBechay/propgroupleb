@@ -865,7 +865,13 @@ reads the terms addressed to them by name, ticks, and signs with a finger
   Desktop falls back to download + a `wa.me` chat with the message ready.
   Helvetica only: non-Latin names (Arabic, Georgian) print as `?` in the PDF;
   the on-screen copy and the signature are unaffected.
-- `ViewingAgreement` snapshots everything (properties, terms, fee) and stores a
+- **Letterhead**: the logo is Settings → Branding (SiteMedia `branding.logoUrl`,
+  converted to PNG by sharp for pdf-lib, cached 5 min); the office name,
+  address and phone are Settings → Chat assistant → Office (`office.phone` was
+  added for this). `services/agreement-branding.service.ts`. The office is
+  snapshotted on each agreement (`ViewingAgreement.office`); older rows fall
+  back to the current settings. A logo that can't be read prints the name in text.
+- `ViewingAgreement` snapshots everything (properties, terms, fee, office) and stores a
   SHA-256 `documentHash`, so later edits to a building or the terms never change
   what was signed. **The signature is a data URL in the row, not in R2** —
   `/api/files/*` is a public proxy.

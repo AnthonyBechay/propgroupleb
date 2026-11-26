@@ -117,7 +117,7 @@ export interface ChatAiSettings {
    */
   modelTier: 'quality' | 'economy';
   /** Where clients can visit, given when they ask for the address. */
-  office: { name: string; address: string; mapsUrl: string };
+  office: { name: string; address: string; mapsUrl: string; phone: string };
   /** Questions the office has answered in advance. */
   knowledge: KnowledgeItem[];
   /** Anything else it should keep in mind, in the office's own words. */
@@ -136,7 +136,7 @@ export function defaultChatAiSettings(): ChatAiSettings {
     maxListings: 3,
     replyStyle: 'match',
     modelTier: 'quality',
-    office: { name: 'PropGroup', address: 'Fanar, Lebanon', mapsUrl: '' },
+    office: { name: 'PropGroup', address: 'Fanar, Lebanon', mapsUrl: '', phone: '' },
     knowledge: [],
     guidance: '',
     followUp: {
@@ -178,6 +178,7 @@ export async function getChatAiSettings(): Promise<ChatAiSettings> {
       name: typeof office.name === 'string' ? office.name : d.office.name,
       address: typeof office.address === 'string' ? office.address : d.office.address,
       mapsUrl: typeof office.mapsUrl === 'string' ? office.mapsUrl : d.office.mapsUrl,
+      phone: typeof office.phone === 'string' ? office.phone : d.office.phone,
     },
     knowledge: Array.isArray(saved.knowledge)
       ? saved.knowledge

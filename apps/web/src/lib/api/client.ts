@@ -555,6 +555,12 @@ export type ViewingFee =
   | { type: 'PERCENT'; percent: number }
   | { type: 'FIXED'; amount: number; currency: string };
 
+export interface AgreementOffice {
+  name: string;
+  address: string;
+  phone: string;
+}
+
 export interface ViewingTerms {
   version: string;
   fee: ViewingFee;
@@ -563,6 +569,7 @@ export interface ViewingTerms {
   currencies: string[];
   protectionMonths: number;
   sections: { title: string; body: string }[];
+  branding?: { logoUrl: string | null; office: AgreementOffice };
 }
 
 export interface ViewingFeeInput {
@@ -605,6 +612,8 @@ export interface ViewingAgreementRow {
 }
 
 export interface ViewingAgreement extends ViewingAgreementRow {
+  office?: AgreementOffice | null;
+  logoUrl?: string | null;
   clientEmail: string | null;
   clientIdNumber: string | null;
   termsVersion: string;

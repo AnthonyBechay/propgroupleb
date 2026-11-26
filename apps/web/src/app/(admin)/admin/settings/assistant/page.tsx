@@ -34,7 +34,7 @@ interface Settings {
   maxListings: 1 | 2 | 3
   replyStyle: 'match' | 'latin' | 'latin_always'
   modelTier: 'quality' | 'economy'
-  office: { name: string; address: string; mapsUrl: string }
+  office: { name: string; address: string; mapsUrl: string; phone?: string }
   knowledge: Knowledge[]
   guidance: string
   followUp: FollowUp
@@ -421,7 +421,7 @@ export default function AiSettingsPage() {
       <section className="bg-white border border-slate-200 rounded-xl p-4 space-y-3">
         <div>
           <h2 className="text-sm font-semibold text-slate-900">Office</h2>
-          <p className="text-sm text-slate-600 mt-1">Given when a client asks where you are, for the address, or to come by.</p>
+          <p className="text-sm text-slate-600 mt-1">Given when a client asks where you are, for the address, or to come by. The name, address and phone are also printed on viewing agreements.</p>
         </div>
         <input value={settings.office.name} maxLength={120} placeholder="Office name — e.g. PropGroup"
           onChange={(e) => update({ office: { ...settings.office, name: e.target.value } })} className={field} />
@@ -429,6 +429,8 @@ export default function AiSettingsPage() {
           onChange={(e) => update({ office: { ...settings.office, address: e.target.value } })} className={field} />
         <input value={settings.office.mapsUrl} maxLength={500} placeholder="Google Maps link — paste it from Maps → Share"
           onChange={(e) => update({ office: { ...settings.office, mapsUrl: e.target.value } })} className={field} />
+        <input value={settings.office.phone ?? ''} maxLength={40} type="tel" inputMode="tel" placeholder="Office phone — e.g. +961 70 123 456"
+          onChange={(e) => update({ office: { ...settings.office, phone: e.target.value } })} className={field} />
       </section>
 
       <section className="bg-white border border-slate-200 rounded-xl p-4">

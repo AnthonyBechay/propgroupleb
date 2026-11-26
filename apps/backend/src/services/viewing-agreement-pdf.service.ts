@@ -34,6 +34,10 @@ export interface AgreementForPdf {
   agentName: string | null;
   voidedAt: Date | null;
   voidReason: string | null;
+  /** The agency's office as printed on it: Settings → Chat assistant → Office. */
+  office?: { name: string; address: string; phone: string } | null;
+  /** Settings → Branding logo, already a PNG. Null → the name in text. */
+  logoPng?: Buffer | null;
 }
 
 const A4 = { w: 595.28, h: 841.89 };
@@ -151,7 +155,7 @@ export async function renderViewingAgreementPdf(a: AgreementForPdf, timeZone = '
   const fmt = (d: Date, withTime = true) => fmtDate(d, zone, withTime);
   const doc = await PDFDocument.create();
   doc.setTitle(`PropGroup viewing agreement ${a.ref}`);
-  doc.setAuthor('PropGroup');
+  doc.setAuthor(safe(a.office?.name || 'PropGroup'));
   doc.setSubject(`Viewing agreement signed by ${safe(a.clientName)}`);
   doc.setCreationDate(a.signedAt);
 
@@ -159,7 +163,44 @@ export async function renderViewingAgreementPdf(a: AgreementForPdf, timeZone = '
   const bold = await doc.embedFont(StandardFonts.HelveticaBold);
   const w = new Writer(doc, font, bold);
 
-  w.text('PROPGROUP', { size: 8, bold: true, color: MUTED });
+  // Letterhead: the logo on the left, the office on the right.
+  const office = a.office ?? null;
+  const top = w.y;
+  let logoBottom = top;
+  if (a.logoPng) {
+    try {
+      const logo = await doc.embedPng(a.logoPng);
+      const scale = Math.min(160 / logo.width, 46 / logo.height, 1);
+      const lw = logo.width * scale;
+      const lh = logo.height * scale;
+      w.page.drawImage(logo, { x: MARGIN, y: top - lh, width: lw, height: lh });
+      logoBottom = top - lh;
+    } catch {
+      // A logo that will not embed must never stop the client's copy.
+    }
+  }
+  const hasLogo = logoBottom !== top;
+  if (!hasLogo) {
+    w.page.drawText(safe((office?.name || 'PropGroup').toUpperCase()), { x: MARGIN, y: top - 14, size: 14, font: bold, color: INK });
+    logoBottom = top - 18;
+  }
+  if (office) {
+    const lines: Array<{ text: string; bold?: boolean }> = [];
+    // Without a logo the name is already on the left.
+    if (office.name && hasLogo) lines.push({ text: office.name, bold: true });
+    for (const l of w.wrap(office.address, 8.5, font, 200)) if (l) lines.push({ text: l });
+    if (office.phone) lines.push({ text: `Tel. ${office.phone}` });
+    let y = top;
+    for (const l of lines) {
+      const f = l.bold ? bold : font;
+      const t = safe(l.text);
+      w.page.drawText(t, { x: A4.w - MARGIN - f.widthOfTextAtSize(t, 8.5), y: y - 8.5, size: 8.5, font: f, color: l.bold ? INK : MUTED });
+      y -= 12;
+    }
+    logoBottom = Math.min(logoBottom, y);
+  }
+  w.y = logoBottom - 16;
+
   w.text('Property viewing agreement', { size: 20, bold: true, gap: 2 });
   w.text(`Reference ${a.ref}`, { size: 10, color: MUTED, gap: 6 });
 
@@ -231,6 +272,8 @@ export async function renderViewingAgreementPdf(a: AgreementForPdf, timeZone = '
   const pages = doc.getPages();
   pages.forEach((p, i) => {
     p.drawText(safe(`${a.ref} - page ${i + 1} of ${pages.length}`), { x: MARGIN, y: 28, size: 7, font, color: MUTED });
+    const contact = safe([office?.name, office?.phone].filter(Boolean).join(' - '));
+    if (contact) p.drawText(contact, { x: A4.w - MARGIN - font.widthOfTextAtSize(contact, 7), y: 28, size: 7, font, color: MUTED });
   });
 
   return doc.save();

@@ -9,6 +9,7 @@ import { parsePagination, buildPaginationResponse } from '../utils/pagination.js
 import { marketOfCountry } from '../utils/market.js';
 import { normalisePhone, findLeadByPhone } from '../services/messaging-intake.service.js';
 import { renderViewingAgreementPdf } from '../services/viewing-agreement-pdf.service.js';
+import { getAgreementOffice, getLogoPng, getLogoUrl, officeOfRow } from '../services/agreement-branding.service.js';
 import {
   VIEWING_TERMS_VERSION,
   VIEWING_PROTECTION_MONTHS,
@@ -119,6 +120,7 @@ router.get(
       currencies: VIEWING_FEE_CURRENCIES,
       protectionMonths: VIEWING_PROTECTION_MONTHS,
       sections: viewingTermsSections(fee),
+      branding: { logoUrl: await getLogoUrl(), office: await getAgreementOffice() },
     });
   })
 );
@@ -235,9 +237,12 @@ router.get(
       sendNotFound(res, 'Viewing agreement');
       return;
     }
+    const [logoPng, currentOffice] = await Promise.all([getLogoPng(), getAgreementOffice()]);
     const pdf = await renderViewingAgreementPdf(
       {
         ...row,
+        office: officeOfRow(row.office) ?? currentOffice,
+        logoPng,
         properties: (row.properties as Array<{ ref: string | null; title: string; city: string | null }>) ?? [],
         feeLabel: feeLabel(feeOfRow(row)),
       },
@@ -262,7 +267,12 @@ router.get(
       sendNotFound(res, 'Viewing agreement');
       return;
     }
-    sendSuccess(res, { ...row, feeLabel: feeLabel(feeOfRow(row)) });
+    sendSuccess(res, {
+      ...row,
+      feeLabel: feeLabel(feeOfRow(row)),
+      office: officeOfRow(row.office) ?? (await getAgreementOffice()),
+      logoUrl: await getLogoUrl(),
+    });
   })
 );
 
@@ -360,6 +370,8 @@ router.post(
     const agentName = [user.firstName, user.lastName].filter(Boolean).join(' ') || user.email;
     const priorIntroductionNote = body.noPriorIntroduction ? null : body.priorIntroductionNote || null;
 
+    // The office as the client sees it on the form, kept with what they signed.
+    const office = await getAgreementOffice();
     const snapshot = {
       clientName: body.clientName,
       clientPhone: body.clientPhone || null,
@@ -377,6 +389,7 @@ router.post(
       signedAt: signedAt.toISOString(),
       agentId: user.id,
       signatureSha256: crypto.createHash('sha256').update(body.signatureData).digest('hex'),
+      office,
     };
 
     // A ref collision is ~1 in a million per day; retry rather than fail.
@@ -409,6 +422,7 @@ router.post(
             signedIp: req.ip || null,
             signedUserAgent: req.get('User-Agent')?.slice(0, 500) || null,
             documentHash: hashAgreement(snapshot),
+            office: { ...office },
             agentId: user.id,
             agentName,
             notes: body.notes || null,

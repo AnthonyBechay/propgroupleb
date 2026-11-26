@@ -69,6 +69,7 @@ const settingsSchema = z.object({
     name: z.string().trim().max(120).default(''),
     address: z.string().trim().max(300).default(''),
     mapsUrl: z.union([z.string().trim().url().max(500), z.literal('')]).default(''),
+    phone: z.string().trim().max(40).default(''),
   }),
   knowledge: z
     .array(

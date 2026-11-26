@@ -7,6 +7,7 @@ import { apiClient, type ViewingAgreement } from '@/lib/api/client'
 import { useAdminData } from '@/lib/api/use-admin-data'
 import { LoadState } from '@/components/admin/ui/LoadState'
 import { AgreementShareButtons } from '@/components/admin/AgreementShareButtons'
+import { AgreementLetterhead } from '@/components/admin/AgreementLetterhead'
 import { useAuth } from '@/contexts/AuthContext'
 import { canVoidAgreements } from '@/lib/permissions'
 
@@ -82,8 +83,8 @@ export default function AgreementPage({ params }: { params: Promise<{ id: string
             VOID{a.voidedAt ? ` since ${new Date(a.voidedAt).toLocaleDateString()}` : ''}{a.voidReason ? ` — ${a.voidReason}` : ''}
           </div>
         )}
-        <p className="text-xs font-semibold uppercase tracking-widest text-slate-500">PropGroup</p>
-        <h2 className="mt-1 text-xl font-semibold text-slate-900">Property viewing agreement</h2>
+        <AgreementLetterhead logoUrl={a.logoUrl} office={a.office} />
+        <h2 className="text-xl font-semibold text-slate-900">Property viewing agreement</h2>
 
         <dl className="mt-5 grid gap-x-6 gap-y-3 rounded-xl bg-slate-50 p-4 text-sm sm:grid-cols-2">
           <Item label="Client">{a.clientName}</Item>

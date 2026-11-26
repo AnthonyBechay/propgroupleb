@@ -11,6 +11,7 @@ import { adminGet, API_URL } from '@/lib/api/use-admin-data'
 import { LoadState } from '@/components/admin/ui/LoadState'
 import { SignaturePad, type SignaturePadHandle } from '@/components/admin/SignaturePad'
 import { AgreementShareButtons } from '@/components/admin/AgreementShareButtons'
+import { AgreementLetterhead } from '@/components/admin/AgreementLetterhead'
 import { countryFlag } from '@/lib/market'
 import { cn } from '@/lib/utils'
 
@@ -284,7 +285,8 @@ function NewAgreement() {
         </button>
 
         <article className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-8">
-          <p className="text-xs font-semibold uppercase tracking-widest text-slate-500">PropGroup · Property viewing agreement</p>
+          <AgreementLetterhead logoUrl={terms.branding?.logoUrl} office={terms.branding?.office} />
+          <p className="text-xs font-semibold uppercase tracking-widest text-slate-500">Property viewing agreement</p>
           <h1 className="mt-2 text-2xl font-semibold text-slate-900 sm:text-3xl">{clientName}</h1>
           <p className="mt-2 text-base text-slate-600">
             Please read before the viewing. In short: you deal with the owner only through PropGroup, and if you buy,
