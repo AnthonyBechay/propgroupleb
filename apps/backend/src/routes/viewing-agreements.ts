@@ -31,7 +31,9 @@ import type { AuthenticatedRequest } from '../types/index.js';
  * agent's phone or tablet before a viewing. See `config/viewing-terms.ts`.
  *
  * Anyone who shows properties may create one (agents included); only an admin
- * may void one. Nothing here is public — a signature never leaves the staff API.
+ * may void or delete one. Void keeps the record (the usual choice once a copy
+ * has been sent); delete removes it from the database, for test runs and
+ * agreements signed by mistake. Nothing here is public — a signature never leaves the staff API.
  */
 const router: Router = express.Router();
 
@@ -489,6 +491,33 @@ router.post(
     });
     await logAdminAction('VIEWING_AGREEMENT_VOIDED', 'ViewingAgreement', row.id, { reason }, req);
     sendSuccess(res, updated);
+  })
+);
+
+// ── DELETE /:id — admin only; removes the row for good ───────────────────────
+// The audit log keeps who deleted what (ref, client, fee) — never the signature.
+router.delete(
+  '/:id',
+  authenticateToken,
+  requireAdmin,
+  asyncHandler(async (req: Request, res: Response) => {
+    const row = await prisma.viewingAgreement.findUnique({
+      where: { id: req.params.id },
+      select: { id: true, ref: true, status: true, clientName: true, leadId: true, signedAt: true, agentName: true, feeType: true, feePercent: true, feeAmount: true, feeCurrency: true },
+    });
+    if (!row) {
+      sendNotFound(res, 'Viewing agreement');
+      return;
+    }
+    await prisma.viewingAgreement.delete({ where: { id: row.id } });
+    await logAdminAction(
+      'VIEWING_AGREEMENT_DELETED',
+      'ViewingAgreement',
+      row.id,
+      { ref: row.ref, status: row.status, clientName: row.clientName, leadId: row.leadId, signedAt: row.signedAt, agentName: row.agentName, fee: feeLabel(feeOfRow(row)) },
+      req,
+    );
+    sendSuccess(res, { id: row.id, ref: row.ref, deleted: true });
   })
 );
 

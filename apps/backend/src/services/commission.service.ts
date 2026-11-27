@@ -257,3 +257,32 @@ export function expectedPaidPct(o: {
   const months = (at.getFullYear() - start.getFullYear()) * 12 + (at.getMonth() - start.getMonth()) - (at.getDate() < start.getDate() ? 1 : 0);
   return Math.min(100, Math.round((down + ((100 - down) / o.planMonths) * Math.max(0, months)) * 10) / 10);
 }
+
+/**
+ * The broker who brought a property (`Building.brokerId`), as deal terms with
+ * his usual share and way of being paid. A deal on that property with no
+ * broker of its own gets these — on creation and again as it becomes
+ * RESERVED/WON — so his cut is counted when it sells. Never applied over a
+ * broker already on the deal, and an explicit "no broker" on the deal wins.
+ */
+export async function propertyBrokerTerms(
+  buildingId: string | null | undefined,
+  listingId?: string | null,
+): Promise<{ brokerId: string; brokerPct: number | null; brokerTakes: BrokerTakes } | null> {
+  let id = buildingId || null;
+  if (!id && listingId) {
+    const l = await prisma.listing.findUnique({
+      where: { id: listingId },
+      select: { buildingId: true, unit: { select: { buildingId: true } } },
+    });
+    id = l?.buildingId ?? l?.unit?.buildingId ?? null;
+  }
+  if (!id) return null;
+  const b = await prisma.building.findUnique({
+    where: { id },
+    select: { broker: { select: { id: true, sharePct: true, takes: true, active: true } } },
+  });
+  const broker = b?.broker;
+  if (!broker || !broker.active) return null;
+  return { brokerId: broker.id, brokerPct: broker.takes === 'SHARE' ? broker.sharePct : null, brokerTakes: broker.takes };
+}

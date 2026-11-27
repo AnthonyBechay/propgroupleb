@@ -19,6 +19,7 @@ import {
 } from 'lucide-react'
 import { LocationFields } from '@/components/admin/LocationFields'
 import { OwnerPicker, type OwnerRef } from '@/components/admin/OwnerPicker'
+import { BrokerPicker, type BrokerRef } from '@/components/admin/BrokerPicker'
 import { AgentPicker } from '@/components/admin/AgentPicker'
 import { PaymentPlansEditor } from '@/components/admin/PaymentPlansEditor'
 import { ImageManager } from '@/components/admin/ui/ImageManager'
@@ -96,10 +97,12 @@ function DescriptionPreview({ text }: { text: string }) {
 }
 
 export function BasicsSection({
-  f, set, disabled, owner, onOwnerChange, unitCount, errors,
+  f, set, disabled, owner, onOwnerChange, broker, onBrokerChange, unitCount, errors,
 }: SectionProps & {
   owner: OwnerRef | null
   onOwnerChange: (o: OwnerRef | null) => void
+  broker: BrokerRef | null
+  onBrokerChange: (b: BrokerRef | null) => void
   /** How many units the property already has — decides how type is presented. */
   unitCount: number
   errors?: Record<string, string>
@@ -118,7 +121,18 @@ export function BasicsSection({
       <div className="space-y-5">
         {/* A project abroad is resold, not listed by an owner. Shown there only
             when an owner is attached already (old data), so it can be removed. */}
-        {(f.country === 'LEBANON' || owner) && <OwnerPicker value={owner} onChange={onOwnerChange} />}
+        {/* Owner and broker are separate: a broker is not the client selling.
+            Either may be empty. */}
+        <FieldGrid cols={2}>
+          {(f.country === 'LEBANON' || owner) && (
+            <OwnerPicker
+              value={owner}
+              onChange={onOwnerChange}
+              hint="The client who owns this property. Leave empty when a broker brought it, or for developer stock."
+            />
+          )}
+          <BrokerPicker value={broker} onChange={onBrokerChange} disabled={disabled} />
+        </FieldGrid>
 
         <Field
           label="Title"

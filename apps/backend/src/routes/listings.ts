@@ -421,6 +421,64 @@ router.get(
   })
 );
 
+// ── GET /resolve/:key — the public listing address for anything we link to ───
+// A link can carry a listing slug, a property slug (current or from before a
+// rename), a property id or a PG- code. Old links did exactly that: "View on
+// site" and /property/:slug both put a PROPERTY slug under /listings/, which
+// only knows listing slugs, so they 404'd. The listing page calls this on a
+// miss and redirects. Answers only with a listing the public may open.
+const PUBLIC_LISTING = {
+  visibility: 'PUBLIC' as const,
+  status: { in: ['ACTIVE', 'UNDER_OFFER', 'CLOSED'] as Array<'ACTIVE' | 'UNDER_OFFER' | 'CLOSED'> },
+  ...PROPERTY_NOT_HIDDEN,
+};
+const STATUS_RANK: Record<string, number> = { ACTIVE: 0, UNDER_OFFER: 1, CLOSED: 2 };
+
+/** The listing a visitor should land on for a property, or null. */
+export async function publicListingSlugForBuilding(buildingId: string): Promise<string | null> {
+  const rows = await prisma.listing.findMany({
+    where: { AND: [PUBLIC_LISTING, { OR: [{ buildingId }, { unit: { buildingId } }] }] },
+    select: { slug: true, status: true, subjectType: true, price: true, publishedAt: true, createdAt: true },
+  });
+  if (!rows.length) return null;
+  // Live before sold; the whole property before one unit; then the cheapest,
+  // which is the "from" price the cards show.
+  rows.sort((a, b) =>
+    (STATUS_RANK[a.status] ?? 9) - (STATUS_RANK[b.status] ?? 9) ||
+    (a.subjectType === 'BUILDING' ? 0 : 1) - (b.subjectType === 'BUILDING' ? 0 : 1) ||
+    Number(a.price) - Number(b.price),
+  );
+  return rows[0].slug;
+}
+
+router.get(
+  '/resolve/:key',
+  asyncHandler(async (req: Request, res: Response) => {
+    const key = String(req.params.key || '').trim();
+    if (!key || key.length > 200) { sendNotFound(res, 'Listing'); return; }
+
+    const direct = await prisma.listing.findFirst({ where: { slug: key, ...PUBLIC_LISTING }, select: { slug: true } });
+    if (direct) { sendSuccess(res, { slug: direct.slug }); return; }
+
+    const ref = looksLikeRef(key) ? buildingRefOf(normalizeRef(key)) : null;
+    const building = await prisma.building.findFirst({
+      where: {
+        visibility: { not: 'HIDDEN' },
+        OR: [
+          { slug: key },
+          { previousSlugs: { has: key } },
+          { id: key },
+          ...(ref ? [{ ref }] : []),
+        ],
+      },
+      select: { id: true },
+    });
+    const slug = building ? await publicListingSlugForBuilding(building.id) : null;
+    if (!slug) { sendNotFound(res, 'Listing'); return; }
+    sendSuccess(res, { slug });
+  })
+);
+
 // ── GET /:id — public detail by id ───────────────────────────────────────────
 
 router.get(
@@ -510,7 +568,17 @@ router.post(
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const result = await prisma.$transaction(async (tx: any) => {
-      const slugSource = resolvedData.slug || resolvedData.headline || `listing-${Date.now()}`;
+      // No headline → name it after what it sells ("verdun-residences-2br-4b"),
+      // never `listing-<timestamp>`: this address goes to clients on WhatsApp.
+      let slugSource = resolvedData.slug || resolvedData.headline || '';
+      if (!slugSource && targetBuildingId) {
+        const b = await tx.building.findUnique({ where: { id: targetBuildingId }, select: { title: true } });
+        const u = data.unitId
+          ? await tx.unit.findUnique({ where: { id: data.unitId }, select: { name: true, unitNumber: true } })
+          : null;
+        slugSource = [b?.title, u?.name, u?.unitNumber].filter(Boolean).join(' ');
+      }
+      if (!slugSource.replace(/[^a-z0-9]/gi, '')) slugSource = 'property';
       const slug = resolvedData.slug || (await generateListingSlug(slugSource, tx));
       return tx.listing.create({
         data: {

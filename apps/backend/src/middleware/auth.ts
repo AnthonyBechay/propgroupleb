@@ -191,6 +191,9 @@ export function isStaff(req: Request): boolean {
 const PRIVATE_FIELDS = new Set([
   'ownerLead',
   'ownerLeadId',
+  // The outside broker behind a property, and what we owe him.
+  'broker',
+  'brokerId',
   'ownerName',
   'ownerPhone',
   'ownerUserId',

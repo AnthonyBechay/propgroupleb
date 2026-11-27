@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { prisma } from '@propgroup/db';
 import { authenticateToken, requireAdmin, requireCrm, canSeeMoney, redactMoney, stripMoneyInput, logAdminAction } from '../middleware/auth.js';
 import { activeClientWhere } from '../utils/client-activity.js';
-import { commissionFields } from '../services/commission.service.js';
+import { commissionFields, propertyBrokerTerms } from '../services/commission.service.js';
 import { asyncHandler } from '../utils/errors.js';
 import { sendSuccess, sendCreated, sendPaginated, sendNotFound, sendError } from '../utils/response.js';
 import { parsePagination, buildPaginationResponse } from '../utils/pagination.js';
@@ -1882,6 +1882,16 @@ router.post(
     const existing = pairing
       ? await prisma.leadOpportunity.findFirst({ where: { leadId: lead.id, ...pairing } })
       : null;
+    // The property's broker comes with it unless this deal says otherwise
+    // (an explicit null is "no broker") or already has one.
+    if (data.brokerId === undefined && !existing?.brokerId) {
+      const inherited = await propertyBrokerTerms(data.buildingId, data.listingId);
+      if (inherited) {
+        data.brokerId = inherited.brokerId;
+        if (data.brokerTakes === undefined) data.brokerTakes = inherited.brokerTakes;
+        if (data.brokerPct === undefined) data.brokerPct = inherited.brokerPct;
+      }
+    }
     if (existing) {
       // Recording a sale against something already shortlisted must update it,
       // not silently return the untouched row and lose the figures.
@@ -2062,6 +2072,16 @@ router.patch(
     else if (data.stage === 'WON' && !existing.closedAt) patch.closedAt = new Date();
     if (data.stage && data.stage !== 'WON') patch.closedAt = null;
 
+    // Becoming a sale: the property's broker joins a deal that has none, so
+    // his cut is counted. Never over a broker on the deal, or an explicit null.
+    if (data.stage && AGREED.includes(data.stage) && data.brokerId === undefined && !existing.brokerId) {
+      const inherited = await propertyBrokerTerms(existing.buildingId, existing.listingId);
+      if (inherited) {
+        data.brokerId = inherited.brokerId;
+        if (data.brokerTakes === undefined) data.brokerTakes = inherited.brokerTakes;
+        if (data.brokerPct === undefined) data.brokerPct = inherited.brokerPct;
+      }
+    }
     Object.assign(patch, termsData({ ...data, brokerPct: await brokerShare(data.brokerId, data.brokerPct), brokerTakes: await brokerTakesFor(data.brokerId, data.brokerTakes) }));
     // Commission follows the price and the rates, unless a figure was typed in.
     // Only when the price or the rates changed: editing a viewing note must not

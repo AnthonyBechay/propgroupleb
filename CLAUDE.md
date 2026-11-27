@@ -307,6 +307,22 @@ units and options with no caller anywhere; they were removed, with the shared
 | Mark sold | row menu | units `SOLD`, open listings `CLOSED` |
 | Delete | row menu | gone |
 
+### Public links: `/listings/<LISTING slug>`, never a property slug
+
+Lebanon's site pages are listings. A property slug under `/listings/` is a 404,
+which is what "View on site" did. So:
+
+- Link a property with `/property/<property slug or id>`; it resolves to the
+  property's public listing (`GET /api/listings/resolve/:key`, which also takes a
+  PG- code or an old slug). `/listings/<x>` falls back to the same resolver and
+  redirects, so property links already sent to clients still open.
+- A link sent to a client must be a **`PUBLIC`** listing. "Live" in
+  `FLAT_PROPERTY_INCLUDE` means not `HIDDEN`, so it includes `ELITE_ONLY`, which
+  the public page 404s. `toCard` in `catalogue.service.ts` picks its link from
+  the public ones.
+- A listing with no headline is slugged from its property (and unit), never
+  `listing-<timestamp>`. Slugs never change after creation, so links keep working.
+
 ### Preview
 
 `/preview/listings/:slug` renders `components/listing/ListingDetailView.tsx`,
@@ -449,6 +465,14 @@ a non-USD price.
   `SELLER_SIDE` / `BUYER_SIDE` = that side's rate on the price, capped at the
   whole commission (he brought the seller, we brought the buyer).
   `brokerCutUsd` follows. A broker on deals is deactivated, never deleted.
+- **A property can carry its broker** (`Building.brokerId`, the Broker picker
+  next to Owner in the property form). A broker is not the owner: leave Owner
+  empty rather than typing his name there. A deal on that property with no
+  broker of its own gets him (`propertyBrokerTerms` in `commission.service.ts`)
+  when it is created and again as it becomes RESERVED/WON, with his usual
+  share and `takes`. An explicit "no broker" on the deal wins, and an inactive
+  broker is not applied. `broker`/`brokerId` are in `PRIVATE_FIELDS`, so
+  public reads never carry them.
 - **Payment plan** (`downPaymentPct`, `planMonths`, `planStartAt`): down payment
   then equal monthly instalments. `expectedPayoutDate()` gives the month they
   reach `payoutAtPct` (50k, 20% down, 36 months, paid at 30% → 5 months in).
@@ -764,6 +788,7 @@ When generating new share links, always go through the `ShareToken` table. Don't
 - **A finish has one view** from a short list (`FINISH_VIEW_OPTIONS`: sea, mountain, road, prime), and each finish-and-view is its own row with its own price per m². `views` stays an array in the API so the storefronts did not change. Free-text notes can no longer be added; old ones show until removed. **`Building.distanceToSea`** is in metres and is the only distance the assistant may quote.
 - **A renamed property keeps its old address.** Changing a title changes the slug; the old one goes into `Building.previousSlugs`, both slug lookups (`/api/buildings/slug/:slug`, `/api/properties/:id`) fall back to it, and propgrp.com's property page redirects to the current slug.
 - **An ad lead gets something to look at by the second reply.** When the advert names no project, the assistant sends the best one or two from the preferred list with its first answer after the name instead of asking budget, bedrooms and features first. `isInvestor` is set only when the client's own words say investing (`INVEST_WORDS`, checked in code, because the prompt rule alone was ignored). A properties list the model types out instead of calling `send_listings` is still attached (`stripToolText` returns its refs), and markdown in a reply is turned into WhatsApp text (`whatsappText`). The answer to "what is your full name?" is saved by `noteNameFromReply` on every message, not only when the assistant stays out. WhatsApp's ready-made ad greeting (`AD_GREETING`) counts as an ad even when Meta sends no referral.
+- **Lebanese, not Syrian or formal.** `LEBANESE_LATIN`/`LEBANESE_ARABIC` tell the model to stay Lebanese even when the client speaks another dialect or sends the formal ad greeting, and `languageProblem` catches what slips through in code: Syrian/Gulf Arabizi (`NOT_LEBANESE_LATIN`: "mesah'to", "bitall3", "kashfo", "teqsif", "hada") and formal Arabic script (`FORMAL_ARABIC`: "سأزودك", "يمكنك", "لدينا"). Either sends the reply through `rewriteLanguage` before it goes out. Add a word there only if it never occurs in Lebanese or English.
 - **Every word the assistant writes goes to the client.** `internalNote()` in `auto-reply.service.ts` and `stripToolText()` keep its notes off their phone. The model sometimes types a tool call as text (`update_conversation_summary(summary="…")`); only that part is cut and the reply still goes. Otherwise: text about "the client", a status or summary, or words copied from what it just recorded is not a reply. It is asked again once, then held back and the team is told. **A colleague's words win:** what the team told this client is passed in as fact over the catalogue. A project's "from" price is one unit in one finish (`priceNote` in `propertyDetails`), and furnishing goes by the finish. Accepting a chat suggestion ("Update client") sends nothing.
 - **Meta ad spend** is read (never written) by `services/meta-ads.service.ts` for the Overview's ads panel; needs `META_AD_ACCOUNT_ID`. Ad leads that reach a viewing or close are reported back by `services/meta-conversions.service.ts` (needs `META_DATASET_ID`; untested against a real dataset), once per stage, tracked in `Lead.metaStage`.
 - **Follow-up after silence** (`services/follow-up.service.ts`): past 24h since the client's last message WhatsApp accepts only Meta-approved templates, each billed. One template, named in Chat assistant settings (off by default), goes hourly in Beirut business hours to WhatsApp *clients* silent `afterDays`–`afterDays+7` days, once per silence (`Conversation.followUpSentAt`), capped per day; never to WON/LOST/ARCHIVED, chats switched off by the team, or "stop". The window bound is what stops switching it on from pinging six months of imported history — keep it. Stored with origin `AI` so the assistant, not "a team reply", picks up the answer. The inbox's "Send follow-up" button sends it by hand.
@@ -876,7 +901,9 @@ reads the terms addressed to them by name, ticks, and signs with a finger
   what was signed. **The signature is a data URL in the row, not in R2** —
   `/api/files/*` is a public proxy.
 - Agents (`AGENT`) may create and see their own; `CRM_MANAGER`+ see all and can
-  add clients; only `ADMIN`+ can void (the row is kept, marked `VOID`).
+  add clients; only `ADMIN`+ can void (the row is kept, marked `VOID`) or
+  delete (`DELETE /:id`, removed from the database; typing the `VA-` ref
+  confirms; the audit log keeps ref, client and fee, never the signature).
 
 ## Chat notifications (web push)
 

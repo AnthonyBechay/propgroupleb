@@ -531,7 +531,7 @@ class ApiClient {
     return res.blob();
   }
 
-  async listViewingAgreements(params: { search?: string; leadId?: string; page?: number; limit?: number } = {}): Promise<ApiResponse<ViewingAgreementRow[]> & { pagination?: { page: number; pages: number; total: number } }> {
+  async listViewingAgreements(params: { search?: string; leadId?: string; status?: 'SIGNED' | 'VOID'; page?: number; limit?: number } = {}): Promise<ApiResponse<ViewingAgreementRow[]> & { pagination?: { page: number; pages: number; total: number } }> {
     const q = new URLSearchParams();
     Object.entries(params).forEach(([k, v]) => { if (v !== undefined && v !== '') q.set(k, String(v)); });
     return this.request(`/api/viewing-agreements?${q.toString()}`);
@@ -547,6 +547,11 @@ class ApiClient {
 
   async voidViewingAgreement(id: string, reason: string): Promise<ApiResponse<{ id: string; status: string }>> {
     return this.request(`/api/viewing-agreements/${id}/void`, { method: 'POST', body: JSON.stringify({ reason }) });
+  }
+
+  /** Remove an agreement from the database. Admin only; cannot be undone. */
+  async deleteViewingAgreement(id: string): Promise<ApiResponse<{ id: string; ref: string; deleted: boolean }>> {
+    return this.request(`/api/viewing-agreements/${encodeURIComponent(id)}`, { method: 'DELETE' });
   }
 
 }

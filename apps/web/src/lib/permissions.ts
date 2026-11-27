@@ -71,6 +71,11 @@ export function canVoidAgreements(role: string | null | undefined): boolean {
   return role === 'ADMIN' || role === 'SUPER_ADMIN'
 }
 
+/** May this user delete an agreement outright? Same audience as void. */
+export function canDeleteAgreements(role: string | null | undefined): boolean {
+  return role === 'ADMIN' || role === 'SUPER_ADMIN'
+}
+
 /**
  * The admin routes a CRM_MANAGER may open.
  *

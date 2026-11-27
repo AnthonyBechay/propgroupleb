@@ -2,14 +2,16 @@
 
 import { use, useState } from 'react'
 import Link from 'next/link'
-import { ArrowLeft, Ban, Loader2 } from 'lucide-react'
+import { useRouter } from 'next/navigation'
+import { ArrowLeft, Ban, Loader2, Trash2 } from 'lucide-react'
 import { apiClient, type ViewingAgreement } from '@/lib/api/client'
 import { useAdminData } from '@/lib/api/use-admin-data'
 import { LoadState } from '@/components/admin/ui/LoadState'
 import { AgreementShareButtons } from '@/components/admin/AgreementShareButtons'
 import { AgreementLetterhead } from '@/components/admin/AgreementLetterhead'
 import { useAuth } from '@/contexts/AuthContext'
-import { canVoidAgreements } from '@/lib/permissions'
+import { canDeleteAgreements, canVoidAgreements } from '@/lib/permissions'
+import { DeleteAgreementDialog, StatusPill } from '@/components/admin/AgreementDialogs'
 
 /**
  * One signed agreement, laid out as the document the client signed, with the
@@ -19,6 +21,7 @@ import { canVoidAgreements } from '@/lib/permissions'
 export default function AgreementPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
   const { user } = useAuth()
+  const router = useRouter()
   const { data, error, loading, reload, setData } = useAdminData(
     async () => (await apiClient.getViewingAgreement(id)).data as ViewingAgreement,
     [id],
@@ -27,6 +30,9 @@ export default function AgreementPage({ params }: { params: Promise<{ id: string
   const [reason, setReason] = useState('')
   const [busy, setBusy] = useState(false)
   const [voidError, setVoidError] = useState<string | null>(null)
+  const [confirmDelete, setConfirmDelete] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
 
   if (loading || !data) return <LoadState error={error} onRetry={reload} />
   const a = data
@@ -46,6 +52,21 @@ export default function AgreementPage({ params }: { params: Promise<{ id: string
     }
   }
 
+  const doDelete = async () => {
+    setDeleting(true)
+    setDeleteError(null)
+    try {
+      await apiClient.deleteViewingAgreement(a.id)
+      router.replace('/admin/agreements')
+    } catch (e) {
+      setDeleteError(e instanceof Error ? e.message : 'Could not delete it')
+      setDeleting(false)
+    }
+  }
+
+  const canVoid = a.status === 'SIGNED' && canVoidAgreements(user?.role)
+  const canDelete = canDeleteAgreements(user?.role)
+
   const sections = a.termsText.split(/\n\n/).map((block) => {
     const [title, ...rest] = block.split('\n')
     return { title, body: rest.join('\n') }
@@ -59,7 +80,7 @@ export default function AgreementPage({ params }: { params: Promise<{ id: string
 
       <div className="mb-4">
         <p className="text-xs font-semibold uppercase tracking-widest text-slate-500">Viewing agreement · <span className="font-mono">{a.ref}</span></p>
-        <h1 className="mt-1 text-2xl font-semibold text-slate-900">{a.clientName}</h1>
+        <h1 className="mt-1 flex flex-wrap items-center gap-2 text-2xl font-semibold text-slate-900">{a.clientName} <StatusPill status={a.status} /></h1>
         <p className="mt-1 text-sm text-slate-600">
           Signed {new Date(a.signedAt).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}
           {a.agentName ? ` with ${a.agentName}` : ''} · fee {a.feeLabel}
@@ -143,14 +164,15 @@ export default function AgreementPage({ params }: { params: Promise<{ id: string
         </div>
       </article>
 
-      {a.status === 'SIGNED' && canVoidAgreements(user?.role) && (
-        <div className="mt-6">
-          {!voiding ? (
-            <button type="button" onClick={() => setVoiding(true)} className="inline-flex min-h-11 items-center gap-2 rounded-lg px-3 text-sm font-medium text-red-700 hover:bg-red-50">
-              <Ban className="h-4 w-4" /> Void this agreement
-            </button>
-          ) : (
-            <div className="rounded-xl border border-red-200 bg-red-50 p-4">
+      {(canVoid || canDelete) && (
+        <section className="mt-6 rounded-xl border border-slate-200 bg-white p-4">
+          <h2 className="text-sm font-semibold text-slate-900">Admin actions</h2>
+          <p className="mt-0.5 text-xs text-slate-500">
+            Void keeps the record, marked void — the usual choice once a copy was sent. Delete removes it from the database.
+          </p>
+
+          {voiding ? (
+            <div className="mt-3 rounded-xl border border-red-200 bg-red-50 p-4">
               <label htmlFor="void-reason" className="block text-sm font-medium text-red-800">Why is this agreement void?</label>
               <input id="void-reason" value={reason} onChange={(e) => setReason(e.target.value)} className="mt-2 min-h-12 w-full rounded-lg border border-red-200 bg-white px-3 text-base" placeholder="e.g. Signed with the wrong property" />
               {voidError && <p className="mt-2 text-sm text-red-700">{voidError}</p>}
@@ -162,9 +184,30 @@ export default function AgreementPage({ params }: { params: Promise<{ id: string
                 <button type="button" onClick={() => setVoiding(false)} className="min-h-11 rounded-lg px-4 text-sm font-medium text-slate-600 hover:bg-white">Cancel</button>
               </div>
             </div>
+          ) : (
+            <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+              {canVoid && (
+                <button type="button" onClick={() => setVoiding(true)} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-slate-300 px-4 text-sm font-medium text-slate-700 hover:bg-slate-50">
+                  <Ban className="h-4 w-4" /> Void
+                </button>
+              )}
+              {canDelete && (
+                <button type="button" onClick={() => { setDeleteError(null); setConfirmDelete(true) }} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-red-200 px-4 text-sm font-medium text-red-700 hover:bg-red-50">
+                  <Trash2 className="h-4 w-4" /> Delete
+                </button>
+              )}
+            </div>
           )}
-        </div>
+        </section>
       )}
+
+      <DeleteAgreementDialog
+        agreement={confirmDelete ? a : null}
+        busy={deleting}
+        error={deleteError}
+        onConfirm={doDelete}
+        onClose={() => !deleting && setConfirmDelete(false)}
+      />
     </div>
   )
 }

@@ -97,6 +97,18 @@ function toCard(building: any): CatalogueCard | null {
     null
   );
   const deal: Deal = cheapest?.intent === 'FOR_RENT' ? 'RENT' : 'SALE';
+  // The link must open for the client. "Live" here means not HIDDEN, but the
+  // public page opens only PUBLIC listings — an ELITE_ONLY one was sent as a
+  // link that 404'd. Prefer the priced listing when it is public, else the
+  // cheapest public one of the same deal type, else any public one.
+  const isPublic = (l: any) => l.visibility === 'PUBLIC';
+  const linkListing =
+    (cheapest && isPublic(cheapest) ? cheapest : null) ??
+    listings
+      .filter((l) => isPublic(l) && (l.intent === 'FOR_RENT') === (deal === 'RENT'))
+      .sort((a, b) => Number(a.price) - Number(b.price))[0] ??
+    listings.find(isPublic) ??
+    null;
   const isProject = market !== 'LEBANON' || building.kind === 'PROJECT' || (p.unitCount ?? 0) > 1;
 
   return {
@@ -119,8 +131,8 @@ function toCard(building: any): CatalogueCard | null {
     // does not exist. Abroad, the Georgia site shows projects by building slug.
     url:
       market === 'LEBANON'
-        ? cheapest?.slug
-          ? `${siteUrl(market)}/listings/${cheapest.slug}`
+        ? linkListing?.slug
+          ? `${siteUrl(market)}/listings/${linkListing.slug}`
           : `${siteUrl(market)}/listings`
         : `${siteUrl(market)}/property/${p.slug}`,
     ...readinessOf(p),

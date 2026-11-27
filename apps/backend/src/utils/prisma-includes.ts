@@ -42,6 +42,9 @@ export const BUILDING_DETAIL_INCLUDE = {
   ownerLead: {
     select: { id: true, name: true, phone: true, whatsapp: true, email: true, type: true },
   },
+  // The outside broker who brought it. Stripped from public replies by
+  // privateFieldGuard, like the owner.
+  broker: { select: { id: true, name: true, company: true, sharePct: true, takes: true } },
   agent: {
     select: {
       id: true,

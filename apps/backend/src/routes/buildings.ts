@@ -111,6 +111,8 @@ const buildingSchema = z.object({
   country: countrySchema.optional(),
   // Whose property this is, as a CRM client. Empty string clears it.
   ownerLeadId: z.string().optional().nullable(),
+  // The outside broker who brought it (a Broker id). Empty string clears it.
+  brokerId: z.string().optional().nullable(),
   mohafazat: z.string().optional().nullable(),
   caza: z.string().optional().nullable(),
   city: z.string().optional().nullable(),
@@ -389,6 +391,7 @@ router.post(
         ...buildingFields,
         // An empty select is "no owner", not a foreign key of "".
         ownerLeadId: data.ownerLeadId || null,
+        brokerId: data.brokerId || null,
         ref: await nextBuildingRef(tx),
         slug,
         images: data.images ?? [],
@@ -567,6 +570,7 @@ router.put(
     // Only touch the owner when the caller actually sent the field, so a
     // partial update from another screen can't silently unlink it.
     if ('ownerLeadId' in data) updateData.ownerLeadId = data.ownerLeadId || null;
+    if ('brokerId' in data) updateData.brokerId = data.brokerId || null;
 
     // Regenerate slug if title changed
     if (data.title && data.title !== existing.title && !data.slug) {

@@ -1,6 +1,7 @@
 import { prisma } from '@propgroup/db';
 import { syncLeadStatus } from '../routes/crm.js';
 import { logger } from '../utils/logger.js';
+import { propertyBrokerTerms } from './commission.service.js';
 import { projectsNamedIn, type Market } from './catalogue.service.js';
 
 /**
@@ -27,7 +28,9 @@ async function ensureDeals(leadId: string, buildingIds: string[], stage: Stage, 
         select: { id: true, stage: true },
       });
       if (!existing) {
-        await prisma.leadOpportunity.create({ data: { leadId, buildingId, stage, createdBy: createdBy ?? null } });
+        // The property's broker comes with the deal, so a sale later pays him.
+        const broker = await propertyBrokerTerms(buildingId);
+        await prisma.leadOpportunity.create({ data: { leadId, buildingId, stage, createdBy: createdBy ?? null, ...(broker ?? {}) } });
       } else if (existing.stage === 'SUGGESTED' && stage === 'SHARED') {
         await prisma.leadOpportunity.update({ where: { id: existing.id }, data: { stage } });
       }

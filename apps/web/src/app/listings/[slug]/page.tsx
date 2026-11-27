@@ -1,4 +1,5 @@
-import { notFound } from 'next/navigation'
+import { notFound, permanentRedirect } from 'next/navigation'
+import { resolveListingSlug } from '@/lib/resolve-listing'
 import { normalizeApiUrl, normalizeFileUrl } from '@/lib/utils/api-url'
 import type { Listing } from '@/types'
 import { ListingIntent } from '@/types'
@@ -84,6 +85,13 @@ export async function generateMetadata({ params }: PageProps) {
 export default async function ListingDetailPage({ params }: PageProps) {
   const { slug } = await params
   const listing = await fetchListing(slug)
-  if (!listing) notFound()
+  if (!listing) {
+    // A property slug, an old property slug, an id or a PG- code: send the
+    // visitor to that property's listing instead of a 404. Links like these
+    // already went out on WhatsApp.
+    const target = await resolveListingSlug(slug)
+    if (target && target !== slug) permanentRedirect(`/listings/${target}`)
+    notFound()
+  }
   return <ListingDetailView listing={listing} />
 }

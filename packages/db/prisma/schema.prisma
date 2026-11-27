@@ -504,6 +504,12 @@ model Building {
   ownerLeadId String?
   ownerLead   Lead?   @relation("BuildingOwner", fields: [ownerLeadId], references: [id], onDelete: SetNull)
 
+  // An outside broker who brought this property (instead of typing his name as
+  // the owner). Deals on it get him by default, so his cut is worked out on
+  // sale. Internal: never returned by public reads.
+  brokerId String?
+  broker   Broker? @relation("BuildingBroker", fields: [brokerId], references: [id], onDelete: SetNull)
+
   units          Unit[]
   listings       Listing[]
   documents      PropertyDocument[]
@@ -528,6 +534,7 @@ model Building {
   @@index([featured])
   @@index([slug])
   @@index([agentId])
+  @@index([brokerId])
   @@index([ownerLeadId])
   @@index([createdAt])
   @@map("buildings")
@@ -2121,6 +2128,7 @@ model Broker {
   updatedAt DateTime @updatedAt
 
   opportunities LeadOpportunity[]
+  buildings     Building[]        @relation("BuildingBroker")
 
   @@map("brokers")
 }

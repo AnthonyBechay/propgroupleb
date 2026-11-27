@@ -412,11 +412,14 @@ const LEBANESE_LATIN = `How Lebanese people text Arabic in Latin letters ("Arabi
 - Only three numbers stand for letters: 2 (ء, and ق — Lebanese pronounce qaf as a hamza: "halla2", "2addeh", "2ariib"), 3 (ع), 7 (ح). Never use 9, 6 or 8 as letters: 9 for ق or ص is Gulf and reads as foreign. Write ص s, ط t, ض d, ظ z, خ kh, غ gh, ش sh.
 - Lebanese, not Syrian, Gulf or Egyptian. Lebanese endings in "e": "7elwe", "hayde", "risele", "tenye", "mni7a". Lebanese words: "3anna" (not "3andna"), "2addeh" (how much), "shu", "halla2", "kif", "baddak", "fi", "akid", "tab3an", "ya3ne", "hek", "hon", "kamen", "ma fi mechkle".
 - Keep property and money words in English, as Lebanese do: budget, apartment, studio, project, investment, payment plan, down payment, sea view, ROI.
-- Never transliterate formal Arabic (fus7a) — no "bodayi3", "mizeytik", "khyarat". If unsure of a word, use the English one.
+- Never transliterate formal Arabic (fus7a) — no "bodayi3", "mizeytik", "khyarat", "teqsit". If unsure of a word, use the English one.
+- Stay Lebanese even when the client speaks Syrian, Palestinian, Jordanian or Gulf. Never copy their dialect: they say "hada", you say "hayda"; "ayye tabe2" is fine, but you write it your way.
+- Lebanese for property talk: "l mse7a" (size, never "mesah'to" or "mesa7to"), "mtalle 3al ba7ar" / "btotlo3 3al ba7ar" (sea view — never "kashfo" or "bitall3"), "ta2sit 3a 36 shahr" or "payment plan 36 months" (never "teqsif"/"teqsit"), "l tabe2", "l ra2em", "byebda men".
+- No apostrophes or "h'" inside words: "mse7to", not "mesah'to".
 - Sounds right: "Ahla w sahla! 2addeh l budget li 3am tfakker fi?" · "3anna projects ktir 7elwe b Batumi bi hal budget:" · "Akid, kel l souwar w l tafasil 3al link." · "Ma weslitna l risele, fik tb3atha marra tenye ka text?"
-- Sounds wrong: "Shu l budget li 3am tfakkir fi la halla9?" · "3andna khyarat ktir 7elwi" · "Hay l-bodayi3 3am tne2i l-afdal la mizeytik".`;
+- Sounds wrong: "Shu l budget li 3am tfakkir fi la halla9?" · "3andna khyarat ktir 7elwi" · "Hay l-bodayi3 3am tne2i l-afdal la mizeytik" · "L studio mesah'to 30 m² w bitall3 3al jabal, w teqsif 3a 36 months" (Syrian — Lebanese is "L studio mse7to 30 m² w mtalle 3al jabal, w l ta2sit 3a 36 shahr").`;
 
-const LEBANESE_ARABIC = `When writing in Arabic letters: Lebanese dialect the way Lebanese people type it, never formal Arabic. "أهلا وسهلا! قديش الميزانية يلي عم تفكر فيها؟" · "عنا مشاريع كتير حلوة بباتومي بهالميزانية" · "أكيد، كل الصور والتفاصيل عاللينك". Project names, reference codes and words like ROI stay in Latin letters.`;
+const LEBANESE_ARABIC = `When writing in Arabic letters: Lebanese dialect the way Lebanese people type it, never formal Arabic — even when the client wrote formal Arabic (an ad's ready-made message is formal; the person is not). No "سأزودك", "يمكنك", "هل يمكنك تزويدي", "لدينا", "هذا", "بكل سرور": write "رح أبعتلك", "فيك", "فيك تبعتلي", "عنا", "هيدا", "أكيد". "أهلا وسهلا! قديش الميزانية يلي عم تفكر فيها؟" · "عنا مشاريع كتير حلوة بباتومي بهالميزانية" · "أكيد، كل الصور والتفاصيل عاللينك". Project names, reference codes and words like ROI stay in Latin letters.`;
 
 const LANGUAGE_RULE: Record<ChatAiSettings['replyStyle'], string> = {
   match: `- Reply in the client's language and script. Arabic typed in Arabic letters gets Lebanese Arabic in Arabic letters. Arabic typed in Latin letters, or SPOKEN in a voice note, gets Lebanese Arabic in Latin letters. English gets English; French gets French. Never ask which language they prefer.
@@ -543,6 +546,15 @@ const LANGUAGE_NAME: Record<ReplyLanguage, string> = {
   english: 'English', french: 'French', latin: 'Latin letters',
 };
 
+/**
+ * Words that give the reply away as Syrian, Gulf or Egyptian rather than
+ * Lebanese — "mesah'to", "bitall3 3al jabal", "teqsif" all went to Lebanese
+ * clients. Only words that never appear in Lebanese or in English.
+ */
+const NOT_LEBANESE_LATIN = /\b(hada|hadi|hadol|hal2|shlon\w*|kashf\w*|teqsi[tf]|taqsit|mesa7to|mesah'?to|mesa7a|bitall3|btitall3|3andna|7elwi|kwayes|kwayyes|ezzay|izzay|wesh|shno|abgha)\b/i;
+/** Formal Arabic that no Lebanese types in a chat: "سأزودك بكل التفاصيل، هل يمكنك تزويدي…". */
+const FORMAL_ARABIC = /سأ[\u0621-\u064A]|سوف|يمكنك|يمكنني|بإمكانك|تزويدي|تزويدك|لديك|لدينا|لتواصلك|بكل سرور|ماذا|(?:^|[\s،.!؟])(?:هذا|هذه|نحن|الذي|التي)(?=$|[\s،.!؟])/;
+
 /** What is wrong with the reply's language, or null. Links are ignored — "goo.gl/9xQ" is not Arabizi. */
 export function languageProblem(text: string, expect: ReplyLanguage | null, names: Array<string | null | undefined> = []): string | null {
   if (!expect) return null;
@@ -553,7 +565,10 @@ export function languageProblem(text: string, expect: ReplyLanguage | null, name
       if (part.length >= 2) words = words.split(part).join(' ');
     }
   }
-  if (expect === 'arabic') return ARABIC_LETTERS.test(words) ? null : 'written in Latin letters instead of Arabic';
+  if (expect === 'arabic') {
+    if (!ARABIC_LETTERS.test(words)) return 'written in Latin letters instead of Arabic';
+    return FORMAL_ARABIC.test(words) ? 'written in formal Arabic instead of Lebanese' : null;
+  }
   if (ARABIC_LETTERS.test(words)) return 'written in Arabic letters instead of Latin';
   // In an English or French reply even one Lebanese phrase is wrong ("Ma fi mechkle, Joe…").
   if ((expect === 'english' || expect === 'french') && (looksArabizi(words) || LEBANESE_PHRASE.test(words))) {
@@ -562,6 +577,7 @@ export function languageProblem(text: string, expect: ReplyLanguage | null, name
   if (expect === 'arabizi' && !looksArabizi(words) && words.split(/\s+/).length > 6) return 'written in English instead of Lebanese';
   // "halla9", "3e9ar", "9ar2eb" — but not "9th floor".
   if ((expect === 'arabizi' || expect === 'latin') && /[a-z]9|\b9(?!th\b)[a-z]/i.test(words)) return 'used 9 as a letter';
+  if ((expect === 'arabizi' || expect === 'latin') && NOT_LEBANESE_LATIN.test(words)) return 'used Syrian or Gulf words instead of Lebanese';
   return null;
 }
 

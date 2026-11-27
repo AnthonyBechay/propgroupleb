@@ -11,6 +11,7 @@ import { normalizeApiUrl } from '@/lib/utils/api-url'
 import { toast } from '@/components/ui/use-toast'
 import { BuildingDocumentsManager } from '@/components/admin/BuildingDocumentsManager'
 import { type OwnerRef } from '@/components/admin/OwnerPicker'
+import { type BrokerRef } from '@/components/admin/BrokerPicker'
 import { InlineNote } from '@/components/admin/ui/form'
 import { PageHeader, SaveBar, SectionNav, type SectionLink } from '@/components/admin/ui/layout'
 import { useUnsavedChanges } from '@/components/admin/ui/useUnsavedChanges'
@@ -72,6 +73,11 @@ export function PropertyForm({ initialData, buildingId }: Props) {
         }
       : null,
   )
+  const [broker, setBroker] = useState<BrokerRef | null>(
+    initialData?.broker
+      ? { id: initialData.broker.id, name: initialData.broker.name, company: initialData.broker.company ?? null }
+      : null,
+  )
   // Only used while creating — afterwards the units manager owns this.
   const [firstUnit, setFirstUnit] = useState<FirstUnit>(EMPTY_FIRST_UNIT)
   const [firstListing, setFirstListing] = useState<FirstListing>(EMPTY_FIRST_LISTING)
@@ -84,7 +90,7 @@ export function PropertyForm({ initialData, buildingId }: Props) {
   const [aiLoading, setAiLoading] = useState(false)
   const [aiError, setAiError] = useState<string | null>(null)
 
-  const snapshot = () => JSON.stringify({ form, ownerId: owner?.id ?? null, firstUnit, firstListing })
+  const snapshot = () => JSON.stringify({ form, ownerId: owner?.id ?? null, brokerId: broker?.id ?? null, firstUnit, firstListing })
   const baseline = useRef(snapshot())
   const dirty = snapshot() !== baseline.current
   useUnsavedChanges(
@@ -165,6 +171,7 @@ export function PropertyForm({ initialData, buildingId }: Props) {
     const payload = {
       ...buildingPayload(form, { showBuildingSpecs }),
       ownerLeadId: owner?.id ?? null,
+      brokerId: broker?.id ?? null,
     }
 
     try {
@@ -415,7 +422,9 @@ export function PropertyForm({ initialData, buildingId }: Props) {
               </Link>
               {initialData?.slug && !hidden && (
                 <a
-                  href={`/listings/${initialData.slug}`}
+                  // A PROPERTY slug: /property/ resolves it to the listing the
+                  // public sees. Under /listings/ it was always a 404.
+                  href={`/property/${initialData.slug}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-slate-200 px-3.5 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-50"
@@ -440,6 +449,8 @@ export function PropertyForm({ initialData, buildingId }: Props) {
             set={set}
             owner={owner}
             onOwnerChange={(o) => { setOwner(o); setSaved(false) }}
+            broker={broker}
+            onBrokerChange={(b) => { setBroker(b); setSaved(false) }}
             unitCount={units.length}
             errors={fieldErrors}
             disabled={saving}
