@@ -23,6 +23,7 @@ import authRoutes from './routes/auth.js';
 import propertyRoutes from './routes/properties.js';
 import buildingRoutes from './routes/buildings.js';
 import unitRoutes from './routes/units.js';
+import { touchListingsAfterEdit } from './middleware/touch-listings.js';
 import listingRoutes from './routes/listings.js';
 import fxRateRoutes from './routes/fx-rates.js';
 import userRoutes from './routes/users.js';
@@ -361,8 +362,8 @@ app.get('/health', (_req, res) => {
 
 // API routes — core
 app.use('/api/auth', authRoutes);
-app.use('/api/buildings', privateFieldGuard, buildingRoutes);
-app.use('/api/units', privateFieldGuard, unitRoutes);
+app.use('/api/buildings', privateFieldGuard, touchListingsAfterEdit('building'), buildingRoutes);
+app.use('/api/units', privateFieldGuard, touchListingsAfterEdit('unit'), unitRoutes);
 app.use('/api/listings', privateFieldGuard, listingRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/favorites', privateFieldGuard, favoriteRoutes);

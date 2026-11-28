@@ -267,7 +267,9 @@ router.get(
 
     // Sort
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    let orderBy: Record<string, any>[] = [{ createdAt: 'desc' }];
+    // Default: last modified first (a property edit touches its listings, see
+    // middleware/touch-listings.ts), then newest.
+    let orderBy: Record<string, any>[] = [{ updatedAt: 'desc' }, { createdAt: 'desc' }];
     if (q.sortBy === 'price' || q.sortBy === 'createdAt' || q.sortBy === 'views') {
       const order = q.sortOrder === 'asc' ? 'asc' : 'desc';
       orderBy = [{ [q.sortBy]: order }];
@@ -442,6 +444,20 @@ router.get(
       select: { slug: true },
     });
     if (direct) { sendSuccess(res, { slug: direct.slug }); return; }
+
+    // A listing that is no longer public (archived, re-priced as a new listing,
+    // made elite-only): send the link to its property's current public listing
+    // rather than a 404. The property's own hidden flag is still respected below.
+    const stale = await prisma.listing.findFirst({
+      where: { OR: [{ slug: key }, { previousSlugs: { has: key } }] },
+      select: { buildingId: true, unit: { select: { buildingId: true } } },
+    });
+    const staleBuildingId = stale?.buildingId ?? stale?.unit?.buildingId ?? null;
+    if (staleBuildingId) {
+      const visible = await prisma.building.findFirst({ where: { id: staleBuildingId, visibility: { not: 'HIDDEN' } }, select: { id: true } });
+      const slug = visible ? await publicListingSlugForBuilding(visible.id) : null;
+      if (slug) { sendSuccess(res, { slug }); return; }
+    }
 
     const ref = looksLikeRef(key) ? buildingRefOf(normalizeRef(key)) : null;
     const building = await prisma.building.findFirst({

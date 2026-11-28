@@ -250,7 +250,7 @@ export async function normaliseCrmData(): Promise<void> {
   await once('listing_readable_slugs_v1', async () => {
     const rows = await prisma.listing.findMany({
       where: { slug: { startsWith: 'listing-' } },
-      select: { id: true, slug: true, headline: true, buildingId: true, unitId: true },
+      select: { id: true, slug: true, headline: true, buildingId: true, unitId: true, updatedAt: true },
     });
     let renamed = 0;
     for (const l of rows) {
@@ -259,7 +259,8 @@ export async function normaliseCrmData(): Promise<void> {
         ? l.headline
         : await listingSlugSource(l.buildingId, l.unitId);
       const slug = await generateListingSlug(source);
-      await prisma.listing.update({ where: { id: l.id }, data: { slug, previousSlugs: { push: l.slug } } });
+      await prisma.listing.update({ where: { id: l.id }, data: { slug, previousSlugs: { push: l.slug }, updatedAt: l.updatedAt } });
+      // ^ keep updatedAt: a rename is not an edit, and the site sorts by it.
       renamed += 1;
     }
     return `${renamed} listings renamed, old addresses kept as redirects`;

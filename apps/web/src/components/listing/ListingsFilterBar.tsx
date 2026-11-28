@@ -43,7 +43,7 @@ interface FilterState {
   maxPrice: string
   minArea: string
   maxArea: string
-  sort: string // "" = newest, else "price:asc" | "price:desc"
+  sort: string // "" = recently updated, else "price:asc" | "price:desc"
 }
 
 const EMPTY: FilterState = {
@@ -287,7 +287,7 @@ export function ListingsFilterBar() {
         <div>
           <label className={fieldLbl}>Sort by</label>
           <select value={filters.sort} onChange={(e) => set({ sort: e.target.value })} className={selCls}>
-            <option value="">Newest</option>
+            <option value="">Recently updated</option>
             <option value="price:asc">Price: Low → High</option>
             <option value="price:desc">Price: High → Low</option>
           </select>
