@@ -1,6 +1,7 @@
 import { prisma } from '@propgroup/db';
 import { logger } from './logger.js';
 import { team } from '../services/assignment.service.js';
+import { generateListingSlug, listingSlugSource, TIMESTAMP_SLUG } from './listing-slug.js';
 
 /**
  * One-time CRM data normalisations.
@@ -242,6 +243,28 @@ export async function normaliseCrmData(): Promise<void> {
     }
     return `${won.length} closed deals marked as paid on their closing date`;
   });
+  // Listings created without a headline were named `listing-<timestamp>-xxxx`,
+  // which is what clients got on WhatsApp. Name each after its property and
+  // unit instead, keeping the old address in previousSlugs so every link
+  // already sent still opens (the site redirects it to the new one).
+  await once('listing_readable_slugs_v1', async () => {
+    const rows = await prisma.listing.findMany({
+      where: { slug: { startsWith: 'listing-' } },
+      select: { id: true, slug: true, headline: true, buildingId: true, unitId: true },
+    });
+    let renamed = 0;
+    for (const l of rows) {
+      if (!TIMESTAMP_SLUG.test(l.slug)) continue;
+      const source = l.headline && l.headline.replace(/[^a-z0-9]/gi, '')
+        ? l.headline
+        : await listingSlugSource(l.buildingId, l.unitId);
+      const slug = await generateListingSlug(source);
+      await prisma.listing.update({ where: { id: l.id }, data: { slug, previousSlugs: { push: l.slug } } });
+      renamed += 1;
+    }
+    return `${renamed} listings renamed, old addresses kept as redirects`;
+  });
+
   // Clients had no owner before "assigned to" existed. Give each one to the
   // person who added them, or failing that whoever last logged a call or note
   // on them — so the board does not open with every card saying "Nobody".

@@ -744,6 +744,9 @@ model Listing {
 
   // Marketing
   slug        String   @unique
+  // Addresses this listing answered to before a rename. Links already sent to
+  // clients keep opening: /resolve redirects them to the current slug.
+  previousSlugs String[] @default([])
   headline    String?
   description String?
   highlights  String[]

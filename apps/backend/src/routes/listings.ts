@@ -12,6 +12,7 @@ import type { AuthenticatedRequest } from '../types/index.js';
 import { logger } from '../utils/logger.js';
 import { normalizeRef, looksLikeRef, buildingRefOf, isUnitRef } from '../utils/reference.js';
 import { publicCountryFilter } from '../utils/market.js';
+import { generateListingSlug, listingSlugSource } from '../utils/listing-slug.js';
 import {
   syncUnitLifecycleFromListing,
   TERMINAL_LIFECYCLES,
@@ -30,28 +31,6 @@ const PROPERTY_NOT_HIDDEN = {
     { buildingId: null, unit: { building: { visibility: { not: 'HIDDEN' as const } } } },
   ],
 };
-
-// ── Slug helper ───────────────────────────────────────────────────────────────
-
-async function generateListingSlug(
-  base: string,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  tx?: any
-): Promise<string> {
-  const slugBase = base
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-    .substring(0, 60);
-  const db = tx || prisma;
-  // Append 4-char random suffix to keep slugs unique without collisions
-  const suffix = Math.random().toString(36).substring(2, 6);
-  const candidate = `${slugBase}-${suffix}`;
-  const exists = await db.listing.findFirst({ where: { slug: candidate }, select: { id: true } });
-  if (!exists) return candidate;
-  // Extremely unlikely collision — retry with a new suffix
-  return generateListingSlug(base, tx);
-}
 
 // ── Inline update schema (partial of listingSchema) ───────────────────────────
 
@@ -457,7 +436,11 @@ router.get(
     const key = String(req.params.key || '').trim();
     if (!key || key.length > 200) { sendNotFound(res, 'Listing'); return; }
 
-    const direct = await prisma.listing.findFirst({ where: { slug: key, ...PUBLIC_LISTING }, select: { slug: true } });
+    // A listing's own address, or one it had before it was renamed.
+    const direct = await prisma.listing.findFirst({
+      where: { AND: [PUBLIC_LISTING, { OR: [{ slug: key }, { previousSlugs: { has: key } }] }] },
+      select: { slug: true },
+    });
     if (direct) { sendSuccess(res, { slug: direct.slug }); return; }
 
     const ref = looksLikeRef(key) ? buildingRefOf(normalizeRef(key)) : null;
@@ -571,14 +554,7 @@ router.post(
       // No headline → name it after what it sells ("verdun-residences-2br-4b"),
       // never `listing-<timestamp>`: this address goes to clients on WhatsApp.
       let slugSource = resolvedData.slug || resolvedData.headline || '';
-      if (!slugSource && targetBuildingId) {
-        const b = await tx.building.findUnique({ where: { id: targetBuildingId }, select: { title: true } });
-        const u = data.unitId
-          ? await tx.unit.findUnique({ where: { id: data.unitId }, select: { name: true, unitNumber: true } })
-          : null;
-        slugSource = [b?.title, u?.name, u?.unitNumber].filter(Boolean).join(' ');
-      }
-      if (!slugSource.replace(/[^a-z0-9]/gi, '')) slugSource = 'property';
+      if (!slugSource.replace(/[^a-z0-9]/gi, '')) slugSource = await listingSlugSource(targetBuildingId, data.unitId, tx);
       const slug = resolvedData.slug || (await generateListingSlug(slugSource, tx));
       return tx.listing.create({
         data: {

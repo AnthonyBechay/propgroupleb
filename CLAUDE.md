@@ -321,7 +321,11 @@ which is what "View on site" did. So:
   the public page 404s. `toCard` in `catalogue.service.ts` picks its link from
   the public ones.
 - A listing with no headline is slugged from its property (and unit), never
-  `listing-<timestamp>`. Slugs never change after creation, so links keep working.
+  `listing-<timestamp>` (`utils/listing-slug.ts`, the one slug generator).
+- Renaming a listing pushes the old slug onto `Listing.previousSlugs`; the
+  resolver matches it and the page redirects. The old `listing-<timestamp>` rows
+  were renamed once on boot (`listing_readable_slugs_v1` in `crm-bootstrap.ts`).
+  Never rename a slug without keeping the old one: it is already on WhatsApp.
 
 ### Preview
 

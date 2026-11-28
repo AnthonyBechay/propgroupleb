@@ -4,6 +4,7 @@ import { z } from 'zod';
 import multer from 'multer';
 import rateLimit from 'express-rate-limit';
 import { prisma } from '@propgroup/db';
+import { generateListingSlug } from '../utils/listing-slug.js';
 import { authenticateToken, requireAdmin, logAdminAction } from '../middleware/auth.js';
 import { asyncHandler } from '../utils/errors.js';
 import { sendSuccess, sendCreated, sendPaginated, sendNotFound, sendError } from '../utils/response.js';
@@ -316,7 +317,6 @@ router.post(
           lifecycle: submission.intent === 'FOR_RENT' ? 'FOR_RENT' : 'FOR_SALE',
         },
       });
-      const listingSlugBase = submission.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').substring(0, 60) || 'listing';
       const listing = await tx.listing.create({
         data: {
           subjectType: 'UNIT',
@@ -329,7 +329,7 @@ router.post(
           status: 'ACTIVE',
           visibility: 'PUBLIC',
           highlights: [],
-          slug: `${listingSlugBase}-${Math.random().toString(36).slice(2, 6)}`,
+          slug: await generateListingSlug(submission.title || 'property', tx),
           publishedAt: new Date(),
         },
       });
